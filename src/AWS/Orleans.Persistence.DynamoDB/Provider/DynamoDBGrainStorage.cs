@@ -107,7 +107,7 @@ namespace Orleans.Storage
             catch (Exception exc)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", exc);
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, exc, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 throw;
             }
         }
@@ -122,7 +122,7 @@ namespace Orleans.Storage
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainReference);
-            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.StorageProviderBase,
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)ErrorCode.StorageProviderBase,
                 "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}",
                 grainType, partitionKey, grainReference, this.options.TableName);
 
@@ -179,9 +179,8 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase,
-                    string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError((int)ErrorCode.StorageProviderBase, exc, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
+                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message));
                 throw;
             }
         }
@@ -260,7 +259,7 @@ namespace Orleans.Storage
             string partitionKey = GetKeyString(grainReference);
             if (this.logger.IsEnabled(LogLevel.Trace))
             {
-                this.logger.Trace(ErrorCode.StorageProviderBase,
+                this.logger.LogTrace((int)ErrorCode.StorageProviderBase,
                     "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}",
                     grainType, partitionKey, grainReference, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
             }
@@ -287,8 +286,8 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError((int)ErrorCode.StorageProviderBase, exc, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
+                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message));
                 throw;
             }
         }
@@ -344,7 +343,7 @@ namespace Orleans.Storage
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
-                this.logger.Error(0, sb.ToString(), exc);
+                this.logger.LogError(0, exc, sb.ToString());
                 throw new AggregateException(sb.ToString(), exc);
             }
 
@@ -360,7 +359,7 @@ namespace Orleans.Storage
                 entity.StringState = JsonConvert.SerializeObject(grainState, this.jsonSettings);
                 dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
             else
@@ -369,7 +368,7 @@ namespace Orleans.Storage
                 entity.BinaryState = this.serializationManager.SerializeToByteArray(grainState);
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
 

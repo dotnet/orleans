@@ -191,7 +191,7 @@ namespace Orleans.Runtime
                             // If the activation is already in Deactivating or Invalid state, its already being collected or was collected 
                             // (both mean a bug, this activation should not be in the collector)
                             // So in any state except for Valid we should just not collect and not reschedule.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_1,
+                            logger.LogWarning((int)ErrorCode.Catalog_ActivationCollector_BadState_1,
                                 "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {0}",
                                 activation.ToDetailedString());
                         }
@@ -203,7 +203,7 @@ namespace Orleans.Runtime
                         else if (!activation.IsInactive)
                         {
                             // This is essentialy a bug, an active activation should not be in the last bucket.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_2,
+                            logger.LogWarning((int)ErrorCode.Catalog_ActivationCollector_BadState_2,
                                 "ActivationCollector found an active activation in it's last bucket. This is violation of ActivationCollector invariants. " +
                                 "For now going to defer it's collection. Activation: {0}",
                                 activation.ToDetailedString());
@@ -212,7 +212,7 @@ namespace Orleans.Runtime
                         else if (!activation.IsStale(now))
                         {
                             // This is essentialy a bug, a non stale activation should not be in the last bucket.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
+                            logger.LogWarning((int)ErrorCode.Catalog_ActivationCollector_BadState_3,
                                 "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
                                 "For now going to defer it's collection. Activation: {1}",
                                 LogFormatter.PrintDate(now),

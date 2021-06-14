@@ -276,42 +276,42 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.LogInformation((int)ErrorCode.MembershipJoining, "-Joining");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToJoin, "Error updating status to Joining", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToJoin, exc, "Error updating status to Joining");
                 throw;
             }
         }
 
         private async Task BecomeShuttingDown()
         {
-            this.log.Info(ErrorCode.MembershipShutDown, "-Shutdown");
+            this.log.LogInformation((int)ErrorCode.MembershipShutDown, "-Shutdown");
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error updating status to ShuttingDown", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToShutdown, exc, "Error updating status to ShuttingDown");
                 throw;
             }
         }
 
         private async Task BecomeStopping()
         {
-            log.Info(ErrorCode.MembershipStop, "-Stop");
+            log.LogInformation((int)ErrorCode.MembershipStop, "-Stop");
             try
             {
                 await this.UpdateStatus(SiloStatus.Stopping);
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.MembershipFailedToStop, "Error updating status to Stopping", exc);
+                log.LogError((int)ErrorCode.MembershipFailedToStop, exc, "Error updating status to Stopping");
                 throw;
             }
         }

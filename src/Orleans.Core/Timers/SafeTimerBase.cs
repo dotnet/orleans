@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
             this.logger = logger;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = NonCapturingTimer.Create(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
@@ -101,14 +101,14 @@ namespace Orleans.Runtime
                 {
                     var t = timer;
                     timer = null;
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
                     t.Dispose();
 
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.TimerDisposeError,
-                        string.Format("Ignored error disposing timer {0}", GetFullName()), exc);
+                    logger.LogWarning((int)ErrorCode.TimerDisposeError, exc,
+                        "Ignored error disposing timer {0}", GetFullName());
                 }
             }
         }
@@ -156,10 +156,10 @@ namespace Orleans.Runtime
 
             if(freezeCheck)
             {
-                logger.Error(errorCode, errMsg);
+                logger.LogError((int)errorCode, errMsg);
             }else
             {
-                logger.Warn(errorCode, errMsg);
+                logger.LogWarning((int)errorCode, errMsg);
             }
             return false;
         }
@@ -179,7 +179,7 @@ namespace Orleans.Runtime
 
             timerFrequency = period;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
 
             try
             {
@@ -188,8 +188,8 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerChangeError,
-                    string.Format("Error changing timer period - timer {0} not changed", GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerChangeError, exc,
+                    "Error changing timer period - timer {0} not changed", GetFullName());
                 return false;
             }
         }
@@ -213,13 +213,13 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
                 syncCallbackFunc(state);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerCallbackError, string.Format("Ignored exception {0} during sync timer callback {1}", exc.Message, GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerCallbackError, exc, "Ignored exception {0} during sync timer callback {1}", exc.Message, GetFullName());
             }
             finally
             {
@@ -244,13 +244,13 @@ namespace Orleans.Runtime
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
                 await asyncTaskCallback(state);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerCallbackError, string.Format("Ignored exception {0} during async task timer callback {1}", exc.Message, GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerCallbackError, exc, "Ignored exception {0} during async task timer callback {1}", exc.Message, GetFullName());
             }
             finally
             {
@@ -269,31 +269,30 @@ namespace Orleans.Runtime
 
                 totalNumTicks++;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
 
                 if (timerFrequency == Constants.INFINITE_TIMESPAN)
                 {
                     //timer.Change(Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
                     DisposeTimer();
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
                 }
                 else
                 {
                     timer.Change(timerFrequency, Constants.INFINITE_TIMESPAN);
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
                 }
             }
             catch (ObjectDisposedException ode)
             {
-                logger.Warn(ErrorCode.TimerDisposeError,
-                    string.Format("Timer {0} already disposed - will not queue next timer tick", GetFullName()), ode);
+                logger.LogWarning((int)ErrorCode.TimerDisposeError, ode,
+                    "Timer {0} already disposed - will not queue next timer tick", GetFullName());
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.TimerQueueTickError,
-                    string.Format("Error queueing next timer tick - WARNING: timer {0} is now stopped", GetFullName()), exc);
+                logger.LogError((int)ErrorCode.TimerQueueTickError, exc, "Error queueing next timer tick - WARNING: timer {0} is now stopped", GetFullName());
             }
         }
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -268,7 +269,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
             catch(InvalidOperationException exc)
             {
-                this.Logger.Info("Thrown as expected:", exc);
+                this.Logger.LogInformation(exc, "Thrown as expected");
                 Assert.True(
                     exc.Message.Contains("DeactivateOnIdle from within OnActivateAsync"),
                     "Did not get expected exception message returned: " + exc.Message);

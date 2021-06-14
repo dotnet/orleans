@@ -264,7 +264,7 @@ namespace Orleans.Serialization
                         }
                     }
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Registered type {0} as {1}", t, name);
                 }
             }
 
@@ -305,7 +305,7 @@ namespace Orleans.Serialization
                 registeredTypes.Add(t);
                 types[name] = t;
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Registered type {0} as {1}", t, name);
 
             // Register any interfaces this type implements, in order to support passing values that are statically of the interface type
             // but dynamically of this (implementation) type
@@ -338,8 +338,8 @@ namespace Orleans.Serialization
             if (serializer == null && deserializer == null && copier == null)
             {
                 var msg = $"No serialization methods found on type {serializerType.GetParseableName(TypeFormattingOptions.LogFormat)}.";
-                logger.Warn(
-                    ErrorCode.SerMgr_SerializationMethodsMissing,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_SerializationMethodsMissing,
                     msg);
                 throw new ArgumentException(msg);
             }
@@ -350,8 +350,8 @@ namespace Orleans.Serialization
                     $"Inconsistency between serializer and deserializer methods on type {serializerType.GetParseableName(TypeFormattingOptions.LogFormat)}."
                     + " Either both must be specified or both must be null. "
                     + $"Instead, serializer = {serializer?.ToString() ?? "null"} and deserializer = {deserializer?.ToString() ?? "null"}";
-                logger.Warn(
-                    ErrorCode.SerMgr_SerializationMethodsMissing,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_SerializationMethodsMissing,
                     msg);
                 throw new ArgumentException(msg);
             }
@@ -398,15 +398,15 @@ namespace Orleans.Serialization
             }
             catch (ArgumentException)
             {
-                logger.Warn(
-                    ErrorCode.SerMgr_ErrorBindingMethods,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_ErrorBindingMethods,
                     "Error binding serialization methods for type {0}",
                     type.GetParseableName());
                 throw;
             }
 
             if (this.logger.IsEnabled(LogLevel.Trace))
-                this.logger.Trace(
+                this.logger.LogTrace(
                     "Loaded serialization info for type {0} from assembly {1}",
                     type.Name,
                     serializerType.Assembly.GetName().Name);
@@ -634,7 +634,7 @@ namespace Orleans.Serialization
                     var source = (byte[])original;
                     if (source.Length > this.LargeObjectSizeThreshold)
                     {
-                        logger.Info(ErrorCode.Ser_LargeObjectAllocated,
+                        logger.LogInformation((int)ErrorCode.Ser_LargeObjectAllocated,
                             "Large byte array of size {0} is being copied. This will result in an allocation on the large object heap. " +
                             "Frequent allocations to the large object heap can result in frequent gen2 garbage collections and poor system performance. " +
                             "Please consider using Immutable<byte[]> instead.", source.Length);
@@ -650,7 +650,7 @@ namespace Orleans.Serialization
                     // Only check the size for primitive types because otherwise Buffer.ByteLength throws
                     if (et.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
                     {
-                        logger.Info(ErrorCode.Ser_LargeObjectAllocated,
+                        logger.LogInformation((int)ErrorCode.Ser_LargeObjectAllocated,
                             $"Large {t.OrleansTypeName()} array of total byte size {Buffer.ByteLength(originalArray)} is being copied. This will result in an allocation on the large object heap. " +
                             "Frequent allocations to the large object heap can result in frequent gen2 garbage collections and poor system performance. " +
                             $"Please consider using Immutable<{t.OrleansTypeName()}> instead.");
@@ -1732,7 +1732,7 @@ namespace Orleans.Serialization
                     }
                     catch (Exception exception)
                     {
-                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
+                        logger.LogError((int)ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, exception, "Failed to create instance of type: " + type.FullName);
                     }
                 });
 

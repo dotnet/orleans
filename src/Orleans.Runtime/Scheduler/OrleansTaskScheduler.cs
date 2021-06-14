@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Scheduler
         public void StopApplicationTurns()
         {
 #if DEBUG
-            logger.Debug("StopApplicationTurns");
+            logger.LogDebug("StopApplicationTurns");
 #endif
             // Do not RunDown the application run queue, since it is still used by low priority system targets.
 
@@ -147,14 +147,14 @@ namespace Orleans.Runtime.Scheduler
         public void QueueWorkItem(IWorkItem workItem)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + workItem);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("QueueWorkItem " + workItem);
 #endif
             var workItemGroup = GetWorkItemGroup(workItem.GrainContext);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
                 var msg = $"Dropping work item {workItem} because application turns are stopped";
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
+                logger.LogWarning((int)ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
 
@@ -254,7 +254,7 @@ namespace Orleans.Runtime.Scheduler
         private void ThrowNoWorkItemGroup(IGrainContext context)
         {
             var error = $"QueueWorkItem was called on a non-null context {context} but there is no valid WorkItemGroup for it.";
-            logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
+            logger.LogError((int)ErrorCode.SchedulerQueueWorkItemWrongContext, error);
             throw new InvalidSchedulingContextException(error);
         }
 
@@ -282,7 +282,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 var stats = Utils.EnumerableToString(all.Select(i => i.Value).OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
-                    logger.Info(ErrorCode.SchedulerStatistics,
+                    logger.LogInformation((int)ErrorCode.SchedulerStatistics,
                         "OrleansTaskScheduler.PrintStatistics(): WorkItems={0}, Directory:" + Environment.NewLine + "{1}", all.Count, stats);
             }
 
@@ -301,7 +301,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (var workgroup in all)
                 sb.AppendLine(workgroup.Value.DumpStatus());
             
-            logger.Info(ErrorCode.SchedulerStatus, sb.ToString());
+            logger.LogInformation((int)ErrorCode.SchedulerStatus, sb.ToString());
         }
     }
 }

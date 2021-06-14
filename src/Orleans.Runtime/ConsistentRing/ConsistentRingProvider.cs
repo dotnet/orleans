@@ -97,14 +97,13 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                     catch (OverflowException exc)
                     {
-                        log.Error(ErrorCode.ConsistentRingProviderBase + 5,
-                            String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
-                            hash, (uint)hash, myKey, (uint)myKey), exc);
+                        log.LogError((int)ErrorCode.ConsistentRingProviderBase + 5, exc, String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
+                            hash, (uint)hash, myKey, (uint)myKey));
                     }
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.Info("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                log.LogInformation("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
             }
         }
 
@@ -146,7 +145,7 @@ namespace Orleans.Runtime.ConsistentRing
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
@@ -163,7 +162,7 @@ namespace Orleans.Runtime.ConsistentRing
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                 }
-                log.Info("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
+                log.LogInformation("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
             }
         }
 
@@ -188,7 +187,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            log.Info("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
+            log.LogInformation("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
@@ -202,9 +201,8 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    log.Error(ErrorCode.CRP_Local_Subscriber_Exception,
-                        String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
-                        listener.GetType().FullName, old, now, increased), exc);
+                    log.LogError((int)ErrorCode.CRP_Local_Subscriber_Exception, exc, String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
+                        listener.GetType().FullName, old, now, increased));
                 }
             }
         }
@@ -283,7 +281,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
             return siloAddress;
         }
 

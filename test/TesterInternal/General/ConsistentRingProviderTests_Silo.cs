@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -104,7 +105,7 @@ namespace UnitTests.General
                 VerificationScenario(PickKey(fail.SiloAddress)); // fail.SiloAddress.GetConsistentHashCode());
             }
 
-            logger.Info("FailureTest {0}, Code {1}, Stopping silos: {2}", numOfFailures, failCode, Utils.EnumerableToString(failures, handle => handle.SiloAddress.ToString()));
+            logger.LogInformation("FailureTest {0}, Code {1}, Stopping silos: {2}", numOfFailures, failCode, Utils.EnumerableToString(failures, handle => handle.SiloAddress.ToString()));
             List<uint> keysToTest = new List<uint>();
             foreach (SiloHandle fail in failures) // verify before failure
             {
@@ -136,7 +137,7 @@ namespace UnitTests.General
 
         private async Task JoinTest(int numOfJoins)
         {
-            logger.Info("JoinTest {0}", numOfJoins);
+            logger.LogInformation("JoinTest {0}", numOfJoins);
             await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos - numOfJoins);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -159,7 +160,7 @@ namespace UnitTests.General
             List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
-            logger.Info("Killing silo {0} and joining a silo", failures[0].SiloAddress);
+            logger.LogInformation("Killing silo {0} and joining a silo", failures[0].SiloAddress);
             
             var tasks = new Task[2]
             {
@@ -189,7 +190,7 @@ namespace UnitTests.General
             List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
-            logger.Info("Killing secondary silo {0} and joining a silo", fail.SiloAddress);
+            logger.LogInformation("Killing secondary silo {0} and joining a silo", fail.SiloAddress);
             var tasks = new Task[2]
             {
                 Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(fail)),
@@ -356,10 +357,10 @@ namespace UnitTests.General
             {
                 ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle.SiloAddress);
             }
-            logger.Info("{0} list of silos: ", msg);
+            logger.LogInformation("{0} list of silos: ", msg);
             foreach (var id in ids.Keys.ToList())
             {
-                logger.Info("{0} -> {1}", ids[id], id);
+                logger.LogInformation("{0} -> {1}", ids[id], id);
             }
         }
 

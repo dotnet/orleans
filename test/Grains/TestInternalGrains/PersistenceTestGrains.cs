@@ -181,7 +181,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
+                this.logger.LogWarning(0, exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
         }
@@ -197,7 +197,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
+                this.logger.LogWarning(0, exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -268,13 +268,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            this.logger.Warn(1, "OnActivateAsync");
+            this.logger.LogWarning(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.logger.Warn(1, "DoSomething");
+            this.logger.LogWarning(1, "DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
@@ -292,13 +292,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            this.logger.Info(1, "OnActivateAsync");
+            this.logger.LogInformation(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.logger.Info(1, "DoSomething");
+            this.logger.LogInformation(1, "DoSomething");
             return Task.CompletedTask;
         }
     }
@@ -710,14 +710,14 @@ namespace UnitTests.Grains
 
         public Task Setup(IReentrentGrainWithState other)
         {
-            logger.Info("Setup");
+            logger.LogInformation("Setup");
             _other = other;
             return Task.CompletedTask;
         }
 
         public async Task SetOne(int val)
         {
-            logger.Info("SetOne Start");
+            logger.LogInformation("SetOne Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.One = val;
@@ -730,7 +730,7 @@ namespace UnitTests.Grains
 
         public async Task SetTwo(int val)
         {
-            logger.Info("SetTwo Start");
+            logger.LogInformation("SetTwo Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.Two = val;
@@ -743,7 +743,7 @@ namespace UnitTests.Grains
 
         public async Task Test1()
         {
-            logger.Info(" ==================================== Test1 Started");
+            logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
             for (var i = 1*Multiple; i < 2*Multiple; i++)
             {
@@ -764,12 +764,12 @@ namespace UnitTests.Grains
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
-            logger.Info(" ==================================== Test1 Done");
+            logger.LogInformation(" ==================================== Test1 Done");
         }
 
         public async Task Test2()
         {
-            logger.Info("==================================== Test2 Started");
+            logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
             for (var i = 2*Multiple; i < 3*Multiple; i++)
             {
@@ -790,18 +790,18 @@ namespace UnitTests.Grains
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
-            logger.Info(" ==================================== Test2 Done");
+            logger.LogInformation(" ==================================== Test2 Done");
         }
 
         public async Task Task_Delay(bool doStart)
         {
             var wrapper = new Task(async () =>
             {
-                logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(1);
-                logger.Info("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(2);
-                logger.Info("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
             });
 
             if (doStart)
@@ -814,9 +814,9 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.Info("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.Info("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
         }
 
         private void CheckRuntimeEnvironment()
@@ -826,7 +826,7 @@ namespace UnitTests.Grains
                 var errorMsg = "Found out that this grain is already in the middle of execution."
                                + " Single threaded-ness violation!\n" +
                                TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -834,7 +834,7 @@ namespace UnitTests.Grains
             if (RuntimeContext.CurrentGrainContext == null)
             {
                 var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -955,11 +955,11 @@ namespace UnitTests.Grains
         {
             var wrapper = new Task(async () =>
             {
-                logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(1);
-                logger.Info("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(2);
-                logger.Info("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
             });
 
             if (doStart)
@@ -972,9 +972,9 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.Info("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.Info("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
         }
 
         private void CheckRuntimeEnvironment(string str)
@@ -990,7 +990,7 @@ namespace UnitTests.Grains
                     this._id,
                     TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
                     callStack);
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 this.scheduler.DumpSchedulerStatus();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
@@ -1007,7 +1007,7 @@ namespace UnitTests.Grains
         private void Log(string fmt, params object[] args)
         {
             var msg = fmt; // +base.CaptureRuntimeEnvironment();
-            logger.Info(msg, args);
+            logger.LogInformation(msg, args);
         }
     }
 
@@ -1029,7 +1029,7 @@ namespace UnitTests.Grains
 
         public Task SetOne(int val)
         {
-            logger.Info("SetOne");
+            logger.LogInformation("SetOne");
             State.One = val;
             return Task.CompletedTask;
         }
@@ -1060,21 +1060,21 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync();
         }
 
         public Task<int> GetValue()
         {
             var val = State.Field1;
-            logger.Info("GetValue {0}", val);
+            logger.LogInformation("GetValue {0}", val);
             return Task.FromResult(val);
         }
 
         public Task SetValue(int val)
         {
             State.Field1 = val;
-            logger.Info("SetValue {0}", val);
+            logger.LogInformation("SetValue {0}", val);
             return WriteStateAsync();
         }
     }

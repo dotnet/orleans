@@ -29,14 +29,14 @@ namespace Orleans.Runtime
 
         internal void IncrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Increment Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Increment Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
 
         internal void DecrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Decrement Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.DecrementBy(1);
         }
@@ -148,7 +148,7 @@ namespace Orleans.Runtime
                 string stats = Utils.EnumerableToString(all.Select(i => i.Value).OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
                 {
-                    logger.Info(ErrorCode.Catalog_ActivationDirectory_Statistics, $"ActivationDirectory.PrintActivationDirectory(): Size = { all.Count}, Directory:{Environment.NewLine}{stats}");
+                    logger.LogInformation((int)ErrorCode.Catalog_ActivationDirectory_Statistics, $"ActivationDirectory.PrintActivationDirectory(): Size = { all.Count}, Directory:{Environment.NewLine}{stats}");
                 }
             }
         }

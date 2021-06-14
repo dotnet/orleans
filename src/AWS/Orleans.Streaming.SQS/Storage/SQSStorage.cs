@@ -236,7 +236,7 @@ namespace OrleansAWSUtils.Storage
             var errMsg = String.Format(
                 "Error doing {0} for SQS queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
-            Logger.Error(errorCode, errMsg, exc);
+            Logger.LogError((int)errorCode, exc, errMsg);
             throw new AggregateException(errMsg, exc);
         }
     }

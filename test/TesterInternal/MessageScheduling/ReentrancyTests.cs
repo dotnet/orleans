@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans;
 using Orleans.Runtime;
@@ -66,7 +67,7 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            this.fixture.Logger.Info("Reentrancy ReentrantGrain Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
         
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -82,7 +83,7 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -98,7 +99,7 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -118,7 +119,7 @@ namespace UnitTests
                 Assert.True(ex.GetBaseException().InnerException?.Message == "boom",
                     "Should fail with Orleans runtime exception having all of necessary details");
             }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
         
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -134,7 +135,7 @@ namespace UnitTests
             done.Add(grain2.Ping(15));
 
             Task.WhenAll(done).Wait();
-            this.fixture.Logger.Info("ReentrancyTest_Deadlock_1 OK - no deadlock.");
+            this.fixture.Logger.LogInformation("ReentrancyTest_Deadlock_1 OK - no deadlock.");
         }
 
         // TODO: [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -148,13 +149,13 @@ namespace UnitTests
             var grain2 = this.fixture.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(2);
             grain2.SetDestination(1).Wait();
 
-            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 is about to call grain1.Ping()");
+            this.fixture.Logger.LogInformation("ReentrancyTest_Deadlock_2 is about to call grain1.Ping()");
             done.Add(grain1.Ping(15));
-            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 is about to call grain2.Ping()");
+            this.fixture.Logger.LogInformation("ReentrancyTest_Deadlock_2 is about to call grain2.Ping()");
             done.Add(grain2.Ping(15));
 
             Task.WhenAll(done).Wait();
-            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 OK - no deadlock.");
+            this.fixture.Logger.LogInformation("ReentrancyTest_Deadlock_2 OK - no deadlock.");
         }
 
         [Fact, TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]

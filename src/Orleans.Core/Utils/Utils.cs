@@ -243,8 +243,8 @@ namespace Orleans.Runtime
 
                         foreach (var e in exc.FlattenAggregate())
                         {
-                            logger.Warn(ErrorCode.Runtime_Error_100325,
-                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.", exc);
+                            logger.LogWarning((int)ErrorCode.Runtime_Error_100325, exc,
+                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.");
                         }
                     }
                     catch

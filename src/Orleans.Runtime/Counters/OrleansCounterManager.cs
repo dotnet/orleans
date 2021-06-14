@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Counters
     {
         public static int WriteCounters(ITelemetryProducer telemetryProducer, ILogger logger)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Writing counters.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Writing counters.");
 
             int numWriteErrors = 0;
 
@@ -24,14 +24,14 @@ namespace Orleans.Runtime.Counters
             {
                 try
                 {
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
 
                     counter.TrackMetric(telemetryProducer);
                 }
                 catch (Exception ex)
                 {
                     numWriteErrors++;
-                    logger.Error(ErrorCode.PerfCounterUnableToWrite, $"Unable to write to counter '{counter.Name}'", ex);
+                    logger.LogError((int)ErrorCode.PerfCounterUnableToWrite, ex, $"Unable to write to counter '{counter.Name}'");
                 }
             }
             return numWriteErrors;

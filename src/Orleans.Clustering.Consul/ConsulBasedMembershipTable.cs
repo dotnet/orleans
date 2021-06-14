@@ -77,7 +77,7 @@ namespace Orleans.Runtime.Membership
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
             {
-                logger.Debug("Could not find any silo registrations for deployment {0}.", clusterId);
+                logger.LogDebug("Could not find any silo registrations for deployment {0}.", clusterId);
                 return new MembershipTableData(NotFoundTableVersion);
             }
 
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Membership
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate });
                 if (!responses.Response.Success)
                 {
-                    _logger.Debug("ConsulMembershipProvider failed to insert the row {0}.", entry.SiloAddress);
+                    _logger.LogDebug("ConsulMembershipProvider failed to insert the row {0}.", entry.SiloAddress);
                     return false;
                 }
 
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.Info("ConsulMembershipProvider failed to insert registration for silo {0}; {1}.", entry.SiloAddress, ex);
+                _logger.LogInformation(ex, "ConsulMembershipProvider failed to insert registration for silo {Silo}", entry.SiloAddress);
                 throw;
             }
         }
@@ -136,7 +136,7 @@ namespace Orleans.Runtime.Membership
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowUpdate, versionUpdate });
                 if (!responses.Response.Success)
                 {
-                    _logger.Debug("ConsulMembershipProvider failed the CAS check when updating the registration for silo {0}.", entry.SiloAddress);
+                    _logger.LogDebug("ConsulMembershipProvider failed the CAS check when updating the registration for silo {0}.", entry.SiloAddress);
                     return false;
                 }
 
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.Info("ConsulMembershipProvider failed to update the registration for silo {0}: {1}.", entry.SiloAddress, ex);
+                _logger.LogInformation(ex, "ConsulMembershipProvider failed to update the registration for silo {0}", entry.SiloAddress);
                 throw;
             }
         }
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.Membership
             var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
             if (allKVs.Response == null)
             {
-                _logger.Debug("Could not find any silo registrations for deployment {0}.", this.clusterId);
+                _logger.LogDebug("Could not find any silo registrations for deployment {0}.", this.clusterId);
                 return;
             }
 

@@ -355,25 +355,25 @@ namespace UnitTests.StreamingTests
             {
                 if (numProduced <= 0)
                 {
-                    logger.Info("numProduced <= 0: Events were not produced");
+                    logger.LogInformation("numProduced <= 0: Events were not produced");
                 }
                 if (consumerCount != numConsumed.Count)
                 {
-                    logger.Info("consumerCount != numConsumed.Count: Incorrect number of consumers. consumerCount = {0}, numConsumed.Count = {1}",
+                    logger.LogInformation("consumerCount != numConsumed.Count: Incorrect number of consumers. consumerCount = {0}, numConsumed.Count = {1}",
                         consumerCount, numConsumed.Count);
                 }
                 foreach (var consumed in numConsumed)
                 {
                     if (numProduced != consumed.Value.Item1)
                     {
-                        logger.Info("numProduced != consumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
+                        logger.LogInformation("numProduced != consumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
                             numProduced, consumed.Key.HandleId + " -> " + consumed.Value);
                             //numProduced, Utils.DictionaryToString(numConsumed));
                     }
                 }
                 return false;
             }
-            logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, 
+            logger.LogInformation("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, 
                 Utils.EnumerableToString(numConsumed, kvp => kvp.Key.HandleId.ToString() + "->" +  kvp.Value.ToString()));
             return true;
         }
@@ -392,16 +392,16 @@ namespace UnitTests.StreamingTests
             {
                 if (numProduced <= 0)
                 {
-                    logger.Info("numProduced <= 0: Events were not produced");
+                    logger.LogInformation("numProduced <= 0: Events were not produced");
                 }
                 if (numProduced != numConsumed)
                 {
-                    logger.Info("numProduced != numConsumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
+                    logger.LogInformation("numProduced != numConsumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
                         numProduced, numConsumed);
                 }
                 return false;
             }
-            logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            logger.LogInformation("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             return true;
         }
     }

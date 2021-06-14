@@ -76,11 +76,11 @@ namespace UnitTests.TimerTests
             }
             catch (Exception exc)
             {
-                log.Info("Couldn't remove {0}, as expected. Exception received = {1}", r1, exc);
+                log.LogInformation("Couldn't remove {0}, as expected. Exception received = {1}", r1, exc);
             }
 
             await grain.StopReminder(r2);
-            log.Info("Removed reminder2 successfully");
+            log.LogInformation("Removed reminder2 successfully");
 
             // trying to see if readreminder works
             _ = await grain.StartReminder(DR);
@@ -90,27 +90,27 @@ namespace UnitTests.TimerTests
 
             IGrainReminder r = await grain.GetReminderObject(DR);
             await grain.StopReminder(r);
-            log.Info("Removed got reminder successfully");
+            log.LogInformation("Removed got reminder successfully");
         }
 
         public async Task Test_Reminders_Basic_ListOps()
         {
             Guid id = Guid.NewGuid();
-            log.Info("Start Grain Id = {0}", id);
+            log.LogInformation("Start Grain Id = {0}", id);
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(id);
             const int count = 5;
             Task<IGrainReminder>[] startReminderTasks = new Task<IGrainReminder>[count];
             for (int i = 0; i < count; i++)
             {
                 startReminderTasks[i] = grain.StartReminder(DR + "_" + i);
-                log.Info("Started {0}_{1}", DR, i);
+                log.LogInformation("Started {0}_{1}", DR, i);
             }
 
             await Task.WhenAll(startReminderTasks);
             // do comparison on strings
             List<string> registered = (from reminder in startReminderTasks select reminder.Result.ReminderName).ToList();
 
-            log.Info("Waited");
+            log.LogInformation("Waited");
 
             List<IGrainReminder> remindersList = await grain.GetRemindersList();
             List<string> fetched = (from reminder in remindersList select reminder.ReminderName).ToList();
@@ -124,7 +124,7 @@ namespace UnitTests.TimerTests
             Assert.True(fetched.Count == 0, $"More than registered reminders. Extra: {Utils.EnumerableToString(fetched)}");
 
             // do some time tests as well
-            log.Info("Time tests");
+            log.LogInformation("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
             for (int i = 0; i < count; i++)
@@ -155,7 +155,7 @@ namespace UnitTests.TimerTests
 
             Thread.Sleep(period.Multiply(5));
             // start another silo ... although it will take it a while before it stabilizes
-            log.Info("Starting another silo");
+            log.LogInformation("Starting another silo");
             await this.HostedCluster.StartAdditionalSilosAsync(1, true);
 
             //Block until all tasks complete.
@@ -176,7 +176,7 @@ namespace UnitTests.TimerTests
             // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing 
             // functionality implemented on the LocalReminderService yet
             TimeSpan period = await g.GetReminderPeriod(DR);
-            this.log.Info("PerGrainMultiReminderTestChurn Period={0} Grain={1}", period, g);
+            this.log.LogInformation("PerGrainMultiReminderTestChurn Period={0} Grain={1}", period, g);
 
             // Start Default Reminder
             //g.StartReminder(DR, file + "_" + DR).Wait();
@@ -230,7 +230,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            this.log.Info("PerGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.LogInformation("PerGrainFailureTest Period={0} Grain={1}", period, grain);
 
             await grain.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
@@ -252,7 +252,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await g.GetReminderPeriod(DR);
 
-            this.log.Info("PerGrainMultiReminderTest Period={0} Grain={1}", period, g);
+            this.log.LogInformation("PerGrainMultiReminderTest Period={0} Grain={1}", period, g);
 
             // Each reminder is started 2 periods after the previous reminder
             // once all reminders have been started, stop them every 2 periods
@@ -321,7 +321,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            this.log.Info("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.LogInformation("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
 
             await grain.StartReminder(DR);
             Thread.Sleep(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
@@ -349,7 +349,7 @@ namespace UnitTests.TimerTests
             sb.AppendFormat(
                 " -- Expecting value in the range between {0} and {1}, and got value {2}.",
                 lowerLimit, upperLimit, val);
-            this.log.Info(sb.ToString());
+            this.log.LogInformation(sb.ToString());
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 
@@ -412,7 +412,7 @@ namespace UnitTests.TimerTests
 
             if (ex is ReminderException)
             {
-                this.log.Info("Retriable operation failed on attempt {0}: {1}", i, ex.ToString());
+                this.log.LogInformation("Retriable operation failed on attempt {0}: {1}", i, ex.ToString());
                 Thread.Sleep(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
                 return true;
             }

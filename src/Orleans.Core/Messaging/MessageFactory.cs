@@ -143,7 +143,7 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }
 

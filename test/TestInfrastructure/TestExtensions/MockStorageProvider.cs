@@ -95,13 +95,13 @@ namespace UnitTests.StorageTests
             this.Name = name;
             this.logger = loggerFactory.CreateLogger(string.Format("Storage.{0}-{1}", this.GetType().Name, this._id));
 
-            logger.Info(0, "Init Name={0}", name);
+            logger.LogInformation(0, "Init Name={0}", name);
             this.serializationManager = serializationManager;
             Interlocked.Increment(ref initCount);
 
             StateStore = new HierarchicalKeyStore(numKeys);
 
-            logger.Info(0, "Finished Init Name={0}", name);
+            logger.LogInformation(0, "Finished Init Name={0}", name);
         }
 
         public StateForTest GetProviderState()
@@ -135,7 +135,7 @@ namespace UnitTests.StorageTests
         {
             lock (StateStore)
             {
-                this.logger.Info("Setting stored value {0} for {1} to {2}", name, grainReference, val);
+                this.logger.LogInformation("Setting stored value {0} for {1} to {2}", name, grainReference, val);
                 var keys = MakeGrainStateKeys(grainType, grainReference);
                 var storedDict = StateStore.ReadRow(keys);
                 if (!storedDict.ContainsKey(stateStoreKey))
@@ -181,7 +181,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task Close()
         {
-            logger.Info(0, "Close");
+            logger.LogInformation(0, "Close");
             Interlocked.Increment(ref closeCount);
             StateStore.Clear();
             return Task.CompletedTask;
@@ -189,7 +189,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            logger.Info(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref readCount);
             lock (StateStore)
             {
@@ -202,7 +202,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            logger.Info(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
@@ -219,7 +219,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            logger.Info(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref deleteCount);
             var keys = MakeGrainStateKeys(grainType, grainReference);
             lock (StateStore)

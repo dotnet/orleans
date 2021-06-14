@@ -98,7 +98,7 @@ namespace Orleans.AzureUtils
             {
                 // Create the queue if it doesn't already exist.
                 var response = await queueClient.CreateIfNotExistsAsync();
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
+                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
             }
             catch (Exception exc)
             {
@@ -116,13 +116,13 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting queue: {0}", QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 if (await queueClient.DeleteIfExistsAsync())
                 {
-                    logger.Info((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
+                    logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
                 }
             }
             catch (Exception exc)
@@ -141,12 +141,12 @@ namespace Orleans.AzureUtils
         public async Task ClearQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Clearing a queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Clearing a queue: {0}", QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 await queueClient.ClearMessagesAsync();
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
+                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (RequestFailedException exc)
             {
@@ -172,7 +172,7 @@ namespace Orleans.AzureUtils
         public async Task AddQueueMessage(string message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Adding message {0} to queue: {1}", message, QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Adding message {0} to queue: {1}", message, QueueName);
             try
             {
                 await queueClient.SendMessageAsync(message);
@@ -193,7 +193,7 @@ namespace Orleans.AzureUtils
         public async Task<PeekedMessage> PeekQueueMessage()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Peeking a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Peeking a message from queue: {0}", QueueName);
             try
             {
                 var messages = await queueClient.PeekMessagesAsync(maxMessages: 1);
@@ -218,7 +218,7 @@ namespace Orleans.AzureUtils
         public async Task<QueueMessage> GetQueueMessage()
         {
                var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting a message from queue: {0}", QueueName);
             try
             {
                 //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
@@ -250,7 +250,7 @@ namespace Orleans.AzureUtils
                 count = null;
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting up to {0} messages from queue: {1}", count, QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting up to {0} messages from queue: {1}", count, QueueName);
             try
             {
                 var messages = await queueClient.ReceiveMessagesAsync(count, messageVisibilityTimeout);
@@ -274,7 +274,7 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueueMessage(QueueMessage message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting a message from queue: {0}", QueueName);
             try
             {
                 await queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
@@ -302,7 +302,7 @@ namespace Orleans.AzureUtils
         public async Task<int> GetApproximateMessageCount()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("GetApproximateMessageCount a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("GetApproximateMessageCount a message from queue: {0}", QueueName);
             try
             {
                 var properties = await queueClient.GetPropertiesAsync();
@@ -325,7 +325,7 @@ namespace Orleans.AzureUtils
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > AzureQueueDefaultPolicies.QueueOperationTimeout)
             {
-                logger.Warn((int)AzureQueueErrorCode.AzureQueue_13, "Slow access to Azure queue {0} for {1}, which took {2}.", QueueName, operation, timeSpan);
+                logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_13, "Slow access to Azure queue {0} for {1}, which took {2}.", QueueName, operation, timeSpan);
             }
         }
 
@@ -334,7 +334,7 @@ namespace Orleans.AzureUtils
             var errMsg = String.Format(
                 "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
-            logger.Error((int)errorCode, errMsg, exc);
+            logger.LogError((int)errorCode, exc, errMsg);
             throw new AggregateException(errMsg, exc);
         }
 
@@ -360,7 +360,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureQueueErrorCode.AzureQueue_14, String.Format("Error creating GetCloudQueueOperationsClient."), exc);
+                logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, String.Format("Error creating GetCloudQueueOperationsClient."));
                 throw;
             }
         }

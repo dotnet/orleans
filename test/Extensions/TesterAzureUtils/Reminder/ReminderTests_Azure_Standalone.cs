@@ -113,17 +113,17 @@ namespace Tester.AzureUtils.TimerTests
                         return true;
                     });
                     promises.Add(promise);
-                    this.log.Info("Started " + capture);
+                    this.log.LogInformation("Started " + capture);
                 }
-                this.log.Info("Started all, now waiting...");
+                this.log.LogInformation("Started all, now waiting...");
                 await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
             }
             catch (Exception exc)
             {
-                this.log.Info("Exception caught {0}", exc);
+                this.log.LogInformation("Exception caught {0}", exc);
             }
             TimeSpan dur = DateTime.UtcNow - startedAt;
-            this.log.Info("Inserted {0} rows in {1}, i.e., {2:f2} upserts/sec", numOfInserts, dur, (numOfInserts / dur.TotalSeconds));
+            this.log.LogInformation("Inserted {0} rows in {1}, i.e., {2:f2} upserts/sec", numOfInserts, dur, (numOfInserts / dur.TotalSeconds));
         }
 
         private ReminderEntry NewReminderEntry()

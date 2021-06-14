@@ -136,8 +136,8 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn((int)AzureQueueErrorCode.AzureQueue_15,
-                        $"Exception upon DeleteQueueMessage on queue {this.azureQueueName}. Ignoring.", exc);
+                    logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_15, exc,
+                        $"Exception upon DeleteQueueMessage on queue {this.azureQueueName}. Ignoring.");
                 }
             }
             finally

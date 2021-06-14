@@ -105,7 +105,7 @@ namespace Orleans.Runtime.Placement
                 Utils.EnumerableToString(
                     all,
                     kvp => String.Format("SiloAddress = {0} -> {1}", kvp.Key.ToString(), kvp.Value.ToString())));
-            logger.Warn(ErrorCode.Placement_ActivationCountBasedDirector_NoSilos, debugLog);
+            logger.LogWarning((int)ErrorCode.Placement_ActivationCountBasedDirector_NoSilos, debugLog);
             throw new OrleansException(debugLog);
         }
 

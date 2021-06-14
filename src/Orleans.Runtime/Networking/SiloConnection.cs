@@ -102,7 +102,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.LogTrace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
                 messageCenter.OutboundQueue.SendMessage(msg);
                 return;
             }
@@ -127,7 +127,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
-                    this.Log.Debug(
+                    this.Log.LogDebug(
                         "Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
                         msg.TargetSilo.ToLongString(),
                         this.LocalSiloAddress.ToLongString(),

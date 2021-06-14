@@ -115,11 +115,11 @@ namespace Orleans.Runtime
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
-            logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
+            logger.LogInformation((int)ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC)
             {
-                logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
-                logger.Warn(ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
+                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
+                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
             }
 
             if (logger.IsEnabled(LogLevel.Debug))
@@ -130,9 +130,9 @@ namespace Orleans.Runtime
                     $"A verbose logging level ({highestLogLevel}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.");
             }
 
-            logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
+            logger.LogInformation((int)ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
                 this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
+            logger.LogInformation((int)ErrorCode.SiloInitConfig, "Starting silo {0}", name);
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             BufferPool.InitGlobalBufferPool(siloMessagingOptions.Value);
@@ -143,7 +143,7 @@ namespace Orleans.Runtime
             }
             catch (InvalidOperationException exc)
             {
-                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container", exc);
+                logger.LogError((int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container");
                 throw;
             }
 
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
             // add self to lifecycle
             this.Participate(this.siloLifecycle);
 
-            logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
+            logger.LogInformation((int)ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -216,7 +216,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start", exc);
+                logger.LogError((int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start");
                 throw;
             }
         }
@@ -251,7 +251,7 @@ namespace Orleans.Runtime
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)
             {
-                logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
+                logger.LogInformation($"Creating reminder grain service for type={reminderTable.GetType()}");
 
                 // Start the reminder service system target
                 var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
@@ -279,7 +279,7 @@ namespace Orleans.Runtime
                 this.SystemStatus = SystemStatus.Starting;
             }
 
-            logger.Info(ErrorCode.SiloStarting, "Silo Start()");
+            logger.LogInformation((int)ErrorCode.SiloStarting, "Silo Start()");
 
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
@@ -292,7 +292,7 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             task.Invoke();
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
+            this.logger.LogInformation((int)ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
         }
 
         private async Task StartAsyncTaskWithPerfAnalysis(string taskName, Func<Task> task, Stopwatch stopWatch)
@@ -300,7 +300,7 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             await task.Invoke();
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
+            this.logger.LogInformation((int)ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
         }
 
         private async Task OnRuntimeServicesStart(CancellationToken ct)
@@ -336,7 +336,7 @@ namespace Orleans.Runtime
             {
                 StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
                 StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
-                logger.Debug("Silo statistics manager started successfully.");
+                logger.LogDebug("Silo statistics manager started successfully.");
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
@@ -345,21 +345,21 @@ namespace Orleans.Runtime
                     var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
                     await this.LocalScheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
                         .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
-                    logger.Debug("Silo deployment load publisher started successfully.");
+                    logger.LogDebug("Silo deployment load publisher started successfully.");
                 }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
                 this.platformWatchdog.Start();
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
+                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo platform watchdog started successfully."); }
             }
             catch (Exception exc)
             {
-                this.SafeExecute(() => this.logger.Error(ErrorCode.Runtime_Error_100330, String.Format("Error starting silo {0}. Going to FastKill().", this.SiloAddress), exc));
+                this.SafeExecute(() => this.logger.LogError((int)ErrorCode.Runtime_Error_100330, exc, String.Format("Error starting silo {0}. Going to FastKill().", this.SiloAddress)));
                 throw;
             }
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo.Start complete: System status = {0}", this.SystemStatus); }
+            if (logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo.Start complete: System status = {0}", this.SystemStatus); }
         }
 
         private Task OnBecomeActiveStart(CancellationToken ct)
@@ -371,7 +371,7 @@ namespace Orleans.Runtime
                 // Now that we're active, we can start the gateway
                 var mc = this.messageCenter as MessageCenter;
                 mc?.StartGateway();
-                logger.Debug("Message gateway service started successfully.");
+                logger.LogDebug("Message gateway service started successfully.");
             }
 
             this.SystemStatus = SystemStatus.Running;
@@ -391,7 +391,7 @@ namespace Orleans.Runtime
                     this.reminderServiceContext = (this.reminderService as IGrainContext) ?? this.fallbackScheduler;
                     await this.LocalScheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
                         .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
-                    this.logger.Debug("Reminder service started successfully.");
+                    this.logger.LogDebug("Reminder service started successfully.");
                 }
             }
             foreach (var grainService in grainServices)
@@ -418,7 +418,7 @@ namespace Orleans.Runtime
             grainServices.Add(grainService);
 
             await this.LocalScheduler.QueueTask(() => grainService.Init(Services), grainService).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-            logger.Info($"Grain Service {service.GetType().FullName} registered successfully.");
+            logger.LogInformation($"Grain Service {service.GetType().FullName} registered successfully.");
         }
 
         private async Task StartGrainService(IGrainService service)
@@ -426,7 +426,7 @@ namespace Orleans.Runtime
             var grainService = (GrainService)service;
 
             await this.LocalScheduler.QueueTask(grainService.Start, grainService).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-            logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
+            logger.LogInformation($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()
@@ -446,13 +446,13 @@ namespace Orleans.Runtime
                     bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
                     if (ok)
                     {
-                        logger.Info(ErrorCode.SiloConfiguredThreadPool,
+                        logger.LogInformation((int)ErrorCode.SiloConfiguredThreadPool,
                                     "Configured ThreadPool.SetMinThreads() to values: {0},{1}. Previous values are: {2},{3}.",
                                     newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
                     }
                     else
                     {
-                        logger.Warn(ErrorCode.SiloFailedToConfigureThreadPool,
+                        logger.LogWarning((int)ErrorCode.SiloFailedToConfigureThreadPool,
                                     "Failed to configure ThreadPool.SetMinThreads(). Tried to set values to: {0},{1}. Previous values are: {2},{3}.",
                                     newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
                     }
@@ -461,7 +461,7 @@ namespace Orleans.Runtime
 
             // Set .NET ServicePointManager settings to optimize throughput performance when using Azure storage
             // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-            logger.Info(ErrorCode.SiloConfiguredServicePointManager,
+            logger.LogInformation((int)ErrorCode.SiloConfiguredServicePointManager,
                 "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
                 performanceTuningOptions.Expect100Continue, performanceTuningOptions.DefaultConnectionLimit, performanceTuningOptions.UseNagleAlgorithm);
             ServicePointManager.Expect100Continue = performanceTuningOptions.Expect100Continue;
@@ -526,11 +526,11 @@ namespace Orleans.Runtime
 
             if (stopAlreadyInProgress)
             {
-                logger.Info(ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
+                logger.LogInformation((int)ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
                 var pause = TimeSpan.FromSeconds(1);
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
-                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
+                    logger.LogInformation((int)ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
 
@@ -644,7 +644,7 @@ namespace Orleans.Runtime
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(
+                    logger.LogDebug(
                         "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
                         grainService.GetType().FullName,
                         grainService.GetPrimaryKeyLong(out string ignored));

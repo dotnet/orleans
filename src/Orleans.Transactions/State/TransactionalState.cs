@@ -63,7 +63,7 @@ namespace Orleans.Transactions
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartRead {info}");
+                logger.LogTrace($"StartRead {info}");
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
@@ -86,7 +86,7 @@ namespace Orleans.Transactions
                      }
 
                      if (logger.IsEnabled(LogLevel.Debug))
-                         logger.Debug($"update-lock read v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+                         logger.LogDebug($"update-lock read v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
 
                      // record this read in the transaction info data structure
                      info.RecordRead(this.participantId, record.Timestamp);
@@ -102,7 +102,7 @@ namespace Orleans.Transactions
                      finally
                      {
                          if (logger.IsEnabled(LogLevel.Trace))
-                             logger.Trace($"EndRead {info} {result} {record.State}");
+                             logger.LogTrace($"EndRead {info} {result} {record.State}");
 
                          detectReentrancy = false;
                      }
@@ -123,7 +123,7 @@ namespace Orleans.Transactions
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartWrite {info}");
+                logger.LogTrace($"StartWrite {info}");
 
             if (info.IsReadOnly)
             {
@@ -159,7 +159,7 @@ namespace Orleans.Transactions
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+                        logger.LogDebug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
 
                     // record this write in the transaction info data structure
                     info.RecordWrite(this.participantId, record.Timestamp);
@@ -174,7 +174,7 @@ namespace Orleans.Transactions
                     finally
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
+                            logger.LogTrace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
 
                         detectReentrancy = false;
                     }

@@ -42,7 +42,7 @@ namespace Orleans.Clustering.DynamoDB
             this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                   this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
-            logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
+            logger.LogInformation((int)ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
@@ -62,7 +62,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await TryCreateTableVersionEntryAsync();
-                if(created) logger.Info("Created new table version row.");
+                if(created) logger.LogInformation("Created new table version row.");
             }
         }
 
@@ -148,7 +148,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
+                this.logger.LogError((int)ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
                     this.options.TableName, clusterId, exc));
                 throw;
             }
@@ -174,13 +174,13 @@ namespace Orleans.Clustering.DynamoDB
                     new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error reading silo entry for key {siloAddress.ToLongString()} from the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error reading silo entry for key {siloAddress.ToLongString()} from the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -207,20 +207,20 @@ namespace Orleans.Clustering.DynamoDB
 
                 if (records.Any(record => record.MembershipVersion > versionRow.MembershipVersion))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
                     //not expecting this to hit often, but if it does, should put in a limit
                     return await this.ReadAll();
                 }
 
                 MembershipTableData data = Convert(records);
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error reading all silo entries {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error reading all silo entries {this.options.TableName}.");
                 throw;
             }
         }
@@ -229,12 +229,12 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("InsertRow entry = {0}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("InsertRow entry = {0}", entry.ToFullString());
                 var tableEntry = Convert(entry, tableVersion);
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Insert failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
                     return false;
                 }
@@ -274,7 +274,7 @@ namespace Orleans.Clustering.DynamoDB
                     if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
                     {
                         result = false;
-                        this.logger.Warn(ErrorCode.MembershipBase,
+                        this.logger.LogWarning((int)ErrorCode.MembershipBase,
                             $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
                     }
                     else
@@ -287,8 +287,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error inserting entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error inserting entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -297,11 +297,11 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
                 var siloEntry = Convert(entry, tableVersion);
                 if (!int.TryParse(etag, out var currentEtag))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
                     return false;
                 }
@@ -310,7 +310,7 @@ namespace Orleans.Clustering.DynamoDB
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
                     return false;
                 }
@@ -352,7 +352,7 @@ namespace Orleans.Clustering.DynamoDB
                     if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
                     {
                         result = false;
-                        this.logger.Warn(ErrorCode.MembershipBase,
+                        this.logger.LogWarning((int)ErrorCode.MembershipBase,
                             $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
                     }
                     else
@@ -365,8 +365,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error updating entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error updating entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -375,7 +375,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Merge entry = {0}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
@@ -383,8 +383,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -411,9 +411,8 @@ namespace Orleans.Clustering.DynamoDB
                         }
                         catch (Exception exc)
                         {
-                            this.logger.Error(ErrorCode.MembershipBase,
-                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.",
-                                exc);
+                            this.logger.LogError((int)ErrorCode.MembershipBase,
+                                exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.");
                         }
                     }
                 }
@@ -422,8 +421,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase,
-                    $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.", exc);
+                this.logger.LogError((int)ErrorCode.MembershipBase, exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.");
                 throw;
             }
         }
@@ -558,7 +556,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
+                this.logger.LogError((int)ErrorCode.MembershipBase, exc, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}");
                 throw;
             }
         }

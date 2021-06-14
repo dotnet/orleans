@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Extension methods which preserves legacy orleans log methods style
     /// </summary>
+    [Obsolete("This type is obsolete and will be removed in a future version. The recommended alternative is Microsoft.Extensions.Logging.")]
     public static class OrleansLoggerExtension
     {
         /// <summary>
@@ -17,6 +18,7 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, string format, params object[] args)
         {
             logger.LogDebug(format, args);
@@ -29,6 +31,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, string message)
         {
             logger.LogDebug(message);
@@ -42,6 +45,7 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, string format, params object[] args)
         {
             logger.LogTrace(format, args);
@@ -53,6 +57,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, string message)
         {
             logger.LogTrace(message);
@@ -66,6 +71,7 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, string format, params object[] args)
         {
             logger.LogInformation(format, args);
@@ -76,6 +82,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">Target logger.</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, string message)
         {
             logger.LogInformation(message);
@@ -90,11 +97,13 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, int logCode, string format, params object[] args)
         {
             logger.LogDebug(logCode, format, args);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogDebug(LoggingUtils.CreateEventId(logCode), format, args);
@@ -106,11 +115,13 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, int logCode, string message)
         {
             logger.LogDebug(logCode, message);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogDebug instead.")]
         public static void Debug(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogDebug(LoggingUtils.CreateEventId(logCode), message);
@@ -125,11 +136,13 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, int logCode, string format, params object[] args)
         {
             logger.LogTrace(logCode, format, args);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogTrace(LoggingUtils.CreateEventId(logCode), format, args);
@@ -141,11 +154,13 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, int logCode, string message)
         {
             logger.LogTrace(logCode, message);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogTrace instead.")]
         public static void Trace(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogTrace(LoggingUtils.CreateEventId(logCode), message);
@@ -160,11 +175,13 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, int logCode, string format, params object[] args)
         {
             logger.LogInformation(logCode, format, args);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), format, args);
@@ -176,11 +193,13 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The log message.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, int logCode, string message)
         {
             logger.LogInformation(logCode, message);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogInformation instead.")]
         public static void Info(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), message);
@@ -195,11 +214,13 @@ namespace Orleans.Runtime
         /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
         /// </param>
         /// <param name="args">Any arguments to the format string.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogWarning instead.")]
         public static void Warn(this ILogger logger, int logCode, string format, params object[] args)
         {
             logger.LogWarning(logCode, format, args);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogWarning instead.")]
         public static void Warn(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogWarning(LoggingUtils.CreateEventId(logCode), format, args);
@@ -212,11 +233,13 @@ namespace Orleans.Runtime
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The warning message to log.</param>
         /// <param name="exception">An exception related to the warning, if any.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogWarning instead.")]
         public static void Warn(this ILogger logger, int logCode, string message, Exception exception = null)
         {
             logger.LogWarning(logCode, exception, message);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogWarning instead.")]
         public static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
             logger.LogWarning(LoggingUtils.CreateEventId(logCode), exception, message);
@@ -229,11 +252,13 @@ namespace Orleans.Runtime
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The error message to log.</param>
         /// <param name="exception">An exception related to the error, if any.</param>
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogError instead.")]
         public static void Error(this ILogger logger, int logCode, string message, Exception exception = null)
         {
             logger.LogError(logCode, exception, message);
         }
 
+        [Obsolete("This method is obsolete. Please use Microsoft.Extensions.Logging.LoggerExtensions.LogError instead.")]
         public static void Error(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
             logger.LogError(LoggingUtils.CreateEventId(logCode), exception, message);

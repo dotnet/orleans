@@ -79,9 +79,8 @@ namespace Orleans.Runtime
             }
             catch (InvalidSchedulingContextException exc)
             {
-                logger.Error(ErrorCode.Timer_InvalidContext,
-                    string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
-                        GetFullName(), context), exc);
+                logger.LogError((int)ErrorCode.Timer_InvalidContext, exc, string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
+                    GetFullName(), context));
                 DisposeTimer();
             }
         }
@@ -95,7 +94,7 @@ namespace Orleans.Runtime
             totalNumTicks++;
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
+                logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
             {
@@ -103,17 +102,16 @@ namespace Orleans.Runtime
                 currentlyExecutingTickTask = callback(state);
                 await currentlyExecutingTickTask;
                 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
-                logger.Error( 
-                    ErrorCode.Timer_GrainTimerCallbackError,
-                    string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
+                logger.LogError( 
+                    (int)ErrorCode.Timer_GrainTimerCallbackError,
+                    exc, string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
                         exc.GetType(),
                         exc.Message,
-                        GetFullName()),
-                    exc);       
+                        GetFullName()));       
             }
             finally
             {

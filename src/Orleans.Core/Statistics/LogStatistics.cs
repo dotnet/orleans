@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 var e = exc.GetBaseException();
-                this.logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during LogStatistics reporter.", e);
+                this.logger.LogError((int)ErrorCode.Runtime_Error_100101, e, "Exception occurred during LogStatistics reporter.");
             }
 
             return Task.CompletedTask;
@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             if (counterData == null)
             {
                 // Flush remaining data
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                logger.LogInformation((int)ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
                 logMsgBuilder.Clear();
                 return;
             }
@@ -107,7 +107,7 @@ namespace Orleans.Runtime
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                logger.LogInformation((int)ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
                 logMsgBuilder.Clear();
             }
 

@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Management
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
-            logger.Info("GetDetailedHosts onlyActive={0}", onlyActive);
+            logger.LogInformation("GetDetailedHosts onlyActive={0}", onlyActive);
 
             await this.membershipTableManager.Refresh();
 
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Management
         public Task ForceGarbageCollection(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("Forcing garbage collection on {0}", Utils.EnumerableToString(silos));
+            logger.LogInformation("Forcing garbage collection on {0}", Utils.EnumerableToString(silos));
             List<Task> actionPromises = PerformPerSiloAction(silos,
                 s => GetSiloControlReference(s).ForceGarbageCollection());
             return Task.WhenAll(actionPromises);
@@ -107,7 +107,7 @@ namespace Orleans.Runtime.Management
         public Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("Forcing runtime statistics collection on {0}", Utils.EnumerableToString(silos));
+            logger.LogInformation("Forcing runtime statistics collection on {0}", Utils.EnumerableToString(silos));
             List<Task> actionPromises = PerformPerSiloAction(
                 silos,
                 s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.Management
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
             foreach (SiloAddress siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
@@ -306,7 +306,7 @@ namespace Orleans.Runtime.Management
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+                logger.LogDebug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
             }
 
             var actionPromises = new List<Task<object>>();

@@ -64,10 +64,10 @@ namespace Orleans.TestingHost
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for ReadState for grain {grainReference} of type {grainType}, ");
+                logger.LogInformation($"Fault injected for ReadState for grain {grainReference} of type {grainType}, ");
                 throw;
             }
-            logger.Info($"ReadState for grain {grainReference} of type {grainType}");
+            logger.LogInformation($"ReadState for grain {grainReference} of type {grainType}");
             await realStorageProvider.ReadStateAsync(grainType, grainReference, grainState);
         }
 
@@ -86,10 +86,10 @@ namespace Orleans.TestingHost
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for WriteState for grain {grainReference} of type {grainType}");
+                logger.LogInformation($"Fault injected for WriteState for grain {grainReference} of type {grainType}");
                 throw;
             }
-            logger.Info($"WriteState for grain {grainReference} of type {grainType}");
+            logger.LogInformation($"WriteState for grain {grainReference} of type {grainType}");
             await realStorageProvider.WriteStateAsync(grainType, grainReference, grainState);
         }
 
@@ -108,10 +108,10 @@ namespace Orleans.TestingHost
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for ClearState for grain {grainReference} of type {grainType}");
+                logger.LogInformation($"Fault injected for ClearState for grain {grainReference} of type {grainType}");
                 throw;
             }
-            logger.Info($"ClearState for grain {grainReference} of type {grainType}");
+            logger.LogInformation($"ClearState for grain {grainReference} of type {grainType}");
             await realStorageProvider.ClearStateAsync(grainType, grainReference, grainState);
         }
 

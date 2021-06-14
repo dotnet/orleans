@@ -56,11 +56,11 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Starting initialization.");
 
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle, this.messagingTrace);
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Completed initialization.");
 
             if (siloDetails.GatewayAddress != null)
             {
@@ -106,20 +106,20 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.Runtime_Error_100110, "Stop failed.", exc);
+                log.LogError((int)ErrorCode.Runtime_Error_100110, exc, "Stop failed.");
             }
         }
 
         public void StopAcceptingClientMessages()
         {
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("StopClientMessages");
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("StopClientMessages");
             if (Gateway == null) return;
 
             try
             {
                 Gateway.Stop();
             }
-            catch (Exception exc) { log.Error(ErrorCode.Runtime_Error_100109, "Stop failed.", exc); }
+            catch (Exception exc) { log.LogError((int)ErrorCode.Runtime_Error_100109, exc, "Stop failed."); }
             Gateway = null;
         }
 
@@ -192,7 +192,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Message has been looped back to this silo: {0}", message);
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Message has been looped back to this silo: {0}", message);
             MessagingStatisticsGroup.LocalMessagesSent.Increment();
             this.OnReceivedMessage(message);
 
@@ -207,7 +207,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {msg}", msg);
             }
             else
             {
@@ -240,7 +240,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public void BlockApplicationMessages()
         {
-            if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
+            if(log.IsEnabled(LogLevel.Debug)) log.LogDebug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
         }
     }

@@ -74,7 +74,7 @@ namespace UnitTests.Grains
             }
 
             string msg = String.Format("ChainGrain Id={0} is in an invalid state. Next={1}", State.Id, State.Next);
-            logger.Warn(0, msg);
+            logger.LogWarning(0, msg);
             throw new OrleansException(msg);
         }
 

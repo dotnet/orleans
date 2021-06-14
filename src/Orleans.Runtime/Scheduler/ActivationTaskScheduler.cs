@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Scheduler
             RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
+                logger.LogWarning((int)ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
                     task.Id, task.Status);
             
             //  Consider adding ResetExecutionContext() or even better:
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Scheduler
         protected override void QueueTask(Task task)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " QueueTask Task Id={0}", task.Id);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(myId + " QueueTask Task Id={0}", task.Id);
 #endif
             workerGroup.EnqueueTask(task);
         }
@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace(myId + " --> TryExecuteTaskInline Task Id={0} Status={1} PreviouslyQueued={2} CanExecute={3} Queued={4}",
+                logger.LogTrace(myId + " --> TryExecuteTaskInline Task Id={0} Status={1} PreviouslyQueued={2} CanExecute={3} Queued={4}",
                     task.Id, task.Status, taskWasPreviouslyQueued, canExecuteInline, workerGroup.ExternalWorkItemCount);
             }
 #endif
@@ -88,7 +88,7 @@ namespace Orleans.Runtime.Scheduler
             if (!canExecuteInline)
             {
 #if DEBUG
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-X TryExecuteTaskInline Task Id={0} Status={1} Execute=No", task.Id, task.Status);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(myId + " <-X TryExecuteTaskInline Task Id={0} Status={1} Execute=No", task.Id, task.Status);
 #endif
                 return false;
             }
@@ -97,17 +97,17 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " TryExecuteTaskInline Task Id={0} Thread={1} Execute=Yes", task.Id, Thread.CurrentThread.ManagedThreadId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(myId + " TryExecuteTaskInline Task Id={0} Thread={1} Execute=Yes", task.Id, Thread.CurrentThread.ManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
             if (!done)
             {
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete3, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
+                logger.LogWarning((int)ErrorCode.SchedulerTaskExecuteIncomplete3, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
                     task.Id, task.Status);
             }
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);
 #endif
             return done;
         }

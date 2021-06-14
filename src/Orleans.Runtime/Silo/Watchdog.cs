@@ -30,7 +30,7 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            logger.Info("Starting Silo Watchdog.");
+            logger.LogInformation("Starting Silo Watchdog.");
             var now = DateTime.UtcNow;
             lastHeartbeat = now;
             lastWatchdogCheck = now;

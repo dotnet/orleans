@@ -69,7 +69,7 @@ namespace Orleans.Runtime
 
         public async Task Start()
         {
-            logger.Info("Starting DeploymentLoadPublisher.");
+            logger.LogInformation("Starting DeploymentLoadPublisher.");
             if (statisticsRefreshTime > TimeSpan.Zero)
             {
                 // Randomize PublishStatistics timer,
@@ -79,14 +79,14 @@ namespace Orleans.Runtime
             }
             await RefreshStatistics();
             await PublishStatistics(null);
-            logger.Info("Started DeploymentLoadPublisher.");
+            logger.LogInformation("Started DeploymentLoadPublisher.");
         }
 
         private async Task PublishStatistics(object _)
         {
             try
             {
-                if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("PublishStatistics.");
+                if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("PublishStatistics.");
                 var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
@@ -109,7 +109,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception)
                     {
-                        logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
+                        logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
                             String.Format("An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored."));
                     }
                 }
@@ -117,15 +117,15 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
-                    String.Format("An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring."), exc);
+                logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2, exc,
+                    "An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring.");
             }
         }
 
 
         public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRuntimeStatistics from {0}", siloAddress);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRuntimeStatistics from {0}", siloAddress);
             if (this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 return Task.CompletedTask;
 
@@ -141,7 +141,7 @@ namespace Orleans.Runtime
 
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("RefreshStatistics.");
             await this.scheduler.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();
@@ -159,9 +159,8 @@ namespace Orleans.Runtime
                                         }
                                         else
                                         {
-                                            logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
-                                                String.Format("An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({0}). Will keep using stale statistics.", capture),
-                                                statsTask.Exception);
+                                            logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3, statsTask.Exception,
+                                                "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({0}). Will keep using stale statistics.", capture);
                                         }
                                     });
                         tasks.Add(task);

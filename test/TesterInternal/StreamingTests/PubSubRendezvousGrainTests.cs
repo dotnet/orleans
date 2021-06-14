@@ -1,6 +1,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -40,7 +41,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterConsumerFaultTest()
         {
-            this.fixture.Logger.Info("************************ RegisterConsumerFaultTest *********************************");
+            this.fixture.Logger.LogInformation("************************ RegisterConsumerFaultTest *********************************");
             var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
@@ -66,7 +67,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterConsumerFaultTest()
         {
-            this.fixture.Logger.Info("************************ UnregisterConsumerFaultTest *********************************");
+            this.fixture.Logger.LogInformation("************************ UnregisterConsumerFaultTest *********************************");
             var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
@@ -112,7 +113,7 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducerFaultTest()
         {
-            this.fixture.Logger.Info("************************ RegisterProducerFaultTest *********************************");
+            this.fixture.Logger.LogInformation("************************ RegisterProducerFaultTest *********************************");
             var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
@@ -142,7 +143,7 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterProducerFaultTest()
         {
-            this.fixture.Logger.Info("************************ UnregisterProducerFaultTest *********************************");
+            this.fixture.Logger.LogInformation("************************ UnregisterProducerFaultTest *********************************");
             var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);

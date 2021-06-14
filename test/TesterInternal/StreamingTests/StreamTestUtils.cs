@@ -20,14 +20,14 @@ namespace UnitTests.StreamingTests
         {
             SiloAddress primSilo = siloHost.Primary?.SiloAddress;
             SiloAddress secSilo = siloHost.SecondarySilos.FirstOrDefault()?.SiloAddress;
-            logger.Info("\n\n**START********************** {0} ********************************* \n\n"
+            logger.LogInformation("\n\n**START********************** {0} ********************************* \n\n"
                         + "Running with initial silos Primary={1} Secondary={2} StreamId={3} StreamType={4} \n\n",
                 testName, primSilo, secSilo, streamId, streamProviderName);
         }
 
         internal static void LogEndTest(string testName, ILogger logger)
         {
-            logger.Info("\n\n--END------------------------ {0} --------------------------------- \n\n", testName);
+            logger.LogInformation("\n\n--END------------------------ {0} --------------------------------- \n\n", testName);
         }
 
         internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)

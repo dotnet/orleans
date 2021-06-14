@@ -206,7 +206,7 @@ namespace Orleans.Runtime
             if (list != null && list.Count > 0)
             {
                 count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
             
@@ -455,7 +455,7 @@ namespace Orleans.Runtime
             {
                 if (failedActivations.TryGetValue(address, out var ex))
                 {
-                    logger.Warn(ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
+                    logger.LogWarning((int)ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
                     ex.Throw();
                 }
 
@@ -535,7 +535,7 @@ namespace Orleans.Runtime
 
                     // Success!! Log the result, and start processing messages
                     initStage = ActivationInitializationStage.Completed;
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InitActivation is done: {0}", activation.Address);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InitActivation is done: {0}", activation.Address);
                 }
                 catch (Exception ex)
                 {
@@ -585,7 +585,7 @@ namespace Orleans.Runtime
                                 $"GrainInstance Type is {activation.GrainInstance?.GetType()}. " +
                                 $"{(primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty)}" +
                                 $"Full activation address is {address.ToFullString()}. We have {activation.WaitingCount} messages to forward.";
-                            logger.Debug(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                            logger.LogDebug((int)ErrorCode.Catalog_DuplicateActivation, logMsg);
                         }
 
                         UnregisterMessageTarget(activation);
@@ -606,10 +606,9 @@ namespace Orleans.Runtime
                     }
                     catch (Exception ex)
                     {
-                        logger.Warn(
-                            ErrorCode.Catalog_UnregisterAsync,
-                            $"Failed to unregister activation {activation} after {initStage} stage failed",
-                            ex);
+                        logger.LogWarning(
+                            (int)ErrorCode.Catalog_UnregisterAsync, ex,
+                            $"Failed to unregister activation {activation} after {initStage} stage failed");
                     }
                 }
                 lock (activation)
@@ -619,7 +618,7 @@ namespace Orleans.Runtime
                     {
                         failedActivations.Add(activation.Address, ExceptionDispatchInfo.Capture(exception));
                         activation.SetState(ActivationState.FailedToActivate);
-                        logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate, string.Format("Failed to InvokeActivate for {0}.", activation), exception);
+                        logger.LogWarning((int)ErrorCode.Catalog_Failed_InvokeActivate, exception, "Failed to InvokeActivate for {Activation}", activation);
                         // Reject all of the messages queued for this activation.
                         var activationFailedMsg = nameof(Grain.OnActivateAsync) + " failed";
                         RejectAllQueuedMessages(activation, activationFailedMsg, exception);
@@ -627,7 +626,7 @@ namespace Orleans.Runtime
                     else
                     {
                         activation.SetState(ActivationState.Invalid);
-                        logger.Warn(ErrorCode.Runtime_Error_100064, $"Failed to RegisterActivationInGrainDirectory for {activation}.", exception);
+                        logger.LogWarning((int)ErrorCode.Runtime_Error_100064, exception, "Failed to RegisterActivationInGrainDirectory for {Activation}", activation);
                         RerouteAllQueuedMessages(activation, null, "Failed RegisterActivationInGrainDirectory", exception);
                     }
                 }
@@ -651,7 +650,7 @@ namespace Orleans.Runtime
             var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
             for (var i = 0; i < list.Count; i++)
@@ -746,7 +745,7 @@ namespace Orleans.Runtime
                     alreadBeingDestroyed = true;
                 }
             }
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_2,
                 "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
             CounterStatistic.FindOrCreate(statisticName).Increment();
@@ -834,14 +833,14 @@ namespace Orleans.Runtime
         {
             if (list == null || list.Count == 0) return;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {0} activations.", list.Count);
 
             await Task.WhenAll(list.Select(DeactivateActivation));
         }
 
         public Task DeactivateAllActivations()
         {
-            logger.Info(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
+            logger.LogInformation((int)ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
             var activationsToShutdown = activations.Where(kv => !kv.Value.IsExemptFromCollection).Select(kv => kv.Value).ToList();
             return DeactivateActivations(activationsToShutdown);
         }
@@ -853,7 +852,7 @@ namespace Orleans.Runtime
                 List<Message> msgs = activation.DequeueAllWaitingMessages();
                 if (msgs == null || msgs.Count <= 0) return;
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
                 this.directory.InvalidateCacheEntry(activation.Address);
                 this.Dispatcher.ProcessRequestsToInvalidActivation(msgs, activation.Address, forwardingAddress, failedOperation, exc);
             }
@@ -876,8 +875,8 @@ namespace Orleans.Runtime
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug(
-                        ErrorCode.Catalog_RerouteAllQueuedMessages,
+                    logger.LogDebug(
+                        (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
                         string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
                 this.directory.InvalidateCacheEntry(activation.Address);
                 this.Dispatcher.ProcessRequestsToInvalidActivation(
@@ -895,19 +894,18 @@ namespace Orleans.Runtime
             var grainTypeName = activation.GrainInstance?.GetType().FullName;
 
             // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_BeforeCallingActivate, "About to call {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Catalog_BeforeCallingActivate, "About to call {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
 
             // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
                 RequestContextExtensions.Import(requestContextData);
                 await activation.ActivateAsync(CancellationToken.None);
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Catalog_ErrorCallingActivate,
-                    string.Format("Error calling grain's OnActivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, exc, string.Format("Error calling grain's OnActivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName));
 
                 activationsFailedToActivate.Increment();
 
@@ -934,7 +932,7 @@ namespace Orleans.Runtime
                 var grainTypeName = activation.GrainInstance?.GetType().FullName;
 
                 // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
 
                 // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
                 try
@@ -946,17 +944,16 @@ namespace Orleans.Runtime
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                         await activation.Lifecycle.OnStop().WithCancellation(ct);
                     }
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                        string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                    logger.LogError((int)ErrorCode.Catalog_ErrorCallingDeactivate, exc, string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName));
                 }
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation), exc);
+                logger.LogError((int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, exc, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation));
             }
             return activation;
         }
@@ -1130,12 +1127,11 @@ namespace Orleans.Runtime
                         }
                         catch (Exception exc)
                         {
-                            logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
-                                String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
+                            logger.LogError((int)ErrorCode.Catalog_SiloStatusChangeNotification_Exception, exc, String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()));
                         }
                     }
                 }
-                logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
+                logger.LogInformation((int)ErrorCode.Catalog_SiloStatusChangeNotification,
                     String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
                         activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
             }

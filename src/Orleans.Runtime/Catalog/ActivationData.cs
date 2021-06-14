@@ -356,13 +356,13 @@ namespace Orleans.Runtime
             {
                 if (State == ActivationState.Invalid)
                 {
-                    logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
+                    logger.LogWarning((int)ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorInvalidActivation;
                 }
                 if (State == ActivationState.FailedToActivate)
                 {
-                    logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
+                    logger.LogWarning((int)ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to activation that failed in OnActivate {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorActivateFailed;
                 }
@@ -371,7 +371,7 @@ namespace Orleans.Runtime
                     var deactivatingTime = DateTime.UtcNow - deactivationStartTime;
                     if (deactivatingTime > maxRequestProcessingTime)
                     {
-                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                        logger.LogError((int)ErrorCode.Dispatcher_StuckActivation,
                             $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
@@ -381,14 +381,14 @@ namespace Orleans.Runtime
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
-                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                        logger.LogError((int)ErrorCode.Dispatcher_StuckActivation,
                             $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
                     {
-                        logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
+                        logger.LogWarning((int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
                              currentRequestActiveTime, this.ToDetailedString(), this.Blocking, message);
                     }

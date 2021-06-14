@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
             Task.Run(() => this.StartAsync()).Ignore();
 
-            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Started asynch agent " + this.Name);
         }
 
         private async Task StartAsync()
@@ -89,12 +89,12 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Run completed on agent " + this.Name + " - restarting");
+                            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Run completed on agent " + this.Name + " - restarting");
                             this.Start();
                         }
                         catch (Exception exc)
                         {
-                            this.Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                            this.Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, "Unable to restart AsynchAgent");
                             this.State = AgentState.Stopped;
                         }
                     }
@@ -123,9 +123,9 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure stop does not throw.
-                Log.Debug("Ignoring error during Stop: {0}", exc);
+                Log.LogDebug(exc, "Ignoring error during Stop");
             }
-            Log.Debug("Stopped agent");
+            Log.LogDebug("Stopped agent");
         }
 
         public void Dispose()
@@ -183,7 +183,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, "Unable to restart AsynchAgent");
                     State = AgentState.Stopped;
                 }
             }
@@ -197,10 +197,10 @@ namespace Orleans.Runtime
             switch (OnFault)
             {
                 case FaultBehavior.IgnoreFault:
-                    Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100025, exc, $"{logMessagePrefix} The executor will exit.");
                     break;
                 case FaultBehavior.RestartOnFault:
-                    Log.Error(ErrorCode.Runtime_Error_100026, $"{logMessagePrefix} The Stage will be restarted.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100026, exc, $"{logMessagePrefix} The Stage will be restarted.");
                     break;
                 default:
                     throw new NotImplementedException();

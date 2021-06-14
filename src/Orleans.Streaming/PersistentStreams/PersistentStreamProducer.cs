@@ -23,7 +23,7 @@ namespace Orleans.Streams
             this.serializationManager = serializationManager;
             IsRewindable = isRewindable;
             var logger = providerUtilities.ServiceProvider.GetRequiredService<ILogger<PersistentStreamProducer<T>>>();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created PersistentStreamProducer for stream {0}, of type {1}, and with Adapter: {2}.",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created PersistentStreamProducer for stream {0}, of type {1}, and with Adapter: {2}.",
                 stream.ToString(), typeof (T), this.queueAdapter.Name);
         }
 

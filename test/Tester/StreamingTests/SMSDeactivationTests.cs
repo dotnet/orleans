@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -57,14 +58,14 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSDeactivationTest()
         {
-            logger.Info("************************ SMSDeactivationTest *********************************");
+            logger.LogInformation("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSDeactivationTest_ClientConsumer()
         {
-            logger.Info("************************ SMSDeactivationTest *********************************");
+            logger.LogInformation("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest_ClientConsumer(Guid.NewGuid(), StreamNamespace);
         }
 

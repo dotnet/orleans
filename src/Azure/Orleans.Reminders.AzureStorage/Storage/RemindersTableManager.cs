@@ -90,13 +90,13 @@ namespace Orleans.Runtime.ReminderService
             var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
             try
             {
-                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
+                singleton.Logger.LogInformation("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
                 await singleton.InitTableAsync();
             }
             catch (Exception ex)
             {
                 string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_39, errorMsg, ex);
+                singleton.Logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, errorMsg);
                 throw new OrleansException(errorMsg, ex);
             }
             return singleton;
@@ -200,7 +200,7 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;
                 }
                 throw;
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;

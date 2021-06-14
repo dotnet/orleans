@@ -52,7 +52,7 @@ namespace Orleans.Transactions.Azure.Tests
                 bool didCreate = await tableRef.CreateIfNotExistsAsync();
 
 
-                logger.Info($"{(didCreate ? "Created" : "Attached to")} Azure storage table {tableName}", (didCreate ? "Created" : "Attached to"));
+                logger.LogInformation($"{(didCreate ? "Created" : "Attached to")} Azure storage table {tableName}", (didCreate ? "Created" : "Attached to"));
                 return tableRef;
             }
             catch (Exception exc)
@@ -74,7 +74,7 @@ namespace Orleans.Transactions.Azure.Tests
             }
             catch (Exception exc)
             {
-                logger.LogError("Error creating CloudTableCreationClient.", exc);
+                logger.LogError(exc, "Error creating CloudTableCreationClient.");
                 throw;
             }
         }

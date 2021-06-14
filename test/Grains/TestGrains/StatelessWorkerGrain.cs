@@ -30,7 +30,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             activationGuid = Guid.NewGuid();
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 
@@ -53,8 +53,8 @@ namespace UnitTests.Grains
                 {
                     DateTime stop = DateTime.UtcNow;
                     calls.Add(new Tuple<DateTime, DateTime>(start, stop));
-                    logger.Info((stop - start).TotalMilliseconds.ToString());
-                    logger.Info($"Start {LogFormatter.PrintDate(start)}, stop {LogFormatter.PrintDate(stop)}, duration {stop - start}. #act {count}");
+                    logger.LogInformation((stop - start).TotalMilliseconds.ToString());
+                    logger.LogInformation($"Start {LogFormatter.PrintDate(start)}, stop {LogFormatter.PrintDate(stop)}, duration {stop - start}. #act {count}");
                 });
         }
 
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
             {
                 ids = allActivationIds.ToList();
             }
-            logger.Info($"# allActivationIds {ids.Count} for silo {silo}: {Utils.EnumerableToString(ids)}");
+            logger.LogInformation($"# allActivationIds {ids.Count} for silo {silo}: {Utils.EnumerableToString(ids)}");
             return Task.FromResult(Tuple.Create(activationGuid, silo, calls));
         }
 

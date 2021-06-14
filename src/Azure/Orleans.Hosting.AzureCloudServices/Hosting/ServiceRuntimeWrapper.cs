@@ -148,7 +148,7 @@ namespace Orleans.Runtime.Host
                 string errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
                     RoleName, endpointName, string.Join(", ", instanceEndpoints));
 
-                logger.Error(ErrorCode.SiloEndpointConfigError, errorMsg, exc);
+                logger.LogError((int)ErrorCode.SiloEndpointConfigError, exc, errorMsg);
                 throw new OrleansException(errorMsg, exc);
             }
         }
@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Host
             if (assembly == null)
             {
                 const string msg1 = "Microsoft.WindowsAzure.ServiceRuntime is not loaded. Trying to load it with Assembly.LoadWithPartialName().";
-                logger.Warn(ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
+                logger.LogWarning((int)ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
 
                 // Microsoft.WindowsAzure.ServiceRuntime isn't loaded. We may be running within a web role or not in Azure.
 #pragma warning disable 618
@@ -190,7 +190,7 @@ namespace Orleans.Runtime.Host
                 if (assembly == null)
                 {
                     const string msg2 = "Failed to find or load Microsoft.WindowsAzure.ServiceRuntime.";
-                    logger.Error(ErrorCode.AzureServiceRuntime_FailedToLoad, msg2);
+                    logger.LogError((int)ErrorCode.AzureServiceRuntime_FailedToLoad, msg2);
                     throw new OrleansException(msg2);
                 }
             }

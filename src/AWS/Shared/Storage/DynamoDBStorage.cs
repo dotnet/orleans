@@ -90,7 +90,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not initialize connection to storage table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not initialize connection to storage table {tableName}");
                 throw;
             }
         }
@@ -186,7 +186,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not create table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not create table {tableName}");
                 throw;
             }
         }
@@ -204,7 +204,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not delete table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not delete table {tableName}");
                 throw;
             }
         }
@@ -219,7 +219,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
 
             try
             {
@@ -234,7 +234,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Unable to create item to table '{tableName}'", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Unable to create item to table '{tableName}'");
                 throw;
             }
         }
@@ -255,7 +255,7 @@ namespace Orleans.Transactions.DynamoDB
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
 
             try
             {
@@ -288,8 +288,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error upserting to the table {tableName}", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error upserting to the table {tableName}");
                 throw;
             }
         }
@@ -347,7 +347,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
 
             try
             {
@@ -367,8 +367,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entry from the table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error deleting entry from the table {tableName}.");
                 throw;
             }
         }
@@ -381,7 +381,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting {0} table entries", tableName);
 
             if (toDelete == null) throw new ArgumentNullException("collection");
 
@@ -406,8 +406,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entries from the table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error deleting entries from the table {tableName}.");
                 throw;
             }
         }
@@ -444,7 +444,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -492,7 +492,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -589,7 +589,7 @@ namespace Orleans.Transactions.DynamoDB
             catch (Exception exc)
             {
                 var errorMsg = $"Failed to read table {tableName}: {exc.Message}";
-                Logger.Warn(ErrorCode.StorageProviderBase, errorMsg, exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, errorMsg);
                 throw new OrleansException(errorMsg, exc);
             }
         }
@@ -602,7 +602,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Put entries {0} table", tableName);
 
             if (toCreate == null) throw new ArgumentNullException("collection");
 
@@ -627,8 +627,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error bulk inserting entries to table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error bulk inserting entries to table {tableName}.");
                 throw;
             }
         }
@@ -663,7 +663,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {0}", Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
                 throw;
             }
         }
@@ -707,7 +707,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to write tx");
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to write tx");
                 throw;
             }
         }

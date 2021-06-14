@@ -42,7 +42,7 @@ namespace Orleans.Runtime.LogConsistency
         public void ProtocolError(string msg, bool throwexception)
         {
 
-            log?.Error((int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
+            log?.LogError((int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
                 string.Format("{0} Protocol Error: {1}",
                     grain.GrainReference,
                     msg));
@@ -55,19 +55,18 @@ namespace Orleans.Runtime.LogConsistency
 
         public void CaughtException(string where, Exception e)
         {
-            log?.Error((int)ErrorCode.LogConsistency_CaughtException,
-               string.Format("{0} Exception Caught at {1}",
-                   grain.GrainReference,
-                   where),e);
+            log?.LogError((int)ErrorCode.LogConsistency_CaughtException, e, "{0} Exception Caught at {1}",
+                grain.GrainReference,
+                @where);
         }
 
         public void CaughtUserCodeException(string callback, string where, Exception e)
         {
-            log?.Warn((int)ErrorCode.LogConsistency_UserCodeException,
-                string.Format("{0} Exception caught in user code for {1}, called from {2}",
+            log?.LogWarning((int)ErrorCode.LogConsistency_UserCodeException, e,
+                "{0} Exception caught in user code for {1}, called from {2}",
                    grain.GrainReference,
                    callback,
-                   where), e);
+                   where);
         }
 
         public void Log(LogLevel level, string format, params object[] args)

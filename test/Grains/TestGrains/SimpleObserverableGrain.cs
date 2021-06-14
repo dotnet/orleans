@@ -25,13 +25,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 
         public async Task SetA(int a)
         {
-            logger.Info("SetA={0}", a);
+            logger.LogInformation("SetA={0}", a);
             A = a;
 
             //If this were run with Task.Run there were no need for the added Unwrap call.

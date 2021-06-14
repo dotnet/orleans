@@ -85,11 +85,11 @@ namespace Orleans.Runtime.Membership
                     await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     await zk.sync(this.clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.Info("Created new deployment path: " + this.clusterPath);
+                    this.logger.LogInformation("Created new deployment path: " + this.clusterPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.Debug("Deployment path already exists: " + this.clusterPath);
+                    this.logger.LogDebug("Deployment path already exists: " + this.clusterPath);
                 }
             });
         }
@@ -359,7 +359,7 @@ namespace Orleans.Runtime.Membership
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug(@event.ToString());
+                logger.LogDebug(@event.ToString());
             }
             return Task.CompletedTask;
         }

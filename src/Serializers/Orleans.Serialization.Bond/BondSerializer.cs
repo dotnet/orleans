@@ -165,7 +165,7 @@ namespace Orleans.Serialization
         private void LogWarning(int code, string format, params object[] parameters)
         {
             if(logger.IsEnabled(LogLevel.Warning))
-                logger.Warn(code, format, parameters);
+                logger.LogWarning(code, format, parameters);
         }
 
         private void Register(Type type)

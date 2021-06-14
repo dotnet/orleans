@@ -168,7 +168,7 @@ namespace Orleans.Internal
             catch (Exception exc)
             {
                 _ = task.Exception; // Observe exception
-                logger.Error(errorCode, message, exc);
+                logger.LogError((int)errorCode, exc, message);
                 throw;
             }
         }

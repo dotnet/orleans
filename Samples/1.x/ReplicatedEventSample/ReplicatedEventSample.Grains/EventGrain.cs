@@ -31,7 +31,7 @@ namespace ReplicatedEventSample.Grains
 
         public async Task NewOutcome(Outcome outcome)
         {
-            logger.Info("{3} new outcome {0} {1} {2}", outcome.When, outcome.Name, outcome.Score, EventName);
+            logger.LogInformation("{3} new outcome {0} {1} {2}", outcome.When, outcome.Name, outcome.Score, EventName);
 
             RaiseEvent(outcome);
 
@@ -138,7 +138,7 @@ namespace ReplicatedEventSample.Grains
             catch (Exception e)
             {
                 // we will log this for diagnostic purposes
-                logger.Info("Store Operation Failed: {0}", e);
+                logger.LogInformation("Store Operation Failed: {0}", e);
 
                 // there is no need to distinguish between exception types.
                 return false;

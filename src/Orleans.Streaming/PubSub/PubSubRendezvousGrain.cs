@@ -70,7 +70,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterProducerFailed, $"Failed to register a stream producer.  Stream: {streamId}, Producer: {streamProducer}", exc);
+                logger.LogError((int)ErrorCode.Stream_RegisterProducerFailed, exc, $"Failed to register a stream producer.  Stream: {streamId}, Producer: {streamProducer}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -97,8 +97,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_UnegisterProducerFailed,
-                    $"Failed to unregister a stream producer.  Stream: {streamId}, Producer: {streamProducer}", exc);
+                logger.LogError((int)ErrorCode.Stream_UnegisterProducerFailed, exc, $"Failed to unregister a stream producer.  Stream: {streamId}, Producer: {streamProducer}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -136,8 +135,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterConsumerFailed,
-                    $"Failed to register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}", exc);
+                logger.LogError((int)ErrorCode.Stream_RegisterConsumerFailed, exc, $"Failed to register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -148,7 +146,7 @@ namespace Orleans.Streams
                 return;
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.Debug("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}",
+                logger.LogDebug("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}",
                     numProducers, streamConsumer, Utils.EnumerableToString(State.Producers));
 
             // Notify producers about a new streamConsumer.
@@ -186,8 +184,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterConsumerFailed,
-                    $"Failed to update producers while register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}", exc);
+                logger.LogError((int)ErrorCode.Stream_RegisterConsumerFailed, exc, $"Failed to update producers while register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -196,7 +193,7 @@ namespace Orleans.Streams
 
         private void RemoveProducer(PubSubPublisherState producer)
         {
-            logger.Warn(ErrorCode.Stream_ProducerIsDead,
+            logger.LogWarning((int)ErrorCode.Stream_ProducerIsDead,
                 "Producer {0} on stream {1} is no longer active - permanently removing producer.",
                 producer, producer.Stream);
 
@@ -230,8 +227,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_UnregisterConsumerFailed,
-                    $"Failed to unregister a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}", exc);
+                logger.LogError((int)ErrorCode.Stream_UnregisterConsumerFailed, exc, $"Failed to unregister a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -270,7 +266,7 @@ namespace Orleans.Streams
                     numConsumers = State.Consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
-                logger.Info("{0}. Now have total of {1} producers and {2} consumers. All Consumers = {3}, All Producers = {4}",
+                logger.LogInformation("{0}. Now have total of {1} producers and {2} consumers. All Consumers = {3}, All Producers = {4}",
                     when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
             }
         }
@@ -345,15 +341,14 @@ namespace Orleans.Streams
             try
             {
                 pubSubState.Fault();
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Setting subscription {0} to a faulted state.", subscriptionId.Guid);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Setting subscription {0} to a faulted state.", subscriptionId.Guid);
 
                 await WriteStateAsync();
                 await NotifyProducersOfRemovedSubscription(pubSubState.SubscriptionId, pubSubState.Stream);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_SetSubscriptionToFaultedFailed,
-                    $"Failed to set subscription state to faulted.  SubscriptionId {subscriptionId}", exc);
+                logger.LogError((int)ErrorCode.Stream_SetSubscriptionToFaultedFailed, exc, $"Failed to set subscription state to faulted.  SubscriptionId {subscriptionId}");
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -365,7 +360,7 @@ namespace Orleans.Streams
             int numProducersBeforeNotify = State.Producers.Count;
             if (numProducersBeforeNotify > 0)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Notifying {0} existing producers about unregistered consumer.", numProducersBeforeNotify);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Notifying {0} existing producers about unregistered consumer.", numProducersBeforeNotify);
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers

@@ -129,8 +129,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 }
                 catch (Exception exc)
                 {
-                    _logger.Warn((int)GoogleErrorCode.AcknowledgeMessage,
-                        $"Exception upon AcknowledgeMessages on queue {Id}. Ignoring.", exc);
+                    _logger.LogWarning((int)GoogleErrorCode.AcknowledgeMessage, exc, "Exception upon AcknowledgeMessages on queue {Id}. Ignoring.", Id);
                 }
             }
             finally

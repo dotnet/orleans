@@ -31,12 +31,12 @@ namespace StatelessCalculatorService
                         try
                         {
                             var value = await grain.Add(1);
-                            logger.Info($"{value - 1} + 1 = {value}");
+                            logger.LogInformation($"{value - 1} + 1 = {value}");
                             await Task.Delay(TimeSpan.FromSeconds(4));
                         }
                         catch (Exception exception)
                         {
-                            logger.Warn(exception.HResult, "Exception in bootstrap provider. Ignoring.", exception);
+                            logger.LogWarning(exception.HResult, "Exception in bootstrap provider. Ignoring.", exception);
                         }
                     }
                 }).Ignore();

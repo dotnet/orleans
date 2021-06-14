@@ -99,7 +99,7 @@ namespace Orleans.Messaging
             numMessages = 0;
             this.grainBuckets = new WeakReference<Connection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
                 () =>
@@ -120,7 +120,7 @@ namespace Orleans.Messaging
             {
                 queueTracking.OnStartExecution();
             }
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client started");
         }
 
         public void Stop()
@@ -153,7 +153,7 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                this.logger.Error(ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
+                this.logger.LogError((int)ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
                 return;
             }
 
@@ -167,8 +167,8 @@ namespace Orleans.Messaging
 
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.Trace(
-                        ErrorCode.ProxyClient_QueueRequest,
+                    this.logger.LogTrace(
+                        (int)ErrorCode.ProxyClient_QueueRequest,
                         "Sending message {0} via gateway {1}",
                         msg,
                         connection.RemoteEndPoint);
@@ -191,8 +191,8 @@ namespace Orleans.Messaging
 
                         if (this.logger.IsEnabled(LogLevel.Trace))
                         {
-                            this.logger.Trace(
-                                ErrorCode.ProxyClient_QueueRequest,
+                            this.logger.LogTrace(
+                                (int)ErrorCode.ProxyClient_QueueRequest,
                                 "Sending message {0} via gateway {1}",
                                 message,
                                 connection.RemoteEndPoint);
@@ -247,7 +247,7 @@ namespace Orleans.Messaging
                 if (numGateways == 0)
                 {
                     RejectMessage(msg, "No gateways available");
-                    logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                    logger.LogWarning((int)ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                     return new ValueTask<Connection>(default(Connection));
                 }
 
@@ -281,13 +281,13 @@ namespace Orleans.Messaging
             if (addr == null)
             {
                 RejectMessage(msg, "No gateways available");
-                logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                logger.LogWarning((int)ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                 return new ValueTask<Connection>(default(Connection));
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(
-                ErrorCode.ProxyClient_CreatedGatewayToGrain,
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(
+                (int)ErrorCode.ProxyClient_CreatedGatewayToGrain,
                 "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X",
                 addr,
                 msg.TargetGrain,
@@ -374,11 +374,11 @@ namespace Orleans.Messaging
             
             if (msg.Direction != Message.Directions.Request)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 OnReceivedMessage(error);

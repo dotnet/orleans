@@ -29,7 +29,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
@@ -51,7 +51,7 @@ namespace TestGrains
         public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
         {
             this.accumulated += items.Count;
-            logger.Info("Received {Count} generated event.  Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
+            logger.LogInformation("Received {Count} generated event.  Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
             if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
             {
                 return Task.CompletedTask;

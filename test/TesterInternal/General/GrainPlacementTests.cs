@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -44,7 +45,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
-            logger.Info("********************** Starting the test DefaultPlacementShouldBeRandom ******************************");
+            logger.LogInformation("********************** Starting the test DefaultPlacementShouldBeRandom ******************************");
             TestSilosStarted(2);
 
             var actual = await GrainFactory.GetGrain<IDefaultPlacementGrain>(GetRandomGrainId()).GetDefaultPlacement();
@@ -55,10 +56,10 @@ namespace UnitTests.General
         public async Task RandomlyPlacedGrainShouldPlaceActivationsRandomly()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            logger.Info("********************** Starting the test RandomlyPlacedGrainShouldPlaceActivationsRandomly ******************************");
+            logger.LogInformation("********************** Starting the test RandomlyPlacedGrainShouldPlaceActivationsRandomly ******************************");
             TestSilosStarted(2);
 
-            logger.Info("********************** TestSilosStarted passed OK. ******************************");
+            logger.LogInformation("********************** TestSilosStarted passed OK. ******************************");
             
             var grains =
                 Enumerable.Range(0, 20).
@@ -77,7 +78,7 @@ namespace UnitTests.General
         //public void PreferLocalPlacedGrainShouldPlaceActivationsLocally_OneHop()
         //{
         //    HostedCluster.WaitForLivenessToStabilize();
-        //    logger.Info("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
+        //    logger.LogInformation("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
         //    TestSilosStarted(2);
 
         //    int numGrains = 20;
@@ -92,7 +93,7 @@ namespace UnitTests.General
         //    foreach (int key in Enumerable.Range(0, numGrains))
         //    {
         //        string preferLocal = preferLocalGrainPlaces.ElementAt(key);
-        //        logger.Info(preferLocal);
+        //        logger.LogInformation(preferLocal);
         //    }
         //}
 
@@ -100,7 +101,7 @@ namespace UnitTests.General
         public async Task PreferLocalPlacedGrainShouldPlaceActivationsLocally_TwoHops()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            logger.Info("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
+            logger.LogInformation("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
             TestSilosStarted(2);
 
             int numGrains = 20;
@@ -153,7 +154,7 @@ namespace UnitTests.General
         /*public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            logger.Info("********************** Starting the test LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations ******************************");
+            logger.LogInformation("********************** Starting the test LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations ******************************");
             TestSilosStarted(2);
 
             // note: this amount should agree with both the specified minimum and maximum in the StatelessWorkerPlacement attribute
@@ -168,7 +169,7 @@ namespace UnitTests.General
         public async Task LocallyPlacedGrainShouldCreateActivationsOnLocalSilo()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            logger.Info("********************** Starting the test LocallyPlacedGrainShouldCreateActivationsOnLocalSilo ******************************");
+            logger.LogInformation("********************** Starting the test LocallyPlacedGrainShouldCreateActivationsOnLocalSilo ******************************");
             TestSilosStarted(2);
 
             const int sampleSize = 5;
@@ -296,7 +297,7 @@ namespace UnitTests.General
             Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
             foreach (var pair in statuses)
             {
-                logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                logger.LogInformation("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
                 Assert.Equal(
                     SiloStatus.Active,
                     pair.Value);

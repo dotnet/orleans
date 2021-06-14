@@ -159,7 +159,7 @@ namespace Orleans
                     this.Running = true;
                 }
 
-                if (_manager.logger.IsEnabled(LogLevel.Trace)) _manager.logger.Trace($"InvokeLocalObjectAsync {message} start {start}");
+                if (_manager.logger.IsEnabled(LogLevel.Trace)) _manager.logger.LogTrace($"InvokeLocalObjectAsync {message} start {start}");
 
                 if (start)
                 {
