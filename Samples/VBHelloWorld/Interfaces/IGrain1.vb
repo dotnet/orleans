@@ -1,7 +1,7 @@
-﻿''' <summary>
+''' <summary>
 ''' Orleans grain communication interface IGrain1
 ''' </summary>
-Public Interface IHello
+Public Interface IHelloGrain
     Inherits Orleans.IGrainWithIntegerKey
 
     Function SayHello(greeting As String) As Task(Of String)
