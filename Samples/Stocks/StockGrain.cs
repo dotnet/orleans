@@ -9,7 +9,7 @@ namespace Stocks.Grains
     public class StockGrain : Grain, IStockGrain
     {
         // Request api key from here https://www.alphavantage.co/support/#api-key
-        private const string ApiKey = "demo";
+        private const string ApiKey = "5NVLFTOEC34MVTDE";
         private readonly HttpClient _httpClient = new();
 
         private string _price;
