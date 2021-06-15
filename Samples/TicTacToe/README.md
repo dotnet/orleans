@@ -1,4 +1,4 @@
-# TicTacToe - Web-based game
+# TicTacToe - Web-based Game
 
 <p align="center">
     <img src="logo.png"/>
