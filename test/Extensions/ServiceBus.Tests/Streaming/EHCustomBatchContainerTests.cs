@@ -92,8 +92,8 @@ namespace ServiceBus.Tests.StreamingTests
 
         private class CustomDataAdapter : EventHubDataAdapter
         {
-            public CustomDataAdapter(SerializationManager serializationManager)
-                : base(serializationManager)
+            public CustomDataAdapter(Serializer serializer)
+                : base(serializer)
             {
             }
 
