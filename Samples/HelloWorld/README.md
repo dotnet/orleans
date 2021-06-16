@@ -1,6 +1,13 @@
 # *Hello, World!* Sample Application
 
-This sample demonstrates how to get started with Orleans. The sample consists of a single project which starts the Orleans-based application, sends a message to a grain, prints the response, and terminates when the user presses a key.
+*Hello, World!* applications are a rite of passage for programmers and this is our *Hello, World!* sample for Orleans.
+The sample consists of a single project which starts the Orleans-based application, sends a message to a grain, prints the response, and terminates when the user presses a key.
+
+### Demonstrates
+
+* How to get started with Orleans
+* How to define and implement grain interface
+* How to get a reference to a grain and call a grain
 
 To start our tour of the application, open [`IHelloGrain.cs`](./IHelloGrain.cs) and you will find the following interface declaration:
 

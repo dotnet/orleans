@@ -1,6 +1,13 @@
 # Stocks
 
-This sample demonstrates setup of an Orleans application which fetches stock prices from a remote service using `HttpClient`.
+This application fetches stock prices from a remote service using `HttpClient`, caches them in a grain, and displays them on screen.
+
+### Demonstrates
+
+* How to use Orleans from within a [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class).
+* How to use timers within a grain
+* How to make external service calls using .NET's `HttpClient` and cache the results within a grain.
+
 A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class) periodically requests the stock price for a variety of stocks from corresponding `StockGrain` instances.
 Each `StockGrain` is identified by its stock ticker symbol, for example, the string `"MSFT"`.
 

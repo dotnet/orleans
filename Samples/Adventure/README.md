@@ -1,10 +1,17 @@
 # Adventure - Text Adventure Game
 
-This sample demonstrates a short text adventure game built using Orleans in the style of [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure):
+Before there were graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure).
+Possibly lame by today's standards, back then it was a magical world of monsters, chirping birds, and things you could pick up.
+It's the inspiration for this sample.
 
 <p align="center">
     <img src="./assets/BoxArt.jpg" />
 </p>
+
+### Demonstrates
+
+* How to structure an application (in this case, a game) using grains
+* How to connect an external client to an Orleans cluster (`ClientBuilder`)
 
 The system consists of two parts: a server executable called *AdventureServer* and a client executable called *AdventureClient*.
 The server reads a game data file, `AdventureMap.json` by default, and initializes `RoomGrain` instances with that game data.

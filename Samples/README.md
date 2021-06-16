@@ -14,63 +14,20 @@ A *Hello, World!* application which demonstrates how to create and use your firs
 * How to define and implement grain interface
 * How to get a reference to a grain and call a grain
 
-## [Stocks](./Stocks/README.md)
-
-<p align="center">
-    <img src="./Stocks/screenshot.png" />
-</p>
-
-A stock price application which fetches prices from a remote service using an HTTP call and caches prices temporarily in a grain.
-A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class) periodically polls for updates stock prices from various `StockGrain` grains which correspond to a set of stock symbols.
-
-### Demonstrates
-
-* How to use Orleans from within a [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class).
-* How to use timers within a grain
-* How to make external service calls using .NET's `HttpClient` and cache the results within a grain.
-
 ## [Adventure](./Adventure/README.md)
 
 <p align="center">
     <img src="./Adventure/assets/BoxArt.jpg" />
 </p>
 
-A short text adventure game built using Orleans in the style of [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure):
+Before there were graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure).
+Possibly lame by today's standards, back then it was a magical world of monsters, chirping birds, and things you could pick up.
+It's the inspiration for this sample.
 
 ### Demonstrates
 
 * How to structure an application (in this case, a game) using grains
 * How to connect an external client to an Orleans cluster (`ClientBuilder`)
-
-## [Presence](./Presence/README.md)
-
-<p align="center">
-    <img src="./Presence/screenshot.png" />
-</p>
-
-A gaming presence service, similar to one of the Orleans-based services built for [Halo](https://www.xbox.com/games/halo).
-A presence service tracks players and game sessions in near-real-time.
-
-### Demonstrates
-
-* A simplified version of a real-world use of Orleans
-* Using a *grain observer* (`IGrainObserver`) to receive push notifications from grains
-
-## [GPS Tracker](./GPSTracker/README.md)
-
-<p align="center">
-    <img src="./GPSTracker/screenshot.jpeg" />
-</p>
-
-A service for tracking GPS-equipped [IoT](https://en.wikipedia.org/wiki/Internet_of_Things) devices on a map.
-Device locations are updated in near-real-time using SignalR and hence this sample demonstrates one approach to integrating Orleans with SignalR.
-The device updates originate from a *device gateway*, which is implemented using a separate process which connects to the main service and simulates a number of devices moving in a pseudorandom fashion around an area of San Francisco.
-
-### Demonstrates
-
-* How to use Orleans to build an [Internet of Things](https://en.wikipedia.org/wiki/Internet_of_Things) application
-* How Orleans can be co-hosted and integrated with [ASP.NET Core SignalR](https://docs.microsoft.com/aspnet/core/signalr/introduction)
-* How to broadcast real-time updates from a grain to a set of clients using Orleans and SignalR
 
 ## [Chirper](./Chirper/README.md)
 
@@ -88,6 +45,54 @@ Publishers send out short *"Chirp"* messages (not to be confused with *"Tweets"*
 * Grains which implement multiple grain interfaces
 * Reentrant grains, which allow for multiple grain calls to be executed concurrently, in a single-threaded, interleaving fashion
 * Using a *grain observer* (`IGrainObserver`) to receive push notifications from grains
+## [GPS Tracker](./GPSTracker/README.md)
+
+<p align="center">
+    <img src="./GPSTracker/screenshot.jpeg" />
+</p>
+
+A service for tracking GPS-equipped [IoT](https://en.wikipedia.org/wiki/Internet_of_Things) devices on a map.
+Device locations are updated in near-real-time using SignalR and hence this sample demonstrates one approach to integrating Orleans with SignalR.
+The device updates originate from a *device gateway*, which is implemented using a separate process which connects to the main service and simulates a number of devices moving in a pseudorandom fashion around an area of San Francisco.
+
+### Demonstrates
+
+* How to use Orleans to build an [Internet of Things](https://en.wikipedia.org/wiki/Internet_of_Things) application
+* How Orleans can be co-hosted and integrated with [ASP.NET Core SignalR](https://docs.microsoft.com/aspnet/core/signalr/introduction)
+* How to broadcast real-time updates from a grain to a set of clients using Orleans and SignalR
+
+## [HanBaoBao](https://github.com/ReubenBond/hanbaobao-web)
+
+<p align="center">
+    <img src="https://github.com/ReubenBond/hanbaobao-web/blob/main/assets/demo-1.png?raw=true" />
+</p>
+
+An English-Mandarin dictionary Web application demonstrating deployment to Kubernetes, fan-out grain calls, and request throttling.
+
+### Demonstrates
+
+* How to build a realistic application using Orleans
+* How to deploy an Orleans-based application to Kubernetes
+* How to integrate Orleans with ASP.NET Core and a [*Single-page Application*](https://en.wikipedia.org/wiki/Single-page_application) JavaScript framework ([Vue.js](https://vuejs.org/))
+* How to implement leaky-bucket request throttling
+* How to load and query data from a database
+* How to cache results lazily and temporarily
+* How to fan-out requests to many grains and collect the results
+
+## [Presence Service](./Presence/README.md)
+
+<p align="center">
+    <img src="./Presence/screenshot.png" />
+</p>
+
+A gaming presence service, similar to one of the Orleans-based services built for [Halo](https://www.xbox.com/games/halo).
+A presence service tracks players and game sessions in near-real-time.
+
+### Demonstrates
+
+* A simplified version of a real-world use of Orleans
+* Using a *grain observer* (`IGrainObserver`) to receive push notifications from grains
+
 
 ## [Tic Tac Toe](./TicTacToe/README.md)
 
@@ -146,6 +151,21 @@ Simulates bank accounts, using ACID transactions to transfer random amounts betw
 
 * How to use Orleans Transactions to safely perform operations involving multiple stateful grains with ACID guarantees and serializable isolation.
 
+## [Stocks](./Stocks/README.md)
+
+<p align="center">
+    <img src="./Stocks/screenshot.png" />
+</p>
+
+A stock price application which fetches prices from a remote service using an HTTP call and caches prices temporarily in a grain.
+A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class) periodically polls for updates stock prices from various `StockGrain` grains which correspond to a set of stock symbols.
+
+### Demonstrates
+
+* How to use Orleans from within a [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class).
+* How to use timers within a grain
+* How to make external service calls using .NET's `HttpClient` and cache the results within a grain.
+
 ## [Transport Layer Security](./TransportLayerSecurity/README.md)
 
 <p align="center">
@@ -157,20 +177,6 @@ A *Hello, World!* application configured to use mutual [*Transport Layer Securit
 ### Demonstrates
 
 * How to configure mutual-TLS (mTLS) authentication for Orleans
-
-## [HanBaoBao](https://github.com/ReubenBond/hanbaobao-web)
-
-<p align="center">
-    <img src="https://github.com/ReubenBond/hanbaobao-web/blob/main/assets/demo-1.png?raw=true" />
-</p>
-
-An English-Mandarin dictionary Web application demonstrating deployment to Kubernetes, fan-out grain calls, and request throttling.
-
-### Demonstrates
-
-* How to build a realistic application using Orleans
-* How to deploy an Orleans-based application to Kubernetes
-* How to integrate Orleans with ASP.NET Core and a [*Single-page Application*](https://en.wikipedia.org/wiki/Single-page_application) JavaScript framework ([Vue.js](https://vuejs.org/))
 
 ## [Visual Basic Hello World](./VBHelloWorld/README.md)
 
