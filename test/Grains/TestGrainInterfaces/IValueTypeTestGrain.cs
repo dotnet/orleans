@@ -162,9 +162,11 @@ public class ClassWithEnumTestData
         Task<RetVal> GetRetValForParamVal(ParamVal param);
     }
 
-    public record ParamVal(int Value);
+    [GenerateSerializer]
+    public record ParamVal([field: Id(0)] int Value);
 
-    public record RetVal(int Value);
+    [GenerateSerializer]
+    public record RetVal([field: Id(0)] int Value);
 
     [Serializable]
     [Immutable]
