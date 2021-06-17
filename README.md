@@ -150,9 +150,9 @@ Metadata and other information can be passed along a series of requests using [r
 
 Documentation is located [here](https://dotnet.github.io/orleans/docs/)
 
-## [Samples](./samples/README.md)
+## [Samples](./samples/#readme)
 
-A variety of samples are available in the [samples](./samples/README.md) directory.
+A variety of samples are available in the [samples](./samples/#readme) directory.
 
 ## Getting Started
 
