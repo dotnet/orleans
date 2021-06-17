@@ -12,17 +12,22 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// Second version of AzureQueueBatchContainer.  This version supports external serializers (like json)
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     internal class AzureQueueBatchContainerV2 : IBatchContainer
     {
         [JsonProperty]
+        [Id(0)]
         private EventSequenceTokenV2 sequenceToken;
 
         [JsonProperty]
+        [Id(1)]
         private readonly List<object> events;
 
         [JsonProperty]
+        [Id(2)]
         private readonly Dictionary<string, object> requestContext;
 
+        [Id(3)]
         public StreamId StreamId { get; }
 
         public StreamSequenceToken SequenceToken => sequenceToken;

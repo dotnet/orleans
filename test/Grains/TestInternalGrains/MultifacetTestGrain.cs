@@ -7,8 +7,10 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class MultifacetTestGrainState
     {
+        [Id(0)]
         public int Value { get; set; }
     }
 

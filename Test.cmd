@@ -32,9 +32,7 @@ set TESTS=^
 %CMDHOME%\test\DefaultCluster.Tests,^
 %CMDHOME%\test\NonSilo.Tests,^
 %CMDHOME%\test\Extensions\AWSUtils.Tests,^
-%CMDHOME%\test\Extensions\Serializers\BondUtils.Tests,^
 %CMDHOME%\test\Extensions\Consul.Tests,^
-%CMDHOME%\test\Extensions\Serializers\GoogleUtils.Tests,^
 %CMDHOME%\test\Extensions\ServiceBus.Tests,^
 %CMDHOME%\test\Extensions\TestServiceFabric,^
 %CMDHOME%\test\Extensions\TesterAdoNet,^
@@ -44,8 +42,7 @@ set TESTS=^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests,^
 %CMDHOME%\test\Orleans.Connections.Security.Tests,^
-%CMDHOME%\test\Analyzers.Tests,^
-%CMDHOME%\test\CodeGeneration\CodeGenerator.Tests
+%CMDHOME%\test\Analyzers.Tests
 
 @Echo Test assemblies = %TESTS%
 

@@ -1,14 +1,11 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.LeaseProviders;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using System;

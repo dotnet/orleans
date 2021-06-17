@@ -12,9 +12,9 @@ namespace Orleans.Hosting.Developer
             string name,
             Action<IEventDataGeneratorStreamConfigurator> configure)
         {
-            var configurator = new EventDataGeneratorStreamConfigurator(name,
-                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
-                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
+            var configurator = new EventDataGeneratorStreamConfigurator(
+                name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
             configure?.Invoke(configurator);
             return builder;
         }
@@ -28,8 +28,7 @@ namespace Orleans.Hosting.Developer
             Action<IEventDataGeneratorStreamConfigurator> configure)
         {
             var configurator = new EventDataGeneratorStreamConfigurator(name,
-                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
-                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

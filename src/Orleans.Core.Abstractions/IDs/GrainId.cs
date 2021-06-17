@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
@@ -12,10 +11,9 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
+    [GenerateSerializer]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        internal static IGrainIdLoggingHelper GrainTypeNameMapper { get; set; }
-
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
@@ -37,11 +35,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// The grain type.
         /// </summary>
+        [Id(1)]
         public GrainType Type { get; }
 
         /// <summary>
         /// The key.
         /// </summary>
+        [Id(2)]
         public IdSpan Key { get; }
 
         // TODO: remove implicit conversion (potentially make explicit to start with)
@@ -154,8 +154,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString()
         {
-            var type = GrainTypeNameMapper?.GetGrainTypeName(Type) ?? Type.ToStringUtf8();
-            return $"{type}/{Key.ToStringUtf8()}";
+            return $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
         }
 
         private static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");

@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Metadata;
-using Orleans.Runtime.Providers;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata

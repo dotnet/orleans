@@ -1,11 +1,7 @@
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.EventSourcing;
-using Orleans.Providers;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestGrainInterfaces;
 
@@ -24,9 +20,11 @@ namespace TestGrains
         /// We define this as a nested class, just for scoping convenience.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class GrainState
         {
             /// <summary>  the current count </summary>
+            [Id(0)]
             public Dictionary<string, int> Counts { get; set; }
 
             public GrainState()
@@ -34,7 +32,7 @@ namespace TestGrains
                 Counts = new Dictionary<string, int>();
             }
 
-            public void Apply(CountersGrain.UpdatedEvent e)
+            public void Apply(UpdatedEvent e)
             {
                 if (Counts.ContainsKey(e.Key))
                     Counts[e.Key] += e.Amount;
@@ -42,7 +40,7 @@ namespace TestGrains
                     Counts.Add(e.Key, e.Amount);
             }
 
-            public void Apply(CountersGrain.ResetAllEvent e)
+            public void Apply(ResetAllEvent e)
             {
                 Counts.Clear();
             }
@@ -52,9 +50,12 @@ namespace TestGrains
         /// An event representing a counter update
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class UpdatedEvent
         {
+            [Id(0)]
             public string Key { get; set; }
+            [Id(1)]
             public int Amount { get; set; }
         }
 
@@ -62,6 +63,7 @@ namespace TestGrains
         /// An event representing a reset of all counters
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class ResetAllEvent
         {
         }

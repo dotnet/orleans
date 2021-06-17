@@ -5,6 +5,7 @@ using Orleans.Metadata;
 namespace Orleans.Runtime
 {
     [Serializable]
+    [GenerateSerializer]
     public abstract class PlacementStrategy
     {
         protected PlacementStrategy()

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -65,7 +65,7 @@ namespace Orleans.Transactions.TestKit
     {
         public static async Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
-            ITransactionInfo ti = TransactionContext.GetTransactionInfo();
+            TransactionInfo ti = TransactionContext.GetTransactionInfo();
             List<string>[] results = new List<string>[tier + 1 + tiers.Length];
             results[tier] = new List<string>(new[] { ti?.Id });
 

@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
-using Orleans.CodeGenerator.Analysis;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.CodeGenerator.MSBuild
 {
     public class CodeGeneratorCommand
     {
-        private const string AbstractionsAssemblyShortName = "Orleans.Core.Abstractions";
+        private const string OrleansSerializationAssemblyShortName = "Orleans.Serialization";
 
         private static readonly int[] SuppressCompilerWarnings =
         {
@@ -29,8 +29,10 @@ namespace Orleans.CodeGenerator.MSBuild
             1998 // CS1998 - This async method lacks 'await' operators and will run synchronously
         };
 
+        public ILogger Log { get; set; }
+        
         /// <summary>
-        /// The MSBuild project path.
+        /// The MS Build project path.
         /// </summary>
         public string ProjectPath { get; set; }
 
@@ -52,17 +54,12 @@ namespace Orleans.CodeGenerator.MSBuild
         /// <summary>
         /// The source files.
         /// </summary>
-        public List<string> Compile { get; } = new List<string>();
+        public List<string> Compile { get; } = new();
 
         /// <summary>
         /// The libraries referenced by the project.
         /// </summary>
-        public List<string> Reference { get; } = new List<string>();
-
-        /// <summary>
-        /// The defined constants for the project.
-        /// </summary>
-        public List<string> DefineConstants { get; } = new List<string>();
+        public List<string> Reference { get; } = new();
 
         /// <summary>
         /// The file which holds the generated code.
@@ -70,100 +67,119 @@ namespace Orleans.CodeGenerator.MSBuild
         public string CodeGenOutputFile { get; set; }
 
         /// <summary>
-        /// The project's assembly name, important for id calculations.
+        /// The metadata name of the attribute used to specify ids.
         /// </summary>
-        public string AssemblyName { get; set; }
-
-        /// <summary>
-        /// Whether or not to add <see cref="DebuggerStepThroughAttribute"/> to generated code.
-        /// </summary>
-        public bool DebuggerStepThrough { get; set; }
+        public List<string> IdAttributes { get; set; } = new();
+        public List<string> AliasAttributes { get; private set; } = new();
+        public List<string> ImmutableAttributes { get; private set; } = new();
+        public List<string> GenerateSerializerAttributes { get; private set; } = new();
 
         public async Task<bool> Execute(CancellationToken cancellationToken)
         {
-            var stopwatch = Stopwatch.StartNew();
-            var projectName = Path.GetFileNameWithoutExtension(ProjectPath);
-            var projectId = !string.IsNullOrEmpty(ProjectGuid) && Guid.TryParse(ProjectGuid, out var projectIdGuid)
-                ? ProjectId.CreateFromSerialized(projectIdGuid)
-                : ProjectId.CreateNewId();
-
-            var languageName = GetLanguageName(ProjectPath);
-
-            var projectInfo = ProjectInfo.Create(
-                projectId,
-                VersionStamp.Default,
-                projectName,
-                AssemblyName,
-                languageName,
-                ProjectPath,
-                TargetPath,
-                CreateCompilationOptions(this),
-                documents: GetDocuments(Compile, projectId),
-                metadataReferences: GetMetadataReferences(Reference),
-                parseOptions: new CSharpParseOptions(preprocessorSymbols: this.DefineConstants)
-            );
-            
-            var workspace = new AdhocWorkspace();
-            workspace.AddProject(projectInfo);
-
-            var project = workspace.CurrentSolution.Projects.Single();
-            stopwatch.Restart();
-
-            var compilation = await project.GetCompilationAsync(cancellationToken);
-            stopwatch.Restart();
-
-            if (!compilation.SyntaxTrees.Any())
+            try
             {
-                Console.WriteLine($"Skipping empty project, {compilation.AssemblyName}.");
+                var projectName = Path.GetFileNameWithoutExtension(ProjectPath);
+                var projectId = !string.IsNullOrEmpty(ProjectGuid) && Guid.TryParse(ProjectGuid, out var projectIdGuid)
+                    ? ProjectId.CreateFromSerialized(projectIdGuid)
+                    : ProjectId.CreateNewId();
+
+                Log.LogDebug($"ProjectGuid: {ProjectGuid}");
+                Log.LogDebug($"ProjectID: {projectId}");
+
+                var languageName = GetLanguageName(ProjectPath);
+                var documents = GetDocuments(Compile, projectId).ToList();
+                var metadataReferences = GetMetadataReferences(Reference).ToList();
+                
+                foreach (var doc in documents)
+                {
+                    Log.LogDebug($"Document: {doc.FilePath}");
+                }
+
+                foreach (var reference in metadataReferences)
+                {
+                    Log.LogDebug($"Reference: {reference.Display}");
+                }
+
+                var projectInfo = ProjectInfo.Create(
+                    projectId,
+                    VersionStamp.Create(),
+                    projectName,
+                    projectName,
+                    languageName,
+                    ProjectPath,
+                    TargetPath,
+                    CreateCompilationOptions(OutputType, languageName),
+                    documents: documents,
+                    metadataReferences: metadataReferences
+                );
+                Log.LogDebug($"Project: {projectInfo}");
+
+                var workspace = new AdhocWorkspace();
+                _ = workspace.AddProject(projectInfo);
+
+                var project = workspace.CurrentSolution.Projects.Single();
+
+                var stopwatch = Stopwatch.StartNew();
+                var compilation = await project.GetCompilationAsync(cancellationToken);
+                Log.LogInformation($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
+
+                if (compilation.ReferencedAssemblyNames.All(name => name.Name != OrleansSerializationAssemblyShortName))
+                {
+                    return false;
+                }
+
+                var codeGeneratorOptions = new CodeGeneratorOptions();
+                codeGeneratorOptions.IdAttributes.AddRange(IdAttributes);
+                codeGeneratorOptions.AliasAttributes.AddRange(AliasAttributes);
+                codeGeneratorOptions.ImmutableAttributes.AddRange(ImmutableAttributes);
+                codeGeneratorOptions.GenerateSerializerAttributes.AddRange(GenerateSerializerAttributes);
+
+                var generator = new CodeGenerator(compilation, codeGeneratorOptions);
+                stopwatch.Restart();
+                var syntax = generator.GenerateCode(cancellationToken);
+                Log.LogInformation($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
+                stopwatch.Restart();
+                
+                var normalized = syntax.NormalizeWhitespace();
+                Log.LogInformation($"NormalizeWhitespace completed in {stopwatch.ElapsedMilliseconds}ms.");
+                stopwatch.Restart();
+
+                var source = normalized.ToFullString();
+                Log.LogInformation($"Generate source from syntax completed in {stopwatch.ElapsedMilliseconds}ms.");
+                stopwatch.Restart();
+                using (var sourceWriter = new StreamWriter(CodeGenOutputFile))
+                {
+                    sourceWriter.WriteLine("#if !EXCLUDE_GENERATED_CODE");
+                    foreach (var warningNum in SuppressCompilerWarnings)
+                    {
+                        await sourceWriter.WriteLineAsync($"#pragma warning disable {warningNum}");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(source))
+                    {
+                        await sourceWriter.WriteLineAsync(source);
+                    }
+
+                    foreach (var warningNum in SuppressCompilerWarnings)
+                    {
+                        await sourceWriter.WriteLineAsync($"#pragma warning restore {warningNum}");
+                    }
+
+                    sourceWriter.WriteLine("#endif");
+                }
+                Log.LogInformation($"Write source to disk completed in {stopwatch.ElapsedMilliseconds}ms.");
+
                 return true;
             }
-
-            if (compilation.ReferencedAssemblyNames.All(name => name.Name != AbstractionsAssemblyShortName))
+            catch (ReflectionTypeLoadException rtle)
             {
-                Console.WriteLine($"Project {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
-                return false;
-            }
-
-            var options = new CodeGeneratorOptions
-            {
-                DebuggerStepThrough = this.DebuggerStepThrough
-            };
-            var generator = new CodeGenerator(new CodeGeneratorExecutionContext { Compilation = compilation }, options);
-            var syntax = generator.GenerateCode(cancellationToken);
-            stopwatch.Restart();
-
-            var normalized = syntax.NormalizeWhitespace();
-            stopwatch.Restart();
-            
-            var sourceBuilder = new StringBuilder();
-            sourceBuilder.AppendLine("// <auto-generated />");
-            sourceBuilder.AppendLine("#if !EXCLUDE_GENERATED_CODE");
-            foreach (var warningNum in SuppressCompilerWarnings) sourceBuilder.AppendLine($"#pragma warning disable {warningNum}");
-            sourceBuilder.AppendLine(normalized.ToFullString());
-            foreach (var warningNum in SuppressCompilerWarnings) sourceBuilder.AppendLine($"#pragma warning restore {warningNum}");
-            sourceBuilder.AppendLine("#endif");
-            var source = sourceBuilder.ToString();
-
-            stopwatch.Restart();
-
-            if (File.Exists(this.CodeGenOutputFile))
-            {
-                using (var reader = new StreamReader(this.CodeGenOutputFile))
+                foreach (var ex in rtle.LoaderExceptions)
                 {
-                    var existing = await reader.ReadToEndAsync();
-                    if (string.Equals(source, existing, StringComparison.Ordinal))
-                    {
-                        return true;
-                    }
+                    Log.LogDebug($"Exception: {ex}");
                 }
-            }
 
-            using (var sourceWriter = new StreamWriter(this.CodeGenOutputFile))
-            {
-                await sourceWriter.WriteAsync(source);
+                throw;
             }
-
-            return true;
         }
 
         private static IEnumerable<DocumentInfo> GetDocuments(List<string> sources, ProjectId projectId) =>
@@ -185,25 +201,21 @@ namespace Orleans.CodeGenerator.MSBuild
             ?? (IEnumerable<MetadataReference>)Array.Empty<MetadataReference>();
 
 
-        private static string GetLanguageName(string projectPath)
+        private static string GetLanguageName(string projectPath) => (Path.GetExtension(projectPath)) switch
         {
-            switch (Path.GetExtension(projectPath))
-            {
-                case ".csproj":
-                    return LanguageNames.CSharp;
-                case string ext when !string.IsNullOrWhiteSpace(ext):
-                    throw new NotSupportedException($"Projects of type {ext} are not supported.");
-                default:
-                    throw new InvalidOperationException("Could not determine supported language from project path");
+            ".csproj" => LanguageNames.CSharp,
+            string ext when !string.IsNullOrWhiteSpace(ext) => throw new NotSupportedException($"Projects of type {ext} are not supported."),
+            _ => throw new InvalidOperationException("Could not determine supported language from project path"),
+        };
 
-            }
-        }
-
-        private static CompilationOptions CreateCompilationOptions(CodeGeneratorCommand command)
+        private static CompilationOptions CreateCompilationOptions(string outputType, string languageName)
         {
-            OutputKind kind;
-            switch (command.OutputType)
+            OutputKind? kind = null;
+            switch (outputType)
             {
+                case "Library":
+                    kind = OutputKind.DynamicallyLinkedLibrary;
+                    break;
                 case "Exe":
                     kind = OutputKind.ConsoleApplication;
                     break;
@@ -213,29 +225,17 @@ namespace Orleans.CodeGenerator.MSBuild
                 case "Winexe":
                     kind = OutputKind.WindowsApplication;
                     break;
-                default:
-                case "Library":
-                    kind = OutputKind.DynamicallyLinkedLibrary;
-                    break;
             }
 
-            return new CSharpCompilationOptions(kind)
-                .WithMetadataImportOptions(MetadataImportOptions.All)
-                .WithAllowUnsafe(true)
-                .WithConcurrentBuild(true)
-                .WithOptimizationLevel(OptimizationLevel.Debug);
-        }
-    }
+            if (kind.HasValue)
+            {
+                if (languageName == LanguageNames.CSharp)
+                {
+                    return new CSharpCompilationOptions(kind.Value);
+                }
+            }
 
-    public class CodeGeneratorExecutionContext : IGeneratorExecutionContext
-    {
-        public Compilation Compilation { get; init; }
-
-        public CancellationToken CancellationToken => CancellationToken.None;
-
-        public void ReportDiagnostic(Diagnostic diagnostic)
-        {
-            Console.WriteLine($"[{diagnostic.Id}] {diagnostic.Severity} at {diagnostic.Location}: {diagnostic.GetMessage()}");
+            return null;
         }
     }
 }

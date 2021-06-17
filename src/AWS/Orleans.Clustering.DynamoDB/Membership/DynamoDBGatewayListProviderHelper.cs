@@ -1,10 +1,6 @@
 using System;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-
-using Orleans.Clustering.DynamoDB;
 using Orleans.Configuration;
-using Orleans.Messaging;
 
 namespace Orleans.Clustering.DynamoDB
 {

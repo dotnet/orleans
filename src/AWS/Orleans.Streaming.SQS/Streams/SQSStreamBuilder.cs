@@ -4,21 +4,14 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using OrleansAWSUtils.Streams;
 using Orleans.Providers.Streams.Common;
-using Orleans.ApplicationParts;
 
 namespace Orleans.Hosting
 {
     public class SiloSqsStreamConfigurator : SiloPersistentStreamConfigurator
     {
-        public SiloSqsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+        public SiloSqsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, SQSAdapterFactory.Create)
         {
-            configureAppPartsDelegate(parts =>
-            {
-                parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
-                    .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-            });
-
             this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<SqsOptions>(name)
@@ -52,11 +45,6 @@ namespace Orleans.Hosting
             : base(name, builder, SQSAdapterFactory.Create)
         {
             builder
-                .ConfigureApplicationParts(parts =>
-                {
-                    parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
-                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                })
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name)

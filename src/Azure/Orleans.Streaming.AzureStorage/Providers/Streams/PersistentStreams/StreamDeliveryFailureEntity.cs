@@ -62,20 +62,20 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Sets sequence token by serializing it to property.
         /// </summary>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="token"></param>
-        public virtual void SetSequenceToken(SerializationManager serializationManager, StreamSequenceToken token)
+        public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken token)
         {
-            SequenceToken = token != null ? GetTokenBytes(serializationManager, token) : null;
+            SequenceToken = token != null ? serializer.SerializeToArray(token) : null;
         }
 
         /// <summary>
         /// Gets sequence token by deserializing it from property.
         /// </summary>
         /// <returns></returns>
-        public virtual StreamSequenceToken GetSequenceToken(SerializationManager serializationManager)
+        public virtual StreamSequenceToken GetSequenceToken(Serializer<StreamSequenceToken> serializer)
         {
-            return SequenceToken != null ? TokenFromBytes(serializationManager, SequenceToken) : null;
+            return SequenceToken != null ? serializer.Deserialize(SequenceToken) : null;
         }
 
         /// <summary>
@@ -92,21 +92,6 @@ namespace Orleans.Providers.Streams.PersistentStreams
         {
             var now = DateTime.UtcNow;
             return DateTime.MaxValue.Ticks - now.Ticks;
-        }
-
-        private static byte[] GetTokenBytes(SerializationManager serializationManager, StreamSequenceToken token)
-        {
-            var bodyStream = new BinaryTokenStreamWriter();
-            serializationManager.Serialize(token, bodyStream);
-            var result = bodyStream.ToByteArray();
-            bodyStream.ReleaseBuffers();
-            return result;
-        }
-
-        private static StreamSequenceToken TokenFromBytes(SerializationManager serializationManager, byte[] bytes)
-        {
-            var stream = new BinaryTokenStreamReader(bytes);
-            return serializationManager.Deserialize<StreamSequenceToken>(stream);
         }
     }
 }

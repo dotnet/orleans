@@ -4,8 +4,10 @@ using System.Threading;
 namespace UnitTests.TestHelper
 {
     [Serializable]
+    [Orleans.GenerateSerializer]
     public sealed class InterlockedFlag
     {
+        [Orleans.Id(0)]
         private int _value;
 
         public InterlockedFlag()

@@ -1,5 +1,4 @@
 using System;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
@@ -7,8 +6,10 @@ namespace Orleans.Runtime
     /// Uniquely identifies a grain interface.
     /// </summary>
     [Serializable, Immutable]
+    [GenerateSerializer]
     public readonly struct GrainInterfaceType : IEquatable<GrainInterfaceType>
     {
+        [Id(1)]
         private readonly IdSpan _value;
 
         /// <summary>

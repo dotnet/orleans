@@ -34,7 +34,7 @@ namespace Orleans.Storage
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
 
         private readonly DynamoDBStorageOptions options;
-        private readonly SerializationManager serializationManager;
+        private readonly Serializer serializer;
         private readonly ILogger logger;
         private readonly IServiceProvider serviceProvider;
         private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
@@ -49,7 +49,7 @@ namespace Orleans.Storage
         public DynamoDBGrainStorage(
             string name,
             DynamoDBStorageOptions options,
-            SerializationManager serializationManager,
+            Serializer serializer,
             IServiceProvider serviceProvider,
             GrainReferenceKeyStringConverter grainReferenceConverter,
             ILogger<DynamoDBGrainStorage> logger)
@@ -57,7 +57,7 @@ namespace Orleans.Storage
             this.name = name;
             this.logger = logger;
             this.options = options;
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
             this.serviceProvider = serviceProvider;
             this.grainReferenceConverter = grainReferenceConverter;
         }
@@ -319,7 +319,7 @@ namespace Orleans.Storage
                 if (binaryData?.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializer.Deserialize<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
@@ -366,7 +366,7 @@ namespace Orleans.Storage
             else
             {
                 // Convert to binary format
-                entity.BinaryState = this.serializationManager.SerializeToByteArray(grainState);
+                entity.BinaryState = this.serializer.SerializeToArray(grainState);
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",

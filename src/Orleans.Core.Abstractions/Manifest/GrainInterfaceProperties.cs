@@ -10,6 +10,7 @@ namespace Orleans.Metadata
     /// Information about a communication interface.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class GrainInterfaceProperties
     {
         /// <summary>
@@ -23,6 +24,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the properties.
         /// </summary>
+        [Id(1)]
         public ImmutableDictionary<string, string> Properties { get; }
 
         /// <summary>
@@ -84,7 +86,7 @@ namespace Orleans.Metadata
     }
 
     /// <summary>
-    /// Interface for <see cref="System.Attribute"/> classes which provide information about a grain interface.
+    /// Interface for <see cref="Attribute"/> classes which provide information about a grain interface.
     /// </summary>
     public interface IGrainInterfacePropertiesProviderAttribute
     {

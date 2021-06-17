@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

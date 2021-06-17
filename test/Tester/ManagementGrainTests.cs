@@ -4,8 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -105,7 +105,7 @@ namespace UnitTests.Management
             SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Before Create");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
-            string grainType = typeof(TGrain).FullName;
+            string grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(random.Next());

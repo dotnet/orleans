@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
@@ -48,7 +47,8 @@ namespace Orleans.Streams
             IStreamFilter streamFilter,
             StreamPullingAgentOptions options,
             ILoggerFactory loggerFactory,
-            SiloAddress siloAddress)
+            SiloAddress siloAddress,
+            IQueueAdapter queueAdapter)
             : base(managerId, siloAddress, lowPriority: false, loggerFactory)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
@@ -76,6 +76,8 @@ namespace Orleans.Streams
             queueBalancer = streamQueueBalancer;
             this.streamFilter = streamFilter;
             this.adapterFactory = adapterFactory;
+            this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
+
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = loggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
@@ -84,14 +86,10 @@ namespace Orleans.Streams
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
         }
 
-        public async Task Initialize(Immutable<IQueueAdapter> qAdapter)
+        public async Task Initialize()
         {
-            if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
-
             Log(ErrorCode.PersistentStreamPullingManager_02, "Init.");
 
-            // Remove cast once we cleanup
-            queueAdapter = qAdapter.Value;
             await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
@@ -223,7 +221,8 @@ namespace Orleans.Streams
                 {
                     var agentIdNumber = Interlocked.Increment(ref nextAgentId);
                     var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo);
+                    IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo,  queueAdapter, queueAdapterCache, deliveryFailureHandler);
                     this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
@@ -265,10 +264,9 @@ namespace Orleans.Streams
         {
             // Init the agent only after it was registered locally.
             var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
-            var queueAdapterCacheAsImmutable = queueAdapterCache != null ? queueAdapterCache.AsImmutable() : new Immutable<IQueueAdapterCache>(null);
-            IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(agent.QueueId);
+
             // Need to call it as a grain reference.
-            var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable, deliveryFailureHandler.AsImmutable()));
+            var task = agentGrainRef.Initialize();
             await task.LogException(logger, ErrorCode.PersistentStreamPullingManager_09, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
         }
 

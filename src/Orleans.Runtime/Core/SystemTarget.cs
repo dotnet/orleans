@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -197,6 +198,24 @@ namespace Orleans.Runtime
             return (implementation, reference);
         }
 
+        TComponent ITargetHolder.GetComponent<TComponent>()
+        {
+            var result = this.GetComponent<TComponent>();
+            if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
+            {
+                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TComponent));
+                if (implementation is not TComponent typedResult)
+                {
+                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
+                }
+
+                this.SetComponent<TComponent>(typedResult);
+                result = typedResult;
+            }
+
+            return result;
+        }
+
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : IGrainExtension
         {
@@ -240,6 +259,8 @@ namespace Orleans.Runtime
                     this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
                     break;
             }
-        } 
+        }
+
+        public TTarget GetTarget<TTarget>() => (TTarget)(object)this;
     }
 }

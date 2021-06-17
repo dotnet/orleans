@@ -1,13 +1,18 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.ProtobufNet
 {
     /// <summary>
     /// An implementation of IExternalSerializer for usage with Protobuf types, using the protobuf-net library.
     /// </summary>
-    public class ProtobufNetSerializer : IExternalSerializer
+    [WellKnownAlias("pb-net")]
+    public class ProtobufNetSerializer : IGeneralizedCodec, IGeneralizedCopier
     {
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem> Cache = new();
 
@@ -22,19 +27,16 @@ namespace Orleans.Serialization.ProtobufNet
             {
                 return cacheItem.IsSupported;
             }
+
             return Cache.GetOrAdd(itemType.TypeHandle, new ProtobufTypeCacheItem(itemType)).IsSupported;
         }
 
-        /// <inheritdoc />
-        public object DeepCopy(object source, ICopyContext context)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (source == null)
-            {
-                return null;
-            }
-            var cacheItem = Cache[source.GetType().TypeHandle];
-            return cacheItem.IsImmutable ? source : ProtoBuf.Serializer.DeepClone(source);
+
         }
+
+        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => throw new NotImplementedException();
 
         /// <inheritdoc />
         public void Serialize(object item, ISerializationContext context, Type expectedType)
@@ -52,7 +54,7 @@ namespace Orleans.Serialization.ProtobufNet
                 context.StreamWriter.Write(0);
                 return;
             }
-            
+
             using (var stream = new MemoryStream())
             {
                 ProtoBuf.Serializer.Serialize(stream, item);
@@ -96,6 +98,17 @@ namespace Orleans.Serialization.ProtobufNet
             }
 
             return message;
+        }
+
+        public object DeepCopy(object input, CopyContext context)
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            var cacheItem = Cache[input.GetType().TypeHandle];
+            return cacheItem.IsImmutable ? input : ProtoBuf.Serializer.DeepClone((object)input);
         }
     }
 }

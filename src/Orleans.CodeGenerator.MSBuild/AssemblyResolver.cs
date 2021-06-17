@@ -7,23 +7,23 @@ using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.DependencyModel.Resolution;
 
-namespace Microsoft.Orleans.CodeGenerator.MSBuild
+namespace Orleans.CodeGenerator.MSBuild
 {
     /// <summary>
     /// Simple class that loads the reference assemblies upon the AppDomain.AssemblyResolve
     /// </summary>
     internal class AssemblyResolver : IDisposable
     {
-        private readonly ICompilationAssemblyResolver assemblyResolver;
-
-        private readonly DependencyContext resolverRependencyContext;
-        private readonly AssemblyLoadContext loadContext;
+        private readonly ICompilationAssemblyResolver _assemblyResolver;
+        
+        private readonly DependencyContext _resolverRependencyContext;
+        private readonly AssemblyLoadContext _loadContext;
 
         public AssemblyResolver()
         {
-            this.resolverRependencyContext = DependencyContext.Load(typeof(AssemblyResolver).Assembly);
+            _resolverRependencyContext = DependencyContext.Load(typeof(AssemblyResolver).Assembly);
             var codegenPath = Path.GetDirectoryName(new Uri(typeof(AssemblyResolver).Assembly.Location).LocalPath);
-            this.assemblyResolver = new CompositeCompilationAssemblyResolver(
+            _assemblyResolver = new CompositeCompilationAssemblyResolver(
                 new ICompilationAssemblyResolver[]
                 {
                     new AppBaseCompilationAssemblyResolver(codegenPath),
@@ -31,23 +31,23 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                     new PackageCompilationAssemblyResolver()
                 });
 
-            AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
-            this.loadContext = AssemblyLoadContext.GetLoadContext(typeof(AssemblyResolver).Assembly);
-            this.loadContext.Resolving += this.AssemblyLoadContextResolving;
-            if (this.loadContext != AssemblyLoadContext.Default)
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
+            _loadContext = AssemblyLoadContext.GetLoadContext(typeof(AssemblyResolver).Assembly);
+            _loadContext.Resolving += AssemblyLoadContextResolving;
+            if (_loadContext != AssemblyLoadContext.Default)
             {
-                AssemblyLoadContext.Default.Resolving += this.AssemblyLoadContextResolving;
+                AssemblyLoadContext.Default.Resolving += AssemblyLoadContextResolving;
             }
         }
 
         public void Dispose()
         {
-            AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
+            AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
 
-            this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
-            if (this.loadContext != AssemblyLoadContext.Default)
+            _loadContext.Resolving -= AssemblyLoadContextResolving;
+            if (_loadContext != AssemblyLoadContext.Default)
             {
-                AssemblyLoadContext.Default.Resolving -= this.AssemblyLoadContextResolving;
+                AssemblyLoadContext.Default.Resolving -= AssemblyLoadContextResolving;
             }
         }
 
@@ -57,18 +57,18 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         /// <param name="sender">The source of the event.</param>
         /// <param name="args">The event data.</param>
         /// <returns>The assembly that resolves the type, assembly, or resource; 
-        /// or null if the assembly cannot be resolved.
+        /// or null if theassembly cannot be resolved.
         /// </returns>
-        public Assembly ResolveAssembly(object sender, ResolveEventArgs args)
-        {
-            return this.AssemblyLoadContextResolving(null, new AssemblyName(args.Name));
-        }
+        public Assembly ResolveAssembly(object sender, ResolveEventArgs args) => AssemblyLoadContextResolving(null, new AssemblyName(args.Name));
 
         public Assembly AssemblyLoadContextResolving(AssemblyLoadContext context, AssemblyName name)
         {
             // Attempt to resolve the library from one of the dependency contexts.
-            var library = this.resolverRependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch);
-            if (library == null) return null;
+            var library = _resolverRependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch);
+            if (library is null)
+            {
+                return null;
+            }
 
             var wrapper = new CompilationLibrary(
                 library.Type,
@@ -80,12 +80,15 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                 library.Serviceable);
 
             var assemblies = new List<string>();
-            if (this.assemblyResolver.TryResolveAssemblyPaths(wrapper, assemblies))
+            if (_assemblyResolver.TryResolveAssemblyPaths(wrapper, assemblies))
             {
                 foreach (var asm in assemblies)
                 {
-                    var assembly = this.TryLoadAssemblyFromPath(asm);
-                    if (assembly != null) return assembly;
+                    var assembly = TryLoadAssemblyFromPath(asm);
+                    if (assembly != null)
+                    {
+                        return assembly;
+                    }
                 }
             }
 
@@ -101,7 +104,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         {
             try
             {
-                return this.loadContext.LoadFromAssemblyPath(path);
+                return _loadContext.LoadFromAssemblyPath(path);
             }
             catch
             {

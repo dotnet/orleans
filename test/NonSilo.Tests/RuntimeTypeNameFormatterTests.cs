@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
 using Xunit;
 using Xunit.Abstractions;

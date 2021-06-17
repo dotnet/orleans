@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -11,6 +12,7 @@ namespace Orleans.Analyzers
         public const string DiagnosticId = "ORLEANS0003";
         private const string BaseInterfaceName = "Orleans.IGrain";
         private const string BaseClassName = "Orleans.Grain";
+        private const string BaseGrainReferenceName = "Orleans.Runtime.GrainReference";
         public const string Title = "Non-abstract classes that implement IGrain should derive from the base class Orleans.Grain";
         public const string MessageFormat = Title;
         private const string Category = "Usage";
@@ -38,15 +40,28 @@ namespace Orleans.Analyzers
             if (diagnostics.Any()) return;
 
             // continue only if the class implements IGrain
-            var GrainInterfaceType = context.Compilation.GetTypeByMetadataName(BaseInterfaceName);
-            if (GrainInterfaceType == null || !namedSymbol.AllInterfaces.Contains(GrainInterfaceType)) return;
+            var orleansIGrainType = context.Compilation.GetTypeByMetadataName(BaseInterfaceName);
+            if (orleansIGrainType == null || !namedSymbol.AllInterfaces.Contains(orleansIGrainType)) return;
 
             // Get the base type of the class
-            var GrainType = context.Compilation.GetTypeByMetadataName(BaseClassName);
+            var orleansGrainBaseType = context.Compilation.GetTypeByMetadataName(BaseClassName);
+            var orleansGrainReferenceBaseType = context.Compilation.GetTypeByMetadataName(BaseGrainReferenceName);
             var baseType = namedSymbol.BaseType;
-            
-            // Check equality with the base class
-            if (!SymbolEqualityComparer.Default.Equals(baseType, GrainType))
+
+            // Check equality with the class hierarchy
+            bool hasGrainBase = false;
+            while (baseType is { })
+            {
+                if (SymbolEqualityComparer.Default.Equals(baseType, orleansGrainBaseType) || SymbolEqualityComparer.Default.Equals(baseType, orleansGrainReferenceBaseType))
+                {
+                    hasGrainBase = true;
+                    break;
+                }
+
+                baseType = baseType.BaseType;
+            }
+
+            if (!hasGrainBase)
             {
                 var location = namedSymbol.Locations.FirstOrDefault();
 

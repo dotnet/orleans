@@ -73,7 +73,7 @@ namespace Orleans.Storage
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
     public class AdoNetGrainStorage: IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private SerializationManager serializationManager;
+        private Serializer serializer;
 
         /// <summary>
         /// Tag for BinaryFormatSerializer
@@ -397,7 +397,7 @@ namespace Orleans.Storage
         /// <summary> Initialization function for this storage provider. </summary>
         private async Task Init(CancellationToken cancellationToken)
         {
-            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
+            this.serializer = providerRuntime.ServiceProvider.GetRequiredService<Serializer>();
 
             //NOTE: StorageSerializationPicker should be defined outside and given as a parameter in constructor or via Init in IProviderConfiguration perhaps.
             //Currently this limits one's options to much to the current situation of providing only one serializer for serialization and deserialization
@@ -582,7 +582,7 @@ namespace Orleans.Storage
             //if none are set true, configure binary format serializer by default
             if(!options.UseXmlFormat && !options.UseJsonFormat)
             {
-                deserializers.Add(new OrleansStorageDefaultBinaryDeserializer(this.serializationManager, BinaryFormatSerializerTag));
+                deserializers.Add(new OrleansStorageDefaultBinaryDeserializer(this.serializer, BinaryFormatSerializerTag));
             }
 
             return deserializers;
@@ -607,7 +607,7 @@ namespace Orleans.Storage
             //if none are set true, configure binary format serializer by default
             if (!options.UseXmlFormat && !options.UseJsonFormat)
             {
-                serializers.Add(new OrleansStorageDefaultBinarySerializer(this.serializationManager, BinaryFormatSerializerTag));
+                serializers.Add(new OrleansStorageDefaultBinarySerializer(this.serializer, BinaryFormatSerializerTag));
             }
 
             return serializers;

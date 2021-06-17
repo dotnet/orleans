@@ -40,7 +40,7 @@ namespace UnitTests.OrleansRuntime
 
             var mgmt1Address2 = await mgmt2.GetActivationAddress(mgmt1);
             Assert.NotNull(mgmt1Address2);
-            Assert.True(mgmt1Address == mgmt1Address2);
+            Assert.True(mgmt1Address.Equals(mgmt1Address2));
 
             var worker = this.fixture.Client.GetGrain<IDumbWorker>(0);
             await Assert.ThrowsAnyAsync<InvalidOperationException>(async () => await mgmt1.GetActivationAddress(worker));

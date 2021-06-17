@@ -72,7 +72,7 @@ namespace Orleans.Runtime.ReminderService
             }
 
             lifecycle.Subscribe(
-                nameof(GrainBasedReminderTable),
+                nameof(InMemoryReminderTable),
                 ServiceLifecycleStage.ApplicationServices,
                 OnApplicationServicesStart,
                 OnApplicationServicesStop);

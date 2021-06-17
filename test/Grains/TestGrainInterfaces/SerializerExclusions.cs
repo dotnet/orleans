@@ -19,8 +19,10 @@ namespace Orleans.UnitTest.GrainInterfaces
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class MyTypeWithAnInternalTypeField
     {
+        [Id(0)]
         private MyInternalDependency _dependency;
 
         public MyTypeWithAnInternalTypeField()

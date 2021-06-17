@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -12,6 +11,7 @@ namespace Orleans.Runtime.Messaging
         internal static readonly object ServicesKey = new object();
         private readonly ConnectionCommon connectionShared;
         private readonly ClientConnectionOptions clientConnectionOptions;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly object initializationLock = new object();
         private bool isInitialized;
         private ClientMessageCenter messageCenter;
@@ -20,11 +20,13 @@ namespace Orleans.Runtime.Messaging
         public ClientOutboundConnectionFactory(
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClientConnectionOptions> clientConnectionOptions,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connectionShared.ServiceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
         {
             this.connectionShared = connectionShared;
             this.clientConnectionOptions = clientConnectionOptions.Value;
+            this.connectionPreambleHelper = connectionPreambleHelper;
         }
 
         protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
@@ -38,7 +40,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.connectionManager,
                 this.ConnectionOptions,
-                this.connectionShared);
+                this.connectionShared,
+                this.connectionPreambleHelper);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

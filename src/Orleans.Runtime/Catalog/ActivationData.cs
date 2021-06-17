@@ -11,6 +11,7 @@ using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -106,6 +107,26 @@ namespace Orleans.Runtime
             }
         }
 
+        public TTarget GetTarget<TTarget>() => (TTarget)(object)this.GrainInstance;
+
+        TComponent ITargetHolder.GetComponent<TComponent>()
+        {
+            var result = this.GetComponent<TComponent>();
+            if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
+            {
+                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TComponent));
+                if (implementation is not TComponent typedResult)
+                {
+                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
+                }
+
+                this.SetComponent(typedResult);
+                result = typedResult;
+            }
+
+            return result;
+        }
+
         public TComponent GetComponent<TComponent>()
         {
             TComponent result;
@@ -125,6 +146,7 @@ namespace Orleans.Runtime
             {
                 result = _shared.GetComponent<TComponent>();
             }
+
 
             return result;
         }
@@ -873,7 +895,7 @@ namespace Orleans.Runtime
                 throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
             }
 
-            this.SetComponent<TExtensionInterface>(typedResult);
+            this.SetComponent(typedResult);
             return typedResult;
         }
 
@@ -888,8 +910,19 @@ namespace Orleans.Runtime
                 this.IncrementEnqueuedOnDispatcherCount();
 
                 // Enqueue the handler on the activation's scheduler
+                var suppressFlow = !ExecutionContext.IsFlowSuppressed();
+                if (suppressFlow)
+                {
+                    ExecutionContext.SuppressFlow();
+                }
+
                 var task = new Task(_receiveMessageInScheduler, msg);
                 task.Start(scheduler);
+
+                if (suppressFlow)
+                {
+                    ExecutionContext.RestoreFlow();
+                }
             }
         }
 

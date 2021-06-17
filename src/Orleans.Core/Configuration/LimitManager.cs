@@ -8,8 +8,10 @@ namespace Orleans.Runtime.Configuration
     /// Limits Manager
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class LimitManager
     {
+        [Id(1)]
         private readonly Dictionary<string, LimitValue> limitValues;
 
         public LimitManager()

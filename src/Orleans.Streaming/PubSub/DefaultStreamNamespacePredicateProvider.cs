@@ -1,4 +1,5 @@
 using System;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
 
 namespace Orleans.Streams

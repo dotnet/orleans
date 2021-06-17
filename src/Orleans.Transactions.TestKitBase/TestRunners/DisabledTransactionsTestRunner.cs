@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,8 +16,7 @@ namespace Orleans.Transactions.TestKit
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
             Func<Task> task = ()=>grain.Set(delta);
-            var response = task.ShouldThrow<OrleansStartTransactionFailedException>();
-            response.WithInnerException<OrleansTransactionsDisabledException>();
+            var response = task.ShouldThrow<OrleansTransactionsDisabledException>();
         }
 
         public virtual void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
@@ -32,8 +31,7 @@ namespace Orleans.Transactions.TestKit
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
-            var response = task.ShouldThrow<OrleansStartTransactionFailedException>();
-            response.WithInnerException<OrleansTransactionsDisabledException>();
+            var response = task.ShouldThrow<OrleansTransactionsDisabledException>();
         }
     }
 }

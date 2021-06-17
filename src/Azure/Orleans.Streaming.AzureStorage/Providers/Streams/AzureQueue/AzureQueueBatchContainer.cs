@@ -9,17 +9,22 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.AzureQueue
 {
     [Serializable]
+    [GenerateSerializer]
     internal class AzureQueueBatchContainer : IBatchContainer
     {
         [JsonProperty]
+        [Id(0)]
         private EventSequenceToken sequenceToken;
 
         [JsonProperty]
+        [Id(1)]
         private readonly List<object> events;
 
         [JsonProperty]
+        [Id(2)]
         private readonly Dictionary<string, object> requestContext;
 
+        [Id(3)]
         public StreamId StreamId { get; private set; }
 
         public StreamSequenceToken SequenceToken

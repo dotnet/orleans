@@ -8,7 +8,6 @@ using Orleans.AzureUtils;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -18,7 +17,6 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
-        private readonly SerializationManager serializationManager;
         private AzureQueueDataManager queue;
         private long lastReadMessage;
         private Task outstandingTask;
@@ -28,21 +26,19 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         private readonly string azureQueueName;
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, AzureQueueOptions queueOptions, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
+        public static IQueueAdapterReceiver Create(ILoggerFactory loggerFactory, string azureQueueName, AzureQueueOptions queueOptions, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             if (azureQueueName == null) throw new ArgumentNullException(nameof(azureQueueName));
             if (queueOptions == null) throw new ArgumentNullException(nameof(queueOptions));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
-            if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
             var queue = new AzureQueueDataManager(loggerFactory, azureQueueName, queueOptions);
-            return new AzureQueueAdapterReceiver(serializationManager, azureQueueName, loggerFactory, queue, dataAdapter);
+            return new AzureQueueAdapterReceiver(azureQueueName, loggerFactory, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
+        private AzureQueueAdapterReceiver(string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
-            this.serializationManager = serializationManager;
             this.queue = queue?? throw new ArgumentNullException(nameof(queue));
             this.dataAdapter = dataAdapter?? throw new ArgumentNullException(nameof(dataAdapter));
             this.logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();

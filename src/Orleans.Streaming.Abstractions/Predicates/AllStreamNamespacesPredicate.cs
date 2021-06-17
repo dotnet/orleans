@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Streams
 {
     internal class AllStreamNamespacesPredicate : IStreamNamespacePredicate

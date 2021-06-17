@@ -70,16 +70,15 @@ namespace TestGrains
     public class LogTestGrainCustomStoragePrimaryCluster : LogTestGrain,
         Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<MyGrainState, object>
     {
+        private readonly DeepCopier<MyGrainState> copier;
 
         // we use fake in-memory state as the storage
         private MyGrainState state;
         private int version;
 
-        private readonly SerializationManager serializationManager;
-
-        public LogTestGrainCustomStoragePrimaryCluster(SerializationManager serializationManager)
+        public LogTestGrainCustomStoragePrimaryCluster(DeepCopier<MyGrainState> copier)
         {
-            this.serializationManager = serializationManager;
+            this.copier = copier;
         }
 
         // simulate an async call during activation. This caused deadlock in earlier version,
@@ -120,7 +119,7 @@ namespace TestGrains
                 state = new MyGrainState();
                 version = 0;
             }
-            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, (MyGrainState)this.serializationManager.DeepCopy(state)));
+            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state)));
         }
     }
 

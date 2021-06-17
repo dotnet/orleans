@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
@@ -30,18 +28,6 @@ namespace TestExtensions
             var result = new SerializationTestEnvironment(configureClientBuilder);
             return result;
         }
-
-        public static SerializationTestEnvironment Initialize(List<Type> serializationProviders = null, Type fallbackProvider = null)
-        {
-            return InitializeWithDefaults(clientBuilder => clientBuilder.Configure<SerializationProviderOptions>(options =>
-            {
-                options.FallbackSerializationProvider = fallbackProvider;
-                if (serializationProviders != null)
-                {
-                    options.SerializationProviders.AddRange(serializationProviders);
-                }
-            }));
-        }
         
         public IGrainFactory GrainFactory => this.RuntimeClient.InternalGrainFactory;
 
@@ -49,7 +35,8 @@ namespace TestExtensions
 
         internal IServiceProvider Services => this.Client.ServiceProvider;
 
-        public SerializationManager SerializationManager => this.RuntimeClient.ServiceProvider.GetRequiredService<SerializationManager>();
+        public DeepCopier DeepCopier => this.RuntimeClient.ServiceProvider.GetRequiredService<DeepCopier>();
+        public Serializer Serializer => RuntimeClient.ServiceProvider.GetRequiredService<Serializer>();
         
         public void Dispose()
         {

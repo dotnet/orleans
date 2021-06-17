@@ -103,9 +103,9 @@ namespace DefaultCluster.Tests.General
             Assert.NotSame(expected, actual);
 
             // Immutable<T> should round-trip without any copying.
-            expected = new Immutable<int[]>(collection);
-            actual = await grain.RoundTrip(expected);
-            Assert.Same(expected, actual);
+            var expectedImmutable = new Immutable<int[]>(collection);
+            var actualImmutable = await grain.RoundTrip(expectedImmutable);
+            Assert.Same(expectedImmutable.Value, actualImmutable.Value);
         }
 
         [Fact]

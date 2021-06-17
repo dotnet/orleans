@@ -1,20 +1,20 @@
-﻿using Orleans.Serialization;
+using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
     public class DefaultTransactionDataCopier<TData> : ITransactionDataCopier<TData>
     {
-        private readonly SerializationManager serializationManager;
+        private readonly DeepCopier<TData> deepCopier;
 
-        public DefaultTransactionDataCopier(SerializationManager serializationManager)
+        public DefaultTransactionDataCopier(DeepCopier<TData> deepCopier)
         {
-            this.serializationManager = serializationManager;
+            this.deepCopier = deepCopier;
         }
 
         public TData DeepCopy(TData original)
         {
-            return (TData)this.serializationManager.DeepCopy(original);
+            return (TData)this.deepCopier.Copy(original);
         }
     }
 }

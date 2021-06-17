@@ -9,16 +9,20 @@ using Orleans.Streams;
 namespace Orleans.Providers
 {
     [Serializable]
+    [GenerateSerializer]
+    [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         [NonSerialized]
         private TSerializer serializer;
-
+        [Id(0)]
         private readonly EventSequenceToken realToken;
 
         public StreamId StreamId => MessageData.StreamId;
         public StreamSequenceToken SequenceToken => realToken;
+
+        [Id(1)]
         public MemoryMessageData MessageData { get; set; }
         public long SequenceNumber => realToken.SequenceNumber;
 
@@ -53,7 +57,7 @@ namespace Orleans.Providers
             return false;
         }
 
-        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);
         }

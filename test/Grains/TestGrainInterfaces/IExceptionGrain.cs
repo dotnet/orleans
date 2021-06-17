@@ -1,13 +1,15 @@
 using System;
-using Orleans.CodeGeneration;
+using System.Buffers;
+using System.Threading.Tasks;
+using Orleans;
 using Orleans.Runtime;
-using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.WireProtocol;
 
 namespace UnitTests.GrainInterfaces
 {
-    using System.Threading.Tasks;
-    using Orleans;
-
     /// <summary>
     /// The ExceptionGrain interface.
     /// </summary>
@@ -64,7 +66,6 @@ namespace UnitTests.GrainInterfaces
         Task<UndeserializableType> GetUndeserializable();
     }
 
-    [Serializable]
     public struct UndeserializableType
     {
         public const string FailureMessage = "Can't do it, sorry.";
@@ -75,47 +76,36 @@ namespace UnitTests.GrainInterfaces
         }
 
         public int Number { get; }
+    }
 
-        [CopierMethod]
-        public static object DeepCopy(object original, ICopyContext context)
-        {
-            var typed = (UndeserializableType) original;
-            return new UndeserializableType(typed.Number);
-        }
+    [GenerateSerializer]
+    public class UnserializableType
+    {
+    }
 
-        [SerializerMethod]
-        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
-        {
-            var typed = (UndeserializableType) untypedInput;
-            context.StreamWriter.Write(typed.Number);
-        }
+    [RegisterSerializer]
+    [RegisterCopier]
+    public sealed class UndeserializableTypeCodec : IFieldCodec<UndeserializableType>, IDeepCopier<UndeserializableType>
+    {
+        public UndeserializableType DeepCopy(UndeserializableType input, CopyContext context) => input;
 
-        [DeserializerMethod]
-        public static object Deserialize(Type expected, IDeserializationContext context)
+        public UndeserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException(UndeserializableType.FailureMessage);
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte>
         {
-            throw new NotSupportedException(FailureMessage);
+            Int32Codec.WriteField(ref writer, fieldIdDelta, typeof(UndeserializableType), value.Number);
         }
     }
 
-    [Serializable]
-    public class UnserializableType
+    [RegisterSerializer]
+    [RegisterCopier]
+    public sealed class UnserializableTypeCodec : IFieldCodec<UnserializableType>, IDeepCopier<UnserializableType>
     {
-        [CopierMethod]
-        public static object DeepCopy(object original, ICopyContext context)
-        {
-            return original;
-        }
+        public UnserializableType DeepCopy(UnserializableType input, CopyContext context) => input;
 
-        [SerializerMethod]
-        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
+        public UnserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType value) where TBufferWriter : IBufferWriter<byte>
         {
             throw new NotSupportedException(UndeserializableType.FailureMessage);
-        }
-
-        [DeserializerMethod]
-        public static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            return null;
         }
     }
 }

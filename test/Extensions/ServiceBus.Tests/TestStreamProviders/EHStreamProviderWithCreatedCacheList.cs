@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
@@ -31,8 +30,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             StreamCacheEvictionOptions evictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdatper,
-            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            IServiceProvider serviceProvider, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, telemetryProducer, loggerFactory)
 
         {
             this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
@@ -46,7 +45,7 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, base.dataAdapter, this.SerializationManager, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
+            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
         }
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -55,20 +54,28 @@ namespace ServiceBus.Tests.TestStreamProviders
             private readonly string name;
 
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
-                IEventHubDataAdapter dataAdapter, SerializationManager serializationManager, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
+                IEventHubDataAdapter dataAdapter, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;
                 this.caches = caches;
             }
-
             private const int DefaultMaxAddCount = 10;
-            protected override IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions options, StreamCacheEvictionOptions evictionOptions, IStreamQueueCheckpointer<string> checkpointer,
-                ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
-                SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
+            protected override IEventHubQueueCache CreateCache(
+                string partition,
+                IEventHubDataAdapter dataAdatper,
+                StreamStatisticOptions options,
+                StreamCacheEvictionOptions evictionOptions,
+                IStreamQueueCheckpointer<string> checkpointer,
+                ILoggerFactory loggerFactory,
+                IObjectPool<FixedSizeBuffer> bufferPool,
+                string blockPoolId,
+                TimePurgePredicate timePurge,
+                EventHubMonitorAggregationDimensions sharedDimensions,
+                ITelemetryProducer telemetryProducer)
             {
                 var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
                 var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);

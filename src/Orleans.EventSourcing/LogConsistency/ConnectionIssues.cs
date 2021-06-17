@@ -9,26 +9,31 @@ namespace Orleans.EventSourcing
     /// who want to monitor their log-consistent grains for communication issues.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public abstract class ConnectionIssue
     {
         /// <summary>
         /// The UTC timestamp of the last time at which the issue was observed
         /// </summary>
+        [Id(1)]
         public DateTime TimeStamp { get; set; }
 
         /// <summary>
         /// The UTC timestamp of the first time we observed this issue
         /// </summary>
+        [Id(2)]
         public DateTime TimeOfFirstFailure { get; set; }
 
         /// <summary>
         /// The number of times we have observed this issue since the first failure
         /// </summary>
+        [Id(3)]
         public int NumberOfConsecutiveFailures { get; set; }
 
         /// <summary>
         /// The delay we are waiting before the next retry
         /// </summary>
+        [Id(4)]
         public TimeSpan RetryDelay { get; set; }
 
         /// <summary>
@@ -46,16 +51,19 @@ namespace Orleans.EventSourcing
     /// Represents information about notification failures encountered inside log consistency protocols.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public abstract class NotificationFailed : ConnectionIssue
     {
         /// <summary>
         /// The clusterId of the remote cluster to which we had an issue when sending change notifications.
         /// </summary>
+        [Id(1)]
         public string RemoteClusterId { get; set; }
 
         /// <summary>
         /// The exception we caught, or null if the problem was not caused by an exception.
         /// </summary>
+        [Id(2)]
         public Exception Exception { get; set; }
     }
 

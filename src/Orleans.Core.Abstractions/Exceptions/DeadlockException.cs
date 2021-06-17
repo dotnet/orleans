@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
@@ -19,8 +18,10 @@ namespace Orleans.Runtime
     /// </para>
     /// </remarks>
     [Serializable]
+    [GenerateSerializer]
     public class DeadlockException : OrleansException
     {
+        [Id(0)]
         internal IEnumerable<GrainId> CallChain { get; private set; }
 
         public DeadlockException() : base("Deadlock between grain calls") {}

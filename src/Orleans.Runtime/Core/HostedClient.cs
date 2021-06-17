@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Internal;
-using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 
@@ -41,7 +38,7 @@ namespace Orleans.Runtime
             IInternalGrainFactory grainFactory,
             MessageCenter messageCenter,
             MessagingTrace messagingTrace,
-            SerializationManager serializationManager,
+            DeepCopier deepCopier,
             GrainReferenceActivator referenceActivator)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
@@ -57,7 +54,7 @@ namespace Orleans.Runtime
             this.invokableObjects = new InvokableObjectManager(
                 this,
                 runtimeClient,
-                serializationManager,
+                deepCopier,
                 messagingTrace,
                 logger);
             this.siloMessageCenter = messageCenter;
@@ -92,13 +89,13 @@ namespace Orleans.Runtime
         public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
 
         /// <inheritdoc />
-        public IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public IAddressable CreateObjectReference(IAddressable obj)
         {
             if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
 
             var observerId = ObserverGrainId.Create(this.ClientId);
             var grainReference = this.grainFactory.GetGrain(observerId.GrainId);
-            if (!this.invokableObjects.TryRegister(obj, observerId, invoker))
+            if (!this.invokableObjects.TryRegister(obj, observerId))
             {
                 throw new ArgumentException(
                     string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
@@ -343,5 +340,7 @@ namespace Orleans.Runtime
                 return result;
             }
         }
+
+        public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
     }
 }

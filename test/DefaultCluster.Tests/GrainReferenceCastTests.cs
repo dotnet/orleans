@@ -101,41 +101,6 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
-        public void ConfirmServiceInterfacesListContents()
-        {
-            // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
-            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            Type t1 = typeof(IGeneratorTestDerivedDerivedGrain);
-            Type t2 = typeof(IGeneratorTestDerivedGrain2);
-            Type t3 = typeof(IGeneratorTestGrain);
-
-            var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(typeof(IGeneratorTestDerivedDerivedGrain));
-            Assert.NotNull(interfaces);
-            Assert.Equal(3, interfaces.Count);
-            Assert.Contains(t1, interfaces);
-            Assert.Contains(t2, interfaces);
-            Assert.Contains(t3, interfaces);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Cast")]
-        public void CastCheckExpectedCompatIds2()
-        {
-            // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
-            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            Type t1 = typeof(IGeneratorTestDerivedDerivedGrain);
-            Type t2 = typeof(IGeneratorTestDerivedGrain2);
-            Type t3 = typeof(IGeneratorTestGrain);
-            int id1 = GrainInterfaceUtils.GetGrainInterfaceId(t1);
-            int id2 = GrainInterfaceUtils.GetGrainInterfaceId(t2);
-            int id3 = GrainInterfaceUtils.GetGrainInterfaceId(t3);
-            Assert.Equal(-692645356, id1);
-            Assert.Equal(-342583538, id2);
-            Assert.Equal(-712890543, id3);
-            GrainReference grain = (GrainReference) this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-            Assert.NotNull(grain);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastFailInternalCastFromBadType()
         {
             var grain = this.GrainFactory.GetGrain<ISimpleGrain>(

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// Indicates that an Orleans message was rejected.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class OrleansMessageRejectionException : OrleansException
     {
         internal OrleansMessageRejectionException(string message)

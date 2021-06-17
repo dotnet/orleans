@@ -65,7 +65,7 @@ namespace AWSUtils.Tests.Streaming
             {
                 ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), null, Options.Create(new ClusterOptions()), null, null);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), null, null);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
@@ -133,7 +133,7 @@ namespace AWSUtils.Tests.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

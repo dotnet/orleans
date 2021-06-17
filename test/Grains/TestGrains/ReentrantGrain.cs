@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 using Orleans.Streams;
 
 using UnitTests.GrainInterfaces;
@@ -86,21 +86,21 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public static bool MayInterleave(InvokeMethodRequest req)
+        public static bool MayInterleave(IInvokable req)
         {
             // not interested
-            if (req.Arguments.Length == 0)
+            if (req.ArgumentCount == 0)
                 return false;
 
             string arg = null;
 
             // assume single argument message
-            if (req.Arguments.Length == 1)
-                arg = (string)UnwrapImmutable(req.Arguments[0]);
+            if (req.ArgumentCount == 1)
+                arg = (string)UnwrapImmutable(req.GetArgument<object>(0));
 
             // assume stream message
-            if (req.Arguments.Length == 2)
-                arg = (string)UnwrapImmutable(req.Arguments[1]);
+            if (req.ArgumentCount == 2)
+                arg = (string)UnwrapImmutable(req.GetArgument<object>(1));
 
             if (arg == "err")
                 throw new ApplicationException("boom");

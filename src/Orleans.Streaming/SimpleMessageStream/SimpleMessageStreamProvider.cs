@@ -5,9 +5,9 @@ using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Core;
-using Orleans.Serialization;
 using Orleans.Configuration;
 using Orleans.Streams.Filtering;
+using Orleans.Serialization;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -20,7 +20,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IRuntimeClient              runtimeClient;
         private IStreamSubscriptionManager  streamSubscriptionManager;
         private ILoggerFactory              loggerFactory;
-        private SerializationManager        serializationManager;
         private SimpleMessageStreamProviderOptions options;
         private readonly IStreamFilter streamFilter;
 
@@ -31,8 +30,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             SimpleMessageStreamProviderOptions options,
             IStreamFilter streamFilter,
             ILoggerFactory loggerFactory,
-            IServiceProvider services,
-            SerializationManager serializationManager)
+            IServiceProvider services)
         {
             this.loggerFactory = loggerFactory;
             this.Name = name;
@@ -41,7 +39,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.streamFilter = streamFilter;
             this.providerRuntime = services.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();
-            this.serializationManager = serializationManager;
             if (this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
                 || this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
@@ -79,7 +76,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 providerRuntime.PubSub(this.options.PubSubType),
                 this.streamFilter,
                 IsRewindable,
-                this.serializationManager,
+                this.runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<T>>(),
                 this.loggerFactory.CreateLogger<SimpleMessageStreamProducer<T>>());
         }
 

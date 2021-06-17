@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Threading.Tasks;
 using System.Runtime.Serialization;
 using Orleans.Runtime;
 
@@ -11,6 +8,7 @@ namespace Orleans.Providers
     /// Exception thrown whenever a provider has failed to be initialized.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class ProviderInitializationException : OrleansException
     {
         public ProviderInitializationException()

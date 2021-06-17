@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
-using Orleans.Serialization;
 using Orleans.Streams;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -16,7 +15,7 @@ namespace Orleans.Providers.Streams.Generator
     public class GeneratorPooledCache : IQueueCache, ICacheDataAdapter
     {
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-        private readonly SerializationManager serializationManager;
+        private readonly Serialization.Serializer serializer;
         private readonly IEvictionStrategy evictionStrategy;
         private readonly PooledQueueCache cache;
 
@@ -27,13 +26,13 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <param name="bufferPool"></param>
         /// <param name="logger"></param>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, Serialization.Serializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             this.bufferPool = bufferPool;
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
             cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
             this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
@@ -44,8 +43,7 @@ namespace Orleans.Providers.Streams.Generator
             //Deserialize payload
             int readOffset = 0;
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            var stream = new BinaryTokenStreamReader(payload);
-            object payloadObject = this.serializationManager.Deserialize(stream);
+            object payloadObject = this.serializer.Deserialize<object>(payload);
             return new GeneratedBatchContainer(cachedMessage.StreamId,
                 payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
         }
@@ -71,7 +69,8 @@ namespace Orleans.Providers.Streams.Generator
         // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
         private ArraySegment<byte> SerializeMessageIntoPooledSegment(GeneratedBatchContainer queueMessage)
         {
-            byte[] serializedPayload = this.serializationManager.SerializeToByteArray(queueMessage.Payload);
+            byte[] serializedPayload = this.serializer.SerializeToArray(queueMessage.Payload);
+
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(serializedPayload);
 

@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientMessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly SiloAddress remoteSiloAddress;
 
         public ClientOutboundConnection(
@@ -23,12 +24,14 @@ namespace Orleans.Runtime.Messaging
             ClientMessageCenter messageCenter,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
+            this.connectionPreambleHelper = connectionPreambleHelper;
             this.remoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
             this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.remoteSiloAddress);
             this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.remoteSiloAddress);
@@ -40,7 +43,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
-            this.messageCenter.OnReceivedMessage(message);
+            this.messageCenter.DispatchLocalMessage(message);
         }
 
         protected override async Task RunInternal()
@@ -50,19 +53,22 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messageCenter.OnGatewayConnectionOpen();
 
-                await ConnectionPreamble.Write(
+                await connectionPreambleHelper.Write(
                     this.Context,
-                    this.messageCenter.ClientId.GrainId,
-                    this.connectionOptions.ProtocolVersion,
-                    siloAddress: null);
+                    new ConnectionPreamble
+                    {
+                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
+                        NodeIdentity = this.messageCenter.ClientId.GrainId,
+                        SiloAddress = null,
+                    });
 
                 if (this.connectionOptions.ProtocolVersion >= NetworkProtocolVersion.Version2)
                 {
-                    var (_, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
+                    var preamble = await connectionPreambleHelper.Read(this.Context);
                     this.Log.LogInformation(
                         "Established connection to {Silo} with protocol version {ProtocolVersion}",
-                        siloAddress,
-                        protocolVersion.ToString());
+                        preamble.SiloAddress,
+                        preamble.NetworkProtocolVersion.ToString());
                 }
 
                 await base.RunInternal();

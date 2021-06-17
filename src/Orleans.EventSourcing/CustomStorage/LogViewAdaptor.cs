@@ -72,15 +72,20 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         [Serializable]
+        [GenerateSerializer]
         private class ReadRequest : ILogConsistencyProtocolMessage
         {
+            [Id(0)]
             public int KnownVersion { get; set; }
         }
         [Serializable]
+        [GenerateSerializer]
         private class ReadResponse<ViewType> : ILogConsistencyProtocolMessage
         {
+            [Id(0)]
             public int Version { get; set; }
 
+            [Id(1)]
             public ViewType Value { get; set; }
         }
 
@@ -223,6 +228,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class UpdatePrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -237,6 +243,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class ReadFromPrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -252,12 +259,15 @@ namespace Orleans.EventSourcing.CustomStorage
         /// updated, to let them know the latest version. Contains all the updates that were applied.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         protected class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
+            [Id(0)]
             public int Version { get; set; }
 
             /// <summary> The list of updates that were applied. </summary>
+            [Id(1)]
             public List<TLogEntry> Updates { get; set; }
 
             /// <summary>

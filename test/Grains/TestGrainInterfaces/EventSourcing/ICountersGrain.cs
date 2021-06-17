@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace TestGrainInterfaces
 {
-   
+
     /// <summary>
     /// A grain that maintains a number of counters, indexed by a string key
     /// </summary>

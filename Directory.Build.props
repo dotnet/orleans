@@ -49,15 +49,17 @@
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
     <SystemSecurityCryptographyCngVersion>5.0.0</SystemSecurityCryptographyCngVersion>
+    <SystemIoPipelinesVersion>5.0.0</SystemIoPipelinesVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>3.8.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftBuildVersion>16.9.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>3.9.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftCodeAnalysisAnalyzersVersion>3.3.2</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>5.0.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationVersion>5.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>5.0.0</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>5.0.0</MicrosoftExtensionsDependencyModelVersion>
     <MicrosoftExtensionsLoggingVersion>5.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsObjectPoolVersion>5.0.2</MicrosoftExtensionsObjectPoolVersion>
@@ -76,11 +78,11 @@
 
     <!-- used only in netstandard2.0 targets - dot not upgrade unless necessary -->
     <!-- on .NET Core 3.1+ runtimes these are inbox, so these versions are actually used only on .NET Framework 4.6.2+ -->
-    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
+    <SystemCollectionsImmutableVersion>5.0.0</SystemCollectionsImmutableVersion>
     <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
-    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemReflectionMetadataVersion>5.0.0</SystemReflectionMetadataVersion>
     <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
-    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
+    <MicrosoftBclHashCodeVersion>1.1.1</MicrosoftBclHashCodeVersion>
 
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
@@ -99,7 +101,7 @@
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <MoqVersion>4.16.0</MoqVersion>
-    <MicrosoftTestSdkVersion>16.8.3</MicrosoftTestSdkVersion>
+    <MicrosoftTestSdkVersion>16.9.4</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.12.1</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
@@ -112,6 +114,9 @@
     <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
     <NSubstituteVersion>4.2.2</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
+    <CoverletVersion>3.0.3</CoverletVersion>
+    <CsCheckVersion>1.1.3</CsCheckVersion>
+    <DotnetReportGeneratorCliVersion>4.3.0</DotnetReportGeneratorCliVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.8.3</SourceLinkVersion>
@@ -136,6 +141,7 @@
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
     <OrleansCoreAbstractionsVersion>2.3.0</OrleansCoreAbstractionsVersion>
+    <OrleansSerializationVersion>2.3.0</OrleansSerializationVersion>
     <OrleansRuntimeAbstractionsVersion>2.3.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.3.0</OrleansCoreVersion>
     <OrleansStreamingAbstractionsVersion>2.3.0</OrleansStreamingAbstractionsVersion>
@@ -169,6 +175,7 @@
 
   <PropertyGroup Condition="$(FullBuild) == 'true'">
     <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
+    <OrleansSerializationVersion>$(VersionPrefix)</OrleansSerializationVersion>
     <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
     <OrleansStreamingAbstractionsVersion>$(VersionPrefix)</OrleansStreamingAbstractionsVersion>
@@ -199,6 +206,8 @@
     <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
     <OrleansTelemetryConsumersVersion>$(VersionPrefix)</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
+
+  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
 
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>

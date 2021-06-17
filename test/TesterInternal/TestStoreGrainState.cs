@@ -6,10 +6,14 @@ using Orleans.Internal;
 namespace UnitTests.Persistence
 {
     [Serializable]
+    [GenerateSerializer]
     public class TestStoreGrainState
     {
+        [Id(0)]
         public string A { get; set; }
+        [Id(1)]
         public int B { get; set; }
+        [Id(2)]
         public long C { get; set; }
 
         internal static GrainState<TestStoreGrainState> NewRandomState(int? aPropertyLength = null)

@@ -20,7 +20,6 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
             }
         }
 

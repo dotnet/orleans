@@ -38,7 +38,6 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceGetGrain()
         {
-
             var grainOfIntFloat1 = GetGrain<IGenericGrain<int, float>>();
             var grainOfIntFloat2 = GetGrain<IGenericGrain<int, float>>();
             var grainOfFloatString = GetGrain<IGenericGrain<float, string>>();

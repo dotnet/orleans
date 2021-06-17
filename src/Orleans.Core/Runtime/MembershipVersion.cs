@@ -3,6 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
+    [GenerateSerializer]
     public struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {
         public MembershipVersion(long version)
@@ -10,6 +11,7 @@ namespace Orleans.Runtime
             this.Value = version;
         }
 
+        [Id(1)]
         public long Value { get; private set; }
 
         public static MembershipVersion MinValue => new MembershipVersion(long.MinValue);

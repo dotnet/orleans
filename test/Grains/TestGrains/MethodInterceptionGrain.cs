@@ -101,6 +101,7 @@ namespace UnitTests.Grains
         }
 
         [Serializable]
+        [GenerateSerializer]
         public class MyDomainSpecificException : Exception
         {
             public MyDomainSpecificException()
@@ -199,7 +200,7 @@ namespace UnitTests.Grains
                 {
                     if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
                     {
-                        ctx.Arguments[0] = value - 1;
+                        ctx.Arguments[0] = (object)(value - 1);
                     }
 
                     --attemptsRemaining;

@@ -1,3 +1,4 @@
+using Orleans.CodeGeneration;
 using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
@@ -13,6 +14,7 @@ namespace Orleans.Concurrency
     /// that may significantly improve the performance of your application.
     /// </para>
     /// </summary>
+    [InvokableCustomInitializer(nameof(RequestBase.AddInvokeMethodOptions), InvokeMethodOptions.ReadOnly)]
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class ReadOnlyAttribute : Attribute
     {
@@ -77,6 +79,7 @@ namespace Orleans.Concurrency
     /// Note that this attribute is applied to method declaration in the grain interface,
     /// and not to the method in the implementation class itself.
     /// </remarks>
+    [InvokableCustomInitializer(nameof(RequestBase.AddInvokeMethodOptions), InvokeMethodOptions.AlwaysInterleave)]
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class AlwaysInterleaveAttribute : Attribute
     {
@@ -111,20 +114,9 @@ namespace Orleans.Concurrency
     }
 
     /// <summary>
-    /// The Immutable attribute indicates that instances of the marked class or struct are never modified
-    /// after they are created.
-    /// </summary>
-    /// <remarks>
-    /// Note that this implies that sub-objects are also not modified after the instance is created.
-    /// </remarks>
-    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
-    public sealed class ImmutableAttribute : Attribute
-    {
-    }
-
-    /// <summary>
     /// Indicates that a method on a grain interface is one-way and that no response message will be sent to the caller.
     /// </summary>
+    [InvokableCustomInitializer(nameof(RequestBase.AddInvokeMethodOptions), InvokeMethodOptions.OneWay)]
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class OneWayAttribute : Attribute
     {

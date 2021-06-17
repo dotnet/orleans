@@ -1,9 +1,7 @@
 using System;
-using System.IO;
 using System.Text;
 using Orleans.Runtime;
 using Azure.Messaging.EventHubs;
-using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 
@@ -11,7 +9,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     public class StreamPerPartitionDataAdapter : EventHubDataAdapter
     {
-        public StreamPerPartitionDataAdapter(SerializationManager serializationManager) : base(serializationManager) {}
+        public StreamPerPartitionDataAdapter(Orleans.Serialization.Serializer serializer) : base(serializer) {}
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {

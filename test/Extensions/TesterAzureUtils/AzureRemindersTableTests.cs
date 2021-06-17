@@ -3,8 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.AzureUtils;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Tester;
@@ -19,7 +17,7 @@ namespace UnitTests.RemindersTest
     /// Tests for operation of Orleans Reminders Table using Azure
     /// </summary>
     [TestCategory("Reminders"), TestCategory("Azure")]
-    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<Tester.AzureUtils.AzureStorageBasicTests>
+    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
         public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {

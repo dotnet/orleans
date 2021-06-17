@@ -9,12 +9,16 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class ChainedGrainState
     {
+        [Id(0)]
         public int Id { get; set; }
 
+        [Id(1)]
         public int X { get; set; }
 
+        [Id(2)]
         public IChainedGrain Next { get; set; }
     }
 

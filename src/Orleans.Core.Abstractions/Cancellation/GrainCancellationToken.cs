@@ -1,18 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans
 {
     /// <summary>
     /// Grain cancellation token
     /// </summary>
-    [Serializable]
     public sealed class GrainCancellationToken : IDisposable
     {
         [NonSerialized]
@@ -95,34 +91,6 @@ namespace Orleans
         public void Dispose()
         {
             _cancellationTokenSource.Dispose();
-        }
-
-        [SerializerMethod]
-        internal static void SerializeGrainCancellationToken(object obj, ISerializationContext context, Type expected)
-        {
-            var ctw = (GrainCancellationToken)obj;
-            var canceled = ctw.CancellationToken.IsCancellationRequested;
-            var writer = context.StreamWriter;
-            writer.Write(canceled);
-            writer.Write(ctw.Id);
-        }
-
-        [DeserializerMethod]
-        internal static object DeserializeGrainCancellationToken(Type expected, IDeserializationContext context)
-        {
-            var runtime = context.ServiceProvider.GetService(typeof(IGrainCancellationTokenRuntime)) as IGrainCancellationTokenRuntime;
-            var reader = context.StreamReader;
-            var cancellationRequested = reader.ReadBoolean();
-            var tokenId = reader.ReadGuid();
-            return new GrainCancellationToken(tokenId, cancellationRequested, runtime);
-        }
-
-        [CopierMethod]
-        internal static object CopyGrainCancellationToken(object obj, ICopyContext context)
-        {
-            var runtime = context.ServiceProvider.GetService(typeof(IGrainCancellationTokenRuntime)) as IGrainCancellationTokenRuntime;
-            var gct = (GrainCancellationToken) obj;
-            return new GrainCancellationToken(gct.Id, gct.IsCancellationRequested, runtime);
         }
     }
 }

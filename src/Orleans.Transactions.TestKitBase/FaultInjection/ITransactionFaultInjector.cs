@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Orleans.Transactions.TestKit
+﻿namespace Orleans.Transactions.TestKit
 {
     public interface ITransactionFaultInjector
     {

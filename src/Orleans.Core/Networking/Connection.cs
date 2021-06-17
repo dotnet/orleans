@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
@@ -12,6 +13,7 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 
 using Microsoft.Extensions.ObjectPool;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -27,6 +29,7 @@ namespace Orleans.Runtime.Messaging
         };
 
         private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
+        private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
@@ -311,6 +314,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 this.StartClosing(error);
+                (serializer as IDisposable)?.Dispose();
             }
         }
 
@@ -365,6 +369,7 @@ namespace Orleans.Runtime.Messaging
                         exception,
                         "Exception while processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
+                (serializer as IDisposable)?.Dispose();
                 }
 
                 error = exception;
@@ -433,7 +438,7 @@ namespace Orleans.Runtime.Messaging
                 // Send a fast fail to the caller.
                 var response = this.MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
-                response.BodyObject = Response.ExceptionResponse(exception);
+                response.BodyObject = Response.FromException(exception);
 
                 // Send the error response and continue processing the next message.
                 this.Send(response);
@@ -442,8 +447,8 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message was a response, propagate the exception to the intended recipient.
                 message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.ExceptionResponse(exception);
-                this.MessageCenter.OnReceivedMessage(message);
+                message.BodyObject = Response.FromException(exception);
+                this.MessageCenter.DispatchLocalMessage(message);
             }
 
             // The exception has been handled by propagating it onwards.
@@ -467,16 +472,16 @@ namespace Orleans.Runtime.Messaging
             {
                 var response = this.MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
-                response.BodyObject = Response.ExceptionResponse(exception);
+                response.BodyObject = Response.FromException(exception);
 
-                this.MessageCenter.OnReceivedMessage(response);
+                this.MessageCenter.DispatchLocalMessage(response);
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 // If we failed sending an original response, turn the response body into an error and reply with it.
                 // unless we have already tried sending the response multiple times.
                 message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.ExceptionResponse(exception);
+                message.BodyObject = Response.FromException(exception);
                 ++message.RetryCount;
 
                 this.Send(message);

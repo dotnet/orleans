@@ -1,18 +1,20 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
+    [GenerateSerializer]
     internal readonly struct InternalStreamId : IEquatable<InternalStreamId>, IComparable<InternalStreamId>, ISerializable
     {
-        public string ProviderName { get; }
-
+        [Id(0)]
         public StreamId StreamId { get; }
+
+        [Id(1)]
+        public string ProviderName { get; }
 
         public InternalStreamId(string providerName, StreamId streamId)
         {

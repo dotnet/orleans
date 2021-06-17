@@ -4,7 +4,6 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Azure.Cosmos.Tables.SharedFiles;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Storage;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 //

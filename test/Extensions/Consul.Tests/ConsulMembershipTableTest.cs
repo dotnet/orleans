@@ -1,13 +1,10 @@
 using System;
 using Orleans;
 using Orleans.Messaging;
-using Orleans.Runtime;
-using Orleans.Runtime.Host;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;

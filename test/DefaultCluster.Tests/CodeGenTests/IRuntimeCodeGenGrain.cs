@@ -144,14 +144,17 @@ namespace Tester.CodeGenTests
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericGrainState<T>
     {
+        [Id(0)]
         public T @event { get; set; }
     }
 
     /// <summary>
     /// A class designed to test that code generation correctly handles reserved keywords.
     /// </summary>
+    [GenerateSerializer]
     public class @event : IEquatable<@event>
     {
         private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
@@ -165,26 +168,31 @@ namespace Tester.CodeGenTests
         /// <summary>
         /// A public field.
         /// </summary>
+        [Id(0)]
         public Guid Id;
 
         /// <summary>
         /// A private field.
         /// </summary>
+        [Id(1)]
         private Guid privateId;
 
         /// <summary>
         /// A property with a reserved keyword type and identifier.
         /// </summary>
+        [Id(2)]
         public @event @public { get; set; }
 
         /// <summary>
         /// Gets or sets the enum.
         /// </summary>
+        [Id(3)]
         public @enum Enum { get; set; }
 
         /// <summary>
         /// A property with a reserved keyword generic type and identifier.
         /// </summary>
+        [Id(4)]
         public List<@event> @if { get; set; }
 
         public static IEqualityComparer<@event> EventComparer
@@ -285,22 +293,30 @@ namespace Tester.CodeGenTests
         }
     }
 
+    [GenerateSerializer]
     public class NestedGeneric<T>
     {
+        [Id(0)]
         public Nested Payload { get; set; }
 
+        [GenerateSerializer]
         public class Nested
         {
+            [Id(0)]
             public T Value { get; set; }
         }
     }
 
+    [GenerateSerializer]
     public class NestedConstructedGeneric
     {
+        [Id(0)]
         public Nested<int> Payload { get; set; }
 
+        [GenerateSerializer]
         public class Nested<T>
         {
+            [Id(0)]
             public T Value { get; set; }
         }
     }

@@ -56,8 +56,10 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class StreamImmutabilityTestObject
     {
+        [Id(0)]
         public string MyString;
     }
 }

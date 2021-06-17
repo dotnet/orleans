@@ -3,9 +3,7 @@ using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Streams;
-using System;
 using System.Data;
-using System.Runtime.CompilerServices;
 
 namespace UnitTests.OrleansRuntime.Streams
 {

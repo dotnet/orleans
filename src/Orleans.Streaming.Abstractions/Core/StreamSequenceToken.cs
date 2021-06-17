@@ -8,16 +8,19 @@ namespace Orleans.Streams
     /// That means that the stream infrastructure will deliver stream events starting from this sequence token.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken>, IComparable<StreamSequenceToken>
     {
         /// <summary>
         /// Number of event batches in stream prior to this event batch
         /// </summary>
+        [Id(1)]
         public abstract long SequenceNumber { get; protected set;  }
 
         /// <summary>
         /// Number of events in batch prior to this event
         /// </summary>
+        [Id(2)]
         public abstract int EventIndex { get; protected set; }
 
         public abstract bool Equals(StreamSequenceToken other);

@@ -8,7 +8,6 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using Xunit;
 
 namespace Tester

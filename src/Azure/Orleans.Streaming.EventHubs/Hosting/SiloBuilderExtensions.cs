@@ -15,8 +15,7 @@ namespace Orleans.Hosting
             Action<ISiloEventHubStreamConfigurator> configure)
         {
             var configurator = new SiloEventHubStreamConfigurator(name,
-                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
-                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
             configure?.Invoke(configurator);
             return builder;
         }
@@ -44,8 +43,7 @@ namespace Orleans.Hosting
             Action<ISiloEventHubStreamConfigurator> configure)
         {
             var configurator = new SiloEventHubStreamConfigurator(name,
-                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
-                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

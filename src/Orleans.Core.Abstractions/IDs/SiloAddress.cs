@@ -9,7 +9,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
@@ -18,15 +17,22 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, Immutable]
     [DebuggerDisplay("SiloAddress {ToString()}")]
+    [SuppressReferenceTracking]
     public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
     {
+        [NonSerialized]
         private int hashCode = 0;
+
+        [NonSerialized]
         private bool hashCodeSet = false;
 
         [NonSerialized]
         private List<uint> uniformHashCache;
 
+        [Id(0)]
         public IPEndPoint Endpoint { get; private set; }
+
+        [Id(1)]
         public int Generation { get; private set; }
 
         [NonSerialized]

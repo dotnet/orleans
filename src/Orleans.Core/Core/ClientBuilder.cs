@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.ApplicationParts;
 using Orleans.Serialization;
 using Microsoft.Extensions.Hosting;
 using IHostingEnvironment = Orleans.Hosting.IHostingEnvironment;
@@ -26,6 +25,11 @@ namespace Orleans
         private IConfiguration appConfiguration;
         private IHostingEnvironment hostingEnvironment;
         private bool built;
+
+        public ClientBuilder()
+        {
+            this.ConfigureDefaults();
+        }
         
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
@@ -36,9 +40,6 @@ namespace Orleans
             if (this.built) throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(ClientBuilder)} instance.");
             this.built = true;
 
-            // Configure default services and build the container.
-
-            this.ConfigureDefaults();
             BuildHostConfiguration();
             CreateHostingEnvironment();
             CreateHostBuilderContext();
@@ -59,7 +60,6 @@ namespace Orleans
             ValidateSystemConfiguration(serviceProvider);
 
             // Construct and return the cluster client.
-            serviceProvider.GetService<SerializationManager>().RegisterSerializers(serviceProvider.GetService<IApplicationPartManager>());
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
             return serviceProvider.GetRequiredService<IClusterClient>();
         }

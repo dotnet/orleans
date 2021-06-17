@@ -5,10 +5,11 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 using Orleans.GrainReferences;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization
 {
-    public class OrleansJsonSerializer : IExternalSerializer
+    public class OrleansJsonSerializer
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
@@ -29,7 +30,7 @@ namespace Orleans.Serialization
         /// <returns>The default serializer settings.</returns>
         public static JsonSerializerSettings GetDefaultSerializerSettings(IServiceProvider services)
         {
-            var typeResolver = services.GetRequiredService<ITypeResolver>();
+            var typeResolver = services.GetRequiredService<TypeResolver>();
             var serializationBinder = new OrleansJsonSerializationBinder(typeResolver);
             var settings = new JsonSerializerSettings
             {
@@ -82,66 +83,22 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public object DeepCopy(object source, ICopyContext context)
+        public object Deserialize(Type expectedType, string input)
         {
-            if (source == null)
+            if (string.IsNullOrWhiteSpace(input))
             {
                 return null;
             }
 
-            var outputWriter = new BinaryTokenStreamWriter();
-            var serializationContext = new SerializationContext(context.GetSerializationManager())
-            {
-                StreamWriter = outputWriter
-            };
-            
-            Serialize(source, serializationContext, source.GetType());
-            var deserializationContext = new DeserializationContext(context.GetSerializationManager())
-            {
-                StreamReader = new BinaryTokenStreamReader(outputWriter.ToBytes())
-            };
-
-            var retVal = Deserialize(source.GetType(), deserializationContext);
-            outputWriter.ReleaseBuffers();
-            return retVal;
-        }
-
-        /// <inheritdoc />
-        public object Deserialize(Type expectedType, IDeserializationContext context)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            var reader = context.StreamReader;
-            var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, this.settings.Value);
+            return JsonConvert.DeserializeObject(input, expectedType, this.settings.Value);
         }
 
         /// <summary>
         /// Serializes an object to a binary stream
         /// </summary>
         /// <param name="item">The object to serialize</param>
-        /// <param name="context">The serialization context.</param>
         /// <param name="expectedType">The type the deserializer should expect</param>
-        public void Serialize(object item, ISerializationContext context, Type expectedType)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            var writer = context.StreamWriter;
-            if (item == null)
-            {
-                writer.WriteNull();
-                return;
-            }
-
-            var str = JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
-            writer.Write(str);
-        }
+        public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
     }
 
     public class IPAddressConverter : JsonConverter

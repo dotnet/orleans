@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Serialization;
-using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
-using System.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.ServiceBus.Providers
@@ -12,6 +9,7 @@ namespace Orleans.ServiceBus.Providers
     /// Replication of EventHub EventData class, reconstructed from cached data CachedEventHubMessage
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class EventHubMessage
     {
         /// <summary>
@@ -41,9 +39,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Duplicate of EventHub's EventData class.
         /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <param name="serializationManager"></param>
-        public EventHubMessage(CachedMessage cachedMessage, SerializationManager serializationManager)
+        public EventHubMessage(CachedMessage cachedMessage, Serialization.Serializer serializer)
         {
             int readOffset = 0;
             StreamId = cachedMessage.StreamId;
@@ -52,41 +48,56 @@ namespace Orleans.ServiceBus.Providers
             SequenceNumber = cachedMessage.SequenceNumber;
             EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
             DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
-            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties(serializationManager);
+            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties(serializer);
             Payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).ToArray();
         }
 
         /// <summary>
         /// Stream identifier
         /// </summary>
+        [Id(0)]
         public StreamId StreamId { get; }
+
         /// <summary>
         /// EventHub partition key
         /// </summary>
+        [Id(1)]
         public string PartitionKey { get; }
+
         /// <summary>
         /// Offset into EventHub partition
         /// </summary>
+        [Id(2)]
         public string Offset { get; }
+
         /// <summary>
         /// Sequence number in EventHub partition
         /// </summary>
+        [Id(3)]
         public long SequenceNumber { get; }
+
         /// <summary>
         /// Time event was written to EventHub
         /// </summary>
+        [Id(4)]
         public DateTime EnqueueTimeUtc { get; }
+
         /// <summary>
         /// Time event was read from EventHub and added to cache
         /// </summary>
+        [Id(5)]
         public DateTime DequeueTimeUtc { get; }
+
         /// <summary>
         /// User EventData properties
         /// </summary>
+        [Id(6)]
         public IDictionary<string, object> Properties { get; }
+
         /// <summary>
         /// Binary event data
         /// </summary>
+        [Id(7)]
         public byte[] Payload { get; }
     }
 }

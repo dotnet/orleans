@@ -12,12 +12,12 @@ using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
+using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -38,7 +38,6 @@ namespace Tester.AzureUtils.Streaming
             this.output = output;
             this.fixture = fixture;
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
-            BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
@@ -60,18 +59,16 @@ namespace Tester.AzureUtils.Streaming
                 QueueNames = azureQueueNames
             };
             options.ConfigureTestDefaults();
-            var serializationManager = this.fixture.Services.GetService<SerializationManager>();
+            var serializer = this.fixture.Services.GetService<Serializer>();
             var clusterOptions = this.fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
             var queueCacheOptions = new SimpleQueueCacheOptions();
-            var queueDataAdapter = new AzureQueueDataAdapterV2(serializationManager);
+            var queueDataAdapter = new AzureQueueDataAdapterV2(serializer);
             var adapterFactory = new AzureQueueAdapterFactory(
                 AZURE_QUEUE_STREAM_PROVIDER_NAME,
                 options,
                 queueCacheOptions,
                 queueDataAdapter,
-                this.fixture.Services,
                 clusterOptions,
-                serializationManager,
                 loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
@@ -140,7 +137,7 @@ namespace Tester.AzureUtils.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

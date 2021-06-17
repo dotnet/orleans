@@ -108,11 +108,6 @@ namespace Orleans.TestingHost
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
         /// </summary>
         public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
-        
-        /// <summary>
-        /// SerializationManager to use in the tests
-        /// </summary>
-        public SerializationManager SerializationManager { get; private set; }
 
         /// <summary>
         /// Delegate used to create and start an individual silo.
@@ -547,7 +542,6 @@ namespace Orleans.TestingHost
 
             this.InternalClient = (IInternalClusterClient)TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
             this.InternalClient.Connect().GetAwaiter().GetResult();
-            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
         }
 
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }

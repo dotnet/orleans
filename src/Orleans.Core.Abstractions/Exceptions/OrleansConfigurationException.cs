@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// Represents a configuration exception.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class OrleansConfigurationException : Exception
     {
         /// <inheritdoc />

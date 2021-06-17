@@ -1,7 +1,4 @@
 using System;
-using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
@@ -12,9 +9,6 @@ using Orleans.Storage;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Placement;
-using Orleans.TestingHost;
 
 namespace DefaultCluster.Tests.General
 {
@@ -45,7 +39,7 @@ namespace DefaultCluster.Tests.General
             // It's probably because the way hash codes are generated for the GrainReference
             // have changed. If you are sure the new code is repeatable, then it's fine to
             // update the expected value here. Good luck, friend.
-            Assert.Equal(2223355815u, r.GetUniformHashCode());
+            Assert.Equal(3068696999u, r.GetUniformHashCode());
         }
 
         [Fact]
@@ -133,9 +127,11 @@ namespace DefaultCluster.Tests.General
         }
 
         [Serializable]
+        [GenerateSerializer]
         public class GenericGrainReferenceHolder
         {
             [JsonProperty]
+            [Id(0)]
             public GrainReference Reference { get; set; }
         }
 
@@ -155,7 +151,7 @@ namespace DefaultCluster.Tests.General
             Assert.Same(g1, g2); // Should be same / interned GrainReference object
 
             // Round-trip through Serializer
-            var g3 = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(g1);
+            var g3 = this.HostedCluster.RoundTripSerializationForTesting(g1);
             Assert.Equal(g3, g1);
             Assert.Equal(g3, g2);
             Assert.Same(g3, g1);

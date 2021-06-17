@@ -5,30 +5,35 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Providers;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class StreamLifecycleTestGrainState
     {
         // For producer and consumer 
         // -- only need to store this because of how we run our unit tests against multiple providers
+        [Id(0)]
         public string StreamProviderName { get; set; }
 
         // For producer only.
+        [Id(1)]
         public IAsyncStream<int> Stream { get; set; }
+        [Id(2)]
         public bool IsProducer { get; set; }
+        [Id(3)]
         public int NumMessagesSent { get; set; }
+        [Id(4)]
         public int NumErrors { get; set; }
 
         // For consumer only.
+        [Id(5)]
         public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
 
         public StreamLifecycleTestGrainState()
@@ -385,11 +390,15 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class MyStreamObserver<T> : IAsyncObserver<T>
     {
+        [Id(0)]
         internal int NumItems { get; private set; }
+        [Id(1)]
         internal int NumErrors { get; private set; }
 
+        [Id(2)]
         private readonly ILogger logger;
 
         internal MyStreamObserver(ILogger logger)

@@ -56,8 +56,7 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void DefaultDhtDirectory()
         {
-            var grainId = LegacyGrainId.GetGrainId(DefaultDirectoryGrain.TYPECODE, Guid.NewGuid());
-            Assert.Null(this.target.Resolve(grainId.ToGrainId().Type));
+            Assert.Null(this.target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
         }
 
         [Fact]

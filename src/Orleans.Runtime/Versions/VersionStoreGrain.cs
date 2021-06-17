@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.Providers;
-using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
@@ -22,11 +18,16 @@ namespace Orleans.Runtime.Versions
         Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy);
     }
 
+    [GenerateSerializer]
     internal class VersionStoreGrainState
     {
+        [Id(0)]
         internal Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies { get; }
+        [Id(1)]
         internal Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies { get; }
+        [Id(2)]
         public VersionSelectorStrategy SelectorOverride { get; set; }
+        [Id(3)]
         public CompatibilityStrategy CompatibilityOverride { get; set; }
 
         public VersionStoreGrainState()

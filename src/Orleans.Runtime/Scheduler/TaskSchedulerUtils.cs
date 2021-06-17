@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
@@ -22,20 +23,71 @@ namespace Orleans.Runtime.Scheduler
 
         public static void QueueAction(this TaskScheduler taskScheduler, Action action)
         {
-            var task = new Task(action);
-            task.Start(taskScheduler);
+            bool restoreFlow = false;
+            try
+            {
+                if (!ExecutionContext.IsFlowSuppressed())
+                {
+                    ExecutionContext.SuppressFlow();
+                    restoreFlow = true;
+                }
+
+                var task = new Task(action);
+                task.Start(taskScheduler);
+            }
+            finally
+            {
+                if (restoreFlow)
+                {
+                    ExecutionContext.RestoreFlow();
+                }
+            }
         }
 
         public static void QueueAction(this TaskScheduler taskScheduler, Action<object> action, object state)
         {
-            var task = new Task(action, state);
-            task.Start(taskScheduler);
+            bool restoreFlow = false;
+            try
+            {
+                if (!ExecutionContext.IsFlowSuppressed())
+                {
+                    ExecutionContext.SuppressFlow();
+                    restoreFlow = true;
+                }
+
+                var task = new Task(action, state);
+                task.Start(taskScheduler);
+            }
+            finally
+            {
+                if (restoreFlow)
+                {
+                    ExecutionContext.RestoreFlow();
+                }
+            }
         }
 
         public static void QueueWorkItem(this TaskScheduler taskScheduler, IWorkItem todo)
         {
-            var workItemTask = new Task(TaskFunc, todo);
-            workItemTask.Start(taskScheduler);
+            bool restoreFlow = false;
+            try
+            {
+                if (!ExecutionContext.IsFlowSuppressed())
+                {
+                    ExecutionContext.SuppressFlow();
+                    restoreFlow = true;
+                }
+
+                var workItemTask = new Task(TaskFunc, todo);
+                workItemTask.Start(taskScheduler);
+            }
+            finally
+            {
+                if (restoreFlow)
+                {
+                    ExecutionContext.RestoreFlow();
+                }
+            }
         }
     }
 }

@@ -5,9 +5,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -119,13 +117,11 @@ namespace UnitTests.General
         [SuppressMessage("ReSharper", "NotAccessedField.Local")]
         public class GrainCallFilterWithDependencies : IIncomingGrainCallFilter
         {
-            private readonly SerializationManager serializationManager;
             private readonly Silo silo;
             private readonly IGrainFactory grainFactory;
 
-            public GrainCallFilterWithDependencies(SerializationManager serializationManager, Silo silo, IGrainFactory grainFactory)
+            public GrainCallFilterWithDependencies(Silo silo, IGrainFactory grainFactory)
             {
-                this.serializationManager = serializationManager;
                 this.silo = silo;
                 this.grainFactory = grainFactory;
             }
@@ -167,7 +163,7 @@ namespace UnitTests.General
             // Original arg should have been:
             // 1. Converted to upper case on the way out of the client: ab -> AB.
             // 2. Doubled on the way out of grain1: AB -> ABAB.
-            // 3. Reversed on the wya in to grain2: ABAB -> BABA.
+            // 3. Reversed on the way in to grain2: ABAB -> BABA.
             Assert.Equal("BABA", result["orig"] as string);
             Assert.NotNull(result["result"]);
             Assert.Equal("intercepted!", result["result"]);

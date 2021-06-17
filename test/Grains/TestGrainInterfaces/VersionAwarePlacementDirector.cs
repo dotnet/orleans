@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class VersionAwarePlacementStrategy : PlacementStrategy
     {
         internal static VersionAwarePlacementStrategy Singleton { get; } = new VersionAwarePlacementStrategy();

@@ -1,7 +1,8 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
 namespace Orleans.Providers
@@ -30,35 +31,37 @@ namespace Orleans.Providers
     /// Default IMemoryMessageBodySerializer
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
+    [SerializationCallbacks(typeof(Runtime.OnDeserializedCallbacks))]
     public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
     {
         [NonSerialized]
-        private SerializationManager serializationManager;
+        private Serializer<MemoryMessageBody> serializer;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DefaultMemoryMessageBodySerializer"/> class.
         /// </summary>
-        /// <param name="serializationManager"></param>
-        public DefaultMemoryMessageBodySerializer(SerializationManager serializationManager)
+        /// <param name="serializer"></param>
+        public DefaultMemoryMessageBodySerializer(Serializer<MemoryMessageBody> serializer)
         {
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
         }
 
         /// <inheritdoc />
         public ArraySegment<byte> Serialize(MemoryMessageBody body)
         {
-            return new ArraySegment<byte>(serializationManager.SerializeToByteArray(body));
+            return new ArraySegment<byte>(serializer.SerializeToArray(body));
         }
 
         /// <inheritdoc />
         public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
         {
-            return serializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
+            return serializer.Deserialize(bodyBytes.ToArray());
         }
 
-        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {
-            this.serializationManager = context.GetSerializationManager();
+            this.serializer = context.ServiceProvider.GetRequiredService<Serializer<MemoryMessageBody>>();
         }
     }
 
@@ -66,6 +69,7 @@ namespace Orleans.Providers
     /// Body of message sent over MemoryStreamProvider
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class MemoryMessageBody
     {
         /// <summary>
@@ -83,11 +87,13 @@ namespace Orleans.Providers
         /// <summary>
         /// Events in message
         /// </summary>
+        [Id(0)]
         public List<object> Events { get; }
 
         /// <summary>
         /// Message context
         /// </summary>
+        [Id(1)]
         public Dictionary<string, object> RequestContext { get; }
     }
 }

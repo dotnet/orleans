@@ -1,13 +1,9 @@
 using Orleans.Streams;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 using Orleans.Streams.PubSub;
-using System.IO;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
@@ -25,6 +21,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class FullStreamIdentity : IStreamIdentity
     {
         public FullStreamIdentity(Guid streamGuid, string streamNamespace, string providerName)
@@ -34,15 +31,19 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             this.ProviderName = providerName;
         }
 
+        [Id(0)]
         public string ProviderName;
+
         /// <summary>
         /// Stream primary key guid.
         /// </summary>
+        [Id(1)]
         public Guid Guid { get; }
 
         /// <summary>
         /// Stream namespace.
         /// </summary>
+        [Id(2)]
         public string Namespace { get; }
 
         public static implicit operator StreamId(FullStreamIdentity identity) => StreamId.Create(identity);

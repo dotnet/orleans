@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
-using Orleans.Transactions;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    internal class Message
+    [GenerateSerializer]
+    [WellKnownId(101)]
+    internal sealed class Message
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -38,15 +40,18 @@ namespace Orleans.Runtime
             get { return _retryCount; }
             set { _retryCount = value; }
         }
-        
+
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
+        [Id(0)]
         private ActivationAddress targetAddress;
+        [Id(1)]
         private ActivationAddress sendingAddress;
         
         static Message()
         {
         }
 
+        [GenerateSerializer]
         public enum Categories
         {
             Ping,
@@ -54,6 +59,7 @@ namespace Orleans.Runtime
             Application,
         }
 
+        [GenerateSerializer]
         public enum Directions
         {
             Request,
@@ -61,6 +67,7 @@ namespace Orleans.Runtime
             OneWay
         }
 
+        [GenerateSerializer]
         public enum ResponseTypes
         {
             Success,
@@ -69,6 +76,7 @@ namespace Orleans.Runtime
             Status
         }
 
+        [GenerateSerializer]
         public enum RejectionTypes
         {
             Transient,
@@ -79,6 +87,7 @@ namespace Orleans.Runtime
             CacheInvalidation
         }
 
+        [Id(2)]
         internal HeadersContainer Headers { get; set; } = new HeadersContainer();
 
         public Categories Category
@@ -111,18 +120,6 @@ namespace Orleans.Runtime
         {
             get { return Headers.IsUnordered; }
             set { Headers.IsUnordered = value; }
-        }
-
-        public bool IsReturnedFromRemoteCluster
-        {
-            get { return Headers.IsReturnedFromRemoteCluster; }
-            set { Headers.IsReturnedFromRemoteCluster = value; }
-        }
-
-        public bool IsTransactionRequired
-        {
-            get { return Headers.IsTransactionRequired; }
-            set { Headers.IsTransactionRequired = value; }
         }
 
         public CorrelationId Id
@@ -226,11 +223,6 @@ namespace Orleans.Runtime
             get { return Headers.CallChainId; }
             set { Headers.CallChainId = value; }
         }
-        
-        public TraceContext TraceContext {
-            get { return Headers.TraceContext; }
-            set { Headers.TraceContext = value; }
-        }
 
         public ActivationAddress SendingAddress
         {
@@ -305,12 +297,6 @@ namespace Orleans.Runtime
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
 
-        public ITransactionInfo TransactionInfo
-        {
-            get { return Headers.TransactionInfo; }
-            set { Headers.TransactionInfo = value; }
-        }
-
         public List<ActivationAddress> CacheInvalidationHeader
         {
             get { return Headers.CacheInvalidationHeader; }
@@ -350,6 +336,7 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
+        [Id(3)]
         public object BodyObject { get; set; }
 
         public void ClearTargetAddress()
@@ -385,7 +372,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
             AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
-            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
@@ -398,7 +384,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
             AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
-            AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
             return sb.ToString();
@@ -445,7 +430,7 @@ namespace Orleans.Runtime
                 Direction, //4
                 $"[{SendingSilo} {SendingGrain} {SendingActivation}]", //5
                 $"[{TargetSilo} {TargetGrain} {TargetActivation}]", //6
-                BodyObject is InvokeMethodRequest request ? $" {request.ToString()}" : string.Empty, // 7
+                BodyObject is { } request ? $" {request}" : string.Empty, // 7
                 Id, //8
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //9
         }
@@ -475,6 +460,7 @@ namespace Orleans.Runtime
         }
 
         // For statistical measuring of time spent in queues.
+        [Id(4)]
         private ITimeInterval timeInterval;
 
         public void Start()
@@ -502,7 +488,7 @@ namespace Orleans.Runtime
                 Category = request.Category,
                 Direction = Message.Directions.Response,
                 Result = Message.ResponseTypes.Error,
-                BodyObject = Response.ExceptionResponse(exception)
+                BodyObject = Response.FromException(exception)
             };
         }
 
@@ -529,7 +515,7 @@ namespace Orleans.Runtime
                 READ_ONLY = 1 << 13,
                 RESEND_COUNT = 1 << 14, // Support removed. Value retained for backwards compatibility.
                 SENDING_ACTIVATION = 1 << 15,
-                SENDING_GRAIN = 1 <<16,
+                SENDING_GRAIN = 1 << 16,
                 SENDING_SILO = 1 << 17,
                 IS_NEW_PLACEMENT = 1 << 18,
 
@@ -539,59 +525,42 @@ namespace Orleans.Runtime
                 TARGET_OBSERVER = 1 << 22,
                 IS_UNORDERED = 1 << 23,
                 REQUEST_CONTEXT = 1 << 24,
-                IS_RETURNED_FROM_REMOTE_CLUSTER = 1 << 25,
                 INTERFACE_VERSION = 1 << 26,
 
-                // transactions
-                TRANSACTION_INFO = 1 << 27,
-                IS_TRANSACTION_REQUIRED = 1 << 28,
-
                 CALL_CHAIN_ID = 1 << 29,
-
-                TRACE_CONTEXT = 1 << 30,
 
                 INTERFACE_TYPE = 1 << 31
                 // Do not add over int.MaxValue of these.
             }
 
-            private Categories _category;
-            private Directions? _direction;
-            private bool _isReadOnly;
-            private bool _isAlwaysInterleave;
-            private bool _isUnordered;
-            private bool _isReturnedFromRemoteCluster;
-            private bool _isTransactionRequired;
-            private CorrelationId _id;
-            private int _forwardCount;
-            private SiloAddress _targetSilo;
-            private GrainId _targetGrain;
-            private ActivationId _targetActivation;
-            private SiloAddress _sendingSilo;
-            private GrainId _sendingGrain;
-            private ActivationId _sendingActivation;
-            private bool _isNewPlacement;
-            private ushort _interfaceVersion;
-            private ResponseTypes _result;
-            private ITransactionInfo _transactionInfo;
-            private TimeSpan? _timeToLive;
-            private List<ActivationAddress> _cacheInvalidationHeader;
-            private RejectionTypes _rejectionType;
-            private string _rejectionInfo;
-            private Dictionary<string, object> _requestContextData;
-            private CorrelationId _callChainId;
-            private readonly DateTime _localCreationTime;
-            private TraceContext _traceContext;
-            private GrainInterfaceType interfaceType;
+            public Categories _category;
+            public Directions? _direction;
+            public bool _isReadOnly;
+            public bool _isAlwaysInterleave;
+            public bool _isUnordered;
+            public CorrelationId _id;
+            public int _forwardCount;
+            public SiloAddress _targetSilo;
+            public GrainId _targetGrain;
+            public ActivationId _targetActivation;
+            public SiloAddress _sendingSilo;
+            public GrainId _sendingGrain;
+            public ActivationId _sendingActivation;
+            public bool _isNewPlacement;
+            public ushort _interfaceVersion;
+            public ResponseTypes _result;
+            public GrainInterfaceType interfaceType;
+            public TimeSpan? _timeToLive;
+            public List<ActivationAddress> _cacheInvalidationHeader;
+            public RejectionTypes _rejectionType;
+            public string _rejectionInfo;
+            public Dictionary<string, object> _requestContextData;
+            public CorrelationId _callChainId;
+            public readonly DateTime _localCreationTime;
 
             public HeadersContainer()
             {
                 _localCreationTime = DateTime.UtcNow;
-            }
-
-            public TraceContext TraceContext
-            {
-                get { return _traceContext; }
-                set { _traceContext = value; }
             }
 
             public Categories Category
@@ -636,24 +605,6 @@ namespace Orleans.Runtime
                 set
                 {
                     _isUnordered = value;
-                }
-            }
-
-            public bool IsReturnedFromRemoteCluster
-            {
-                get { return _isReturnedFromRemoteCluster; }
-                set
-                {
-                    _isReturnedFromRemoteCluster = value;
-                }
-            }
-
-            public bool IsTransactionRequired
-            {
-                get { return _isTransactionRequired; }
-                set
-                {
-                    _isTransactionRequired = value;
                 }
             }
 
@@ -756,15 +707,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            public ITransactionInfo TransactionInfo
-            {
-                get { return _transactionInfo; }
-                set
-                {
-                    _transactionInfo = value;
-                }
-            }
-
             public TimeSpan? TimeToLive
             {
                 get
@@ -834,7 +776,7 @@ namespace Orleans.Runtime
             internal Headers GetHeadersMask()
             {
                 Headers headers = Headers.NONE;
-                if(Category != default(Categories))
+                if (Category != default(Categories))
                     headers = headers | Headers.CATEGORY;
 
                 headers = _direction == null ? headers & ~Headers.DIRECTION : headers | Headers.DIRECTION;
@@ -842,12 +784,12 @@ namespace Orleans.Runtime
                     headers = headers | Headers.READ_ONLY;
                 if (IsAlwaysInterleave)
                     headers = headers | Headers.ALWAYS_INTERLEAVE;
-                if(IsUnordered)
+                if (IsUnordered)
                     headers = headers | Headers.IS_UNORDERED;
 
-                headers = _id == null ? headers & ~Headers.CORRELATION_ID : headers | Headers.CORRELATION_ID;
+                headers = _id.ToInt64() == 0 ? headers & ~Headers.CORRELATION_ID : headers | Headers.CORRELATION_ID;
 
-                if(_forwardCount != default (int))
+                if (_forwardCount != default(int))
                     headers = headers | Headers.FORWARD_COUNT;
 
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
@@ -857,291 +799,16 @@ namespace Orleans.Runtime
                 headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
-                headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
-                headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
+                headers = _result == default(ResponseTypes) ? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
-                headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
-                headers = _traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
-                headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
-                headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
+                headers = _callChainId.ToInt64() == 0 ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
                 headers = interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
                 return headers;
-            }
-
-            [CopierMethod]
-            public static object DeepCopier(object original, ICopyContext context)
-            {
-                return original;
-            }
-
-            [SerializerMethod]
-            public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
-            {
-                HeadersContainer input = (HeadersContainer)untypedInput;
-                var sm = context.GetSerializationManager();
-                var headers = input.GetHeadersMask();
-                var writer = context.StreamWriter;
-                writer.Write((int)headers);
-                if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
-                {
-                    var count = input.CacheInvalidationHeader.Count;
-                    writer.Write(input.CacheInvalidationHeader.Count);
-                    for (int i = 0; i < count; i++)
-                    {
-                        WriteObj(sm, context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
-                    }
-                }
-
-                if ((headers & Headers.CATEGORY) != Headers.NONE)
-                {
-                    writer.Write((byte)input.Category);
-                }
-
-                if ((headers & Headers.DIRECTION) != Headers.NONE)
-                    writer.Write((byte)input.Direction.Value);
-
-                if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
-                    writer.Write(input.TimeToLive.Value);
-
-                if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
-                    writer.Write(input.ForwardCount);
-
-                if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    writer.Write(input.Id);
-
-                if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
-                    writer.Write(input.IsAlwaysInterleave);
-
-                if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
-                    writer.Write(input.IsNewPlacement);
-
-                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
-                    writer.Write(input.IsReturnedFromRemoteCluster);
-
-                if ((headers & Headers.INTERFACE_VERSION) != Headers.NONE)
-                    writer.Write(input.InterfaceVersion);
-
-                if ((headers & Headers.READ_ONLY) != Headers.NONE)
-                    writer.Write(input.IsReadOnly);
-
-                if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
-                    writer.Write(input.IsUnordered);
-
-                if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
-                    writer.Write(input.RejectionInfo);
-
-                if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
-                    writer.Write((byte)input.RejectionType);
-
-                if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
-                {
-                    var requestData = input.RequestContextData;
-                    var count = requestData.Count;
-                    writer.Write(count);
-                    foreach (var d in requestData)
-                    {
-                        writer.Write(d.Key);
-                        SerializationManager.SerializeInner(d.Value, context, typeof(object));
-                    }
-                }
-
-                if ((headers & Headers.RESULT) != Headers.NONE)
-                    writer.Write((byte)input.Result);
-
-                if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-                {
-                    writer.Write(input.SendingActivation);
-                }
-
-                if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
-                {
-                    writer.Write(input.SendingGrain);
-                }
-
-                if ((headers & Headers.SENDING_SILO) != Headers.NONE)
-                {
-                    writer.Write(input.SendingSilo);
-                }
-
-                if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
-                {
-                    writer.Write(input.TargetActivation);
-                }
-
-                if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
-                {
-                    writer.Write(input.TargetGrain);
-                }
-
-                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
-                {
-                    writer.Write(input.CallChainId);
-                }
-
-                if ((headers & Headers.TARGET_SILO) != Headers.NONE)
-                {
-                    writer.Write(input.TargetSilo);
-                }
-
-                if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(ITransactionInfo));
-
-                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
-                {
-                    SerializationManager.SerializeInner(input._traceContext, context, typeof(TraceContext));
-                }
-
-                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
-                {
-                    writer.Write(input.interfaceType);
-                }
-            }
-
-            [DeserializerMethod]
-            public static object Deserializer(Type expected, IDeserializationContext context)
-            {
-                var sm = context.GetSerializationManager();
-                var result = new HeadersContainer();
-                var reader = context.StreamReader;
-                context.RecordObject(result);
-                var headers = (Headers)reader.ReadInt();
-
-                if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
-                {
-                    var n = reader.ReadInt();
-                    if (n > 0)
-                    {
-                       var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
-                        for (int i = 0; i < n; i++)
-                        {
-                            list.Add((ActivationAddress)ReadObj(sm, typeof(ActivationAddress), context));
-                        }
-                    }
-                }
-
-                if ((headers & Headers.CATEGORY) != Headers.NONE)
-                    result.Category = (Categories)reader.ReadByte();
-
-                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    _ = reader.ReadString();
-
-                if ((headers & Headers.DIRECTION) != Headers.NONE)
-                    result.Direction = (Message.Directions)reader.ReadByte();
-
-                if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
-                    result.TimeToLive = reader.ReadTimeSpan();
-
-                if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
-                    result.ForwardCount = reader.ReadInt();
-
-                if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
-                    _ = reader.ReadString();
-
-                if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(sm, typeof(CorrelationId), context);
-
-                if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
-                    result.IsAlwaysInterleave = ReadBool(reader);
-
-                if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
-                    result.IsNewPlacement = ReadBool(reader);
-
-                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
-                    result.IsReturnedFromRemoteCluster = ReadBool(reader);
-
-                if ((headers & Headers.INTERFACE_VERSION) != Headers.NONE)
-                    result.InterfaceVersion = reader.ReadUShort();
-
-                if ((headers & Headers.READ_ONLY) != Headers.NONE)
-                    result.IsReadOnly = ReadBool(reader);
-
-                if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
-                    result.IsUnordered = ReadBool(reader);
-
-                if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    _ = reader.ReadString();
-
-                if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
-                    result.RejectionInfo = reader.ReadString();
-
-                if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
-                    result.RejectionType = (RejectionTypes)reader.ReadByte();
-
-                if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
-                {
-                    var c = reader.ReadInt();
-                    var requestData = new Dictionary<string, object>(c);
-                    for (int i = 0; i < c; i++)
-                    {
-                        requestData[reader.ReadString()] = SerializationManager.DeserializeInner(null, context);
-                    }
-                    result.RequestContextData = requestData;
-                }
-
-                // Read for backwards compatibility but ignore the value.
-                if ((headers & Headers.RESEND_COUNT) != Headers.NONE) reader.ReadInt();
-
-                if ((headers & Headers.RESULT) != Headers.NONE)
-                    result.Result = (Orleans.Runtime.Message.ResponseTypes)reader.ReadByte();
-
-                if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-                    result.SendingActivation = reader.ReadActivationId();
-
-                if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
-                    result.SendingGrain = reader.ReadGrainId();
-
-                if ((headers & Headers.SENDING_SILO) != Headers.NONE)
-                    result.SendingSilo = reader.ReadSiloAddress();
-
-                if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE) 
-                    result.TargetActivation = reader.ReadActivationId();
-
-                if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
-                    result.TargetGrain = reader.ReadGrainId();
-
-                if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    _ = (GuidId)ReadObj(sm, typeof(GuidId), context);
-
-                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
-                    result.CallChainId = reader.ReadCorrelationId();
-
-                if ((headers & Headers.TARGET_SILO) != Headers.NONE)
-                    result.TargetSilo = reader.ReadSiloAddress();
-
-                result.IsTransactionRequired = (headers & Headers.IS_TRANSACTION_REQUIRED) != Headers.NONE;
-
-                if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    result.TransactionInfo = SerializationManager.DeserializeInner<ITransactionInfo>(context);
-
-                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
-                    result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
-
-                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
-                    result.InterfaceType = reader.ReadGrainInterfaceType();
-
-                return result;
-            }
-
-            private static bool ReadBool(IBinaryTokenStreamReader stream)
-            {
-                return stream.ReadByte() == (byte) SerializationTokenType.True;
-            }
-
-            private static void WriteObj(SerializationManager sm, ISerializationContext context, Type type, object input)
-            {
-                var ser = sm.GetSerializer(type);
-                ser.Invoke(input, context, type);
-            }
-
-            private static object ReadObj(SerializationManager sm, Type t, IDeserializationContext context)
-            {
-                var des = sm.GetDeserializer(t);
-                return des.Invoke(t, context);
             }
         }
     }

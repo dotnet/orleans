@@ -13,11 +13,10 @@ namespace Orleans.Runtime
         private readonly LogStatistics logStatistics;
 
         public ClientStatisticsManager(
-            SerializationStatisticsGroup serializationStatistics, 
             ILoggerFactory loggerFactory, 
             IOptions<StatisticsOptions> statisticsOptions)
         {
-            this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, false, serializationStatistics, loggerFactory);
+            this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, false, loggerFactory);
             MessagingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init();
         }

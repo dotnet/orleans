@@ -52,11 +52,6 @@ namespace Orleans.ServiceBus.Providers
         private ITelemetryProducer telemetryProducer;
 
         /// <summary>
-        /// Gets the serialization manager.
-        /// </summary>
-        public SerializationManager SerializationManager { get; private set; }
-
-        /// <summary>
         /// Name of the adapter. Primarily for logging purposes
         /// </summary>
         public string Name { get; }
@@ -116,7 +111,6 @@ namespace Orleans.ServiceBus.Providers
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            SerializationManager serializationManager,
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
@@ -128,7 +122,6 @@ namespace Orleans.ServiceBus.Providers
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         }
@@ -270,7 +263,7 @@ namespace Orleans.ServiceBus.Providers
         {
            var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, this.SerializationManager, sharedDimensions);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)

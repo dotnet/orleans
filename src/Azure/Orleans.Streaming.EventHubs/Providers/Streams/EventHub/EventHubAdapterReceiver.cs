@@ -10,7 +10,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
-using Azure.Messaging.EventHubs.Consumer;
 using Azure.Messaging.EventHubs;
 
 namespace Orleans.ServiceBus.Providers

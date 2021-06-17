@@ -9,23 +9,27 @@ namespace Orleans.Streams
     /// A batch of batch containers, that if configured (see StreamPullingAgentOptions), will be the data pulled by the
     /// PersistenStreamPullingAgent from it's underlying cache
     /// </summary>
-    class BatchContainerBatch : IBatchContainerBatch
+    [GenerateSerializer]
+    public class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
         /// Derived from the first batch container in the batch.
         /// </summary>
+        [Id(0)]
         public StreamId StreamId { get; }
 
         /// <summary>
         /// Stream Sequence Token for the start of this batch.
         /// Derived from the first batch container in the batch.
         /// </summary>
+        [Id(1)]
         public StreamSequenceToken SequenceToken { get; }
 
         /// <summary>
         /// Batch containers comprising this batch
         /// </summary>
+        [Id(2)]
         public List<IBatchContainer> BatchContainers { get; }
 
         public BatchContainerBatch(List<IBatchContainer> batchContainers)

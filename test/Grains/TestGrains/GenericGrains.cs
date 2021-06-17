@@ -2,21 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class SimpleGenericGrainState<T>
     {
+        [Id(0)]
         public T A { get; set; }
+        [Id(1)]
         public T B { get; set; }
     }
 
@@ -86,9 +87,12 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class SimpleGenericGrainUState<U>
     {
+        [Id(0)]
         public U A { get; set; }
+        [Id(1)]
         public U B { get; set; }
     }
 
@@ -126,9 +130,12 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class SimpleGenericGrain2State<T, U>
     {
+        [Id(0)]
         public T A { get; set; }
+        [Id(1)]
         public U B { get; set; }
     }
 
@@ -183,8 +190,10 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class IGrainWithListFieldsState
     {
+        [Id(0)]
         public IList<string> Items { get; set; }
     }
 
@@ -211,8 +220,10 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericGrainWithListFieldsState<T>
     {
+        [Id(0)]
         public IList<T> Items { get; set; }
     }
 
@@ -240,30 +251,42 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericReaderWriterState<T>
     {
+        [Id(0)]
         public T Value { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericReader2State<TOne, TTwo>
     {
+        [Id(0)]
         public TOne Value1 { get; set; }
+        [Id(1)]
         public TTwo Value2 { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericReaderWriterGrain2State<TOne, TTwo>
     {
+        [Id(0)]
         public TOne Value1 { get; set; }
+        [Id(1)]
         public TTwo Value2 { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class GenericReader3State<TOne, TTwo, TThree>
     {
+        [Id(0)]
         public TOne Value1 { get; set; }
+        [Id(1)]
         public TTwo Value2 { get; set; }
+        [Id(2)]
         public TThree Value3 { get; set; }
     }
 
@@ -701,6 +724,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        [WellKnownAlias("GenericGrainWithConstraints.GetCount")]
         public Task<int> GetCount() { return Task.FromResult(collection.Count); }
 
         public Task Add(B item)
@@ -750,9 +774,11 @@ namespace UnitTests.Grains
 
 
     [Serializable]
+    [GenerateSerializer]
     public class Reducer1Action { }
 
     [Serializable]
+    [GenerateSerializer]
     public class Reducer2Action { }
 
     public class Reducer1 : IReducer<string, Reducer1Action>

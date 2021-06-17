@@ -47,8 +47,10 @@ namespace TestGrains
         }
 
         [Serializable]
+        [GenerateSerializer]
         public class MyState
         {
+            [Id(0)]
             public IList<SomeAbstractClass> Classes { get; set; }
         }
     }

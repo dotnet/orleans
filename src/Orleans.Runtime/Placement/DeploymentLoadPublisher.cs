@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -92,7 +91,6 @@ namespace Orleans.Runtime
                 var activationCount = this.activationDirectory.Count;
                 var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
                 var myStats = new SiloRuntimeStatistics(
-                    this.messageCenter,
                     activationCount,
                     recentlyUsedActivationCount,
                     this.appEnvironmentStatistics,

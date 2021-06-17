@@ -210,9 +210,11 @@ namespace UnitTests.GrainInterfaces
         Task<T> GetLastValue();
     }
 
+    [WellKnownAlias("IGenericGrainWithConstraints`3")]
     public interface IGenericGrainWithConstraints<A, B, C> : IGrainWithStringKey
         where A : ICollection<B>, new() where B : struct where C : class
     {
+        [WellKnownAlias("IGenericGrainWithConstraints_GetCount`3")]
         Task<int> GetCount();
 
         Task Add(B item);
@@ -315,10 +317,48 @@ namespace UnitTests.GrainInterfaces
 
         public interface IYetOneMoreReceivingFurtherSpecializedGenArg<T> : IBasicGrain
         { }
-
-
     }
 
+    public interface IG2<T1, T2> : IGrainWithGuidKey
+    { }
 
+    public class HalfOpenGrain1<T> : Grain, IG2<T, int>
+    { }
+    public class HalfOpenGrain2<T> : Grain, IG2<int, T>
+    { }
 
+    public class OpenGeneric<T2, T1> : Grain, IG2<T2, T1>
+    { }
+
+    public class ClosedGeneric : Grain, IG2<Dummy1, Dummy2>
+    { }
+
+    public class ClosedGenericWithManyInterfaces : Grain, IG2<Dummy1, Dummy2>, IG2<Dummy2, Dummy1>
+    { }
+
+    [GenerateSerializer]
+    public class Dummy1 { }
+
+    [GenerateSerializer]
+    public class Dummy2 { }
+
+    public interface IG<T> : IGrain
+    {
+    }
+
+    public class G1<T1, T2, T3, T4> : Grain, Root<T1>.IA<T2, T3, T4>
+    {
+    }
+
+    public class Root<TRoot>
+    {
+        public interface IA<T1, T2, T3> : IGrainWithIntegerKey
+        {
+
+        }
+
+        public class G<T1, T2, T3> : Grain, IG<IA<T1, T2, T3>>
+        {
+        }
+    }
 }

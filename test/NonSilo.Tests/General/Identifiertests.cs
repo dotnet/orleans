@@ -4,9 +4,6 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -38,61 +35,6 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void UniqueKeyToByteArrayWithKeyExt()
-        {
-            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: "hello world");
-
-            var result = key.ToByteArray();
-
-            var sw = new BinaryTokenStreamWriter();
-            sw.Write(key);
-            var expected = sw.ToByteArray();
-
-            Assert.Equal(expected.Length, result.Length);
-            for (int i = 0; i < expected.Length; i++)
-            {
-                Assert.Equal(expected[i], result[i]);
-            }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void UniqueKeyToByteArrayWithoutKeyExt()
-        {
-            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.Client);
-
-            var result = key.ToByteArray();
-
-            var sw = new BinaryTokenStreamWriter();
-            sw.Write(key);
-            var expected = sw.ToByteArray();
-
-            Assert.Equal(expected.Length, result.Length);
-            for (int i = 0; i < expected.Length; i++)
-            {
-                Assert.Equal(expected[i], result[i]);
-            }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void SiloAddressGetUniformHashCodes()
-        {
-            int numberofHash = 3;
-            var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 8080), 26);
-
-            var result = siloAddress.GetUniformHashCodes(numberofHash);
-
-            for (int i = 0; i < numberofHash; i++)
-            {
-                var sw = new BinaryTokenStreamWriter();
-                sw.Write(siloAddress);
-                sw.Write(i);
-                var expected = JenkinsHash.ComputeHash(sw.ToByteArray());
-
-                Assert.Equal(expected, result[i]);
-            }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -111,39 +53,6 @@ namespace UnitTests.General
         {
             Assert.Throws<ArgumentException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: " \t\n\r"));
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void UniqueKeySerializationShouldReproduceAnIdenticalObject()
-        {
-            {
-                var expected = UniqueKey.NewKey(Guid.NewGuid());
-                BinaryTokenStreamWriter writer = new BinaryTokenStreamWriter();
-                writer.Write(expected);
-                BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
-                var actual = reader.ReadUniqueKey();
-                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #1).
-            }
-
-            {
-                var kx = random.Next().ToString(CultureInfo.InvariantCulture);
-                var expected = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx);
-                BinaryTokenStreamWriter writer = new BinaryTokenStreamWriter();
-                writer.Write(expected);
-                BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
-                var actual = reader.ReadUniqueKey();
-                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #2).
-            }
-
-            {
-                var kx = random.Next().ToString(CultureInfo.InvariantCulture) + new String('*', 400);
-                var expected = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx);
-                BinaryTokenStreamWriter writer = new BinaryTokenStreamWriter();
-                writer.Write(expected);
-                BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
-                var actual = reader.ReadUniqueKey();
-                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #3).
-            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
@@ -305,7 +214,7 @@ namespace UnitTests.General
             Assert.Equal(gid1, gid2); // Should be equal GrainId's
 
             // Round-trip through Serializer
-            GrainId gid3 = (GrainId)this.environment.SerializationManager.RoundTripSerializationForTesting(gid1);
+            GrainId gid3 = this.environment.Serializer.Deserialize<GrainId>(environment.Serializer.SerializeToArray(gid1));
             Assert.Equal(gid1, gid3); // Should be equal GrainId's
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
         }
@@ -322,7 +231,7 @@ namespace UnitTests.General
             Assert.Same(r1, r2); // 2: Objects should be same / intern'ed
 
             // Round-trip through Serializer
-            string r3 = (string)this.environment.SerializationManager.RoundTripSerializationForTesting(r1);
+            string r3 = this.environment.Serializer.Deserialize<string>(environment.Serializer.SerializeToArray(r1));
 
             Assert.Equal(r1, r3); // 3: Should be equal
             Assert.Equal(r2, r3); // 4: Should be equal
@@ -370,7 +279,7 @@ namespace UnitTests.General
             Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
             // Round-trip through Serializer
-            SiloAddress a3 = (SiloAddress)this.environment.SerializationManager.RoundTripSerializationForTesting(a1);
+            SiloAddress a3 = this.environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Equal(a2, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
@@ -392,7 +301,7 @@ namespace UnitTests.General
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
 
             // Round-trip through Serializer
-            SiloAddress a3 = (SiloAddress)this.environment.SerializationManager.RoundTripSerializationForTesting(a1);
+            SiloAddress a3 = this.environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
@@ -437,7 +346,7 @@ namespace UnitTests.General
             GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.ToKeyString
 
-            roundTripped = this.environment.SerializationManager.RoundTripSerializationForTesting(grainRef);
+            roundTripped = this.environment.Serializer.Deserialize<GrainReference>(environment.Serializer.SerializeToArray(grainRef));
             Assert.Equal(grainRef, roundTripped); // GrainReference.OrleansSerializer
         }
 

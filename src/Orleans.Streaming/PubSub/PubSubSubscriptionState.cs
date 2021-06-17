@@ -6,6 +6,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
+    [GenerateSerializer]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
         internal enum SubscriptionStates
@@ -18,18 +19,23 @@ namespace Orleans.Streams
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
+        [Id(1)]
         public GuidId SubscriptionId;
 
         [JsonProperty]
+        [Id(2)]
         public InternalStreamId Stream;
 
         [JsonProperty]
+        [Id(3)]
         public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
+        [Id(4)]
         public string FilterData; // Serialized func info
 
         [JsonProperty]
+        [Id(5)]
         public SubscriptionStates state;
 
         // This property does not need to be Json serialized, since we already have producerReference.

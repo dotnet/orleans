@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -10,6 +11,7 @@ using Orleans.Streams;
 
 namespace Tester.TestStreamProviders.Controllable
 {
+    [GenerateSerializer]
     public enum ControllableTestStreamProviderCommands
     {
         AdapterEcho = PersistentStreamProviderCommand.AdapterCommandStartRange + 1,

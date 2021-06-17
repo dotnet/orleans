@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Runtime;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,11 +13,9 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
-using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Internal;
@@ -105,8 +102,6 @@ namespace Orleans.Runtime
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
 
-            services.GetService<SerializationManager>().RegisterSerializers(services.GetService<IApplicationPartManager>());
-
             this.Services = services;
 
             //set PropagateActivityId flag from node config
@@ -135,7 +130,6 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-            BufferPool.InitGlobalBufferPool(siloMessagingOptions.Value);
 
             try
             {
@@ -157,8 +151,6 @@ namespace Orleans.Runtime
 
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
-            var dispatcher = this.Services.GetRequiredService<Dispatcher>();
-            messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             // Now the router/directory service
@@ -256,7 +248,6 @@ namespace Orleans.Runtime
                 // Start the reminder service system target
                 var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
                 reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
-                this.Services.GetService<SiloLoggingHelper>()?.RegisterGrainService(reminderService);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
 
@@ -307,8 +298,6 @@ namespace Orleans.Runtime
         {
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
-            // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
@@ -364,16 +353,6 @@ namespace Orleans.Runtime
 
         private Task OnBecomeActiveStart(CancellationToken ct)
         {
-            var stopWatch = Stopwatch.StartNew();
-            StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
-            void StartGateway()
-            {
-                // Now that we're active, we can start the gateway
-                var mc = this.messageCenter as MessageCenter;
-                mc?.StartGateway();
-                logger.Debug("Message gateway service started successfully.");
-            }
-
             this.SystemStatus = SystemStatus.Running;
             return Task.CompletedTask;
         }
@@ -403,10 +382,8 @@ namespace Orleans.Runtime
         private async Task CreateGrainServices()
         {
             var grainServices = this.Services.GetServices<IGrainService>();
-            var loggingHelper = this.Services.GetService<SiloLoggingHelper>();
             foreach (var grainService in grainServices)
             {
-                loggingHelper?.RegisterGrainService(grainService); 
                 await RegisterGrainService(grainService);
             }
         }

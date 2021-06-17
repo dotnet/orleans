@@ -15,6 +15,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
@@ -117,11 +118,11 @@ namespace Orleans
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
-                var serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+                var copier = this.ServiceProvider.GetRequiredService<DeepCopier>();
                 this.localObjects = new InvokableObjectManager(
                     services.GetRequiredService<ClientGrainContext>(),
                     this,
-                    serializationManager,
+                    copier,
                     this.messagingTrace,
                     this.loggerFactory.CreateLogger<ClientGrainContext>());
 
@@ -131,8 +132,6 @@ namespace Orleans
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
                 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
-
-                BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
 
                 this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
@@ -245,16 +244,15 @@ namespace Orleans
             MessageCenter.SendMessage(message);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
-            Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
-        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options)
+        public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
+
             SendRequestMessage(target, message, context, options);
         }
 
-        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, InvokeMethodOptions options)
+        private void SendRequestMessage(GrainReference target, Message message, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
@@ -281,6 +279,10 @@ namespace Orleans
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
+            }
+            else
+            {
+                context?.Complete();
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
@@ -312,10 +314,7 @@ namespace Orleans
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        using (request.SetThreadActivityId())
-                        {
-                            this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
-                        }
+                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
                     }
                 }
                 else
@@ -323,10 +322,7 @@ namespace Orleans
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        using (response.SetThreadActivityId())
-                        {
-                            this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
-                        }
+                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
                     }
                 }
 
@@ -404,7 +400,7 @@ namespace Orleans
         /// <inheritdoc />
         public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
-        public IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public IAddressable CreateObjectReference(IAddressable obj)
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
@@ -417,7 +413,7 @@ namespace Orleans
                 : ObserverGrainId.Create(this.clientId);
             var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
 
-            if (!localObjects.TryRegister(obj, observerId, invoker))
+            if (!localObjects.TryRegister(obj, observerId))
             {
                 throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", "reference");
             }

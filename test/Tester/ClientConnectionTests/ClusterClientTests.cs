@@ -9,7 +9,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 

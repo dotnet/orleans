@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
@@ -13,6 +13,7 @@ namespace Orleans.Runtime
     /// The message is likely to be accepted by this or another silo if it is retransmitted at a later time.
     /// </remarks>
     [Serializable]
+    [GenerateSerializer]
     public class LimitExceededException : OrleansException
     {
         public LimitExceededException() : base("Limit exceeded") { }

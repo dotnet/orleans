@@ -3,7 +3,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
@@ -12,7 +11,7 @@ namespace Orleans.Runtime.Messaging
     internal sealed class GatewayInboundConnection : Connection
     {
         private readonly MessageCenter messageCenter;
-        private readonly ILocalSiloDetails siloDetails;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
@@ -27,14 +26,15 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails siloDetails,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connection, middleware, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
             this.overloadDetector = overloadDetector;
-            this.siloDetails = siloDetails;
             this.messageCenter = messageCenter;
+            this.connectionPreambleHelper = connectionPreambleHelper;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.myAddress = siloDetails.SiloAddress;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
@@ -101,20 +101,23 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            var (grainId, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
+            var preamble = await connectionPreambleHelper.Read(this.Context);
 
-            if (protocolVersion >= NetworkProtocolVersion.Version2)
+            if (preamble.NetworkProtocolVersion >= NetworkProtocolVersion.Version3)
             {
-                await ConnectionPreamble.Write(
+                await connectionPreambleHelper.Write(
                     this.Context,
-                    Constants.SiloDirectConnectionId,
-                    this.connectionOptions.ProtocolVersion,
-                    this.myAddress);
+                    new ConnectionPreamble
+                    {
+                        NodeIdentity = Constants.SiloDirectConnectionId,
+                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
+                        SiloAddress = this.myAddress
+                    });
             }
 
-            if (!ClientGrainId.TryParse(grainId, out var clientId))
+            if (!ClientGrainId.TryParse(preamble.NodeIdentity, out var clientId))
             {
-                throw new InvalidOperationException($"Unexpected connection id {grainId} on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
+                throw new InvalidOperationException($"Unexpected connection id {preamble.NodeIdentity} on proxy endpoint from {preamble.SiloAddress?.ToString() ?? "unknown silo"}");
             }
 
             try

@@ -9,9 +9,12 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class SimplePersistentGrain_State
     {
+        [Id(0)]
         public int A { get; set; }
+        [Id(1)]
         public int B { get; set; }
     }
 

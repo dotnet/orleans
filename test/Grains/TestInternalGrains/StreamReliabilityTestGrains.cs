@@ -14,19 +14,23 @@ using UnitTests.StreamingTests;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class StreamReliabilityTestGrainState
     {
         // For producer and consumer 
         // -- only need to store because of how we run our unit tests against multiple providers
+        [Id(0)]
         public string StreamProviderName { get; set; }
 
         // For producer only.
 #if USE_GENERICS
         public IAsyncStream<T> Stream { get; set; }
 #else
+        [Id(1)]
         public IAsyncStream<int> Stream { get; set; }
 #endif
 
+        [Id(2)]
         public bool IsProducer { get; set; }
 
         // For consumer only.
@@ -38,6 +42,7 @@ namespace UnitTests.Grains
             ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<T>>();
         }
 #else
+        [Id(3)]
         public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
 
         public StreamReliabilityTestGrainState()

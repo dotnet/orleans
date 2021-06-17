@@ -25,8 +25,10 @@ namespace TestGrains
         /// The state of this grain is just the current balance.
         /// </summary>
         [Serializable]
+        [Orleans.GenerateSerializer]
         public class GrainState
         {
+            [Orleans.Id(0)]
             public uint Balance { get; set; }
 
             public void Apply(DepositTransaction d)

@@ -32,6 +32,7 @@ namespace UnitTests.Grains
         }
     }
 
+    [GenerateSerializer]
     public class ThirdGrainState
     {
     }

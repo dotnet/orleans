@@ -66,9 +66,13 @@ namespace Orleans.GrainDirectory
     }
 
     [Serializable]
+    [GenerateSerializer]
     internal struct AddressAndTag
     {
+        [Id(1)]
         public ActivationAddress Address;
+       
+        [Id(2)]
         public int VersionTag;
     }
 

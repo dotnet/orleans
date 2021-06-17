@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static Dictionary<string, object> Export(SerializationManager serializationManager)
+        public static Dictionary<string, object> Export(DeepCopier copier)
         {
             var values = RequestContext.CallContextData.Value;
 
@@ -59,7 +59,7 @@ namespace Orleans.Runtime
             }
 
             return (values != null && values.Count > 0)
-                ? (Dictionary<string, object>)serializationManager.DeepCopy(values)
+                ? copier.Copy(values)
                 : null;
         }
     }

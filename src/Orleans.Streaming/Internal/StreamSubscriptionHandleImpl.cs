@@ -7,11 +7,16 @@ using Orleans.Runtime;
 namespace Orleans.Streams
 {
     [Serializable]
+    [GenerateSerializer]
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
+        [Id(1)]
         private StreamImpl<T> streamImpl;
+        [Id(2)]
         private readonly string filterData;
+        [Id(3)]
         private readonly GuidId subscriptionId;
+        [Id(4)]
         private readonly bool isRewindable;
 
         [NonSerialized]

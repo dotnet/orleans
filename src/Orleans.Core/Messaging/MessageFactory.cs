@@ -4,24 +4,23 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
-using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
     internal class MessageFactory
     {
-        private readonly SerializationManager serializationManager;
+        private readonly DeepCopier deepCopier;
         private readonly ILogger logger;
         private readonly MessagingTrace messagingTrace;
 
-        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
+        public MessageFactory(DeepCopier deepCopier, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
-            this.serializationManager = serializationManager;
+            this.deepCopier = deepCopier;
             this.logger = logger;
             this.messagingTrace = messagingTrace;
         }
 
-        public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
+        public Message CreateMessage(object body, InvokeMethodOptions options)
         {
             var message = new Message
             {
@@ -31,59 +30,12 @@ namespace Orleans.Runtime
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
-                BodyObject = request,
-                RequestContextData = RequestContextExtensions.Export(this.serializationManager)
+                BodyObject = body,
+                RequestContextData = RequestContextExtensions.Export(this.deepCopier)
             };
-
-            if (options.IsTransactional())
-            {
-                SetTransaction(message, options);
-            }
-            else
-            {
-                // clear transaction info if not in transaction
-                message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
-            }
 
             messagingTrace.OnCreateMessage(message);
             return message;
-        }
-
-        private void SetTransaction(Message message, InvokeMethodOptions options)
-        { 
-            // clear transaction info if transaction operation requires new transaction.
-            ITransactionInfo transactionInfo = TransactionContext.GetTransactionInfo();
-
-            // enforce join transaction calls
-            if(options.IsTransactionOption(InvokeMethodOptions.TransactionJoin) && transactionInfo == null)
-            {
-                throw new NotSupportedException("Call cannot be made outside of a transaction.");
-            }
-
-            // enforce not allowed transaction calls
-            if (options.IsTransactionOption(InvokeMethodOptions.TransactionNotAllowed) && transactionInfo != null)
-            {
-                throw new NotSupportedException("Call cannot be made within a transaction.");
-            }
-
-            // clear transaction context if creating a transaction or transaction is suppressed
-            if (options.IsTransactionOption(InvokeMethodOptions.TransactionCreate) ||
-                options.IsTransactionOption(InvokeMethodOptions.TransactionSuppress))
-            {
-                transactionInfo = null;
-            }
-
-            bool isTransactionRequired = options.IsTransactionOption(InvokeMethodOptions.TransactionCreate) ||
-                                         options.IsTransactionOption(InvokeMethodOptions.TransactionCreateOrJoin) ||
-                                         options.IsTransactionOption(InvokeMethodOptions.TransactionJoin);
-
-            message.TransactionInfo = transactionInfo?.Fork();
-            message.IsTransactionRequired = isTransactionRequired;
-            if (transactionInfo == null)
-            {
-                // if we're leaving a transaction context, make sure it's been cleared from the request context.
-                message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
-            }
         }
 
         public Message CreateResponseMessage(Message request)
@@ -96,8 +48,6 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
-                TraceContext = request.TraceContext,
-                TransactionInfo = request.TransactionInfo
             };
 
             if (!request.SendingGrain.IsDefault)
@@ -126,7 +76,7 @@ namespace Orleans.Runtime
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
             response.TimeToLive = request.TimeToLive;
 
-            var contextData = RequestContextExtensions.Export(this.serializationManager);
+            var contextData = RequestContextExtensions.Export(this.deepCopier);
             if (contextData != null)
             {
                 response.RequestContextData = contextData;

@@ -1,18 +1,19 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
+    [GenerateSerializer]
     [Serializable]
     [Immutable]
     public readonly struct ParticipantId
     {
         public static readonly IEqualityComparer<ParticipantId> Comparer = new IdComparer();
 
+        [GenerateSerializer]
         [Flags]
         public enum Role
         {
@@ -21,8 +22,13 @@ namespace Orleans.Transactions
             PriorityManager = 1 << 2
         }
 
+        [Id(0)]
         public string Name { get; }
+
+        [Id(1)]
         public GrainReference Reference { get; }
+
+        [Id(2)]
         public Role SupportedRoles { get; }
 
         public ParticipantId(string name, GrainReference reference, Role supportedRoles)
@@ -37,7 +43,8 @@ namespace Orleans.Transactions
             return $"ParticipantId.{Name}.{Reference}";
         }
 
-        private class IdComparer : IEqualityComparer<ParticipantId>
+        [GenerateSerializer]
+        public class IdComparer : IEqualityComparer<ParticipantId>
         {
             public bool Equals(ParticipantId x, ParticipantId y)
             {

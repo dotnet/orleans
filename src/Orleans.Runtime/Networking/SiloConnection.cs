@@ -7,16 +7,18 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnection : Connection
     {
-        private static readonly Response PingResponse = new Response(null);
+        private static readonly Response PingResponse = Response.Completed;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
         private readonly ProbeRequestMonitor probeMonitor;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
 
         public SiloConnection(
             SiloAddress remoteSiloAddress,
@@ -27,13 +29,15 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions,
             ConnectionCommon connectionShared,
-            ProbeRequestMonitor probeMonitor)
+            ProbeRequestMonitor probeMonitor,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.probeMonitor = probeMonitor;
+            this.connectionPreambleHelper = connectionPreambleHelper;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
             this.RemoteSiloAddress = remoteSiloAddress;
         }
@@ -69,7 +73,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (messageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableType.Equals(msg.SendingGrain))
+            if (messageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application))
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request)
@@ -95,7 +99,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // Nope, it's for us
-                messageCenter.OnReceivedMessage(msg);
+                messageCenter.DispatchLocalMessage(msg);
                 return;
             }
 
@@ -103,7 +107,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
-                messageCenter.OutboundQueue.SendMessage(msg);
+                messageCenter.SendMessage(msg);
                 return;
             }
 
@@ -239,31 +243,34 @@ namespace Orleans.Runtime.Messaging
 
             async Task WritePreamble()
             {
-                await ConnectionPreamble.Write(
+                await connectionPreambleHelper.Write(
                     this.Context,
-                    Constants.SiloDirectConnectionId,
-                    this.connectionOptions.ProtocolVersion,
-                    this.LocalSiloAddress);
+                    new ConnectionPreamble
+                    {
+                        NodeIdentity = Constants.SiloDirectConnectionId,
+                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
+                        SiloAddress = this.LocalSiloAddress
+                    });
             }
 
             async ValueTask<NetworkProtocolVersion> ReadPreamble()
             {
-                var (grainId, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
+                var preamble = await connectionPreambleHelper.Read(this.Context);
 
-                if (!grainId.Equals(Constants.SiloDirectConnectionId))
+                if (!preamble.NodeIdentity.Equals(Constants.SiloDirectConnectionId))
                 {
                     throw new InvalidOperationException("Unexpected non-proxied connection on silo endpoint.");
                 }
 
-                if (siloAddress is object)
+                if (preamble.SiloAddress is object)
                 {
-                    this.RemoteSiloAddress = siloAddress;
-                    this.connectionManager.OnConnected(siloAddress, this);
+                    this.RemoteSiloAddress = preamble.SiloAddress;
+                    this.connectionManager.OnConnected(preamble.SiloAddress, this);
                 }
 
-                this.RemoteProtocolVersion = protocolVersion;
+                this.RemoteProtocolVersion = preamble.NetworkProtocolVersion;
 
-                return protocolVersion;
+                return this.RemoteProtocolVersion;
             }
         }
 

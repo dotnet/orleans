@@ -6,17 +6,18 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
-    [Serializable]
     internal class InMemoryMembershipTable
     {
-        private readonly SerializationManager serializationManager;
         private readonly Dictionary<SiloAddress, Tuple<MembershipEntry, string>> siloTable;
         private TableVersion tableVersion;
         private long lastETagCounter;
 
-        public InMemoryMembershipTable(SerializationManager serializationManager)
+        [NonSerialized]
+        private readonly DeepCopier deepCopier;
+
+        public InMemoryMembershipTable(DeepCopier deepCopier)
         {
-            this.serializationManager = serializationManager;
+            this.deepCopier = deepCopier;
             siloTable = new Dictionary<SiloAddress, Tuple<MembershipEntry, string>>();
             lastETagCounter = 0;
             tableVersion = new TableVersion(0, NewETag());
@@ -25,14 +26,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableData Read(SiloAddress key)
         {
             return siloTable.TryGetValue(key, out var data) ?
-                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(data), tableVersion)
+                new MembershipTableData(this.deepCopier.Copy(data), tableVersion)
                 : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
             return new MembershipTableData(siloTable.Values.Select(tuple => 
-                new Tuple<MembershipEntry, string>((MembershipEntry)this.serializationManager.DeepCopy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
+                new Tuple<MembershipEntry, string>(this.deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
         public TableVersion ReadTableVersion()

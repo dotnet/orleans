@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
-using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -27,7 +26,7 @@ namespace DefaultCluster.Tests.General
 
         private void ClientSerializerExists(Type t)
         {
-            Assert.True(this.HostedCluster.SerializationManager.HasSerializer(t));
+            Assert.True(this.HostedCluster.GetSerializer().CanSerialize(t));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
@@ -45,13 +44,13 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task Silo_Serializer_Exists_for_Type_In_Known_Assembly()
         {
-            await SiloSerializerExists(typeof(FSharpOption<>));
+            await SiloSerializerExists(typeof(FSharpOption<int>));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public void Client_Serializer_Exists_for_Type_In_Known_Assembly()
         {
-            ClientSerializerExists(typeof(FSharpOption<>));
+            ClientSerializerExists(typeof(FSharpOption<int>));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]

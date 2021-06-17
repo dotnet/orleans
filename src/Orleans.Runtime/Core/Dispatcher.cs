@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -9,7 +8,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Versions;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -17,6 +16,7 @@ namespace Orleans.Runtime
     {
         private readonly MessageCenter messageCenter;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly SiloAddress _siloAddress;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
         private readonly ILogger logger;
@@ -36,8 +36,10 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             ILoggerFactory loggerFactory,
             ActivationDirectory activationDirectory,
-            RuntimeMessagingTrace messagingTrace)
+            RuntimeMessagingTrace messagingTrace,
+            ILocalSiloDetails localSiloDetails)
         {
+            _siloAddress = localSiloDetails.SiloAddress;
             this.scheduler = scheduler;
             this.catalog = catalog;
             this.messageCenter = messageCenter;
@@ -48,10 +50,7 @@ namespace Orleans.Runtime
             this.activationDirectory = activationDirectory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<Dispatcher>();
-            messageCenter.SetDispatcher(this);
         }
-
-        public InsideRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
         public void RejectMessage(
             Message message,
@@ -236,9 +235,7 @@ namespace Orleans.Runtime
         // (got here due to duplicate activation, outdated cache, silo is shutting down/overloaded, ...).
         private static bool MayForward(Message message, SiloMessagingOptions messagingOptions)
         {
-            return message.ForwardCount < messagingOptions.MaxForwardCount
-                // allow one more forward hop for multi-cluster case
-                + (message.IsReturnedFromRemoteCluster ? 1 : 0);
+            return message.ForwardCount < messagingOptions.MaxForwardCount;
         }
 
         /// <summary>
@@ -310,7 +307,7 @@ namespace Orleans.Runtime
 
             if (message.TargetSilo == null)
             {
-                message.TargetSilo = messageCenter.MyAddress;
+                message.TargetSilo = _siloAddress;
             }
 
             if (message.TargetActivation is null)

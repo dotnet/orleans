@@ -8,8 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.ApplicationParts;
-using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
@@ -240,27 +238,6 @@ namespace Orleans
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
                         .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
-        }
-
-        /// <summary>
-        /// Configures the <see cref="ApplicationPartManager"/> for this builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configure">The configuration delegate.</param>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder ConfigureApplicationParts(this IClientBuilder builder, Action<IApplicationPartManager> configure)
-        {
-            if (builder == null)
-            {
-                throw new ArgumentNullException(nameof(builder));
-            }
-
-            if (configure == null)
-            {
-                throw new ArgumentNullException(nameof(configure));
-            }
-
-            return builder.ConfigureServices(services => configure(services.GetApplicationPartManager()));
         }
     }
 }

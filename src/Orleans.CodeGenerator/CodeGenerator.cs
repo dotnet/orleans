@@ -1,461 +1,567 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.CodeGenerator.Analysis;
-using Orleans.CodeGenerator.Analyzers;
-using Orleans.CodeGenerator.Compatibility;
-using Orleans.CodeGenerator.Generators;
-using Orleans.CodeGenerator.Model;
-using Orleans.CodeGenerator.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
+    public class CodeGeneratorOptions
+    {
+        public List<string> GenerateSerializerAttributes { get; } = new() { "Orleans.GenerateSerializer" };
+        public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
+        public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
+        public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
+
+        public bool GenerateFieldIds { get; set; } = false;
+    }
+
     public class CodeGenerator
     {
-        public const string ToolName = "OrleansCodeGen";
-        public static readonly string Version = typeof(CodeGenerator).Assembly.GetName().Version.ToString();
-        private readonly IGeneratorExecutionContext context;
-        private readonly Compilation compilation;
-        private readonly WellKnownTypes wellKnownTypes;
-        private readonly SemanticModel semanticModelForAccessibility;
-        private readonly CompilationAnalyzer compilationAnalyzer;
-        private readonly SerializerTypeAnalyzer serializerTypeAnalyzer;
-        private readonly SerializerGenerator serializerGenerator;
-        private readonly GrainMethodInvokerGenerator grainMethodInvokerGenerator;
-        private readonly GrainReferenceGenerator grainReferenceGenerator;
-        private readonly CodeGeneratorOptions options;
+        internal const string CodeGeneratorName = "OrleansCodeGen";
+        private readonly Compilation _compilation;
+        private readonly CodeGeneratorOptions _options;
+        private readonly INamedTypeSymbol[] _generateSerializerAttributes;
 
-        public CodeGenerator(IGeneratorExecutionContext context, CodeGeneratorOptions options)
+        public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {
-            this.context = context;
-            this.compilation = context.Compilation;
-            this.options = options;
-            this.wellKnownTypes = new WellKnownTypes(compilation);
-            this.compilationAnalyzer = new CompilationAnalyzer(context, this.wellKnownTypes, compilation);
-
-            var firstSyntaxTree = compilation.SyntaxTrees.FirstOrDefault() ?? throw new InvalidOperationException("Compilation has no syntax trees.");
-            this.semanticModelForAccessibility = compilation.GetSemanticModel(firstSyntaxTree);
-            this.serializerTypeAnalyzer = SerializerTypeAnalyzer.Create(this.wellKnownTypes);
-            this.serializerGenerator = new SerializerGenerator(this.options, this.wellKnownTypes);
-            this.grainMethodInvokerGenerator = new GrainMethodInvokerGenerator(this.options, this.wellKnownTypes);
-            this.grainReferenceGenerator = new GrainReferenceGenerator(this.options, this.wellKnownTypes);
+            _compilation = compilation;
+            _options = options;
+            LibraryTypes = LibraryTypes.FromCompilation(compilation, options);
+            _generateSerializerAttributes = options.GenerateSerializerAttributes.Select(compilation.GetTypeByMetadataName).ToArray();
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal LibraryTypes LibraryTypes { get; }
+
         public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
         {
-            // Create a model of the code to generate from the collection of types.
-            var model = this.AnalyzeCompilation(cancellationToken);
+            // Collect metadata from the compilation.
+            var metadataModel = GenerateMetadataModel(cancellationToken);
+            var nsMembers = new Dictionary<string, List<MemberDeclarationSyntax>>();
 
-            // Perform some validation against the generated model.
-            this.ValidateModel(model, cancellationToken);
-
-            // Finally, generate code for the model.
-            return this.GenerateSyntax(model, cancellationToken);
-        }
-
-        private AggregatedModel AnalyzeCompilation(CancellationToken cancellationToken)
-        {
-            // Inspect the target assembly to discover known assemblies and known types.
-            this.compilationAnalyzer.Analyze(cancellationToken);
-
-            // Create a list of all distinct types from all known assemblies.
-            var types = this.compilationAnalyzer
-                .KnownAssemblies.SelectMany(a => a.GetDeclaredTypes())
-                .Concat(this.compilationAnalyzer.KnownTypes)
-                .Distinct(SymbolEqualityComparer.Default)
-                .Cast<INamedTypeSymbol>()
-                .ToList();
-
-            var model = new AggregatedModel();
-
-            // Inspect all types
-            foreach (var type in types) this.compilationAnalyzer.InspectType(type);
-
-            // Get the types which need processing.
-            var (grainClasses, grainInterfaces, serializationTypes) = this.compilationAnalyzer.GetTypesToProcess();
-
-            // Process each of the types into the model.
-            foreach (var grainInterface in grainInterfaces) this.ProcessGrainInterface(model, grainInterface);
-            foreach (var grainClass in grainClasses)
+            foreach (var type in metadataModel.InvokableInterfaces)
             {
-                this.ProcessGrainClass(model, grainClass);
-                this.ProcessSerializableType(model, grainClass);
+                string ns = type.GeneratedNamespace;
+                foreach (var method in type.Methods)
+                {
+                    var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(LibraryTypes, type, method);
+                    metadataModel.SerializableTypes.Add(generatedInvokerDescription);
+                    metadataModel.GeneratedInvokables[method] = generatedInvokerDescription;
+                    AddMember(ns, invokable);
+
+                    var methodSymbol = method.Method;
+                    if (GetWellKnownTypeId(methodSymbol) is uint wellKnownTypeId)
+                    {
+                        metadataModel.WellKnownTypeIds.Add((generatedInvokerDescription.OpenTypeSyntax, wellKnownTypeId));
+                    }
+
+                    if (GetTypeAlias(methodSymbol) is string typeAlias)
+                    {
+                        metadataModel.TypeAliases.Add((generatedInvokerDescription.OpenTypeSyntax, typeAlias));
+                    }
+                }
+
+                var (proxy, generatedProxyDescription) = ProxyGenerator.Generate(LibraryTypes, type, metadataModel);
+                metadataModel.GeneratedProxies.Add(generatedProxyDescription);
+                AddMember(ns, proxy);
             }
 
-            foreach (var type in serializationTypes) this.ProcessSerializableType(model, type);
-
-            foreach (var part in this.compilationAnalyzer.ApplicationParts)
+            // Generate code.
+            foreach (var type in metadataModel.SerializableTypes)
             {
-                model.ApplicationParts.Add(part);
+                string ns = type.GeneratedNamespace;
+
+                // Generate a partial serializer class for each serializable type.
+                var serializer = SerializerGenerator.GenerateSerializer(LibraryTypes, type);
+                AddMember(ns, serializer);
+
+                // Generate a copier for each serializable type.
+                var copier = CopierGenerator.GenerateCopier(LibraryTypes, type);
+                AddMember(ns, copier);
+
+                if (type.IsEmptyConstructable || type.HasActivatorConstructor)
+                {
+                    metadataModel.ActivatableTypes.Add(type);
+
+                    // Generate a partial serializer class for each serializable type.
+                    var activator = ActivatorGenerator.GenerateActivator(LibraryTypes, type);
+                    AddMember(ns, activator);
+                }
             }
 
-            this.AddAssemblyMetadata(model);
+            // Generate metadata.
+            var metadataClassNamespace = CodeGeneratorName + "." + _compilation.AssemblyName;
+            var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
+            AddMember(ns: metadataClassNamespace, member: metadataClass);
+            var metadataAttribute = AttributeList()
+                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
+                .WithAttributes(
+                    SingletonSeparatedList(
+                        Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
+                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
 
-            return model;
+            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
+            assemblyAttributes.Add(metadataAttribute);
+
+            var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
+            var namespaces = new List<MemberDeclarationSyntax>(nsMembers.Count);
+            foreach (var pair in nsMembers)
+            {
+                var ns = pair.Key;
+                var member = pair.Value;
+
+                namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
+            }
+
+            return CompilationUnit()
+                .WithAttributeLists(List(assemblyAttributes))
+                .WithMembers(List(namespaces));
+
+            void AddMember(string ns, MemberDeclarationSyntax member)
+            {
+                if (!nsMembers.TryGetValue(ns, out var existing))
+                {
+                    existing = nsMembers[ns] = new List<MemberDeclarationSyntax>();
+                }
+
+                existing.Add(member);
+            }
         }
 
-        private void AddAssemblyMetadata(AggregatedModel model)
+        private MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
-            var assembliesToScan = new List<IAssemblySymbol>();
-            foreach (var asm in this.compilationAnalyzer.ReferencedAssemblies)
-            {
-                // Known assemblies are already handled.
-                if (this.compilationAnalyzer.KnownAssemblies.Contains(asm)) continue;
+            var metadataModel = new MetadataModel();
 
-                if (this.compilationAnalyzer.AssembliesExcludedFromCodeGeneration.Contains(asm)
-                    || this.compilationAnalyzer.AssembliesExcludedFromMetadataGeneration.Contains(asm))
+#pragma warning disable RS1024 // Compare symbols correctly
+            var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+            var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024 // Compare symbols correctly
+
+            var compilationAsm = LibraryTypes.Compilation.Assembly;
+            ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
+
+            // Expand the set of referenced assemblies
+            referencedAssemblies.Add(compilationAsm);
+            metadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
+            foreach (var reference in LibraryTypes.Compilation.References)
+            {
+                if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
                 {
                     continue;
                 }
 
-                assembliesToScan.Add(asm);
-            }
-
-            foreach (var asm in assembliesToScan)
-            {
-                foreach (var type in asm.GetDeclaredTypes())
+                if (!referencedAssemblies.Add(asm))
                 {
-                    if (this.ValidForKnownTypes(type))
+                    continue;
+                }
+
+                if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
+                {
+                    metadataModel.ApplicationParts.Add(asm.MetadataName);
+                    foreach (var attr in attrs)
                     {
-                        AddKnownType(model, type);
+                        metadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
                     }
                 }
             }
-        }
 
-        private void ValidateModel(AggregatedModel model, CancellationToken cancellationToken)
-        {
-            // Check that all types which the developer marked as requiring code generation have had code generation.
-            foreach (var required in this.compilationAnalyzer.CodeGenerationRequiredTypes)
+            // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
+#pragma warning disable RS1024 // Compare symbols correctly
+            var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024 // Compare symbols correctly
+
+            foreach (var asm in assembliesToExamine)
             {
-                if (!model.Serializers.SerializerTypes.Any(t => SymbolEqualityComparer.Default.Equals(t.Target, required)))
+                foreach (var symbol in asm.GetDeclaredTypes())
                 {
-                    throw new CodeGenerationException(
-                        $"Found {this.wellKnownTypes.ConsiderForCodeGenerationAttribute} with ThrowOnFailure set for type {required}, but a serializer" +
-                        " could not be generated. Ensure that the type is accessible.");
-                }
-            }
-        }
+                    var syntaxTree = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ?? _compilation.SyntaxTrees.First();
+                    var semanticModel = _compilation.GetSemanticModel(syntaxTree);
 
-        private CompilationUnitSyntax GenerateSyntax(AggregatedModel model, CancellationToken cancellationToken)
-        {
-            var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>(SymbolEqualityComparer.Default);
-
-            // Pass the relevant elements of the model to each of the code generators.
-            foreach (var grainInterface in model.GrainInterfaces)
-            {
-                var nsMembers = GetNamespace(namespaceGroupings, grainInterface.Type.ContainingNamespace);
-                nsMembers.Add(grainMethodInvokerGenerator.GenerateClass(grainInterface));
-                nsMembers.Add(grainReferenceGenerator.GenerateClass(grainInterface));
-            }
-
-            var serializersToGenerate = model.Serializers.SerializerTypes
-                .Where(s => s.SerializerTypeSyntax == null)
-                .Distinct(SerializerTypeDescription.TargetComparer);
-            foreach (var serializerType in serializersToGenerate)
-            {
-                var nsMembers = GetNamespace(namespaceGroupings, serializerType.Target.ContainingNamespace);
-                TypeDeclarationSyntax generated;
-                (generated, serializerType.SerializerTypeSyntax) = this.serializerGenerator.GenerateClass(this.context, this.semanticModelForAccessibility, serializerType);
-                nsMembers.Add(generated);
-            }
-
-            var compilationMembers = new List<MemberDeclarationSyntax>();
-
-            // Group the generated code by namespace since serialized types, such as the generated GrainReference classes must have a stable namespace.
-            foreach (var group in namespaceGroupings)
-            {
-                var ns = group.Key;
-                var members = group.Value;
-                if (ns.IsGlobalNamespace)
-                {
-                    compilationMembers.AddRange(members);
-                }
-                else
-                {
-                    compilationMembers.Add(NamespaceDeclaration(ParseName(ns.ToDisplayString())).AddMembers(members.ToArray()));
-                }
-            }
-
-            // Add and generate feature populators to tie everything together.
-            var (attributes, featurePopulators) = FeaturePopulatorGenerator.GenerateSyntax(this.wellKnownTypes, model, this.compilation);
-            compilationMembers.AddRange(featurePopulators);
-
-            attributes.AddRange(ApplicationPartAttributeGenerator.GenerateSyntax(this.wellKnownTypes, model));
-
-            // Add some attributes detailing which assemblies this generated code targets.
-            attributes.Add(AttributeList(
-                AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)),
-                SeparatedList(GetCodeGenerationTargetAttribute().ToArray())));
-
-            return CompilationUnit()
-                .AddUsings(UsingDirective(ParseName("global::Orleans")))
-                .WithAttributeLists(List(attributes))
-                .WithMembers(List(compilationMembers));
-
-            List<MemberDeclarationSyntax> GetNamespace(Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>> namespaces, INamespaceSymbol ns)
-            {
-                if (namespaces.TryGetValue(ns, out var result)) return result;
-                return namespaces[ns] = new List<MemberDeclarationSyntax>();
-            }
-
-            IEnumerable<AttributeSyntax> GetCodeGenerationTargetAttribute()
-            {
-                yield return GenerateAttribute(this.compilation.Assembly);
-
-                foreach (var assembly in this.compilationAnalyzer.ReferencedAssemblies)
-                {
-                    if (this.compilationAnalyzer.AssembliesExcludedFromCodeGeneration.Contains(assembly) ||
-                        this.compilationAnalyzer.AssembliesExcludedFromMetadataGeneration.Contains(assembly))
+                    if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
-                        continue;
+                        metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
                     }
 
-                    yield return GenerateAttribute(assembly);
-                }
-
-                AttributeSyntax GenerateAttribute(IAssemblySymbol assembly)
-                {
-                    var assemblyName = assembly.Identity.GetDisplayName(fullKey: true);
-                    var nameSyntax = this.wellKnownTypes.OrleansCodeGenerationTargetAttribute.ToNameSyntax();
-                    return Attribute(nameSyntax)
-                        .AddArgumentListArguments(AttributeArgument(assemblyName.ToLiteralExpression()));
-                }
-            }
-        }
-
-        private void ProcessGrainInterface(AggregatedModel model, INamedTypeSymbol type)
-        {
-            var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
-
-            if (accessible)
-            {
-                var genericMethod = type.GetInstanceMembers<IMethodSymbol>().FirstOrDefault(m => m.IsGenericMethod);
-                if (genericMethod != null && this.wellKnownTypes.GenericMethodInvoker is WellKnownTypes.None)
-                {
-                    var declaration = genericMethod.GetDeclarationSyntax();
-                    this.context.ReportDiagnostic(GenericMethodRequireOrleansCoreDiagnostic.CreateDiagnostic(declaration));
-                }
-
-                var methods = GetGrainMethodDescriptions(type);
-
-                model.GrainInterfaces.Add(new GrainInterfaceDescription(
-                    type,
-                    this.wellKnownTypes.GetTypeId(type),
-                    this.wellKnownTypes.GetVersion(type),
-                    methods));
-            }
-
-            // Returns a list of all methods in all interfaces on the provided type.
-            IEnumerable<GrainMethodDescription> GetGrainMethodDescriptions(INamedTypeSymbol initialType)
-            {
-                IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
-                {
-                    if (s.TypeKind == TypeKind.Interface)
-                        yield return s;
-                    foreach (var i in s.AllInterfaces) yield return i;
-                }
-
-                foreach (var iface in GetAllInterfaces(initialType))
-                {
-                    foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
+                    if (GetTypeAlias(symbol) is string typeAlias)
                     {
-                        yield return new GrainMethodDescription(this.wellKnownTypes.GetMethodId(method), method);
+                        metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
+                    }
+
+                    if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
+                    {
+                        var typeDescription = new FSharpUtilities.FSharpUnionCaseTypeDescription(semanticModel, symbol, LibraryTypes);
+                        metadataModel.SerializableTypes.Add(typeDescription);
+                    }
+                    else if (ShouldGenerateSerializer(symbol))
+                    {
+                        if (FSharpUtilities.IsRecord(LibraryTypes, symbol))
+                        {
+                            var typeDescription = new FSharpUtilities.FSharpRecordTypeDescription(semanticModel, symbol, LibraryTypes);
+                            metadataModel.SerializableTypes.Add(typeDescription);
+                        }
+                        else
+                        {
+                            // Regular type
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, GetDataMembers(symbol), LibraryTypes);
+                            metadataModel.SerializableTypes.Add(typeDescription);
+                        }
+                    }
+
+                    if (symbol.TypeKind == TypeKind.Interface)
+                    {
+                        var attribute = HasAttribute(
+                            symbol,
+                            LibraryTypes.GenerateMethodSerializersAttribute,
+                            inherited: true);
+                        if (attribute != null)
+                        {
+                            var prop = symbol.GetAllMembers<IPropertySymbol>().FirstOrDefault();
+                            if (prop is { })
+                            {
+                                throw new InvalidOperationException($"Invokable type {symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} contains property {prop.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}. Invokable types cannot contain properties.");
+                            }
+
+                            var baseClass = (INamedTypeSymbol)attribute.ConstructorArguments[0].Value;
+                            var isExtension = (bool)attribute.ConstructorArguments[1].Value;
+                            var invokableBaseTypes = GetInvokableBaseTypes(proxyBaseTypeInvokableBaseTypes, baseClass);
+
+                            var description = new InvokableInterfaceDescription(
+                                this,
+                                semanticModel,
+                                symbol,
+                                GetTypeAlias(symbol) ?? symbol.Name,
+                                baseClass,
+                                isExtension,
+                                invokableBaseTypes);
+                            metadataModel.InvokableInterfaces.Add(description);
+                        }
+                    }
+
+                    if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct) && !symbol.IsAbstract && (symbol.DeclaredAccessibility == Accessibility.Public || symbol.DeclaredAccessibility == Accessibility.Internal))
+                    {
+                        if (symbol.HasAttribute(LibraryTypes.RegisterSerializerAttribute))
+                        {
+                            metadataModel.DetectedSerializers.Add(symbol);
+                        }
+
+                        if (symbol.HasAttribute(LibraryTypes.RegisterActivatorAttribute))
+                        {
+                            metadataModel.DetectedActivators.Add(symbol);
+                        }
+
+                        if (symbol.HasAttribute(LibraryTypes.RegisterCopierAttribute))
+                        {
+                            metadataModel.DetectedCopiers.Add(symbol);
+                        }
+
+                        // Find all implementations of invokable interfaces
+                        foreach (var iface in symbol.AllInterfaces)
+                        {
+                            var attribute = HasAttribute(
+                                iface,
+                                LibraryTypes.GenerateMethodSerializersAttribute,
+                                inherited: true);
+                            if (attribute != null)
+                            {
+                                metadataModel.InvokableInterfaceImplementations.Add(symbol);
+                                break;
+                            }
+                        }
+                    }
+
+                    bool ShouldGenerateSerializer(INamedTypeSymbol t)
+                    {
+                        if (!semanticModel.IsAccessible(0, t))
+                        {
+                            return false;
+                        }
+
+                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute, inherited: true) != null)
+                        {
+                            return true;
+                        }
+
+                        foreach (var attr in _generateSerializerAttributes)
+                        {
+                            if (HasAttribute(t, attr, inherited: true) != null)
+                            {
+                                return true;
+                            }
+                        }
+
+                        return false;
                     }
                 }
             }
-        }
 
-        private void ProcessGrainClass(AggregatedModel model, INamedTypeSymbol type)
-        {
-            var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
+            return metadataModel;
 
-            if (accessible)
+            Dictionary<INamedTypeSymbol, INamedTypeSymbol> GetInvokableBaseTypes(Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> proxyBaseTypeInvokableBaseTypes, INamedTypeSymbol baseClass)
             {
-                model.GrainClasses.Add(new GrainClassDescription(type, this.wellKnownTypes.GetTypeId(type)));
-            }
-            else
-            {
-                var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TypeDeclarationSyntax;
-                this.context.ReportDiagnostic(InaccessibleGrainClassDiagnostic.CreateDiagnostic(declaration));
-            }
-        }
-
-        private void ProcessSerializableType(AggregatedModel model, INamedTypeSymbol type)
-        {
-            if (!ValidForKnownTypes(type))
-            {
-                return;
-            }
-
-            AddKnownType(model, type);
-
-            var serializerModel = model.Serializers;
-
-            if (type.IsAbstract)
-            {
-                return;
-            }
-
-            // Ensure that the type is accessible from generated code.
-            var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
-            if (!accessible)
-            {
-                return;
-            }
-
-            if (type.HasBaseType(this.wellKnownTypes.Exception))
-            {
-                return;
-            }
-
-            if (type.HasBaseType(this.wellKnownTypes.Delegate))
-            {
-                return;
-            }
-
-            if (type.AllInterfaces.Contains(this.wellKnownTypes.IAddressable))
-            {
-                return;
-            }
-
-            // Account for types that serialize themselves and/or are serializers for other types.
-            var selfSerializing = false;
-            if (this.serializerTypeAnalyzer.IsSerializer(type, out var serializerTargets))
-            {
-                var typeSyntax = type.ToTypeSyntax();
-                foreach (var target in serializerTargets)
+                // Set the base invokable types which are used if attributes on individual methods do not override them.
+                if (!proxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
                 {
-                    if (SymbolEqualityComparer.Default.Equals(target, type))
+#pragma warning disable RS1024 // Compare symbols correctly
+                    invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024 // Compare symbols correctly
+
+                    if (baseClass.GetAttributes(LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
                     {
-                        selfSerializing = true;
-                        typeSyntax = type.WithoutTypeParameters().ToTypeSyntax();
+                        foreach (var attr in invokableBaseTypeAttributes)
+                        {
+                            var ctorArgs = attr.ConstructorArguments;
+                            var returnType = (INamedTypeSymbol)ctorArgs[0].Value;
+                            var invokableBaseType = (INamedTypeSymbol)ctorArgs[1].Value;
+                            invokableBaseTypes[returnType] = invokableBaseType;
+                        }
                     }
 
-                    serializerModel.SerializerTypes.Add(new SerializerTypeDescription
+                    proxyBaseTypeInvokableBaseTypes[baseClass] = invokableBaseTypes;
+                }
+
+                return invokableBaseTypes;
+            }
+
+            void ComputeAssembliesToExamine(IAssemblySymbol asm, HashSet<IAssemblySymbol> expandedAssemblies)
+            {
+                if (!expandedAssemblies.Add(asm))
+                {
+                    return;
+                }
+
+                if (!asm.GetAttributes(LibraryTypes.GenerateCodeForDeclaringAssemblyAttribute, out var attrs)) return;
+
+                foreach (var attr in attrs)
+                {
+                    var param = attr.ConstructorArguments.First();
+                    if (param.Kind != TypedConstantKind.Type)
                     {
-                        Target = target,
-                        SerializerTypeSyntax = typeSyntax,
-                        OverrideExistingSerializer = true
-                    });
+                        throw new ArgumentException($"Unrecognized argument type in attribute [{attr.AttributeClass.Name}({param.ToCSharpString()})]");
+                    }
+
+                    var type = (ITypeSymbol)param.Value;
+
+                    // Recurse on the assemblies which the type was declared in.
+                    ComputeAssembliesToExamine(type.OriginalDefinition.ContainingAssembly, expandedAssemblies);
+                }
+            }
+        }
+
+        private static IEnumerable<MemberDeclarationSyntax> GetTypeDeclarations(SyntaxNode node)
+        {
+            SyntaxList<MemberDeclarationSyntax> members;
+            switch (node)
+            {
+                case EnumDeclarationSyntax enumDecl:
+                    yield return enumDecl;
+                    members = new SyntaxList<MemberDeclarationSyntax>();
+                    break;
+                case TypeDeclarationSyntax type:
+                    yield return type;
+                    members = type.Members;
+                    break;
+                case NamespaceDeclarationSyntax ns:
+                    members = ns.Members;
+                    break;
+                case CompilationUnitSyntax compilationUnit:
+                    members = compilationUnit.Members;
+                    break;
+                default:
+                    yield break;
+            }
+
+            foreach (var member in members)
+            {
+                foreach (var decl in GetTypeDeclarations(member))
+                {
+                    yield return decl;
+                }
+            }
+        }
+
+        // Returns descriptions of all data members (fields and properties) 
+        private IEnumerable<IMemberDescription> GetDataMembers(INamedTypeSymbol symbol)
+        {
+            var hasAttributes = false;
+            foreach (var member in symbol.GetMembers())
+            {
+                if (member.IsStatic)
+                {
+                    continue;
+                }
+
+                if (member.HasAttribute(LibraryTypes.NonSerializedAttribute))
+                {
+                    continue;
+                }
+
+                if (LibraryTypes.IdAttributeTypes.Any(t => member.HasAttribute(t)))
+                {
+                    hasAttributes = true;
+                    break;
                 }
             }
 
-            if (selfSerializing)
+            var nextFieldId = (ushort)0;
+            foreach (var member in symbol.GetMembers().OrderBy(m => m.MetadataName))
             {
-                return;
-            }
-
-            if (type.HasAttribute(this.wellKnownTypes.GeneratedCodeAttribute))
-            {
-                return;
-            }
-
-            if (type.IsStatic)
-            {
-                return;
-            }
-
-            if (type.TypeKind == TypeKind.Enum)
-            {
-                return;
-            }
-
-            if (type.TypeParameters.Any(p => p.ConstraintTypes.Any(c => SymbolEqualityComparer.Default.Equals(c, this.wellKnownTypes.Delegate))))
-            {
-                return;
-            }
-
-            var isSerializable = this.compilationAnalyzer.IsSerializable(type);
-            if (isSerializable && this.compilationAnalyzer.IsFromKnownAssembly(type))
-            {
-                // Skip types which have fields whose types are inaccessible from generated code.
-                foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
+                // Only consider fields and properties.
+                if (!(member is IFieldSymbol || member is IPropertySymbol))
                 {
-                    // Ignore fields which won't be serialized anyway.
-                    if (!this.serializerGenerator.ShouldSerializeField(field))
+                    continue;
+                }
+
+                if (member.HasAttribute(LibraryTypes.NonSerializedAttribute))
+                {
+                    continue;
+                }
+
+                if (member is IPropertySymbol prop)
+                {
+                    var id = GetId(prop);
+                    if (!id.HasValue)
                     {
-                                                continue;
+                        if (hasAttributes)
+                        {
+                            continue;
+                        }
+
+                        id = ++nextFieldId;
                     }
 
-                    // Check field type accessibility.
-                    var fieldAccessible = this.semanticModelForAccessibility.IsAccessible(0, field.Type);
-                    if (!fieldAccessible)
+                    yield return new PropertyDescription(id.Value, prop);
+                }
+
+                if (member is IFieldSymbol field)
+                {
+                    var id = GetId(field);
+                    if (!id.HasValue)
                     {
-                        return;
+                        prop = PropertyUtility.GetMatchingProperty(field);
+
+                        if (prop is null)
+                        {
+                            continue;
+                        }
+
+                        if (prop.HasAttribute(LibraryTypes.NonSerializedAttribute))
+                        {
+                            continue;
+                        }
+
+                        id = GetId(prop);
+                    }
+
+                    if (!id.HasValue)
+                    {
+                        if (hasAttributes || !_options.GenerateFieldIds)
+                        {
+                            continue;
+                        }
+
+                        id = nextFieldId++;
+                    }
+
+                    yield return new FieldDescription(id.Value, field, field.Type);
+                }
+            }
+        }
+
+        public ushort? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
+
+        internal static ushort? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
+        {
+            var idAttr = memberSymbol.GetAttributes().FirstOrDefault(attr => libraryTypes.IdAttributeTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, attr.AttributeClass)));
+            if (idAttr is null)
+            {
+                return null;
+            }
+
+            var id = (ushort)idAttr.ConstructorArguments.First().Value;
+            return id;
+        }
+
+        private uint? GetWellKnownTypeId(ISymbol symbol)
+        {
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownIdAttribute, attr.AttributeClass));
+            if (attr is null)
+            {
+                return null;
+            }
+
+            var id = (uint)attr.ConstructorArguments.First().Value;
+            return id;
+        }
+
+        private string GetTypeAlias(ISymbol symbol)
+        {
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
+            if (attr is null)
+            {
+                return null;
+            }
+
+            var value = (string)attr.ConstructorArguments.First().Value;
+            return value;
+        }
+
+        // Returns true if the type declaration has the specified attribute.
+        private static AttributeData HasAttribute(INamedTypeSymbol symbol, ISymbol attributeType, bool inherited = false)
+        {
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
+                {
+                    return attribute;
+                }
+            }
+
+            if (inherited)
+            {
+                foreach (var iface in symbol.AllInterfaces)
+                {
+                    foreach (var attribute in iface.GetAttributes())
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
+                        {
+                            return attribute;
+                        }
                     }
                 }
 
-                // Add the type that needs generation.
-                // The serializer generator will fill in the missing SerializerTypeSyntax field with the
-                // generated type.
-                serializerModel.SerializerTypes.Add(new SerializerTypeDescription
+                while ((symbol = symbol.BaseType) != null)
                 {
-                    Target = type
-                });
+                    foreach (var attribute in symbol.GetAttributes())
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
+                        {
+                            return attribute;
+                        }
+                    }
+                }
             }
+
+            return null;
         }
 
-        private static void AddKnownType(AggregatedModel model, INamedTypeSymbol type)
+        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax()
         {
-            // Many types which will never have a serializer generated are still added to known types so that they can be used to identify the type
-            // in a serialized payload. For example, when serializing List<SomeAbstractType>, SomeAbstractType must be known. The same applies to
-            // interfaces (which are encoded as abstract).
-            var serializerModel = model.Serializers;
-            var strippedType = type.WithoutTypeParameters();
-            serializerModel.KnownTypes.Add(new KnownTypeDescription(strippedType));
+            var version = typeof(CodeGenerator).Assembly.GetName().Version.ToString();
+            return
+                Attribute(ParseName("System.CodeDom.Compiler.GeneratedCodeAttribute"))
+                    .AddArgumentListArguments(
+                        AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
+                        AttributeArgument(version.GetLiteralExpression()));
         }
 
-        private bool ValidForKnownTypes(INamedTypeSymbol type)
+        internal static AttributeSyntax GetMethodImplAttributeSyntax()
         {
-            // Skip implicitly declared types like anonymous classes and closures.
-            if (type.IsImplicitlyDeclared)
-            {
-                return false;
-            }
-
-            if (!type.CanBeReferencedByName)
-            {
-                return false;
-            }
-
-            if (type.SpecialType != SpecialType.None)
-            {
-                return false;
-            }
-
-            switch (type.TypeKind)
-            {
-                case TypeKind.Unknown:
-                case TypeKind.Array:
-                case TypeKind.Delegate:
-                case TypeKind.Dynamic:
-                case TypeKind.Error:
-                case TypeKind.Module:
-                case TypeKind.Pointer:
-                case TypeKind.TypeParameter:
-                case TypeKind.Submission:
-                    return false;
-            }
-
-            if (type.IsStatic)
-            {
-                return false;
-            }
-
-            if (type.HasUnsupportedMetadata)
-            {
-                return false;
-            }
-
-            return true;
+            return Attribute(ParseName("System.Runtime.CompilerServices.MethodImplAttribute"))
+                .AddArgumentListArguments(AttributeArgument(ParseName("System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
         }
     }
 }

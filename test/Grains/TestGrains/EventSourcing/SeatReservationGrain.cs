@@ -45,8 +45,10 @@ namespace TestGrains
     /// The state of the reservation grain
     /// </summary>
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class ReservationState
     {
+        [Orleans.Id(0)]
         public Dictionary<int, SeatReservation> Reservations { get; set; }
 
         public ReservationState()
@@ -68,9 +70,12 @@ namespace TestGrains
     /// The class that defines the update operation when a reservation is requested
     /// </summary>
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class SeatReservation
     {
+        [Orleans.Id(0)]
         public int Seat { get; set; }
+        [Orleans.Id(1)]
         public string UserId { get; set; }
     }
 

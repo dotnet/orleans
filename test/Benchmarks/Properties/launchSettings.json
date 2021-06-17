@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Benchmarks": {
+      "commandName": "Project",
+      "commandLineArgs": "ConcurrentPing_SiloToSilo_Forever"
+    }
+  }
+}

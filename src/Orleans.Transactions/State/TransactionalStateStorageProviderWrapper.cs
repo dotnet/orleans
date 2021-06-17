@@ -7,9 +7,7 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Utilities;
 using Orleans.Transactions.Abstractions;
-using Orleans.CodeGeneration;
-
-[assembly: GenerateSerializer(typeof(Orleans.Transactions.TransactionalStateRecord<>))]
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Transactions
 {
@@ -108,15 +106,20 @@ namespace Orleans.Transactions
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class TransactionalStateRecord<TState>
         where TState : class, new()
     {
+        [Id(0)]
         public TState CommittedState { get; set; } = new TState();
 
+        [Id(1)]
         public long CommittedSequenceId { get; set; }
 
+        [Id(2)]
         public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
 
+        [Id(3)]
         public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
     }
 }

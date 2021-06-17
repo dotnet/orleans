@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +9,6 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using TestExtensions;
@@ -19,7 +17,7 @@ using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General
-{ 
+{
     public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -460,57 +458,6 @@ namespace UnitTests.General
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }
-        }
-    }
-
-    public class TestClientInvokeCallback
-    {
-        public int TotalCalls;
-
-        private readonly ITestOutputHelper output;
-        private readonly Guid setActivityId;
-
-        public TestClientInvokeCallback(ITestOutputHelper output, Guid setActivityId)
-        {
-            this.output = output;
-            this.setActivityId = setActivityId;
-        }
-
-        public void OnInvoke(InvokeMethodRequest request, IGrain grain)
-        {
-            // (NOT YET AVAILABLE) Interface name is available from: <c>grainReference.InterfaceName</c>
-            // (NOT YET AVAILABLE) Method name is available from: <c>grainReference.GetMethodName(request.InterfaceId, request.MethodId)</c>
-            // GrainId is available from: <c>grainReference.GrainId</c>
-            // PrimaryKey is availabe from: <c>grainReference.GrainId.GetPrimaryKeyLong()</c> or <c>grainReference.GrainId.GetPrimaryKey()</c> depending on key type.
-            // Call arguments are available from: <c>request.Arguments</c> array
-
-            TotalCalls++;
-
-            output.WriteLine("OnInvoke TotalCalls={0}", TotalCalls);
-
-            try
-            {
-                output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} with {2} arguments",
-                    grain.GetType().FullName,
-                    grain.GetGrainId(),
-                    request.Arguments != null ? request.Arguments.Length : 0);
-            }
-            catch (Exception exc)
-            {
-                output.WriteLine("**** Error OnInvoke for Grain={0} GrainId={1} with {2} arguments. Exception = {3}",
-                    grain.GetType().FullName,
-                    ((GrainReference)grain).GrainId,
-                    request.Arguments != null ? request.Arguments.Length : 0,
-                    exc);
-            }
-
-            if (setActivityId != Guid.Empty)
-            {
-                RequestContextTestUtils.SetActivityId(setActivityId);
-
-                output.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
-            }
-            output.WriteLine("OnInvoke Current ActivityId={0}", RequestContextTestUtils.GetActivityId());
         }
     }
 }

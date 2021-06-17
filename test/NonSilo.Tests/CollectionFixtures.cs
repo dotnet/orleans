@@ -1,5 +1,4 @@
-﻿using TestExtensions;
-using UnitTests.Serialization;
+using TestExtensions;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -8,7 +7,6 @@ namespace NonSilo.Tests
     [CollectionDefinition("DefaultCluster")]
     public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
 
-
     [CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
-    public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture>, ICollectionFixture<BuiltInSerializerCollectionFixture> { }
+    public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }
 }

@@ -6,19 +6,27 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
-using Tester.TestStreamProviders;
 using Orleans;
+using Orleans.Streams;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     public class TestEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
-        public TestEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
-            StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter,
-            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public TestEventHubStreamAdapterFactory(
+            string name,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            StreamCacheEvictionOptions evictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            ITelemetryProducer telemetryProducer,
+            ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
         {
-            StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<SerializationManager>());
+            StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<Serializer<StreamSequenceToken>>());
         }
 
         public static new TestEventHubStreamAdapterFactory Create(IServiceProvider services, string name)

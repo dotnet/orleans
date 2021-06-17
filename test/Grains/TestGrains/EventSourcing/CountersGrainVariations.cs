@@ -1,10 +1,5 @@
 ﻿using Orleans.Concurrency;
 using Orleans.Providers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TestGrains
 {
@@ -23,7 +18,7 @@ namespace TestGrains
     /// 
     /// When using the LogStorage consistency provider, we persist the log,
     /// i.e. the complete sequence of all events
- 
+
     [LogConsistencyProvider(ProviderName = "StateStorage")]
     [StorageProvider(ProviderName = "SlowMemoryStore")]
     public class CountersGrain_StateStore_NonReentrant : CountersGrain

@@ -186,7 +186,7 @@ namespace Orleans.Hosting.Kubernetes
                         previous = update;
                     }
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && (exception is TaskCanceledException || exception is OperationCanceledException)))
                 {
                     _logger.LogError(exception, "Error monitoring cluster changes");
                     if (!_shutdownToken.IsCancellationRequested)

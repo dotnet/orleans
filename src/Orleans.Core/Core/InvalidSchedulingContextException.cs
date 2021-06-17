@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// Signifies that an operation was attempted on an invalid SchedulingContext.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     internal sealed class InvalidSchedulingContextException : OrleansException
     {
         public InvalidSchedulingContextException(string msg) : base(msg) { }

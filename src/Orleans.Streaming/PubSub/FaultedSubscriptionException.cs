@@ -9,6 +9,7 @@ namespace Orleans.Streams
     ///  a faulted state.  Work on faulted subscriptions should be abandoned.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class FaultedSubscriptionException : OrleansException
     {
         private const string ErrorStringFormat =

@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Core;
 
 namespace Orleans.Runtime
 {
@@ -8,6 +7,7 @@ namespace Orleans.Runtime
     /// Indicates that a client is not longer reachable.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class ClientNotAvailableException : OrleansException
     {
         internal ClientNotAvailableException(GrainId clientId) : base("No activation for client " + clientId.ToString()) { }

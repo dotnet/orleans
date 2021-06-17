@@ -3,8 +3,10 @@ using System;
 namespace Orleans.Streams
 {
     [Serializable]
+    [GenerateSerializer]
     internal class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
     {
+        [Id(1)]
         public StreamSequenceToken Token { get; private set; }
         
         public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
@@ -45,8 +47,10 @@ namespace Orleans.Streams
     }
 
     [Serializable]
+    [GenerateSerializer]
     internal class StartToken : StreamHandshakeToken { }
     
     [Serializable]
+    [GenerateSerializer]
     internal class DeliveryToken : StreamHandshakeToken { }
 }

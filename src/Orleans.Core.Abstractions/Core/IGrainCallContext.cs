@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
@@ -50,7 +51,7 @@ namespace Orleans
         /// <summary>
         /// Gets the arguments for this method invocation.
         /// </summary>
-        object[] Arguments { get; }
+        IMethodArguments Arguments { get; }
 
         /// <summary>
         /// Invokes the request.
@@ -61,6 +62,11 @@ namespace Orleans
         /// Gets or sets the result.
         /// </summary>
         object Result { get; set; }
+       
+        /// <summary>
+        /// Gets or sets the response.
+        /// </summary>
+        Response Response { get; set; }
     }
 
     /// <summary>
@@ -79,5 +85,13 @@ namespace Orleans
     /// </summary>
     public interface IOutgoingGrainCallContext : IGrainCallContext
     {
+    }
+
+    public interface IMethodArguments
+    {
+        object this[int index] { get;set; }
+        T GetArgument<T>(int index);
+        void SetArgument<T>(int index, T value);
+        int Length { get; }
     }
 }

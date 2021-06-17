@@ -22,8 +22,10 @@ namespace Orleans
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
+    [GenerateSerializer]
     public class GrainState<T> : IGrainState
     {
+        [Id(1)]
         public T State;
 
         object IGrainState.State
@@ -36,7 +38,9 @@ namespace Orleans
         public Type Type => typeof(T);
 
         /// <inheritdoc />
+        [Id(2)]
         public string ETag { get; set; }
+        [Id(3)]
         public bool RecordExists { get; set; }
 
         /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>

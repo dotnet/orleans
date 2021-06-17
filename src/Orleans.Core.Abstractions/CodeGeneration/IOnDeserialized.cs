@@ -1,3 +1,5 @@
+using System;
+
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -9,6 +11,12 @@ namespace Orleans.Serialization
         /// Notifies this instance that it has been fully deserialized.
         /// </summary>
         /// <param name="context">The serializer context.</param>
-        void OnDeserialized(ISerializerContext context);
+        void OnDeserialized(DeserializationContext context);
+    }
+
+    public abstract class DeserializationContext
+    {
+        public abstract IServiceProvider ServiceProvider { get; }
+        public abstract object RuntimeClient { get; }
     }
 }

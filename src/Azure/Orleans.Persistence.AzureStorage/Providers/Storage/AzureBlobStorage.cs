@@ -16,6 +16,7 @@ using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Serialization.TypeSystem;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -31,26 +32,20 @@ namespace Orleans.Storage
         private ILogger logger;
         private readonly string name;
         private AzureBlobStorageOptions options;
-        private SerializationManager serializationManager;
-        private IGrainFactory grainFactory;
-        private ITypeResolver typeResolver;
+        private Serializer serializer;
         private readonly IServiceProvider services;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
-            SerializationManager serializationManager,
-            IGrainFactory grainFactory,
-            ITypeResolver typeResolver,
+            Serializer serializer,
             IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
-            this.serializationManager = serializationManager;
-            this.grainFactory = grainFactory;
-            this.typeResolver = typeResolver;
+            this.serializer = serializer;
             this.services = services;
             this.logger = logger;
         }
@@ -262,7 +257,7 @@ namespace Orleans.Storage
             }
             else
             {
-                data = this.serializationManager.SerializeToByteArray(grainState);
+                data = this.serializer.SerializeToArray(grainState);
                 mimeType = "application/octet-stream";
             }
 
@@ -288,7 +283,7 @@ namespace Orleans.Storage
             }
             else
             {
-                result = this.serializationManager.DeserializeFromByteArray<object>(contents);
+                result = this.serializer.Deserialize<object>(contents);
             }
 
             return result;

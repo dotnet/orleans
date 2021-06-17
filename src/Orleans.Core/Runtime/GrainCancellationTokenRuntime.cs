@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Internal;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
 {
@@ -64,5 +67,43 @@ namespace Orleans.Runtime
                 _cancelCallBackoffProvider);
             grainReferences.TryRemove(key, out _);
         }
+    }
+
+    [RegisterSerializer]
+    internal class GrainCancellationTokenCodec : GeneralizedReferenceTypeSurrogateCodec<GrainCancellationToken, GrainCancellationTokenSurrogate>
+    {
+        private readonly IGrainCancellationTokenRuntime _runtime;
+
+        public GrainCancellationTokenCodec(IGrainCancellationTokenRuntime runtime, IValueSerializer<GrainCancellationTokenSurrogate> surrogateSerializer) : base(surrogateSerializer)
+        {
+            _runtime = runtime;
+        }
+
+        public override GrainCancellationToken ConvertFromSurrogate(ref GrainCancellationTokenSurrogate surrogate)
+        {
+            return new GrainCancellationToken(surrogate.TokenId, surrogate.IsCancellationRequested, _runtime);
+        }
+
+        public override void ConvertToSurrogate(GrainCancellationToken value, ref GrainCancellationTokenSurrogate surrogate)
+        {
+            surrogate.IsCancellationRequested = value.IsCancellationRequested;
+            surrogate.TokenId = value.Id;
+        }
+    }
+
+    [RegisterCopier]
+    internal class GrainCancellationTokenCopier : IDeepCopier<GrainCancellationToken>
+    {
+        public GrainCancellationToken DeepCopy(GrainCancellationToken input, CopyContext context) => input;
+    }
+
+    [GenerateSerializer]
+    internal struct GrainCancellationTokenSurrogate
+    {
+        [Id(0)]
+        public bool IsCancellationRequested { get; set; }
+
+        [Id(1)]
+        public Guid TokenId { get; set; }
     }
 }

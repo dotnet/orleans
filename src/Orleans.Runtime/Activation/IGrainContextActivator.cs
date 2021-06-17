@@ -7,9 +7,9 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Metadata;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -267,7 +267,7 @@ namespace Orleans.Runtime
                 && _grainClassMap.TryGetGrainClass(grainType, out var grainClass))
             {
                 var predicate = GetMayInterleavePredicate(grainClass);
-                configurator = new MayInterleaveConfigurator(message => predicate((InvokeMethodRequest)message.BodyObject));
+                configurator = new MayInterleaveConfigurator(message => predicate(message.BodyObject as IInvokable));
                 return true;
             }
 
@@ -279,7 +279,7 @@ namespace Orleans.Runtime
         /// Returns interleave predicate depending on whether class is marked with <see cref="MayInterleaveAttribute"/> or not.
         /// </summary>
         /// <param name="grainType">Grain class.</param>
-        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(Type grainType)
+        private static Func<IInvokable, bool> GetMayInterleavePredicate(Type grainType)
         {
             var attribute = grainType.GetCustomAttribute<MayInterleaveAttribute>();
             if (attribute is null)
@@ -298,17 +298,17 @@ namespace Orleans.Runtime
 
             if (method.ReturnType != typeof(bool) ||
                 method.GetParameters().Length != 1 ||
-                method.GetParameters()[0].ParameterType != typeof(InvokeMethodRequest))
+                method.GetParameters()[0].ParameterType != typeof(IInvokable))
             {
                 throw new InvalidOperationException(
                     $"Wrong signature of callback method {callbackMethodName} " +
                     $"specified in MayInterleave attribute for grain class {grainType.FullName}. \n" +
-                    $"Expected: public static bool {callbackMethodName}(InvokeMethodRequest req)");
+                    $"Expected: public static bool {callbackMethodName}(IInvokable req)");
             }
 
-            var parameter = Expression.Parameter(typeof(InvokeMethodRequest));
+            var parameter = Expression.Parameter(typeof(IInvokable));
             var call = Expression.Call(null, method, parameter);
-            var predicate = Expression.Lambda<Func<InvokeMethodRequest, bool>>(call, parameter).Compile();
+            var predicate = Expression.Lambda<Func<IInvokable, bool>>(call, parameter).Compile();
 
             return predicate;
         }
