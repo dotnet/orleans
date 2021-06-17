@@ -63,16 +63,8 @@ namespace Orleans.Statistics
         }
     }
 
-    public static class SiloHostBuilderExtensions
+    public static class SiloBuilderExtensions
     {
-        /// <summary>
-        /// Use Linux host environment statistics
-        /// </summary>
-        public static ISiloHostBuilder UseLinuxEnvironmentStatistics(this ISiloHostBuilder builder)
-        {
-            return builder.ConfigureServices(LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>);
-        }
-
         /// <summary>
         /// Use Linux host environment statistics
         /// </summary>

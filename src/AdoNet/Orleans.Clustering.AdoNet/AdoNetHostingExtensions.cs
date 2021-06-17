@@ -23,66 +23,6 @@ namespace Orleans.Hosting
         /// The configuration delegate.
         /// </param>
         /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        /// <remarks>
-        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
-        /// </remarks>
-        public static ISiloHostBuilder UseAdoNetClustering(
-            this ISiloHostBuilder builder,
-            Action<AdoNetClusteringSiloOptions> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-
-                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
-                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
-                });
-        }
-
-        /// <summary>
-        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        /// <remarks>
-        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
-        /// </remarks>
-        public static ISiloHostBuilder UseAdoNetClustering(
-            this ISiloHostBuilder builder,
-            Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    configureOptions?.Invoke(services.AddOptions<AdoNetClusteringSiloOptions>());
-                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
-                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
-                });
-        }
-
-        /// <summary>
-        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
         /// <remarks>

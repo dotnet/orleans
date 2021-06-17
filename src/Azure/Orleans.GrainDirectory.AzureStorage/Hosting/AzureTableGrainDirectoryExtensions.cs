@@ -10,36 +10,6 @@ namespace Orleans.Hosting
 {
     public static class AzureTableGrainDirectoryExtensions
     {
-        public static ISiloHostBuilder UseAzureTableGrainDirectoryAsDefault(
-            this ISiloHostBuilder builder,
-            Action<AzureTableGrainDirectoryOptions> configureOptions)
-        {
-            return builder.UseAzureTableGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
-        }
-
-        public static ISiloHostBuilder UseAzureTableGrainDirectoryAsDefault(
-            this ISiloHostBuilder builder,
-            Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
-        }
-
-        public static ISiloHostBuilder AddAzureTableGrainDirectory(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<AzureTableGrainDirectoryOptions> configureOptions)
-        {
-            return builder.AddAzureTableGrainDirectory(name, ob => ob.Configure(configureOptions));
-        }
-
-        public static ISiloHostBuilder AddAzureTableGrainDirectory(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(name, configureOptions));
-        }
-
         public static ISiloBuilder UseAzureTableGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<AzureTableGrainDirectoryOptions> configureOptions)

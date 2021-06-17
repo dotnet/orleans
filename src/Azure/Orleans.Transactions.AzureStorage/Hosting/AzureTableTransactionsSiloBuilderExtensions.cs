@@ -15,38 +15,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure table storage as the default transactional grain storage.
         /// </summary>
-        public static ISiloHostBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloHostBuilder builder, Action<AzureTableTransactionalStateOptions> configureOptions)
-        {
-            return builder.AddAzureTableTransactionalStateStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage for transactional grain storage.
-        /// </summary>
-        public static ISiloHostBuilder AddAzureTableTransactionalStateStorage(this ISiloHostBuilder builder, string name, Action<AzureTableTransactionalStateOptions> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddAzureTableTransactionalStateStorage(name, ob => ob.Configure(configureOptions)));
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage as the default transactional grain storage.
-        /// </summary>
-        public static ISiloHostBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
-        {
-            return builder.AddAzureTableTransactionalStateStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage for transactional grain storage.
-        /// </summary>
-        public static ISiloHostBuilder AddAzureTableTransactionalStateStorage(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
-        {
-            return builder.ConfigureServices(services => services.AddAzureTableTransactionalStateStorage(name, configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage as the default transactional grain storage.
-        /// </summary>
         public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<AzureTableTransactionalStateOptions> configureOptions)
         {
             return builder.AddAzureTableTransactionalStateStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);

@@ -14,22 +14,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a log storage log consistency provider as default consistency provider"/>
         /// </summary>
-        public static ISiloHostBuilder AddLogStorageBasedLogConsistencyProviderAsDefault(this ISiloHostBuilder builder)
-        {
-            return builder.AddLogStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
-        }
-
-        /// <summary>
-        /// Adds a log storage log consistency provider"/>
-        /// </summary>
-        public static ISiloHostBuilder AddLogStorageBasedLogConsistencyProvider(this ISiloHostBuilder builder, string name = "LogStorage")
-        {
-            return builder.ConfigureServices(services => services.AddLogStorageBasedLogConsistencyProvider(name));
-        }
-
-        /// <summary>
-        /// Adds a log storage log consistency provider as default consistency provider"/>
-        /// </summary>
         public static ISiloBuilder AddLogStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder)
         {
             return builder.AddLogStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);

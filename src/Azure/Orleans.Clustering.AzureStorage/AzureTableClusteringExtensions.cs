@@ -21,60 +21,6 @@ namespace Orleans.Hosting
         /// The configuration delegate.
         /// </param>
         /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        public static ISiloHostBuilder UseAzureStorageClustering(
-            this ISiloHostBuilder builder,
-            Action<AzureStorageClusteringOptions> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
-                    .ConfigureFormatter<AzureStorageClusteringOptions>();
-                });
-        }
-
-        /// <summary>
-        /// Configures the silo to use Azure Storage for clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The silo builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        public static ISiloHostBuilder UseAzureStorageClustering(
-            this ISiloHostBuilder builder,
-            Action<OptionsBuilder<AzureStorageClusteringOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
-                    .ConfigureFormatter<AzureStorageClusteringOptions>();
-                });
-        }
-
-        /// <summary>
-        /// Configures the silo to use Azure Storage for clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The silo builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
         public static ISiloBuilder UseAzureStorageClustering(

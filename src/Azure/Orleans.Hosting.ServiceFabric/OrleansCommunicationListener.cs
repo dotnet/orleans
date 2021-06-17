@@ -15,12 +15,12 @@ namespace Orleans.Hosting.ServiceFabric
     /// </summary>
     public class OrleansCommunicationListener : ICommunicationListener
     {
-        private readonly Action<ISiloHostBuilder> configure;
+        private readonly Action<SiloHostBuilder> configure;
         
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansCommunicationListener" /> class.
         /// </summary>
-        public OrleansCommunicationListener(Action<ISiloHostBuilder> configure)
+        public OrleansCommunicationListener(Action<SiloHostBuilder> configure)
         {
             this.configure = configure ?? throw new ArgumentNullException(nameof(configure));
         }

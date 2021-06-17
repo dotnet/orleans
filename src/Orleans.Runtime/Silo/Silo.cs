@@ -80,10 +80,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="siloDetails">The silo initialization parameters</param>
         /// <param name="services">Dependency Injection container</param>
-        [Obsolete("This constructor is obsolete and may be removed in a future release. Use SiloHostBuilder to create an instance of ISiloHost instead.")]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
-            Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
-        public Silo(ILocalSiloDetails siloDetails, IServiceProvider services)
+        internal Silo(ILocalSiloDetails siloDetails, IServiceProvider services)
         {
             string name = siloDetails.Name;
             // Temporarily still require this. Hopefuly gone when 2.0 is released.

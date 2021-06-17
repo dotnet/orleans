@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.TelemetryConsumers.AI;
 
@@ -6,16 +6,6 @@ namespace Orleans.Hosting
 {
     public static class AITelemetryConsumerConfigurationExtensions
     {
-        /// <summary>
-        /// Adds a metrics telemetric consumer provider of type <see cref="AITelemetryConsumer"/>.
-        /// </summary>
-        /// <param name="hostBuilder"></param>
-        /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
-        public static ISiloHostBuilder AddApplicationInsightsTelemetryConsumer(this ISiloHostBuilder hostBuilder, string instrumentationKey = null)
-        {
-            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
-        }
-
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="AITelemetryConsumer"/>.
         /// </summary>

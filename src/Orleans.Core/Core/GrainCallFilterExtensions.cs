@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,10 +12,10 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        [Obsolete("Use ISiloHostBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
+        [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
         public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter)
         {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloHostBuilder.AddIncomingGrainCallFilter(...) instead.");
+            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
         }
 
         /// <summary>
@@ -24,11 +24,11 @@ namespace Orleans.Hosting
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        [Obsolete("Use ISiloHostBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
+        [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
         public static IServiceCollection AddGrainCallFilter<TImplementation>(this IServiceCollection services)
             where TImplementation : class, IIncomingGrainCallFilter
         {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloHostBuilder.AddIncomingGrainCallFilter(...) instead.");
+            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
         }
 
         /// <summary>
@@ -37,10 +37,10 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        [Obsolete("Use ISiloHostBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
+        [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
         public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
         {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloHostBuilder.AddIncomingGrainCallFilter(...) instead.");
+            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
         }
 
         /// <summary>

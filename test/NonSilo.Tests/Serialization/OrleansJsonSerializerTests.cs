@@ -10,6 +10,7 @@ namespace UnitTests.Serialization
     using System;
     using System.Text;
     using FluentAssertions.Common;
+    using Microsoft.Extensions.Hosting;
     using Microsoft.OData.Json;
     using Newtonsoft.Json;
 
@@ -39,13 +40,17 @@ namespace UnitTests.Serialization
         [Fact]
         public void OrleansJsonSerializer_ExternalSerializer_Silo()
         {
-            var silo = new SiloHostBuilder()
-                .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")
-                .UseLocalhostClustering()
-                .ConfigureServices(
-                services =>
+            var silo = new HostBuilder()
+                .UseOrleans(siloBuilder =>
                 {
-                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                    siloBuilder
+                    .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")
+                    .UseLocalhostClustering()
+                    .ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                    });
                 })
                 .Build();
             var serializer = silo.Services.GetRequiredService<Serializer>();
