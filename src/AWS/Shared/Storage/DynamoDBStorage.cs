@@ -29,7 +29,7 @@ namespace Orleans.Transactions.DynamoDB
     internal class DynamoDBStorage
     {
         private string accessKey;
-
+        private string token;
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
         private string service;
@@ -47,6 +47,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="logger"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
+        /// <param name="token"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
@@ -56,6 +57,7 @@ namespace Orleans.Transactions.DynamoDB
             string service,
             string accessKey = "",
             string secretKey = "",
+            string token = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits,
             bool useProvisionedThroughput = true)
@@ -63,6 +65,7 @@ namespace Orleans.Transactions.DynamoDB
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
             this.secretKey = secretKey;
+            this.token = token;
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
@@ -102,6 +105,12 @@ namespace Orleans.Transactions.DynamoDB
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
                 this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
+            }
+            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this.token))
+            {
+                // AWS DynamoDB instance (auth via explicit credentials and token)
+                var credentials = new SessionAWSCredentials(this.accessKey, this.secretKey, this.token);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {

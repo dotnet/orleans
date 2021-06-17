@@ -22,9 +22,9 @@ namespace Orleans.Clustering.DynamoDB
         private readonly DynamoDBGatewayOptions options;
 
         public DynamoDBGatewayListProvider(
-            ILogger<DynamoDBGatewayListProvider> logger, 
+            ILogger<DynamoDBGatewayListProvider> logger,
             IOptions<DynamoDBGatewayOptions> options,
-            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<GatewayOptions> gatewayOptions)
         {
             this.logger = logger;
@@ -40,6 +40,7 @@ namespace Orleans.Clustering.DynamoDB
                 this.options.Service,
                 this.options.AccessKey,
                 this.options.SecretKey,
+                this.options.Token,
                 this.options.ReadCapacityUnits,
                 this.options.WriteCapacityUnits);
 
