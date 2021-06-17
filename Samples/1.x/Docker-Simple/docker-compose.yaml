@@ -1,7 +1,0 @@
-version: '3'
-
-services:
-  client:
-    build: Client
-  silo:
-    build: Silo
