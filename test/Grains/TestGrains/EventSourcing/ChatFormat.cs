@@ -13,7 +13,7 @@ namespace TestGrains
     {
         public static void Initialize(this XDocument document, DateTime timestamp, string origin)
         {
-            if (document.Nodes().Count() == 0)
+            if (!document.Nodes().Any())
             {
                 document.Add(new XComment($"This chat room was created by {origin}"));
                 document.Add(new XElement("root",
