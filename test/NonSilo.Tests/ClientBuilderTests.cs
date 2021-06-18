@@ -43,16 +43,17 @@ namespace NonSilo.Tests
         public void ClientBuilder_ClusterOptionsTest()
         {
             Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
+                .Configure<ClusterOptions>(options => { options.ClusterId = null; options.ServiceId = null; })
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
                 .Build());
 
             Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
-               .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+               .Configure<ClusterOptions>(options => { options.ClusterId = "someClusterId"; options.ServiceId = null; })
                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
                .Build());
 
             Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
-               .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
+                .Configure<ClusterOptions>(options => { options.ClusterId = null; options.ServiceId = "someServiceId"; })
                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
                .Build());
 
