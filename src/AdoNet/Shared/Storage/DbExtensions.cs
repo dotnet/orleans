@@ -138,6 +138,20 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
+        public static DateTime? GetDateTimeValueOrDefault(this IDataRecord record, string fieldName, DateTime? @default = default)
+        {
+
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.IsDBNull(ordinal) ? @default : record.GetDateTime(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
+
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.
         /// </summary>
@@ -210,6 +224,19 @@ namespace Orleans.Tests.SqlUtils
             {
                 var ordinal = record.GetOrdinal(fieldName);
                 return (TValue)record.GetValue(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
+
+        public static DateTime GetDateTimeValue(this IDataRecord record, string fieldName)
+        {
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.GetDateTime(ordinal);
             }
             catch (IndexOutOfRangeException e)
             {
