@@ -95,18 +95,19 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_ClusterOptionsTest()
         {
             Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => { options.ClusterId = null; options.ServiceId = null; })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                 .Build());
 
             Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
-                .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                .Configure<ClusterOptions>(options => { options.ClusterId = "someClusterId"; options.ServiceId = null; })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                 .Build());
 
             Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
-                .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
+                .Configure<ClusterOptions>(options => { options.ClusterId = null; options.ServiceId = "someServiceId"; })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                 .Build());
