@@ -30,6 +30,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.NewRelic", "src\TelemetryConsumers\Orleans.TelemetryConsumers.NewRelic\Orleans.TelemetryConsumers.NewRelic.csproj", "{F409A36D-3571-470E-980A-3229FC252781}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.TelemetryConsumers.Datadog", "src\TelemetryConsumers\Orleans.TelemetryConsumers.Datadog\Orleans.TelemetryConsumers.Datadog.csproj", "{2CD0D41E-9833-402B-81A2-45E27A181E19}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost", "src\Orleans.TestingHost\Orleans.TestingHost.csproj", "{9BCF7A12-6A5B-43FF-828A-A804F9B9DBB4}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeeper", "src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
@@ -532,6 +534,10 @@ Global
 		{0ECCC344-21E8-4AD7-9CB9-933054200000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0ECCC344-21E8-4AD7-9CB9-933054200000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0ECCC344-21E8-4AD7-9CB9-933054200000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2CD0D41E-9833-402B-81A2-45E27A181E19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CD0D41E-9833-402B-81A2-45E27A181E19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CD0D41E-9833-402B-81A2-45E27A181E19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CD0D41E-9833-402B-81A2-45E27A181E19}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -631,6 +637,7 @@ Global
 		{EA49BFD9-6946-4858-AF4B-4138E871447F} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 		{2A9C009B-5219-47DB-A540-106DADF9FC91} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{0ECCC344-21E8-4AD7-9CB9-933054200000} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{2CD0D41E-9833-402B-81A2-45E27A181E19} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
