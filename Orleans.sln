@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28803.202
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31410.414
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
@@ -193,6 +193,11 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Abstractions", "src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj", "{2A9C009B-5219-47DB-A540-106DADF9FC91}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.FSharp", "src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj", "{0ECCC344-21E8-4AD7-9CB9-933054200000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9CE767E6-7510-4327-9726-274C13E96B7A}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
