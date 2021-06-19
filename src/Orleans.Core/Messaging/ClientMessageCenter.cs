@@ -55,7 +55,7 @@ namespace Orleans.Messaging
         // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-        private readonly WeakReference<Connection>[] grainBuckets;
+        private readonly WeakReference<ClientOutboundConnection>[] grainBuckets;
         private readonly ILogger logger;
         public SiloAddress MyAddress { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
@@ -87,7 +87,7 @@ namespace Orleans.Messaging
             Running = false;
             this.gatewayManager = gatewayManager;
             numMessages = 0;
-            this.grainBuckets = new WeakReference<Connection>[clientMessagingOptions.Value.ClientSenderBuckets];
+            this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
@@ -257,12 +257,12 @@ namespace Orleans.Messaging
             // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
             // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-            WeakReference<Connection> weakRef = grainBuckets[index];
+            WeakReference<ClientOutboundConnection> weakRef = grainBuckets[index];
 
             if (weakRef != null
                 && weakRef.TryGetTarget(out var existingConnection)
                 && existingConnection.IsValid
-                && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
+                && gatewayManager.IsGatewayAvailable(existingConnection.RemoteSiloAddress))
             {
                 return new ValueTask<Connection>(existingConnection);
             }
@@ -274,20 +274,11 @@ namespace Orleans.Messaging
                 logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                 return new ValueTask<Connection>(default(Connection));
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(
-                ErrorCode.ProxyClient_CreatedGatewayToGrain,
-                "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X",
-                addr,
-                msg.TargetGrain,
-                index,
-                msg.TargetGrain.GetHashCode().ToString("x"));
 
             var gatewayConnection = this.connectionManager.GetConnection(addr);
             if (gatewayConnection.IsCompletedSuccessfully)
             {
-                this.UpdateBucket(index, gatewayConnection.Result);
+                this.UpdateBucket(index, (ClientOutboundConnection)gatewayConnection.Result);
                 return gatewayConnection;
             }
 
@@ -300,7 +291,7 @@ namespace Orleans.Messaging
             {
                 try
                 {
-                    var connection = await connectionTask.ConfigureAwait(false);
+                    var connection = (ClientOutboundConnection)await connectionTask.ConfigureAwait(false);
                     this.UpdateBucket(bucketIndex, connection);
                     return connection;
                 }
@@ -342,11 +333,11 @@ namespace Orleans.Messaging
             }
         }
 
-        private void UpdateBucket(uint index, Connection connection)
+        private void UpdateBucket(uint index, ClientOutboundConnection connection)
         {
             lock (this.grainBucketUpdateLock)
             {
-                var value = this.grainBuckets[index] ?? new WeakReference<Connection>(connection);
+                var value = this.grainBuckets[index] ?? new WeakReference<ClientOutboundConnection>(connection);
                 value.SetTarget(connection);
                 this.grainBuckets[index] = value;
             }

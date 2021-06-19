@@ -29,7 +29,6 @@ namespace Orleans.Runtime.Messaging
         };
 
         private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
-        private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
