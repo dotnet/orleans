@@ -11,6 +11,7 @@ using Orleans.Internal;
 using System.Threading;
 using Orleans.Streams.Filtering;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Streams
 {
@@ -140,7 +141,7 @@ namespace Orleans.Streams
         /// </summary>
         public Task QueueDistributionChangeNotification()
         {
-            return this.ScheduleTask(() => this.HandleQueueDistributionChangeNotification());
+            return this.RunOrQueueTask(() => this.HandleQueueDistributionChangeNotification());
         }
 
         public Task HandleQueueDistributionChangeNotification()

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
@@ -22,6 +23,8 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
+
+        private int _activeCount;
         private Task _runTask;
 
         public ActivationWorkingSet(
@@ -34,46 +37,66 @@ namespace Orleans.Runtime
             _observers = observers.ToList();
         }
 
-        public void Add(IActivationWorkingSetMember member)
+        public int Count => _activeCount;
+
+        public void OnActivated(IActivationWorkingSetMember member)
         {
             if (!_members.TryAdd(member, new MemberState()))
             {
                 throw new InvalidOperationException($"Member {member} is already a member of the working set");
             }
 
+            Interlocked.Increment(ref _activeCount);
             foreach (var observer in _observers)
             {
                 observer.OnAdded(member);
             }
         }
 
-        public void AddOrUnmark(IActivationWorkingSetMember member)
+        public void OnActive(IActivationWorkingSetMember member)
         {
             if (_members.TryGetValue(member, out var state))
             {
                 state.IsMarkedForRemoval = false;
-                foreach (var observer in _observers)
-                {
-                    observer.OnActive(member);
-                }
             }
             else if (_members.TryAdd(member, new()))
             {
+                Interlocked.Increment(ref _activeCount);
+            }
+
+            foreach (var observer in _observers)
+            {
+                observer.OnActive(member);
+            }
+        }
+
+        public void OnEvicted(IActivationWorkingSetMember member)
+        {
+            if (_members.TryRemove(member, out _))
+            {
+                Interlocked.Decrement(ref _activeCount);
                 foreach (var observer in _observers)
                 {
-                    observer.OnAdded(member);
+                    observer.OnEvicted(member);
                 }
             }
         }
 
-        public void Remove(IActivationWorkingSetMember member)
+        public void OnDeactivating(IActivationWorkingSetMember member)
         {
-            if (_members.TryRemove(member, out _))
+            OnEvicted(member);
+            foreach (var observer in _observers)
             {
-                foreach (var observer in _observers)
-                {
-                    observer.OnRemoved(member);
-                }
+                observer.OnDeactivating(member);
+            }
+        }
+
+        public void OnDeactivated(IActivationWorkingSetMember member)
+        {
+            OnEvicted(member);
+            foreach (var observer in _observers)
+            {
+                observer.OnDeactivated(member);
             }
         }
 
@@ -84,7 +107,7 @@ namespace Orleans.Runtime
             {
                 if (wouldRemove)
                 {
-                    Remove(member);
+                    OnEvicted(member);
                 }
                 else
                 {
@@ -150,19 +173,30 @@ namespace Orleans.Runtime
     public interface IActivationWorkingSet
     {
         /// <summary>
+        /// Returns the number of grain activations which were recently active.
+        /// </summary>
+        public int Count { get; }
+
+        /// <summary>
         /// Adds a new member to the working set.
         /// </summary>
-        void Add(IActivationWorkingSetMember member);
+        void OnActivated(IActivationWorkingSetMember member);
 
         /// <summary>
-        /// Signals that a member is active and should be added to the working set.
+        /// Signals that a member is active and should be in the working set.
         /// </summary>
-        void AddOrUnmark(IActivationWorkingSetMember member);
+        void OnActive(IActivationWorkingSetMember member);
 
         /// <summary>
-        /// Removes a member from the working set.
+        /// Signals that a member has begun to deactivate.
         /// </summary>
-        void Remove(IActivationWorkingSetMember member);
+        /// <param name="member"></param>
+        void OnDeactivating(IActivationWorkingSetMember member);
+
+        /// <summary>
+        /// Signals that a members has deactivated.
+        /// </summary>
+        void OnDeactivated(IActivationWorkingSetMember member);
     }
 
     /// <summary>
@@ -175,7 +209,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns><see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.</returns>
         /// <remarks>
-        /// If this method returns <see langword="true"/> and <paramref name="wouldRemove"/> is <see langword="true"/>, the member must be removed from the working set and is eligible to be added again via a call to <see cref="IActivationWorkingSet.Add(IActivationWorkingSetMember)"/>.
+        /// If this method returns <see langword="true"/> and <paramref name="wouldRemove"/> is <see langword="true"/>, the member must be removed from the working set and is eligible to be added again via a call to <see cref="IActivationWorkingSet.OnActivated(IActivationWorkingSetMember)"/>.
         /// </remarks>
         bool IsCandidateForRemoval(bool wouldRemove);
     }
@@ -188,21 +222,31 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called when an activation is added to the working set.
         /// </summary>
-        void OnAdded(IActivationWorkingSetMember member);
+        void OnAdded(IActivationWorkingSetMember member) { }
 
         /// <summary>
         /// Called when an activation becomes active.
         /// </summary>
-        void OnActive(IActivationWorkingSetMember member);
+        void OnActive(IActivationWorkingSetMember member) { }
 
         /// <summary>
         /// Called when an activation becomes idle.
         /// </summary>
-        void OnIdle(IActivationWorkingSetMember member);
+        void OnIdle(IActivationWorkingSetMember member) { }
 
         /// <summary>
         /// Called when an activation is removed from the working set.
         /// </summary>
-        void OnRemoved(IActivationWorkingSetMember member);
+        void OnEvicted(IActivationWorkingSetMember member) { }
+
+        /// <summary>
+        /// Called when an activation starts deactivating.
+        /// </summary>
+        void OnDeactivating(IActivationWorkingSetMember member) { }
+
+        /// <summary>
+        /// Called when an activation is deactivated.
+        /// </summary>
+        void OnDeactivated(IActivationWorkingSetMember member) { }
     }
 }

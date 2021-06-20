@@ -283,9 +283,12 @@ namespace Orleans.ServiceBus.Providers
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
 
-        private class StreamActivityNotificationBatch : IBatchContainer
+        [GenerateSerializer]
+        internal class StreamActivityNotificationBatch : IBatchContainer
         {
+            [Id(0)]
             public StreamPosition Position { get; }
+
             public StreamId StreamId => this.Position.StreamId;
             public StreamSequenceToken SequenceToken => this.Position.SequenceToken;
 

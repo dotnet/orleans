@@ -8,6 +8,7 @@ using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using System.Diagnostics;
 
 namespace UnitTests.StuckGrainTests
 {
@@ -34,9 +35,14 @@ namespace UnitTests.StuckGrainTests
                     {
                         options.CollectionAge = TimeSpan.FromSeconds(3);
                         options.CollectionQuantum = TimeSpan.FromSeconds(1);
+
+                        options.DeactivationTimeout = TimeSpan.FromSeconds(3);
                     });
 
-                    hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3));
+                    hostBuilder.Configure<SiloMessagingOptions>(options =>
+                    {
+                        options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
+                    });
                 }
             }
         }
@@ -90,7 +96,8 @@ namespace UnitTests.StuckGrainTests
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
-            Assert.Equal(1, await stuckGrain.GetNonBlockingCallCounter());
+            // All 4 otherwise stuck calls should have been forwarded to a new activation
+            Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
@@ -112,7 +119,8 @@ namespace UnitTests.StuckGrainTests
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
-            Assert.Equal(1, await stuckGrain.GetNonBlockingCallCounter());
+            // All 4 otherwise stuck calls should have been forwarded to a new activation
+            Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter());
         }
     }
 }

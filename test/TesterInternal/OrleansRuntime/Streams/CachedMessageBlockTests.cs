@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -19,9 +20,13 @@ namespace UnitTests.OrleansRuntime.Streams
             public EventSequenceTokenV2 SequenceToken { get; set; }
         }
 
-        private class TestBatchContainer : IBatchContainer
+        [GenerateSerializer]
+        public class TestBatchContainer : IBatchContainer
         {
+            [Id(0)]
             public StreamId StreamId { get; set; }
+
+            [Id(1)]
             public StreamSequenceToken SequenceToken { get; set; }
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()

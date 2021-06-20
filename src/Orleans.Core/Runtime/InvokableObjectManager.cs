@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
@@ -109,6 +108,8 @@ namespace Orleans
             IServiceProvider IGrainContext.ActivationServices => throw new NotSupportedException();
 
             IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException();
+
+            public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
             void IGrainContext.SetComponent<TComponent>(TComponent value)
             {

@@ -19,10 +19,8 @@ namespace Orleans.Runtime
         private readonly ILocalSiloDetails siloDetails;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly OrleansTaskScheduler scheduler;
-        private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory activationDirectory;
-        private readonly ActivationCollector activationCollector;
+        private readonly IActivationWorkingSet activationWorkingSet;
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
@@ -40,11 +38,9 @@ namespace Orleans.Runtime
             ISiloStatusOracle siloStatusOracle,
             IOptions<DeploymentLoadPublisherOptions> options,
             IInternalGrainFactory grainFactory,
-            OrleansTaskScheduler scheduler,
             ILoggerFactory loggerFactory,
-            IMessageCenter messageCenter,
             ActivationDirectory activationDirectory,
-            ActivationCollector activationCollector,
+            IActivationWorkingSet activationWorkingSet,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
@@ -54,10 +50,8 @@ namespace Orleans.Runtime
             this.siloDetails = siloDetails;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
-            this.scheduler = scheduler;
-            this.messageCenter = messageCenter;
             this.activationDirectory = activationDirectory;
-            this.activationCollector = activationCollector;
+            this.activationWorkingSet = activationWorkingSet;
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
@@ -89,7 +83,7 @@ namespace Orleans.Runtime
                 var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
-                var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
+                var recentlyUsedActivationCount = this.activationWorkingSet.Count;
                 var myStats = new SiloRuntimeStatistics(
                     activationCount,
                     recentlyUsedActivationCount,
@@ -140,7 +134,7 @@ namespace Orleans.Runtime
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
-            await this.scheduler.RunOrQueueTask(() =>
+            await this.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();
                     var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -166,7 +160,7 @@ namespace Orleans.Runtime
                         task.Ignore();
                     }
                     return Task.WhenAll(tasks);
-                }, this);
+                });
             return periodicStats;
         }
 
@@ -211,7 +205,7 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            this.ScheduleTask(() => { Utils.SafeExecute(() => this.OnSiloStatusChange(updatedSilo, status), this.logger); }).Ignore();
+            this.RunOrQueueAction(() => { Utils.SafeExecute(() => this.OnSiloStatusChange(updatedSilo, status), this.logger); }).Ignore();
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)

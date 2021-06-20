@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -53,15 +55,25 @@ namespace Orleans.Runtime
         //TComponent GetComponent<TComponent>();
 
         void ReceiveMessage(object message);
+
+        IWorkItemScheduler Scheduler { get; }
     }
 
     internal interface IActivationData : IGrainContext
     {
         IGrainRuntime Runtime { get; }
 
+        void DeactivateOnIdle();
         void DelayDeactivation(TimeSpan timeSpan);
         void OnTimerCreated(IGrainTimer timer);
         void OnTimerDisposed(IGrainTimer timer);
+    }
+
+    public interface IWorkItemScheduler
+    {
+        void QueueAction(Action action);
+        void QueueTask(Task task);
+        void QueueWorkItem(IThreadPoolWorkItem workItem);
     }
 
     /// <summary>

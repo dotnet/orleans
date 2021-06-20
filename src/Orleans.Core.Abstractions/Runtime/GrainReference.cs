@@ -8,6 +8,7 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -354,6 +355,40 @@ namespace Orleans.Runtime
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }
         public abstract MethodInfo Method { get; }
+
+        public override string ToString()
+        {
+            var result = new StringBuilder();
+            result.Append(InterfaceName);
+            if (GetTarget<object>() is { } target)
+            {
+                result.Append("[(");
+                result.Append(InterfaceName);
+                result.Append(')');
+                result.Append(target.ToString());
+                result.Append(']');
+            }
+            else
+            {
+                result.Append(InterfaceName);
+            }
+
+            result.Append('.');
+            result.Append(MethodName);
+            result.Append('(');
+            for (var n = 0; n < ArgumentCount; n++)
+            {
+                if (n > 0)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(GetArgument<object>(n));
+            }
+
+            result.Append(')');
+            return result.ToString();
+        }
     }
 
     [GenerateSerializer]

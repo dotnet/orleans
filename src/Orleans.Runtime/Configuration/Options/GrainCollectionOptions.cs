@@ -27,6 +27,12 @@ namespace Orleans.Configuration
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
 
         /// <summary>
+        /// Timeout value before giving up when trying to activate a grain.
+        /// </summary>
+        public TimeSpan ActivationTimeout { get; set; } = DEFAULT_ACTIVATION_TIMEOUT;
+        public static readonly TimeSpan DEFAULT_ACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
+
+        /// <summary>
         /// Timeout value before giving up when trying to deactivate a grain activation
         /// (waiting for all timers to stop and calling Grain.OnDeactivate())
         /// </summary>
