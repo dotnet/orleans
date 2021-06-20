@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +8,7 @@ using Orleans.Transactions;
 
 namespace BenchmarkGrains.Transaction
 {
+    [GrainType("txload")]
     public class LoadGrain : Grain, ILoadGrain
     {
         private Task<Report> runTask;
