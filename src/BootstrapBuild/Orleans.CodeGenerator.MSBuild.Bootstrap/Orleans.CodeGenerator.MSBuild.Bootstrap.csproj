@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <NoPackageAnalysis>true</NoPackageAnalysis>
@@ -13,11 +13,11 @@
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <DevelopmentDependency>true</DevelopmentDependency>
     <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
-    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <PublishDir>$(PublishRoot)</PublishDir>
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <Compile Include="$(SourceDir)**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs" Condition="'$(DesignTimeBuild)' != 'true'">
       <!-- Hide the files and folder structure in the editor. -->
@@ -27,7 +27,7 @@
     <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />

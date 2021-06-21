@@ -60,17 +60,18 @@
     <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.4</SystemThreadingTasksExtensionsVersion>
     <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
-    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
+    <SystemBuffersVersion>4.5.1</SystemBuffersVersion>
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
     <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
     <SystemSecurityPermissionsVersion>4.7.0</SystemSecurityPermissionsVersion>
+    <SystemSecurityCryptographyProtectedDataVersion>4.7.0</SystemSecurityCryptographyProtectedDataVersion>
     <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
     <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisVersion>3.9.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>4.7.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
@@ -94,7 +95,7 @@
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <MicrosoftAzureEventHubsVersion>4.1.0</MicrosoftAzureEventHubsVersion>
     <AzureCoreVersion>1.3.0</AzureCoreVersion>
-    <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
+    <AzureIdentityVersion>1.4.0</AzureIdentityVersion>
     <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
