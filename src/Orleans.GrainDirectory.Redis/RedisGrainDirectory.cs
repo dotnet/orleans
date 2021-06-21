@@ -95,8 +95,11 @@ namespace Orleans.GrainDirectory.Redis
             {
                 if (address.MembershipVersion == MembershipVersion.MinValue)
                 {
+                    // The address was not returned by the directory and must have been constructed externally.
+                    // We need to get the value stored in the directory to get the MembershipVersion to possibly
+                    // safely delete the address after.
                     var fullAddress = await Lookup(address.GrainId);
-                    if (!fullAddress.Equals(address))
+                    if (!fullAddress.Matches(address))
                     {
                         if (this.logger.IsEnabled(LogLevel.Debug))
                             this.logger.LogDebug("Unregister {GrainId} ({Address}): Not found in storage", address.GrainId, value);
