@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -144,7 +144,15 @@ namespace UnitTests.GrainInterfaces
         Task<CampaignEnemyTestType> GetEnemyType();
 
         Task<object> GetClosedGenericValue();
+
+        Task<RetVal> GetRetValForParamVal(ParamVal param);
     }
+
+    [Serializable]
+    public record ParamVal(int Value);
+
+    [Serializable]
+    public record RetVal(int Value);
 
     [Serializable]
     [Immutable]

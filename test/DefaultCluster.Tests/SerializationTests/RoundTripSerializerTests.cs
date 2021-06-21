@@ -14,6 +14,14 @@ namespace UnitTests.SerializerTests
         }
 
         [Fact]
+        public async Task Serialize_TestMethodResultRecord()
+        {
+            var grain = this.GrainFactory.GetGrain<IRoundtripSerializationGrain>(GetRandomGrainId());
+            RetVal retVal = await grain.GetRetValForParamVal(new ParamVal(42));
+            Assert.Equal(42, retVal.Value);
+        }
+
+        [Fact]
         public async Task Serialize_TestMethodResultEnum()
         {
             var grain = this.GrainFactory.GetGrain<IRoundtripSerializationGrain>(GetRandomGrainId());
