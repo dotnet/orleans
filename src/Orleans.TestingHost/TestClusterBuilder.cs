@@ -85,17 +85,15 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Adds an implementation of <see cref="ISiloConfigurator"/>, <see cref="IHostConfigurator"/>, or <see cref="ISiloBuilderConfigurator"/> to configure silos created by the test cluster.
+        /// Adds an implementation of <see cref="ISiloConfigurator"/> or <see cref="IHostConfigurator"/> to configure silos created by the test cluster.
         /// </summary>
         /// <typeparam name="T">The configurator type.</typeparam>
         public TestClusterBuilder AddSiloBuilderConfigurator<T>() where T : new()
         {
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (!typeof(ISiloConfigurator).IsAssignableFrom(typeof(T)) && !typeof(IHostConfigurator).IsAssignableFrom(typeof(T)) && !typeof(ISiloBuilderConfigurator).IsAssignableFrom(typeof(T)))
+            if (!typeof(ISiloConfigurator).IsAssignableFrom(typeof(T)) && !typeof(IHostConfigurator).IsAssignableFrom(typeof(T)))
             {
-                throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(ISiloConfigurator)}, {nameof(IHostConfigurator)}, or {nameof(ISiloBuilderConfigurator)}.");
+                throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(ISiloConfigurator)} or {nameof(IHostConfigurator)}");
             }
-#pragma warning restore CS0618 // Type or member is obsolete
 
             this.Options.SiloBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
             return this;

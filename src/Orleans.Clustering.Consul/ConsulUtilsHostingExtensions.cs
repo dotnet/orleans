@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Messaging;
@@ -9,58 +9,6 @@ namespace Orleans.Hosting
 {
     public static class ConsulUtilsHostingExtensions
     {
-        /// <summary>
-        /// Configures the silo to use Consul for clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        public static ISiloHostBuilder UseConsulClustering(
-            this ISiloHostBuilder builder,
-            Action<ConsulClusteringSiloOptions> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-
-                    services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
-                });
-        }
-
-        /// <summary>
-        /// Configures the silo to use Consul for clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>.
-        /// </returns>
-        public static ISiloHostBuilder UseConsulClustering(
-            this ISiloHostBuilder builder,
-            Action<OptionsBuilder<ConsulClusteringSiloOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(
-                services =>
-                {
-                    configureOptions?.Invoke(services.AddOptions<ConsulClusteringSiloOptions>());
-                    services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
-                });
-        }
-
         /// <summary>
         /// Configures the silo to use Consul for clustering.
         /// </summary>

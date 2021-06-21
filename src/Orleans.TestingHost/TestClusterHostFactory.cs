@@ -37,7 +37,6 @@ namespace Orleans.TestingHost
 
             var hostBuilder = new HostBuilder();
             var siloBuilder = new SiloBuilder(hostBuilder);
-            var siloHostBuilder = new SiloHostBuilderAdaptor(hostBuilder, siloBuilder);
 
             // Add the silo builder to the host builder so that it is executed during configuration time. 
             hostBuilder.Properties[nameof(SiloBuilder)] = siloBuilder;
@@ -53,7 +52,7 @@ namespace Orleans.TestingHost
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
             hostBuilder.Properties["Configuration"] = configuration;
-            ConfigureAppServices(configuration, hostBuilder, siloBuilder, siloHostBuilder);
+            ConfigureAppServices(configuration, hostBuilder, siloBuilder);
 
             hostBuilder.ConfigureServices((context, services) =>
             {
@@ -144,7 +143,7 @@ namespace Orleans.TestingHost
             });
         }
 
-        private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder, ISiloBuilder siloBuilder, ISiloHostBuilder siloHostBuilder)
+        private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
             var builderConfiguratorTypes = configuration.GetSection(nameof(TestClusterOptions.SiloBuilderConfiguratorTypes))?.Get<string[]>();
             if (builderConfiguratorTypes == null) return;
@@ -157,9 +156,6 @@ namespace Orleans.TestingHost
 
                     (configurator as IHostConfigurator)?.Configure(hostBuilder);
                     (configurator as ISiloConfigurator)?.Configure(siloBuilder);
-#pragma warning disable CS0618 // Type or member is obsolete
-                    (configurator as ISiloBuilderConfigurator)?.Configure(siloHostBuilder);
-#pragma warning restore CS0618 // Type or member is obsolete
                 }
             }
         }

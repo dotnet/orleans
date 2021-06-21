@@ -13,48 +13,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Use a Redis data-store as the default Grain Directory
         /// </summary>
-        public static ISiloHostBuilder UseRedisGrainDirectoryAsDefault(
-            this ISiloHostBuilder builder,
-            Action<RedisGrainDirectoryOptions> configureOptions)
-        {
-            return builder.UseRedisGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Use a Redis data-store as the default Grain Directory
-        /// </summary>
-        public static ISiloHostBuilder UseRedisGrainDirectoryAsDefault(
-            this ISiloHostBuilder builder,
-            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
-        }
-
-        /// <summary>
-        /// Add a Redis data-store as a named Grain Directory
-        /// </summary>
-        public static ISiloHostBuilder AddRedisGrainDirectory(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<RedisGrainDirectoryOptions> configureOptions)
-        {
-            return builder.AddRedisGrainDirectory(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Add a Redis data-store as a named Grain Directory
-        /// </summary>
-        public static ISiloHostBuilder AddRedisGrainDirectory(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(name, configureOptions));
-        }
-
-        /// <summary>
-        /// Use a Redis data-store as the default Grain Directory
-        /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<RedisGrainDirectoryOptions> configureOptions)

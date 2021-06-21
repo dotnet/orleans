@@ -12,28 +12,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure queue persistent streams.
         /// </summary>
-        public static ISiloHostBuilder AddAzureQueueStreams(this ISiloHostBuilder builder, string name,
-            Action<SiloAzureQueueStreamConfigurator> configure)
-        {
-            var configurator = new SiloAzureQueueStreamConfigurator(name,
-                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
-            configure?.Invoke(configurator);
-            return builder;
-        }
-
-        /// <summary>
-        /// Configure silo to use azure queue persistent streams with default settings
-        /// </summary>
-        public static ISiloHostBuilder AddAzureQueueStreams(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
-        {
-            builder.AddAzureQueueStreams(name, b =>
-                 b.ConfigureAzureQueue(configureOptions));
-            return builder;
-        }
-
-        /// <summary>
-        /// Configure silo to use azure queue persistent streams.
-        /// </summary>
         public static ISiloBuilder AddAzureQueueStreams(this ISiloBuilder builder, string name,
             Action<SiloAzureQueueStreamConfigurator> configure)
         {
@@ -57,15 +35,6 @@ namespace Orleans.Hosting
         /// Configure silo to use azure blob lease provider
         /// </summary>
         public static ISiloBuilder UseAzureBlobLeaseProvider(this ISiloBuilder builder, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
-        {
-            builder.ConfigureServices(services => ConfigureAzureBlobLeaseProviderServices(services, configureOptions));
-            return builder;
-        }
-
-        /// <summary>
-        /// Configure silo to use azure blob lease provider
-        /// </summary>
-        public static ISiloHostBuilder UseAzureBlobLeaseProvider(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
             builder.ConfigureServices(services => ConfigureAzureBlobLeaseProviderServices(services, configureOptions));
             return builder;

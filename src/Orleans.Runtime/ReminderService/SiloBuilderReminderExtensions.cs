@@ -6,25 +6,10 @@ using Orleans.Runtime.ReminderService;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Extensions to <see cref="ISiloHostBuilder"/> for configuring reminder storage.
+    /// Extensions to <see cref="ISiloBuilder"/> for configuring reminder storage.
     /// </summary>
-    public static class SiloHostBuilderReminderExtensions
+    public static class SiloBuilderReminderExtensions
     {
-        /// <summary>
-        /// Configures reminder storage using an in-memory, non-persistent store.
-        /// </summary>
-        /// <remarks>
-        /// Note that this is for development and testing scenarios only and should not be used in production.
-        /// </remarks>
-        /// <param name="builder">The silo host builder.</param>
-        /// <returns>The provided <see cref="ISiloHostBuilder"/>, for chaining.</returns>
-        public static ISiloHostBuilder UseInMemoryReminderService(this ISiloHostBuilder builder)
-        {
-            // The reminder table is a reference to a singleton IReminderTableGrain.
-            builder.ConfigureServices(services => services.UseInMemoryReminderService());
-            return builder;
-        }
-
         /// <summary>
         /// Configures reminder storage using an in-memory, non-persistent store.
         /// </summary>

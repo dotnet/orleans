@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
@@ -22,45 +23,49 @@ namespace DefaultCluster.Tests.General
     [TestCategory("BVT"), TestCategory("HostedClient")]
     public class HostedClientTests : IClassFixture<HostedClientTests.Fixture>
     {
-        private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
-        private readonly ISiloHost silo;
+        private readonly TimeSpan _timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
+        private readonly IHost _host;
 
         public class Fixture : IAsyncLifetime
         {
             private TestClusterPortAllocator portAllocator;
-            public ISiloHost Silo { get; private set; }
+            public IHost Host { get; private set; }
 
             public Fixture()
             {
-                this.portAllocator = new TestClusterPortAllocator();
+                portAllocator = new TestClusterPortAllocator();
             }
 
             public async Task InitializeAsync()
             {
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
-                this.Silo = new SiloHostBuilder()
-                    .UseLocalhostClustering(siloPort, gatewayPort)
-                    .Configure<ClusterOptions>(options =>
+                Host = new HostBuilder()
+                    .UseOrleans(siloBuilder =>
                     {
-                        options.ClusterId = Guid.NewGuid().ToString();
-                        options.ServiceId = Guid.NewGuid().ToString();
+                        siloBuilder
+                            .UseLocalhostClustering(siloPort, gatewayPort)
+                            .Configure<ClusterOptions>(options =>
+                            {
+                                options.ClusterId = Guid.NewGuid().ToString();
+                                options.ServiceId = Guid.NewGuid().ToString();
+                            })
+                            .ConfigureLogging(logging => logging.AddDebug())
+                            .AddMemoryGrainStorage("PubSubStore")
+                            .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream");
                     })
-                    .ConfigureLogging(logging => logging.AddDebug())
-                    .AddMemoryGrainStorage("PubSubStore")
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
                     .Build();
-                await this.Silo.StartAsync();
+                await Host.StartAsync();
             }
 
             public async Task DisposeAsync()
             {
                 try
                 {
-                    await this.Silo.StopAsync();
+                    await Host.StopAsync();
                 }
                 finally
                 {
-                    this.Silo.Dispose();
+                    Host.Dispose();
                     portAllocator.Dispose();
                 }
             }
@@ -68,13 +73,13 @@ namespace DefaultCluster.Tests.General
 
         public HostedClientTests(Fixture fixture)
         {
-            this.silo = fixture.Silo;
+            _host = fixture.Host;
         }
 
         [Fact]
         public async Task HostedClient_GrainCallTest()
         {
-            var client = this.silo.Services.GetRequiredService<IClusterClient>();
+            var client = _host.Services.GetRequiredService<IClusterClient>();
 
             var grain = client.GetGrain<ISimpleGrain>(65);
             await grain.SetA(23);
@@ -85,7 +90,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_ReferenceEquality_GrainCallTest()
         {
-            var client = this.silo.Services.GetRequiredService<IClusterClient>();
+            var client = _host.Services.GetRequiredService<IClusterClient>();
             var grain = client.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
 
             // Strings are immutable.
@@ -111,7 +116,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_ObserverTest()
         {
-            var client = this.silo.Services.GetRequiredService<IClusterClient>();
+            var client = _host.Services.GetRequiredService<IClusterClient>();
 
             var handle = new AsyncResultHandle();
 
@@ -154,7 +159,7 @@ namespace DefaultCluster.Tests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.True(await handle.WaitForFinished(timeout));
+            Assert.True(await handle.WaitForFinished(_timeout));
 
             await client.DeleteObjectReference<ISimpleGrainObserver>(reference);
             Assert.NotNull(observer);
@@ -163,7 +168,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_StreamTest()
         {
-            var client = this.silo.Services.GetRequiredService<IClusterClient>();
+            var client = _host.Services.GetRequiredService<IClusterClient>();
 
             var handle = new AsyncResultHandle();
             var vals = new List<int>();
@@ -178,7 +183,7 @@ namespace DefaultCluster.Tests.General
             var stream = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);
-            Assert.True(await handle.WaitForFinished(timeout));
+            Assert.True(await handle.WaitForFinished(_timeout));
             Assert.Equal(new[] { 1, 409 }, vals);
         }
     }

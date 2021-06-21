@@ -20,11 +20,5 @@ namespace Orleans.Hosting
             builder.AddStreaming();
             this.ConfigureComponent(SimpleMessageStreamProvider.Create);
         }
-
-        public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, ISiloHostBuilder builder) : base(name, configureDelegate)
-        {
-            builder.AddStreaming();
-            this.ConfigureComponent(SimpleMessageStreamProvider.Create);
-        }
     }
 }

@@ -27,7 +27,7 @@ namespace Orleans.Configuration
             if (options.AdvertisedIPAddress == null)
             {
                 throw new OrleansConfigurationException(
-                    $"No listening address specified. Use {nameof(ISiloHostBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
+                    $"No listening address specified. Use {nameof(ISiloBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
                     + $"to configure endpoints and ensure that {nameof(options.AdvertisedIPAddress)} is set.");
             }
 
@@ -43,7 +43,7 @@ namespace Orleans.Configuration
             if (options.SiloPort == 0)
             {
                 throw new OrleansConfigurationException(
-                    $"No listening port specified. Use {nameof(ISiloHostBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
+                    $"No listening port specified. Use {nameof(ISiloBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
                     + $"to configure endpoints and ensure that {nameof(options.SiloPort)} is set.");
             }
         }
