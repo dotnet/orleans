@@ -9,6 +9,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -16,6 +18,7 @@ namespace Orleans.Runtime
     /// Data class encapsulating the details of silo addresses.
     /// </summary>
     [Serializable, Immutable]
+    [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
     public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
@@ -411,5 +414,12 @@ namespace Orleans.Runtime
             }
             return 0;
         }
+    }
+
+    public class SiloAddressConverter : JsonConverter<SiloAddress>
+    {
+        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString());
+
+        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToParsableString());
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory
 {
@@ -29,14 +30,14 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="grainId">The Grain ID to lookup</param>
         /// <returns>The <see cref="GrainAddress"/> entry found in the directory, if any</returns>
-        Task<GrainAddress> Lookup(string grainId);
+        Task<GrainAddress> Lookup(GrainId grainId);
 
         /// <summary>
         /// Unregister from the directory all entries that point to one of the silo in argument.
         /// Can be a NO-OP depending on the implementation.
         /// </summary>
         /// <param name="siloAddresses">The silos to be removed from the directory</param>
-        Task UnregisterSilos(List<string> siloAddresses);
+        Task UnregisterSilos(List<SiloAddress> siloAddresses);
     }
 
     /// <summary>
@@ -47,7 +48,7 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Identifier of the Grain
         /// </summary>
-        public string GrainId { get; set; }
+        public GrainId GrainId { get; set; }
 
         /// <summary>
         /// Id of the specific Grain activation
@@ -57,12 +58,28 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Address of the silo where the grain activation lives
         /// </summary>
-        public string SiloAddress { get; set; }
+        public SiloAddress SiloAddress { get; set; }
+
+        /// <summary>
+        /// MembershipVersion at the time of registration
+        /// </summary>
+        public MembershipVersion MembershipVersion { get; set; } = MembershipVersion.MinValue;
 
         public override bool Equals(object obj)
         {
             return obj is GrainAddress address &&
-                   this.SiloAddress == address.SiloAddress &&
+                   this.Matches(address) &&
+                   this.MembershipVersion == address.MembershipVersion;
+        }
+
+        /// <summary>
+        /// Two grain addresses match if they are equal ignoring their <see cref="MembershipVersion"/> value.
+        /// </summary>
+        /// <param name="address"> The other GrainAddress to compare this one with.</param>
+        /// <returns> Returns <c>true</c> if the two GrainAddress are considered to match</returns>
+        public bool Matches(GrainAddress address)
+        {
+            return this.SiloAddress == address.SiloAddress &&
                    this.GrainId == address.GrainId &&
                    this.ActivationId == address.ActivationId;
         }

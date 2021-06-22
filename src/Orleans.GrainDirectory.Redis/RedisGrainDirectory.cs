@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -31,7 +31,7 @@ namespace Orleans.GrainDirectory.Redis
             this.clusterOptions = clusterOptions.Value;
         }
 
-        public async Task<GrainAddress> Lookup(string grainId)
+        public async Task<GrainAddress> Lookup(GrainId grainId)
         {
             try
             {
@@ -43,7 +43,7 @@ namespace Orleans.GrainDirectory.Redis
                 if (string.IsNullOrWhiteSpace(result))
                     return default;
 
-                return JsonConvert.DeserializeObject<GrainAddress>(result);
+                return JsonSerializer.Deserialize<GrainAddress>(result);
             }
             catch (Exception ex)
             {
@@ -58,7 +58,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var value = JsonConvert.SerializeObject(address);
+            var value = JsonSerializer.Serialize(address);
 
             try
             {
@@ -89,11 +89,27 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            var value = JsonConvert.SerializeObject(address);
+            var value = JsonSerializer.Serialize(address);
 
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
+                if (address.MembershipVersion == MembershipVersion.MinValue)
+                {
+                    // The address was not returned by the directory and must have been constructed externally.
+                    // We need to get the value stored in the directory to get the MembershipVersion to possibly
+                    // safely delete the address after.
+                    var fullAddress = await Lookup(address.GrainId);
+                    if (!fullAddress.Matches(address))
+                    {
+                        if (this.logger.IsEnabled(LogLevel.Debug))
+                            this.logger.LogDebug("Unregister {GrainId} ({Address}): Not found in storage", address.GrainId, value);
+
+                        return;
+                    }
+                    address = fullAddress;
+                }
+
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonSerializer.Serialize(address) });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
@@ -109,7 +125,7 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
-        public Task UnregisterSilos(List<string> siloAddresses)
+        public Task UnregisterSilos(List<SiloAddress> siloAddresses)
         {
             return Task.CompletedTask;
         }
@@ -154,7 +170,7 @@ end
             }
         }
 
-        private string GetKey(string grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
+        private string GetKey(GrainId grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)

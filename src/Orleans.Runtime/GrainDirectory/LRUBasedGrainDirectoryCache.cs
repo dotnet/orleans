@@ -6,14 +6,14 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
     {
-        private readonly LRU<GrainId, ActivationAddress> cache;
+        private readonly LRU<GrainId, (ActivationAddress ActivationAddress, int Version)> cache;
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
 
         public void AddOrUpdate(ActivationAddress activationAddress, int version)
         {
             // ignore the version number
-            cache.Add(activationAddress.Grain, activationAddress);
+            cache.Add(activationAddress.Grain, (activationAddress, version));
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
@@ -22,8 +22,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool LookUp(GrainId key, out ActivationAddress result, out int version)
         {
+            if (cache.TryGetValue(key, out var entry))
+            {
+                version = entry.Version;
+                result = entry.ActivationAddress;
+                return true;
+            }
+
             version = default;
-            return cache.TryGetValue(key, out result);
+            result = default;
+            return false;
         }
 
         public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
@@ -32,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var entry in cache)
                 {
-                    yield return (entry.Value, -1);
+                    yield return (entry.Value.ActivationAddress, entry.Value.Version);
                 }
             }
         }
