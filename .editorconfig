@@ -47,10 +47,10 @@ dotnet_style_collection_initializer                                          = t
 dotnet_style_explicit_tuple_names                                            = true : suggestion
 dotnet_style_null_propagation                                                = true : suggestion
 dotnet_style_object_initializer                                              = true : suggestion
-dotnet_style_parentheses_in_arithmetic_binary_operators                      = never_if_unnecessary : silent
-dotnet_style_parentheses_in_other_binary_operators                           = never_if_unnecessary : silent
-dotnet_style_parentheses_in_other_operators                                  = never_if_unnecessary : silent
-dotnet_style_parentheses_in_relational_binary_operators                      = never_if_unnecessary : silent
+dotnet_style_parentheses_in_arithmetic_binary_operators                      =never_if_unnecessary:suggestion
+dotnet_style_parentheses_in_other_binary_operators                           =never_if_unnecessary:suggestion
+dotnet_style_parentheses_in_other_operators                                  =never_if_unnecessary:suggestion
+dotnet_style_parentheses_in_relational_binary_operators                      =never_if_unnecessary:suggestion
 dotnet_style_predefined_type_for_locals_parameters_members                   = true : suggestion
 dotnet_style_predefined_type_for_member_access                               = true : suggestion
 dotnet_style_prefer_auto_properties                                          = true : suggestion
@@ -60,10 +60,10 @@ dotnet_style_prefer_conditional_expression_over_return                       = t
 dotnet_style_prefer_inferred_anonymous_type_member_names                     = true : suggestion
 dotnet_style_prefer_inferred_tuple_names                                     = true : suggestion
 dotnet_style_prefer_is_null_check_over_reference_equality_method             = true : suggestion
-dotnet_style_qualification_for_event                                         = false : silent
-dotnet_style_qualification_for_field                                         = false : silent
-dotnet_style_qualification_for_method                                        = false : silent
-dotnet_style_qualification_for_property                                      = false : silent
+dotnet_style_qualification_for_event                                         =false:suggestion
+dotnet_style_qualification_for_field                                         =false:suggestion
+dotnet_style_qualification_for_method                                        =false:suggestion
+dotnet_style_qualification_for_property                                      =false:suggestion
 dotnet_style_require_accessibility_modifiers                                 = always : suggestion
 
 # Naming Symbols
@@ -96,6 +96,9 @@ dotnet_naming_symbols.parameters.applicable_kinds                            = p
 dotnet_naming_symbols.non_interface_types.applicable_kinds                   = class, struct, enum, delegate
 # interface_types - Defines interfaces
 dotnet_naming_symbols.interface_types.applicable_kinds                       = interface
+# private_fields - Defines private fields
+dotnet_naming_symbols.private_fields.applicable_kinds                        = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities              = private
 
 # Naming Styles
 # camel_case - Define the camelCase style
@@ -107,6 +110,9 @@ dotnet_naming_style.first_upper.capitalization                               = f
 # prefix_interface_interface_with_i - Interfaces must be PascalCase and the first character of an interface must be an 'I'
 dotnet_naming_style.prefix_interface_interface_with_i.capitalization         = pascal_case
 dotnet_naming_style.prefix_interface_interface_with_i.required_prefix        = I
+# prefix_underscore_camel_case - Private fields must be prefixed with an '_'
+dotnet_naming_style.prefix_underscore_camel_case.capitalization              = camel_case
+dotnet_naming_style.prefix_underscore_camel_case.required_prefix             = _
 
 # Naming Rules
 # Constant fields must be PascalCase
@@ -124,7 +130,7 @@ dotnet_naming_rule.static_readonly_fields_must_be_pascal_case.style          = p
 # Private readonly fields must be camelCase
 dotnet_naming_rule.private_readonly_fields_must_be_camel_case.severity       = suggestion
 dotnet_naming_rule.private_readonly_fields_must_be_camel_case.symbols        = private_readonly_fields
-dotnet_naming_rule.private_readonly_fields_must_be_camel_case.style          = camel_case
+dotnet_naming_rule.private_readonly_fields_must_be_camel_case.style          = prefix_underscore_camel_case
 # Public and internal fields must be PascalCase
 dotnet_naming_rule.public_internal_fields_must_be_pascal_case.severity       = suggestion
 dotnet_naming_rule.public_internal_fields_must_be_pascal_case.symbols        = public_internal_fields
@@ -149,6 +155,10 @@ dotnet_naming_rule.non_interface_types_must_be_pascal_case.style             = p
 dotnet_naming_rule.interface_types_must_be_prefixed_with_i.severity          = suggestion
 dotnet_naming_rule.interface_types_must_be_prefixed_with_i.symbols           = interface_types
 dotnet_naming_rule.interface_types_must_be_prefixed_with_i.style             = prefix_interface_interface_with_i
+# Private fields must begin with an '_'
+dotnet_naming_rule.private_members_with_underscore.symbols                   = private_fields
+dotnet_naming_rule.private_members_with_underscore.style                     = prefix_underscore_camel_case
+dotnet_naming_rule.private_members_with_underscore.severity                  = suggestion
 
 # C# Code Style Settings
 # See https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference
