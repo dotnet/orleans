@@ -207,6 +207,7 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
+            services.AddPlacementDirector<SiloRoleBasedPlacement, SiloRoleBasedPlacementDirector>();
 
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
