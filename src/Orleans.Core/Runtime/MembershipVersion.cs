@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
@@ -30,5 +30,6 @@ namespace Orleans.Runtime
         public static bool operator <=(MembershipVersion left, MembershipVersion right) => left.version <= right.version;
         public static bool operator >(MembershipVersion left, MembershipVersion right) => left.version > right.version;
         public static bool operator <(MembershipVersion left, MembershipVersion right) => left.version < right.version;
+        public static explicit operator long(MembershipVersion membershipVersion) => membershipVersion.version;
     }
 }

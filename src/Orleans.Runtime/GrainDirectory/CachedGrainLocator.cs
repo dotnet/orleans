@@ -24,8 +24,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
         private readonly IClusterMembershipService clusterMembershipService;
 
-        private HashSet<SiloAddress> knownDeadSilos = new HashSet<SiloAddress>();
-
         private Task listenToClusterChangeTask;
 
         internal interface ITestAccessor
@@ -67,7 +65,7 @@ namespace Orleans.Runtime.GrainDirectory
             var activationAddress = entry.ToActivationAddress();
 
             // Check if the entry is pointing to a dead silo
-            if (this.knownDeadSilos.Contains(activationAddress.Silo))
+            if (IsKnownDeadSilo(entry))
             {
                 // Remove it from the directory
                 await GetGrainDirectory(grainId).Unregister(entry);
@@ -88,13 +86,14 @@ namespace Orleans.Runtime.GrainDirectory
                 return await this.inClusterGrainLocator.Register(address);
 
             var grainAddress = address.ToGrainAddress();
+            grainAddress.MembershipVersion = (long) this.clusterMembershipService.CurrentSnapshot.Version;
             var grainId = address.Grain;
 
             var result = await GetGrainDirectory(grainId).Register(grainAddress);
             var activationAddress = result.ToActivationAddress();
 
             // Check if the entry point to a dead silo
-            if (this.knownDeadSilos.Contains(activationAddress.Silo))
+            if (IsKnownDeadSilo(result))
             {
                 // Remove outdated entry and retry to register
                 await GetGrainDirectory(grainId).Unregister(result);
@@ -113,13 +112,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
         {
-            if (this.cache.LookUp(grainId, out var results))
+            if (this.cache.LookUp(grainId, out var results, out var version))
             {
                 // IGrainDirectory only supports single activation
                 var result = results[0];
 
                 // If the silo is dead, remove the entry
-                if (this.knownDeadSilos.Contains(result.Item1))
+                if (IsKnownDeadSilo(result.Item1, new MembershipVersion(version)))
                 {
                     this.cache.Remove(grainId);
                 }
@@ -168,21 +167,12 @@ namespace Orleans.Runtime.GrainDirectory
         private async Task ListenToClusterChange()
         {
             var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
-            // Update the list of known dead silos for lazy filtering for the first time
-            this.knownDeadSilos = new HashSet<SiloAddress>(previousSnapshot.Members.Values
-                .Where(m => m.Status == SiloStatus.Dead)
-                .Select(m => m.SiloAddress));
 
             ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
 
             var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
             await foreach (var snapshot in updates)
             {
-                // Update the list of known dead silos for lazy filtering
-                this.knownDeadSilos = new HashSet<SiloAddress>(snapshot.Members.Values
-                    .Where(m => m.Status.IsTerminating())
-                    .Select(m => m.SiloAddress));
-
                 // Active filtering: detect silos that went down and try to clean proactively the directory
                 var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
                 var deadSilos = changes
@@ -202,6 +192,25 @@ namespace Orleans.Runtime.GrainDirectory
 
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
             }
+        }
+
+        private bool IsKnownDeadSilo(GrainAddress grainAddress)
+            => IsKnownDeadSilo(SiloAddress.FromParsableString(grainAddress.SiloAddress), new MembershipVersion(grainAddress.MembershipVersion));
+
+        private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
+        {
+            var current = this.clusterMembershipService.CurrentSnapshot;
+
+            // Check if the target silo is in the cluster
+            if (current.Members.TryGetValue(siloAddress, out var value))
+            {
+                // It is, check if it's alive
+                return value.Status.IsTerminating();
+            }
+
+            // We didn't find it in the cluster. If the silo entry is too old, it has been cleaned in the membership table: the entry isn't valid anymore.
+            // Otherwise, maybe the membership service isn't up to date yet. The entry should be valid
+            return current.Version > membershipVersion;
         }
     }
 

@@ -6,23 +6,22 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
     {
-        private readonly LRU<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>> cache;
+        private readonly LRU<GrainId, (IReadOnlyList<Tuple<SiloAddress, ActivationId>> Entry, int Version)> cache;
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge)
         {
-            cache = new LRU<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>>(maxCacheSize, maxEntryAge, null);
+            cache = new (maxCacheSize, maxEntryAge, null);
         }
 
         public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
         {
             // ignore the version number
-            cache.Add(key, value);
+            cache.Add(key, (value, version));
         }
 
         public bool Remove(GrainId key)
         {
-            IReadOnlyList<Tuple<SiloAddress, ActivationId>> tmp;
-            return cache.RemoveKey(key, out tmp);
+            return cache.RemoveKey(key, out var tmp);
         }
 
         public void Clear()
@@ -32,8 +31,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
         {
-            version = default(int);
-            return cache.TryGetValue(key, out result);
+            if (cache.TryGetValue(key, out var value))
+            {
+                result = value.Entry;
+                version = value.Version;
+                return true;
+            }
+
+            result = default;
+            version = default;
+            return false;
         }
 
         public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
@@ -41,11 +48,11 @@ namespace Orleans.Runtime.GrainDirectory
             get
             {
                 var result = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
-                IEnumerator<KeyValuePair<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>>> enumerator = cache.GetEnumerator();
+                var enumerator = cache.GetEnumerator();
                 while (enumerator.MoveNext())
                 {
                     var current = enumerator.Current;
-                    result.Add(new Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>(current.Key, current.Value, -1));
+                    result.Add(new Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>(current.Key, current.Value.Entry, current.Value.Version));
                 }
                 return result;
             }

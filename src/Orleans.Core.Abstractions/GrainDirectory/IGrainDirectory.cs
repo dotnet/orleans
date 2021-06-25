@@ -60,10 +60,27 @@ namespace Orleans.GrainDirectory
         /// </summary>
         public string SiloAddress { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public long MembershipVersion { get; set; }
+
         public override bool Equals(object obj)
         {
             return obj is GrainAddress address &&
                    this.SiloAddress == address.SiloAddress &&
+                   this.Matches(address) &&
+                   this.MembershipVersion == address.MembershipVersion;
+        }
+
+        /// <summary>
+        /// Two grain addresses match if they are equal ignoring their <see cref="MembershipVersion"/> value.
+        /// </summary>
+        /// <param name="address"> The other GrainAddress to compare this one with.</param>
+        /// <returns> Returns <c>true</c> if the two GrainAddress are considered to match</returns>
+        public bool Matches(GrainAddress address)
+        {
+            return this.SiloAddress == address.SiloAddress &&
                    this.GrainId == address.GrainId &&
                    this.ActivationId == address.ActivationId;
         }
