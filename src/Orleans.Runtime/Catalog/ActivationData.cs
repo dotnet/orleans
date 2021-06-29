@@ -99,7 +99,7 @@ namespace Orleans.Runtime
         public IGrainLifecycle ObservableLifecycle => lifecycle;
         internal ILifecycleObserver Lifecycle => lifecycle;
         public GrainId GrainId => Address.Grain;
-        internal bool IsExemptFromCollection => false;
+        internal bool IsExemptFromCollection => CollectionAgeLimit == Timeout.InfiniteTimeSpan;
         public bool ShouldBeKeptAlive => keepAliveUntil != default && keepAliveUntil >= DateTime.UtcNow;
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
