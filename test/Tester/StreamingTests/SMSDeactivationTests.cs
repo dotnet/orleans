@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
@@ -66,6 +67,5 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest_ClientConsumer(Guid.NewGuid(), StreamNamespace);
         }
-
     }
 }
