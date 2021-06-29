@@ -39,7 +39,8 @@ namespace Tester.StreamingTests
                             options.DataMaxAgeInCache = TimeSpan.FromSeconds(5);
                             options.DataMinTimeInCache = TimeSpan.FromSeconds(0);
                         }));
-                    });
+                    })
+                    .AddStreamFilter<CustomStreamFilter>(StreamProviderName);
             }
         }
 
@@ -51,9 +52,6 @@ namespace Tester.StreamingTests
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
             }
         }
-
-        public override Task PreviousEventEvictedFromCacheWithFilterTest()
-            => throw new SkipException("Custom batch container not supported using MemoryStream");
 
         #endregion
 

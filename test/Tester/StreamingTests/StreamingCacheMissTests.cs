@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.Filtering;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -20,23 +21,14 @@ namespace Tester.StreamingTests
 
         private readonly ITestOutputHelper output;
 
-        // Custom batch container that enable filtering for all provider
-        protected class CustomBatchContainer : IBatchContainer
+        // Only deliver if item[0] == 1
+        protected class CustomStreamFilter : IStreamFilter
         {
-            private IBatchContainer batchContainer;
-
-            public CustomBatchContainer(IBatchContainer batchContainer)
+            public bool ShouldDeliver(StreamId streamId, object item, string filterData)
             {
-                this.batchContainer = batchContainer;
+                var data = item as byte[];
+                return data == default || data[0] == 1;
             }
-
-            public StreamSequenceToken SequenceToken => this.batchContainer.SequenceToken;
-
-            public StreamId StreamId => batchContainer.StreamId;
-
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => this.batchContainer.GetEvents<T>();
-
-            public bool ImportRequestContext() => this.batchContainer.ImportRequestContext();
         }
 
         public StreamingCacheMissTests(ITestOutputHelper output)
