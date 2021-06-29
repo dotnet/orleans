@@ -14,72 +14,72 @@ namespace Orleans.Runtime
     /// <summary>
     /// This class collects runtime statistics for all silos in the current deployment for use by placement.
     /// </summary>
-    internal class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener
-    {
-        private readonly ILocalSiloDetails siloDetails;
-        private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IInternalGrainFactory grainFactory;
-        private readonly ActivationDirectory activationDirectory;
-        private readonly IActivationWorkingSet activationWorkingSet;
-        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
-        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
-        private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
-
-        private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
-        private readonly TimeSpan statisticsRefreshTime;
-        private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
-        private readonly ILogger logger;
-        private IDisposable publishTimer;
-
-        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
-
-        public DeploymentLoadPublisher(
-            ILocalSiloDetails siloDetails,
-            ISiloStatusOracle siloStatusOracle,
-            IOptions<DeploymentLoadPublisherOptions> options,
-            IInternalGrainFactory grainFactory,
-            ILoggerFactory loggerFactory,
-            ActivationDirectory activationDirectory,
-            IActivationWorkingSet activationWorkingSet,
-            IAppEnvironmentStatistics appEnvironmentStatistics,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
+        internal class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener
         {
-            this.logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
-            this.siloDetails = siloDetails;
-            this.siloStatusOracle = siloStatusOracle;
-            this.grainFactory = grainFactory;
-            this.activationDirectory = activationDirectory;
-            this.activationWorkingSet = activationWorkingSet;
-            this.appEnvironmentStatistics = appEnvironmentStatistics;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
-            this.loadSheddingOptions = loadSheddingOptions;
-            statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
-            periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
-            siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
-        }
+            private readonly ILocalSiloDetails siloDetails;
+            private readonly ISiloStatusOracle siloStatusOracle;
+            private readonly IInternalGrainFactory grainFactory;
+            private readonly ActivationDirectory activationDirectory;
+            private readonly IActivationWorkingSet activationWorkingSet;
+            private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
+            private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+            private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
 
-        public async Task Start()
-        {
-            logger.Info("Starting DeploymentLoadPublisher.");
-            if (statisticsRefreshTime > TimeSpan.Zero)
+            private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
+            private readonly TimeSpan statisticsRefreshTime;
+            private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
+            private readonly ILogger logger;
+            private IDisposable publishTimer;
+
+            public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
+
+            public DeploymentLoadPublisher(
+                ILocalSiloDetails siloDetails,
+                ISiloStatusOracle siloStatusOracle,
+                IOptions<DeploymentLoadPublisherOptions> options,
+                IInternalGrainFactory grainFactory,
+                ILoggerFactory loggerFactory,
+                ActivationDirectory activationDirectory,
+                IActivationWorkingSet activationWorkingSet,
+                IAppEnvironmentStatistics appEnvironmentStatistics,
+                IHostEnvironmentStatistics hostEnvironmentStatistics,
+                IOptions<LoadSheddingOptions> loadSheddingOptions)
+                : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
             {
-                // Randomize PublishStatistics timer,
-                // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
-                var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(statisticsRefreshTime);
-                this.publishTimer = this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
+                this.logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
+                this.siloDetails = siloDetails;
+                this.siloStatusOracle = siloStatusOracle;
+                this.grainFactory = grainFactory;
+                this.activationDirectory = activationDirectory;
+                this.activationWorkingSet = activationWorkingSet;
+                this.appEnvironmentStatistics = appEnvironmentStatistics;
+                this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+                this.loadSheddingOptions = loadSheddingOptions;
+                statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
+                periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
+                siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
             }
-            await RefreshStatistics();
-            await PublishStatistics(null);
-            logger.Info("Started DeploymentLoadPublisher.");
-        }
 
-        private async Task PublishStatistics(object _)
-        {
+            public async Task Start()
+            {
+                logger.LogDebug("Starting DeploymentLoadPublisher");
+                if (statisticsRefreshTime > TimeSpan.Zero)
+                {
+                    // Randomize PublishStatistics timer,
+                    // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
+                    var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(statisticsRefreshTime);
+                    this.publishTimer = this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
+                }
+                await RefreshStatistics();
+                await PublishStatistics(null);
+                logger.LogDebug("Started DeploymentLoadPublisher");
+            }
+
+            private async Task PublishStatistics(object _)
+            {
             try
             {
-                if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("PublishStatistics.");
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("PublishStatistics");
                 var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
@@ -99,25 +99,29 @@ namespace Orleans.Runtime
                             Constants.DeploymentLoadPublisherSystemTargetType, siloAddress)
                             .UpdateRuntimeStatistics(this.siloDetails.SiloAddress, myStats));
                     }
-                    catch (Exception)
+                    catch (Exception exception)
                     {
-                        logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
-                            String.Format("An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored."));
+                        logger.LogWarning(
+                            (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
+                            exception,
+                            "An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored");
                     }
                 }
                 await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
-                    String.Format("An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring."), exc);
+                logger.LogWarning(
+                    (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
+                    exc,
+                    "An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring");
             }
         }
 
 
         public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRuntimeStatistics from {0}", siloAddress);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("UpdateRuntimeStatistics from {Server}", siloAddress);
             if (this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 return Task.CompletedTask;
 
@@ -133,7 +137,7 @@ namespace Orleans.Runtime
 
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RefreshStatistics");
             await this.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();
@@ -151,9 +155,11 @@ namespace Orleans.Runtime
                                         }
                                         else
                                         {
-                                            logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
-                                                String.Format("An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({0}). Will keep using stale statistics.", capture),
-                                                statsTask.Exception);
+                                            logger.LogWarning(
+                                                (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
+                                                statsTask.Exception,
+                                                "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({SiloAddress}). Will keep using stale statistics.",
+                                                capture);
                                         }
                                     });
                         tasks.Add(task);
