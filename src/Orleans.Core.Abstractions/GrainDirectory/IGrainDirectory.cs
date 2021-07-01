@@ -61,7 +61,7 @@ namespace Orleans.GrainDirectory
         public string SiloAddress { get; set; }
 
         /// <summary>
-        /// 
+        /// The membership version at the time this registration was created.
         /// </summary>
         public long MembershipVersion { get; set; }
 
