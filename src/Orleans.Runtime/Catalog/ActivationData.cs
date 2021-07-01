@@ -662,7 +662,7 @@ namespace Orleans.Runtime
         private string GetActivationInfoString()
         {
             var placement = PlacedUsing != null ? PlacedUsing.GetType().Name : "";
-            return GrainInstance is null ? placement : $"#GrainType={RuntimeTypeNameFormatter.Format(GrainInstance?.GetType())} Placement={placement}";
+            return GrainInstance is null ? $"#Placement={placement}" : $"#GrainType={RuntimeTypeNameFormatter.Format(GrainInstance?.GetType())} Placement={placement}";
         }
 
         public async ValueTask DisposeAsync()

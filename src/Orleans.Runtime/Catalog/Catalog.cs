@@ -27,7 +27,6 @@ namespace Orleans.Runtime
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
         private readonly ActivationDirectory activations;
-        private readonly LRU<ActivationAddress, ExceptionDispatchInfo> failedActivations = new(1000, TimeSpan.FromSeconds(5));
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly string localSiloName;
@@ -262,12 +261,10 @@ namespace Orleans.Runtime
         /// Concurrently start creating and initializing the real activation and replace it when it is ready.
         /// </summary>
         /// <param name="address">Grain's activation address</param>
-        /// <param name="newPlacement">Creation of new activation was requested by the placement director.</param>
         /// <param name="requestContextData">Request context data.</param>
         /// <returns></returns>
         public ActivationData GetOrCreateActivation(
             ActivationAddress address,
-            bool newPlacement,
             Dictionary<string, object> requestContextData)
         {
             if (TryGetActivationData(address.Activation, out var result))
@@ -283,7 +280,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
+                if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     result = (ActivationData)this.grainActivator.CreateInstance(address);
 
@@ -305,8 +302,10 @@ namespace Orleans.Runtime
                                     result.Name,
                                     redirect.ActivationId);
                             }
+
                             return redirect;
                         }
+
                         // The newly created StatelessWorker will be registered in RegisterMessageTarget()
                     }
 
@@ -322,12 +321,6 @@ namespace Orleans.Runtime
 
             if (result is null)
             {
-                if (failedActivations.TryGetValue(address, out var ex))
-                {
-                    logger.Warn(ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
-                    ex.Throw();
-                }
-
                 // Did not find and did not start placing new
                 if (logger.IsEnabled(LogLevel.Debug))
                 {

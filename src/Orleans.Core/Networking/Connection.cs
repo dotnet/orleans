@@ -524,6 +524,7 @@ namespace Orleans.Runtime.Messaging
                 this.connection.OnReceivedMessage(this.message);
                 MessageHandlerPool.Return(this);
             }
+
             public void Reset()
             {
                 this.message = null;
