@@ -107,5 +107,10 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
         }
+
+        public void CachePlacementDecision(ActivationAddress address) => this.localGrainDirectory.CachePlacementDecision(address);
+        public void InvalidateCache(GrainId grainId) => this.localGrainDirectory.InvalidateCacheEntry(grainId);
+        public void InvalidateCache(ActivationAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
+        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
     }
 }

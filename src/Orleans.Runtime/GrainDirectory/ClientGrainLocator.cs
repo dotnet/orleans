@@ -42,7 +42,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (location.Silo.Equals(_localSiloAddress))
                     {
                         unadjustedResult = location;
-                        break; 
+                        break;
                     }
                 }
 
@@ -80,5 +80,17 @@ namespace Orleans.Runtime.GrainDirectory
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static GrainId ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
+
+        public void CachePlacementDecision(ActivationAddress address) { }
+
+        public void InvalidateCache(GrainId grainId) { }
+
+        public void InvalidateCache(ActivationAddress address) { }
+
+        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address)
+        {
+            address = default;
+            return false;
+        }
     }
 }

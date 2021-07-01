@@ -16,9 +16,17 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<ActivationAddress> Register(ActivationAddress address) => GetGrainLocator(address.Grain.Type).Register(address);
 
-        public bool TryLocalLookup(GrainId grainId, out ActivationAddress addresses) => GetGrainLocator(grainId.Type).TryLocalLookup(grainId, out addresses);
+        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address) => GetGrainLocator(grainId.Type).TryLocalLookup(grainId, out address);
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause) => GetGrainLocator(address.Grain.Type).Unregister(address, cause);
+
+        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address) => GetGrainLocator(grainId.Type).TryCacheOnlyLookup(grainId, out address);
+
+        public void InvalidateCache(GrainId grainId) => GetGrainLocator(grainId.Type).InvalidateCache(grainId);
+
+        public void InvalidateCache(ActivationAddress address) => GetGrainLocator(address.Grain.Type).InvalidateCache(address);
+
+        public void CachePlacementDecision(ActivationAddress address) => GetGrainLocator(address.Grain.Type).CachePlacementDecision(address);
 
         private IGrainLocator GetGrainLocator(GrainType grainType) => _grainLocatorResolver.GetGrainLocator(grainType);
     }
