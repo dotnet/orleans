@@ -109,7 +109,7 @@ namespace OrleansAWSUtils.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.LogWarning($"Exception upon DeleteMessage on queue {Id}. Ignoring.", exc);
+                    logger.LogWarning(exc, "Exception upon DeleteMessage on queue {Id}. Ignoring.", Id);
                 }
             }
             finally

@@ -14,14 +14,14 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies activations that have been idle long enough to be deactivated.
     /// </summary>
-    internal class ActivationCollector : IActivationCollector, IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
+    internal class ActivationCollector : IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
     {
         internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private DateTime nextTicket;
-        private static readonly List<ActivationData> nothing = new(0);
+        private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
         private IAsyncTimer _collectionTimer;
         private Task _collectionLoopTask;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             this.logger = logger;
-            _collectionTimer = timerFactory.Create(quantum, "Catalog.GCTimer");
+            _collectionTimer = timerFactory.Create(quantum, "ActivationCollector");
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -65,12 +65,9 @@ namespace Orleans.Runtime
             return sum;
         }
 
-        public Task CollectActivations(TimeSpan ageLimit)
-        {
-            return CollectActivationsImpl(false, ageLimit);
-        }
+        public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
 
-        public void ScheduleCollection(ActivationData item)
+        public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout)
         {
             lock (item)
             {
@@ -78,8 +75,6 @@ namespace Orleans.Runtime
                 {
                     return;
                 }
-
-                TimeSpan timeout = item.CollectionAgeLimit;
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
             
@@ -92,7 +87,7 @@ namespace Orleans.Runtime
             }
         }
         
-        public bool TryCancelCollection(ActivationData item)
+        public bool TryCancelCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
 
@@ -110,7 +105,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        public bool TryRescheduleCollection(ActivationData item)
+        public bool TryRescheduleCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
 
@@ -118,15 +113,15 @@ namespace Orleans.Runtime
             {
                 if (TryRescheduleCollection_Impl(item, item.CollectionAgeLimit)) return true;
 
-                item.ResetCollectionTicket();
+                item.CollectionTicket = default;
                 return false;
             }
         }
 
-        private bool TryRescheduleCollection_Impl(ActivationData item, TimeSpan timeout)
+        private bool TryRescheduleCollection_Impl(ICollectibleGrainContext item, TimeSpan timeout)
         {
             // note: we expect the activation lock to be held.
-            if (default(DateTime) == item.CollectionTicket) return false;
+            if (default == item.CollectionTicket) return false;
             ThrowIfTicketIsInvalid(item.CollectionTicket); 
             if (IsExpired(item.CollectionTicket)) return false;
 
@@ -143,12 +138,11 @@ namespace Orleans.Runtime
             }
 
             // it shouldn't be possible for Add to throw an exception here, as only one concurrent competitor should be able to reach to this point in the method.
-            item.ResetCollectionTicket();
             Add(item, newTicket);
             return true;
         }
 
-        private bool DequeueQuantum(out List<ActivationData> items, DateTime now)
+        private bool DequeueQuantum(out List<ICollectibleGrainContext> items, DateTime now)
         {
             DateTime key;
             lock (buckets)
@@ -189,33 +183,40 @@ namespace Orleans.Runtime
         /// Scans for activations that are due for collection.
         /// </summary>
         /// <returns>A list of activations that are due for collection.</returns>
-        public List<ActivationData> ScanStale()
+        public List<ICollectibleGrainContext> ScanStale()
         {
             var now = DateTime.UtcNow;
-            List<ActivationData> condemned = null;
+            List<ICollectibleGrainContext> condemned = null;
             while (DequeueQuantum(out var activations, now))
             {
-                // at this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently. if the activation is to be reactivated, it's our job to clear the activation's copy of the ticket.
+                // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
+                // If the activation is to be reactivated, it's our job to clear the activation's copy of the ticket.
                 foreach (var activation in activations)
                 {
                     lock (activation)
                     {
-                        activation.ResetCollectionTicket();
-                        if (activation.State != ActivationState.Valid)
+                        activation.CollectionTicket = default;
+                        if (!activation.IsValid)
                         {
                             // Do nothing: don't collect, don't reschedule.
                             // The activation can't be in Created or Activating, since we only ScheduleCollection after successfull activation.
                             // If the activation is already in Deactivating or Invalid state, its already being collected or was collected 
                             // (both mean a bug, this activation should not be in the collector)
                             // So in any state except for Valid we should just not collect and not reschedule.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_1,
-                                "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {0}",
-                                activation.ToDetailedString());
+                            logger.LogWarning(
+                                (int)ErrorCode.Catalog_ActivationCollector_BadState_1,
+                                "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {Activation}",
+                                activation);
                         }
-                        else if (activation.ShouldBeKeptAlive || !activation.IsInactive || !activation.IsStale(now))
+                        else if (activation.KeepAliveUntil > now)
                         {
-                            // Consider: if ShouldBeKeptAlive is set, should reschedule to what is the remaining time for ShouldBeKeptAlive, not the full CollectionAgeLimit.
-                            ScheduleCollection(activation);
+                            var keepAliveDuration = activation.KeepAliveUntil - now;
+                            var timeout = TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, activation.CollectionAgeLimit.Ticks));
+                            ScheduleCollection(activation, timeout);
+                        }
+                        else if (!activation.IsInactive || !activation.IsStale(now))
+                        {
+                            ScheduleCollection(activation, activation.CollectionAgeLimit);
                         }
                         else
                         {
@@ -235,9 +236,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
         /// <returns></returns>
-        public List<ActivationData> ScanAll(TimeSpan ageLimit)
+        public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
         {
-            List<ActivationData> condemned = null;
+            List<ICollectibleGrainContext> condemned = null;
             var now = DateTime.UtcNow;
             foreach (var kv in buckets)
             {
@@ -247,11 +248,11 @@ namespace Orleans.Runtime
                     var activation = kvp.Value;
                     lock (activation)
                     {
-                        if (activation.State != ActivationState.Valid)
+                        if (!activation.IsValid)
                         {
                             // Do nothing: don't collect, don't reschedule.
                         }
-                        else if (activation.ShouldBeKeptAlive)
+                        else if (activation.KeepAliveUntil > now)
                         {
                             // do nothing
                         }
@@ -283,7 +284,7 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
-        private void AddActivationToList(ActivationData activation, ref List<ActivationData> condemned)
+        private void AddActivationToList(ICollectibleGrainContext activation, ref List<ICollectibleGrainContext> condemned)
         {
             condemned ??= new();
             condemned.Add(activation);
@@ -307,12 +308,14 @@ namespace Orleans.Runtime
 
         private DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
-            // round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46. note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            DateTime ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
+            // Round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
+            // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
+            var ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
                 throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
             }
+
             return ticket;
         }
 
@@ -326,25 +329,22 @@ namespace Orleans.Runtime
             return MakeTicketFromDateTime(DateTime.UtcNow + timeout);
         }
 
-        private void Add(ActivationData item, DateTime ticket)
+        private void Add(ICollectibleGrainContext item, DateTime ticket)
         {
             // note: we expect the activation lock to be held.
-
-            item.ResetCollectionCancelledFlag();
-
+            item.CollectionTicket = ticket;
             var bucket = buckets.GetOrAdd(ticket, _ => new Bucket());
             bucket.Add(item);
-            item.SetCollectionTicket(ticket);
         }
 
         void IActivationWorkingSetObserver.OnAdded(IActivationWorkingSetMember member)
         {
             Interlocked.Increment(ref _activationCount);
-            if (member is ActivationData activation)
+            if (member is ICollectibleGrainContext activation)
             {
                 if (activation.CollectionTicket == default)
                 {
-                    ScheduleCollection(activation);
+                    ScheduleCollection(activation, activation.CollectionAgeLimit);
                 }
                 else
                 {
@@ -355,15 +355,13 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnActive(IActivationWorkingSetMember member)
         {
-            if (member is ActivationData activation)
-            {
-                TryRescheduleCollection(activation);
-            }
+            // We do not need to do anything when a grain becomes active, since we can lazily handle it when scanning its bucket instead.
+            // This reduces the amount of unnecessary work performed.
         }
 
         void IActivationWorkingSetObserver.OnEvicted(IActivationWorkingSetMember member)
         {
-            if (member is ActivationData activation && activation.CollectionTicket == default)
+            if (member is ICollectibleGrainContext activation && activation.CollectionTicket == default)
             {
                 TryRescheduleCollection(activation);
             }
@@ -371,7 +369,7 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivating(IActivationWorkingSetMember member)
         {
-            if (member is ActivationData activation)
+            if (member is ICollectibleGrainContext activation)
             {
                 TryCancelCollection(activation);
             }
@@ -380,7 +378,7 @@ namespace Orleans.Runtime
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
             Interlocked.Decrement(ref _activationCount);
-            if (member is ActivationData activation)
+            if (member is ICollectibleGrainContext activation)
             {
                 TryCancelCollection(activation);
             }
@@ -444,7 +442,7 @@ namespace Orleans.Runtime
                     ToString());
             }
 
-            List<ActivationData> list = scanStale ? ScanStale() : ScanAll(ageLimit);
+            List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
             collectionCounter.Increment();
             var count = 0;
             if (list != null && list.Count > 0)
@@ -471,7 +469,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
@@ -504,9 +502,9 @@ namespace Orleans.Runtime
 
         private class Bucket
         {
-            public ConcurrentDictionary<ActivationData, ActivationData> Items { get; } = new(ReferenceEqualsComparer.Default);
+            public ConcurrentDictionary<ICollectibleGrainContext, ICollectibleGrainContext> Items { get; } = new(ReferenceEqualsComparer.Default);
 
-            public void Add(ActivationData item)
+            public void Add(ICollectibleGrainContext item)
             {
                 if (!Items.TryAdd(item, item))
                 {
@@ -514,23 +512,40 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool TryRemove(ActivationData item)
+            public bool TryRemove(ICollectibleGrainContext item)
             {
-                if (!item.TrySetCollectionCancelledFlag()) return false;
+                lock (item)
+                {
+                    if (item.CollectionTicket == default)
+                    {
+                        return false;
+                    }
+
+                    item.CollectionTicket = default;
+                }
+
                 return Items.TryRemove(item, out _);
             }
 
-            public List<ActivationData> CancelAll()
+            public List<ICollectibleGrainContext> CancelAll()
             {
-                List<ActivationData> result = null;
+                List<ICollectibleGrainContext> result = null;
                 foreach (var pair in Items)
                 {
-                    // attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.
-                    if (pair.Value.TrySetCollectionCancelledFlag())
+                    // Attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.
+                    var item = pair.Value;
+                    lock (item)
                     {
-                        result ??= new List<ActivationData>();
-                        result.Add(pair.Value);
+                        if (item.CollectionTicket == default)
+                        {
+                            continue;
+                        }
+
+                        item.CollectionTicket = default;
                     }
+
+                    result ??= new List<ICollectibleGrainContext>();
+                    result.Add(pair.Value);
                 }
 
                 return result ?? nothing;

@@ -47,7 +47,8 @@ namespace Orleans.TestingHost
 
             siloBuilder
                 .Configure<ClusterOptions>(configuration)
-                .Configure<SiloOptions>(options => options.SiloName = siloName);
+                .Configure<SiloOptions>(options => options.SiloName = siloName)
+                .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 

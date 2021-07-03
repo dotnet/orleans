@@ -314,7 +314,7 @@ namespace Orleans.Runtime
                         ise.IsSourceActivation = false;
 
                         this.invokeExceptionLogger.Info($"Deactivating {target} due to inconsistent state.");
-                        this.DeactivateOnIdle(target.ActivationId);
+                        this.DeactivateOnIdle(target.GrainId);
                     }
                 }
 
@@ -525,13 +525,10 @@ namespace Orleans.Runtime
             }
         }
 
-        public void DeactivateOnIdle(ActivationId id)
+        public void DeactivateOnIdle(GrainId id)
         {
-            ActivationData data;
-            if (!Catalog.TryGetActivationData(id, out data)) return; // already gone
-
-            data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
-            data.DeactivateOnIdle();
+            if (!Catalog.TryGetActivationData(id, out var data)) return; // already gone
+            _ = data.DeactivateAsync();
         }
 
         private Task OnRuntimeInitializeStop(CancellationToken tc)

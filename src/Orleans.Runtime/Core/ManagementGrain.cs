@@ -163,7 +163,8 @@ namespace Orleans.Runtime.Management
                 tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
 
             await Task.WhenAll(tasks);
-            return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
+            return tasks.Select(s => s.Result).Select(CountActivations).Sum();
+            static int CountActivations(DetailedGrainReport report) => report.LocalActivation is { Length: > 0 } ? 1 : 0;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

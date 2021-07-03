@@ -272,6 +272,11 @@ namespace Orleans.Runtime.Messaging
             {
                 foreach (var message in messages)
                 {
+                    if (oldAddress != null)
+                    {
+                        message.AddToCacheInvalidationHeader(oldAddress);
+                    }
+
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
                 }
             }
@@ -388,7 +393,6 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.IsNewPlacement = false;
                 SendMessage(message);
             }
             else

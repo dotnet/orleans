@@ -33,7 +33,6 @@ namespace Orleans.Runtime
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
         private readonly LocalGrainDirectory localGrainDirectory;
-        private readonly ActivationDirectory activationDirectory;
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
@@ -152,9 +151,6 @@ namespace Orleans.Runtime
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>();
-
-            // Now the activation directory.
-            activationDirectory = Services.GetRequiredService<ActivationDirectory>();
 
             // Now the consistent ring provider
             RingProvider = Services.GetRequiredService<IConsistentRingProvider>();

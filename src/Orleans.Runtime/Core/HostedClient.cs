@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -87,6 +88,10 @@ namespace Orleans.Runtime
 
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
+        public bool IsExemptFromCollection => true;
+
+        public PlacementStrategy PlacementStrategy => null;
+
         /// <inheritdoc />
         public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
 
@@ -129,7 +134,7 @@ namespace Orleans.Runtime
         public TComponent GetComponent<TComponent>()
         {
             if (this is TComponent component) return component;
-            return default; 
+            return default;
         }
 
         public void SetComponent<TComponent>(TComponent instance)
@@ -344,5 +349,8 @@ namespace Orleans.Runtime
         }
 
         public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+        public void Deactivate(CancellationToken? cancellationToken = null) { }
+        public Task Deactivated => Task.CompletedTask;
     }
 }

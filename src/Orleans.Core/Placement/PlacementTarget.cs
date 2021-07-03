@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.Placement
 {
-    public struct PlacementTarget
+    public readonly struct PlacementTarget
     {
         public GrainId GrainIdentity { get; }
 

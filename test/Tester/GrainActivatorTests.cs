@@ -80,7 +80,7 @@ namespace UnitTests.General
                 _grainClassMap = grainClassMap;
             }
 
-            public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
+            public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
             {
                 if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
                 {

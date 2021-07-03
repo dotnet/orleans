@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Placement
             var grainId = message.TargetGrain;
             if (_grainLocator.TryLookupInCache(grainId, out var result))
             {
-                SetMessageTargetPlacement(message, result.Activation, result.Silo, false);
+                SetMessageTargetPlacement(message, result.Activation, result.Silo);
                 return Task.CompletedTask;
             }
 
@@ -84,15 +84,10 @@ namespace Orleans.Runtime.Placement
             static void ThrowMissingAddress() => throw new InvalidOperationException("Cannot address a message without a target");
         }
 
-        private void SetMessageTargetPlacement(Message message, ActivationId activationId, SiloAddress targetSilo, bool isNewPlacement)
+        private void SetMessageTargetPlacement(Message message, ActivationId activationId, SiloAddress targetSilo)
         {
             message.TargetActivation = activationId;
             message.TargetSilo = targetSilo;
-            message.IsNewPlacement = isNewPlacement;
-            if (isNewPlacement)
-            {
-                CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
-            }
 #if DEBUG
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
 #endif
@@ -274,7 +269,7 @@ namespace Orleans.Runtime.Placement
                     foreach (var message in messages)
                     {
                         var result = resultTask.Result;
-                        _placementService.SetMessageTargetPlacement(message.Message, result.Address.Activation, result.Address.Silo, result.IsNewPlacement);
+                        _placementService.SetMessageTargetPlacement(message.Message, result.Activation, result.Silo);
                         message.Completion.TrySetResult(true);
                     }
 
@@ -291,7 +286,7 @@ namespace Orleans.Runtime.Placement
                 }
             }
 
-            private async Task<(ActivationAddress Address, bool IsNewPlacement)> GetOrPlaceActivationAsync(Message firstMessage)
+            private async Task<ActivationAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
                 var target = new PlacementTarget(
@@ -304,7 +299,7 @@ namespace Orleans.Runtime.Placement
                 var result = await _placementService._grainLocator.Lookup(targetGrain);
                 if (result is not null)
                 {
-                    return (result, false);
+                    return result;
                 }
 
                 var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
@@ -314,7 +309,7 @@ namespace Orleans.Runtime.Placement
                 // Give the grain locator one last chance to tell us that the grain has already been placed
                 if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result))
                 {
-                    return (result, false);
+                    return result;
                 }
 
                 ActivationId activationId;
@@ -331,14 +326,14 @@ namespace Orleans.Runtime.Placement
                 result = ActivationAddress.GetAddress(siloAddress, targetGrain, activationId);
                 _placementService._grainLocator.InvalidateCache(targetGrain);
                 _placementService._grainLocator.CachePlacementDecision(result);
-                return (result, true);
+                return result;
             }
 
             private class GrainPlacementWorkItem
             {
                 public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = new();
 
-                public Task<(ActivationAddress Address, bool IsNewPlacement)> Result { get; set; }
+                public Task<ActivationAddress> Result { get; set; }
             }
         }
     }
