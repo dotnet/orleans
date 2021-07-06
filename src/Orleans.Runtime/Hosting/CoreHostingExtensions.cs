@@ -17,11 +17,6 @@ namespace Orleans.Hosting
     public static class CoreHostingExtensions
     {
         /// <summary>
-        /// Configure the container to use Orleans.
-        /// </summary>
-
-
-        /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
         /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
         /// </summary>
@@ -39,6 +34,9 @@ namespace Orleans.Hosting
             .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
         }
 
+        /// <summary>
+        /// Configure the container to use Orleans.
+        /// </summary>
         /// <param name="builder">The silo builder.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder ConfigureDefaults(this ISiloBuilder builder)
