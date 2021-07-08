@@ -7,7 +7,7 @@ namespace FakeFx.Runtime
 {
     [WellKnownId(9902)]
     [GenerateSerializer]
-    internal sealed class Message
+    internal sealed class BenchmarkMessage
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -40,10 +40,10 @@ namespace FakeFx.Runtime
         }
         
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
-        internal ActivationAddress targetAddress;
-        internal ActivationAddress sendingAddress;
+        internal BenchmarkActivationAddress targetAddress;
+        internal BenchmarkActivationAddress sendingAddress;
         
-        static Message()
+        static BenchmarkMessage()
         {
         }
 
@@ -171,7 +171,7 @@ namespace FakeFx.Runtime
             }
         }
 
-        public ActivationAddress TargetAddress
+        public BenchmarkActivationAddress TargetAddress
         {
             get
             {
@@ -182,7 +182,7 @@ namespace FakeFx.Runtime
 
                 if (!TargetGrain.IsDefault)
                 {
-                    return targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
+                    return targetAddress = BenchmarkActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
                 }
 
                 return null;
@@ -238,9 +238,9 @@ namespace FakeFx.Runtime
             set { Headers.TraceContext = value; }
         }
 
-        public ActivationAddress SendingAddress
+        public BenchmarkActivationAddress SendingAddress
         {
-            get { return sendingAddress ?? (sendingAddress = ActivationAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation)); }
+            get { return sendingAddress ?? (sendingAddress = BenchmarkActivationAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation)); }
             set
             {
                 SendingGrain = value.Grain;
@@ -299,7 +299,7 @@ namespace FakeFx.Runtime
             set { Headers.TransactionInfo = value; }
         }
 
-        public List<ActivationAddress> CacheInvalidationHeader
+        public List<BenchmarkActivationAddress> CacheInvalidationHeader
         {
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
@@ -308,9 +308,9 @@ namespace FakeFx.Runtime
         public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
                                                   && this.CacheInvalidationHeader.Count > 0;
         
-        internal void AddToCacheInvalidationHeader(ActivationAddress address)
+        internal void AddToCacheInvalidationHeader(BenchmarkActivationAddress address)
         {
-            var list = new List<ActivationAddress>();
+            var list = new List<BenchmarkActivationAddress>();
             if (CacheInvalidationHeader != null)
             {
                 list.AddRange(CacheInvalidationHeader);
@@ -355,7 +355,7 @@ namespace FakeFx.Runtime
         /// </summary>
         /// <param name="other"></param>
         /// <returns></returns>
-        public bool IsDuplicate(Message other)
+        public bool IsDuplicate(BenchmarkMessage other)
         {
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
@@ -391,7 +391,7 @@ namespace FakeFx.Runtime
             return sb.ToString();
         }
         
-        internal void AppendIfExists(HeadersContainer.Headers header, StringBuilder sb, Func<Message, object> valueProvider)
+        internal void AppendIfExists(HeadersContainer.Headers header, StringBuilder sb, Func<BenchmarkMessage, object> valueProvider)
         {
             // used only under log3 level
             if ((Headers.GetHeadersMask() & header) != HeadersContainer.Headers.NONE)
@@ -434,13 +434,13 @@ namespace FakeFx.Runtime
                 $"{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}";
         }
 
-        public static Message CreatePromptExceptionResponse(Message request, Exception exception)
+        public static BenchmarkMessage CreatePromptExceptionResponse(BenchmarkMessage request, Exception exception)
         {
             return new()
             {
                 Category = request.Category,
-                Direction = Message.Directions.Response,
-                Result = Message.ResponseTypes.Error,
+                Direction = BenchmarkMessage.Directions.Response,
+                Result = BenchmarkMessage.ResponseTypes.Error,
                 BodyObject = Response.ExceptionResponse(exception)
             };
         }
@@ -530,7 +530,7 @@ namespace FakeFx.Runtime
             public ResponseTypes _result;
             public object _transactionInfo;
             public TimeSpan? _timeToLive;
-            public List<ActivationAddress> _cacheInvalidationHeader;
+            public List<BenchmarkActivationAddress> _cacheInvalidationHeader;
             public RejectionTypes _rejectionType;
             public string _rejectionInfo;
             public Dictionary<string, object> _requestContextData;
@@ -724,7 +724,7 @@ namespace FakeFx.Runtime
                 }
             }
 
-            public List<ActivationAddress> CacheInvalidationHeader
+            public List<BenchmarkActivationAddress> CacheInvalidationHeader
             {
                 get { return _cacheInvalidationHeader; }
                 set
@@ -857,7 +857,7 @@ namespace FakeFx.Runtime
                     && _result == container._result
                     && EqualityComparer<object>.Default.Equals(_transactionInfo, container._transactionInfo)
                     && EqualityComparer<TimeSpan?>.Default.Equals(_timeToLive, container._timeToLive)
-                    && EqualityComparer<List<ActivationAddress>>.Default.Equals(_cacheInvalidationHeader, container._cacheInvalidationHeader)
+                    && EqualityComparer<List<BenchmarkActivationAddress>>.Default.Equals(_cacheInvalidationHeader, container._cacheInvalidationHeader)
                     && _rejectionType == container._rejectionType
                     && _rejectionInfo == container._rejectionInfo
                     && EqualityComparer<CorrelationId>.Default.Equals(_callChainId, container._callChainId)

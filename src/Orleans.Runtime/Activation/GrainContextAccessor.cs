@@ -9,6 +9,6 @@ namespace Orleans.Runtime
             _hostedClient = hostedClient;
         }
 
-        public IGrainContext GrainContext => RuntimeContext.CurrentGrainContext ?? _hostedClient;
+        public IGrainContext GrainContext => RuntimeContext.Current ?? _hostedClient;
     }
 }

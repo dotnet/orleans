@@ -48,7 +48,7 @@ namespace Orleans.Runtime.Services
         /// <summary>
         /// Resolves the Grain Reference invoking this request.
         /// </summary>
-        protected GrainReference CallingGrainReference => RuntimeContext.CurrentGrainContext?.GrainReference;
+        protected GrainReference CallingGrainReference => RuntimeContext.Current?.GrainReference;
 
         /// <summary>
         /// Moved from InsideRuntimeClient.cs

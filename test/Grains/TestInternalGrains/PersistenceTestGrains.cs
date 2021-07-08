@@ -715,7 +715,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            _context = RuntimeContext.CurrentGrainContext;
+            _context = RuntimeContext.Current;
             _scheduler = TaskScheduler.Current;
             executing = false;
             return base.OnActivateAsync();
@@ -860,7 +860,7 @@ namespace UnitTests.Grains
                 //Environment.Exit(1);
             }
 
-            if (RuntimeContext.CurrentGrainContext == null)
+            if (RuntimeContext.Current == null)
             {
                 var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
                 this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
@@ -868,7 +868,7 @@ namespace UnitTests.Grains
                 //Environment.Exit(1);
             }
 
-            var context = RuntimeContext.CurrentGrainContext;
+            var context = RuntimeContext.Current;
             var scheduler = TaskScheduler.Current;
 
             executing = true;

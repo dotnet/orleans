@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Providers
         /// <inheritdoc />
         public StreamDirectory GetStreamDirectory()
         {
-            if (RuntimeContext.CurrentGrainContext is { } activation)
+            if (RuntimeContext.Current is { } activation)
             {
                 var directory = activation.GetComponent<StreamDirectory>();
                 if (directory is null)

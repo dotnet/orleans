@@ -25,7 +25,7 @@ namespace Orleans.Runtime
 
         private GrainTimer(IGrainContext activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.CurrentGrainContext;
+            var ctxt = RuntimeContext.Current;
             if (ctxt is null)
             {
                 throw new InvalidSchedulingContextException(

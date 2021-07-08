@@ -12,7 +12,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Metadata;
 
 namespace Benchmarks.Ping
 {
@@ -40,10 +39,6 @@ namespace Benchmarks.Ping
                     if (i == 0 && grainsOnSecondariesOnly)
                     {
                         siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                        siloBuilder.ConfigureServices(services =>
-                        {
-                            services.Remove(services.First(s => s.ImplementationType?.Name == "ApplicationPartValidator"));
-                        });
                     }
                 });
 

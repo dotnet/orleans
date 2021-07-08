@@ -53,14 +53,14 @@ namespace UnitTests.SchedulerTests
                 {
                     for (int i = 0; i < 10; i++)
                     {
-                        Task.Factory.StartNew(() => 
+                        Task.Factory.StartNew(() =>
                         {
                             // ReSharper disable AccessToModifiedClosure
-                            this.output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current); 
+                            this.output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current);
                             Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                             insideTask = true;
-                            int k = n; 
-                            Thread.Sleep(100); 
+                            int k = n;
+                            Thread.Sleep(100);
                             n = k + 1;
                             insideTask = false;
                             // ReSharper restore AccessToModifiedClosure
@@ -686,8 +686,8 @@ namespace UnitTests.SchedulerTests
         private static void CheckRuntimeContext(IGrainContext context)
         {
             Assert.NotNull(RuntimeContext.Current); // Runtime context should not be null
-            Assert.NotNull(RuntimeContext.CurrentGrainContext); // Activation context should not be null
-            Assert.Equal(context, RuntimeContext.CurrentGrainContext);  // "Activation context"
+            Assert.NotNull(RuntimeContext.Current); // Activation context should not be null
+            Assert.Equal(context, RuntimeContext.Current);  // "Activation context"
         }
     }
 }

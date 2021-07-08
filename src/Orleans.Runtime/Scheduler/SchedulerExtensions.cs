@@ -67,7 +67,7 @@ namespace Orleans.Runtime.Scheduler
         internal static Task<T> RunOrQueueTask<T>(this IGrainContext targetContext, Func<Task<T>> taskFunc) => targetContext.Scheduler.RunOrQueueTask(taskFunc, targetContext);
         private static Task<T> RunOrQueueTask<T>(this IWorkItemScheduler scheduler, Func<Task<T>> taskFunc, IGrainContext targetContext)
         {
-            var currentContext = RuntimeContext.CurrentGrainContext;
+            var currentContext = RuntimeContext.Current;
             if (currentContext is object && currentContext.Equals(targetContext))
             {
                 try
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Scheduler
         internal static Task RunOrQueueTask(this IGrainContext targetContext, Func<Task> taskFunc) => targetContext.Scheduler.RunOrQueueTask(taskFunc, targetContext);
         private static Task RunOrQueueTask(this IWorkItemScheduler scheduler, Func<Task> taskFunc, IGrainContext targetContext)
         {
-            var currentContext = RuntimeContext.CurrentGrainContext;
+            var currentContext = RuntimeContext.Current;
             if (currentContext is object && currentContext.Equals(targetContext))
             {
                 try

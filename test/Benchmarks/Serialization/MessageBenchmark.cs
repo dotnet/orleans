@@ -16,15 +16,15 @@ namespace Benchmarks
     [Config(typeof(BenchmarkConfig))]
     public class MessageBenchmark
     {
-        private static readonly Serializer<Message.HeadersContainer> Serializer;
+        private static readonly Serializer<BenchmarkMessage.HeadersContainer> Serializer;
         private static readonly byte[] Input;
         private static readonly SerializerSession Session;
-        private static readonly Message.HeadersContainer Value;
+        private static readonly BenchmarkMessage.HeadersContainer Value;
 
         static MessageBenchmark()
         {
             var body = new Response("yess!");
-            Value = (new Message
+            Value = (new BenchmarkMessage
             {
                 TargetActivation = ActivationId.NewId(),
                 TargetSilo = SiloAddress.New(IPEndPoint.Parse("210.50.4.44:40902"), 5423123),
@@ -42,7 +42,7 @@ namespace Benchmarks
             var services = new ServiceCollection()
                 .AddSerializer()
                 .BuildServiceProvider();
-            Serializer = services.GetRequiredService<Serializer<Message.HeadersContainer>>();
+            Serializer = services.GetRequiredService<Serializer<BenchmarkMessage.HeadersContainer>>();
             var bytes = new byte[4000];
             Session = services.GetRequiredService<SerializerSessionPool>().GetSession();
             var writer = new SingleSegmentBuffer(bytes).CreateWriter(Session);

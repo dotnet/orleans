@@ -56,7 +56,7 @@ namespace Orleans.Runtime
 
         internal static void OnDispatcherMessageReceive(Message msg)
         {
-            var context = RuntimeContext.CurrentGrainContext;
+            var context = RuntimeContext.Current;
             dispatcherMessagesProcessingReceivedPerDirection[(int)msg.Direction].Increment();
             dispatcherMessagesReceivedTotal.Increment();
             if (context == null)
