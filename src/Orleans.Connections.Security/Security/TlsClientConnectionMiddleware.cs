@@ -16,6 +16,7 @@ namespace Orleans.Connections.Security
         private readonly TlsOptions _options;
         private readonly ILogger _logger;
         private readonly X509Certificate2 _certificate;
+        private readonly Func<object, string, X509CertificateCollection, X509Certificate, string[], X509Certificate2> _certificateSelector;
 
         public TlsClientConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory loggerFactory)
         {
@@ -28,6 +29,7 @@ namespace Orleans.Connections.Security
 
             // capture the certificate now so it can't be switched after validation
             _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
+            _certificateSelector = options.LocalClientCertificateSelector;
 
 
             _options = options;
@@ -112,9 +114,25 @@ namespace Orleans.Connections.Security
             {
                 try
                 {
+                    ClientCertificateSelectionCallback selector = null;
+                    if (_certificateSelector != null)
+                    {
+                        selector = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
+                        {
+                            var cert = _certificateSelector(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers);
+                            if (cert != null)
+                            {
+                                EnsureCertificateIsAllowedForClientAuth(cert);
+                            }
+
+                            return cert;
+                        };
+                    }
+
                     var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection { _certificate },
+                        ClientCertificates = _certificate == null || _certificateSelector != null ? null : new X509CertificateCollection { _certificate },
+                        LocalCertificateSelectionCallback = selector,
                         EnabledSslProtocols = _options.SslProtocols,
                     };
 
