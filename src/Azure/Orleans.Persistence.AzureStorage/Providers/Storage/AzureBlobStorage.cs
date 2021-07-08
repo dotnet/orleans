@@ -91,7 +91,8 @@ namespace Orleans.Storage
                     grainState.RecordExists = true;
                 }
 
-                grainState.State = this.ConvertFromStorageFormat(contents);
+                var loadedState = this.ConvertFromStorageFormat(contents, grainState.Type);
+                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Read: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -268,18 +269,19 @@ namespace Orleans.Storage
         /// Deserialize from the configured storage format, either binary or JSON.
         /// </summary>
         /// <param name="contents">The serialized contents.</param>
+        /// <param name="stateType">The state type.</param>
         /// <remarks>
         /// See:
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        private object ConvertFromStorageFormat(byte[] contents)
+        private object ConvertFromStorageFormat(byte[] contents, Type stateType)
         {
             object result;
             if (this.options.UseJson)
             {
                 var str = Encoding.UTF8.GetString(contents);
-                result = JsonConvert.DeserializeObject<object>(str, this.jsonSettings);
+                result = JsonConvert.DeserializeObject(str, stateType, this.jsonSettings);
             }
             else
             {
