@@ -100,8 +100,12 @@ namespace Orleans.CodeGenerator
             var statements = new List<StatementSyntax>();
             var requestVar = IdentifierName("request");
             var requestDescription = metadataModel.GeneratedInvokables[methodDescription];
-            var createRequestExpr = InvocationExpression(ThisExpression().Member("GetInvokable", requestDescription.TypeSyntax))
-                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>()));
+            ExpressionSyntax createRequestExpr = (!requestDescription.IsEmptyConstructable || requestDescription.UseActivator) switch
+            {
+                true => InvocationExpression(ThisExpression().Member("GetInvokable", requestDescription.TypeSyntax))
+                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
+                _ => ObjectCreationExpression(requestDescription.TypeSyntax).WithArgumentList(ArgumentList())
+            };
 
             statements.Add(
                 LocalDeclarationStatement(
