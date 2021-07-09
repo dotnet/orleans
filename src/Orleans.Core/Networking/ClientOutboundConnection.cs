@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly SiloAddress remoteSiloAddress;
 
         public ClientOutboundConnection(
             SiloAddress remoteSiloAddress,
@@ -32,10 +31,12 @@ namespace Orleans.Runtime.Messaging
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.connectionPreambleHelper = connectionPreambleHelper;
-            this.remoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
-            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.remoteSiloAddress);
-            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.remoteSiloAddress);
+            this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
+            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
+            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
         }
+
+        public SiloAddress RemoteSiloAddress { get; }
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
@@ -79,7 +80,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.connectionManager.OnConnectionTerminated(this.remoteSiloAddress, this, error);
+                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
         }
@@ -98,7 +99,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.TargetSilo != null) return true;
 
-            msg.TargetSilo = this.remoteSiloAddress;
+            msg.TargetSilo = this.RemoteSiloAddress;
             if (msg.TargetGrain.IsSystemTarget())
                 msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
 
