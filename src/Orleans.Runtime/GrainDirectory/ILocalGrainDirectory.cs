@@ -54,6 +54,17 @@ namespace Orleans.Runtime.GrainDirectory
         void InvalidateCacheEntry(ActivationAddress activation);
 
         /// <summary>
+        /// Invalidates cache entry for the given grain.
+        /// </summary>
+        void InvalidateCacheEntry(GrainId grainId);
+
+        /// <summary>
+        /// Adds a cache entry for the given activation addrss.
+        /// This method is intended to be called whenever a placement decision is made.
+        /// </summary>
+        void CachePlacementDecision(ActivationAddress activation);
+
+        /// <summary>
         /// For testing purposes only.
         /// Returns the silo that this silo thinks is the primary owner of directory information for
         /// the provided grain ID.
@@ -78,6 +89,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="grain"></param>
         /// <returns></returns>
         ActivationAddress GetLocalCacheData(GrainId grain);
+
+        /// <summary>
+        /// Attempts to find the specified grain in the directory cache.
+        /// </summary>
+        bool TryCachedLookup(GrainId grainId, out ActivationAddress address);
 
         /// <summary>
         /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not

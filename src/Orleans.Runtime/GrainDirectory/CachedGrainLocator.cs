@@ -215,6 +215,10 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
+
+        public void CachePlacementDecision(ActivationAddress address) => cache.AddOrUpdate(address, 0);
+        public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
+        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => TryLocalLookup(grainId, out address);
     }
 
     internal static class AddressHelpers

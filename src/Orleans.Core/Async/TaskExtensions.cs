@@ -159,6 +159,19 @@ namespace Orleans.Internal
             return completion.Task;
         }
 
+        /// <summary>
+        /// Returns the single exception contained by the provided <see cref="AggregateException"/> or the provided <see cref="AggregateException"/> if it represents multiple exceptions.
+        /// </summary>
+        internal static Exception OriginalException(this AggregateException exception)
+        {
+            if (exception.InnerExceptions.Count == 1)
+            {
+                return exception.InnerException;
+            }
+
+            return exception;
+        }
+
         public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try
