@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
+using System.Threading;
 
 namespace Orleans.Networking.Shared
 {
-    internal sealed class IOQueue : PipeScheduler
+    internal sealed class IOQueue : PipeScheduler,  IThreadPoolWorkItem
     {
         private readonly object _workSync = new object();
-        private readonly ConcurrentQueue<Work> _workItems = new ConcurrentQueue<Work>();
-        private static readonly Action<IOQueue> Callback = ctx => ctx.Execute();
+        private readonly ConcurrentQueue<Work> _workItems = new();
 
         private bool _doingWork;
 
@@ -22,13 +22,13 @@ namespace Orleans.Networking.Shared
             {
                 if (!_doingWork)
                 {
-                    System.Threading.ThreadPool.QueueUserWorkItem(Callback, this, preferLocal: false);
+                    System.Threading.ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
                     _doingWork = true;
                 }
             }
         }
 
-        private void Execute()
+        public void Execute()
         {
             while (true)
             {
