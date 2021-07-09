@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -11,40 +12,46 @@ namespace Orleans.CodeGenerator
     {
         public void Execute(GeneratorExecutionContext context)
         {
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_designtimebuild", out var isDesignTimeBuild)
-                && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
+            var processName = Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
+            if (processName.Contains("devenv") || processName.Contains("servicehub"))
             {
                 return;
             }
 
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_attachdebugger", out var attachDebuggerOption)
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
+                && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_attachdebugger", out var attachDebuggerOption)
                 && string.Equals("true", attachDebuggerOption, StringComparison.OrdinalIgnoreCase))
             {
-                System.Diagnostics.Debugger.Launch();
+                Debugger.Launch();
             }
 
             var options = new CodeGeneratorOptions();
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_immutableattributes", out var immutableAttributes) && immutableAttributes is {Length: > 0 })
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_immutableattributes", out var immutableAttributes) && immutableAttributes is {Length: > 0 })
             {
                 options.ImmutableAttributes.AddRange(immutableAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
             }
 
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_aliasattributes", out var aliasAttributes) && aliasAttributes is {Length: > 0 })
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_aliasattributes", out var aliasAttributes) && aliasAttributes is {Length: > 0 })
             {
                 options.AliasAttributes.AddRange(aliasAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
             }
 
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_idattributes", out var idAttributes) && idAttributes is {Length: > 0 })
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_idattributes", out var idAttributes) && idAttributes is {Length: > 0 })
             {
                 options.IdAttributes.AddRange(idAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
             }
 
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_generateserializerattributes", out var generateSerializerAttributes) && generateSerializerAttributes is {Length: > 0 })
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generateserializerattributes", out var generateSerializerAttributes) && generateSerializerAttributes is {Length: > 0 })
             {
                 options.GenerateSerializerAttributes.AddRange(generateSerializerAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
             }
 
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.Orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is {Length: > 0 })
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is {Length: > 0 })
             {
                 options.GenerateFieldIds = bool.Parse(generateFieldIds);
             }
