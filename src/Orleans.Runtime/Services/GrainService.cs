@@ -11,7 +11,6 @@ namespace Orleans.Runtime
     /// <summary>Base class for implementing a grain-like partitioned service with per silo instances of it automatically instantiated and started by silo runtime</summary>
     public abstract class GrainService : SystemTarget, IRingRangeListener, IGrainService
     {
-        private readonly OrleansTaskScheduler scheduler;
         private readonly IConsistentRingProvider ring;
         private readonly string typeName;
         private GrainServiceStatus status;
@@ -51,7 +50,6 @@ namespace Orleans.Runtime
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);
 
-            scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
         }
@@ -108,7 +106,7 @@ namespace Orleans.Runtime
 
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            this.QueueTask(() => OnRangeChange(oldRange, newRange, increased)).Ignore();
         }
 
         /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>

@@ -73,7 +73,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void UnRegisterWorkItemGroup(int workItemGroup)
+        internal void UnregisterWorkItemGroup(int workItemGroup)
         {
             Utils.SafeExecute(() => CounterStatistic.Delete(turnsExecutedPerWorkItemGroup[workItemGroup].Name),
                 logger,

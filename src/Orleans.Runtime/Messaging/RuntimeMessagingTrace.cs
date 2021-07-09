@@ -57,11 +57,11 @@ namespace Orleans.Runtime
                 new EventId((int)ErrorCode.Messaging_Dispatcher_ForwardingRequests, DispatcherForwardingMultipleEventName),
                 "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}");
 
-        private static readonly Action<ILogger, Message, IGrainContext, Exception> LogDispatcherSelectTargetFailed =
-            LoggerMessage.Define<Message, IGrainContext>(
+        private static readonly Action<ILogger, Message, Exception> LogDispatcherSelectTargetFailed =
+            LoggerMessage.Define<Message>(
                 LogLevel.Error,
                 new EventId((int)ErrorCode.Dispatcher_SelectTarget_Failed, DispatcherSelectTargetFailedEventName),
-                "Failed to address message {Message} from activation {Activation}");
+                "Failed to address message {Message}");
 
         public RuntimeMessagingTrace(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
@@ -152,16 +152,16 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void OnDispatcherSelectTargetFailed(Message message, IGrainContext sendingActivation, Exception exception)
+        internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
         {
             if (this.IsEnabled(DispatcherSelectTargetFailedEventName))
             {
-                this.Write(DispatcherSelectTargetFailedEventName, new { Message = message, SendingActivation = sendingActivation, Exception = exception });
+                this.Write(DispatcherSelectTargetFailedEventName, new { Message = message, Exception = exception });
             }
 
             if (ShouldLogError(exception))
             {
-                LogDispatcherSelectTargetFailed(this, message, sendingActivation, exception);
+                LogDispatcherSelectTargetFailed(this, message, exception);
             }
 
             MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);

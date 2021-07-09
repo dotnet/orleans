@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
@@ -8,9 +7,13 @@ using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TestKit
 {
+    [GenerateSerializer]
     public class FaultInjectionControl
     {
+        [Id(0)]
         public TransactionFaultInjectPhase FaultInjectionPhase = TransactionFaultInjectPhase.None;
+
+        [Id(1)]
         public FaultInjectionType FaultInjectionType = FaultInjectionType.None;
 
         public void Reset()
@@ -20,6 +23,7 @@ namespace Orleans.Transactions.TestKit
         }
     }
 
+    [GenerateSerializer]
     public enum TransactionFaultInjectPhase
     {
         None,
@@ -61,17 +65,13 @@ namespace Orleans.Transactions.TestKit
         public FaultInjectionControl FaultInjectionControl { get; set; }
         private IControlledTransactionFaultInjector faultInjector;
         public string CurrentTransactionId => this.txState.CurrentTransactionId;
-        public FaultInjectionTransactionalState(TransactionalState<TState> txState, IGrainContext activationContext, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
+        public FaultInjectionTransactionalState(TransactionalState<TState> txState, IControlledTransactionFaultInjector faultInjector, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
         {
             this.grainRuntime = grainRuntime;
             this.txState = txState;
             this.logger = logger;
             this.FaultInjectionControl = new FaultInjectionControl();
-            //fault injector has to be injected to DI as a scoped service, so each grain activation share one injector. but different grain activation use different ones.
-            this.faultInjector = activationContext.ActivationServices.GetService<IControlledTransactionFaultInjector>();
-            if(this.faultInjector == null)
-                throw new ArgumentOutOfRangeException($"Incorrect {nameof(faultInjector)} type configured. Only {nameof(IControlledTransactionFaultInjector)} is allowed.");
-
+            this.faultInjector = faultInjector;
         }
 
         public void Participate(IGrainLifecycle lifecycle)

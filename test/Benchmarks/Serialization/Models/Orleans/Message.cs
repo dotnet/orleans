@@ -5,7 +5,7 @@ using Orleans;
 
 namespace FakeFx.Runtime
 {
-    [WellKnownId(101)]
+    [WellKnownId(9902)]
     [GenerateSerializer]
     internal sealed class Message
     {

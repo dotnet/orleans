@@ -38,6 +38,7 @@ namespace Orleans.Transactions.TestKit
         }
     }
 
+    [GenerateSerializer]
     public class SimpleAzureStorageException : StorageException
     {
     }

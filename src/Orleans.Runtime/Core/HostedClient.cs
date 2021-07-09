@@ -85,6 +85,8 @@ namespace Orleans.Runtime
 
         public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
+        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+
         /// <inheritdoc />
         public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
 

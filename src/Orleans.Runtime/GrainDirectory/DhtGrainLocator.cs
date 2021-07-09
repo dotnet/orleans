@@ -15,18 +15,15 @@ namespace Orleans.Runtime.GrainDirectory
     internal class DhtGrainLocator : IGrainLocator
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
-        private readonly OrleansTaskScheduler taskScheduler;
         private readonly IGrainContext grainContext;
-        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)> unregistrationQueue = new ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)>();
+        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)> unregistrationQueue = new();
         private int isWorking = 0;
 
         public DhtGrainLocator(
             ILocalGrainDirectory localGrainDirectory,
-            OrleansTaskScheduler taskScheduler,
             IGrainContext grainContext)
         {
             this.localGrainDirectory = localGrainDirectory;
-            this.taskScheduler = taskScheduler;
             this.grainContext = grainContext;
         }
 
@@ -51,12 +48,12 @@ namespace Orleans.Runtime.GrainDirectory
             var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.unregistrationQueue.Enqueue((tcs, address, cause));
             // Make sure to not run the loop on the Grain Activation context
-            this.taskScheduler.RunOrQueueTask(() => this.UnregisterExecute(), this.grainContext).Ignore();
+            this.grainContext.RunOrQueueTask(() => this.UnregisterExecute()).Ignore();
             return tcs.Task;
         }
 
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
-            => new(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
+            => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory);
 
         private async Task UnregisterExecute()
         {

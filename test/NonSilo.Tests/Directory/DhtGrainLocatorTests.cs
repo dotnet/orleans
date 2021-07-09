@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using TestExtensions;
 using UnitTests.SchedulerTests;
 using UnitTests.TesterInternal;
@@ -17,25 +16,26 @@ using Xunit.Abstractions;
 namespace UnitTests.Directory
 {
     [TestCategory("BVT"), TestCategory("Directory")]
-    public class DhtGrainLocatorTests : IDisposable
+    public class DhtGrainLocatorTests
     {
         private readonly DhtGrainLocator target;
         private readonly MockLocalGrainDirectory localGrainDirectory;
         private readonly ITestOutputHelper output;
         private readonly LoggerFactory loggerFactory;
         private readonly UnitTestSchedulingContext rootContext;
-        private readonly OrleansTaskScheduler taskScheduler;
 
         public DhtGrainLocatorTests(ITestOutputHelper output)
         {
             this.output = output;
             this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
-            this.rootContext = new UnitTestSchedulingContext();
-            this.taskScheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.loggerFactory);
+            this.rootContext = new UnitTestSchedulingContext()
+            {
+                Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory)
+            };
             this.localGrainDirectory = new MockLocalGrainDirectory(
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(200));
-            this.target = new DhtGrainLocator(this.localGrainDirectory, this.taskScheduler, this.rootContext);
+            this.target = new DhtGrainLocator(this.localGrainDirectory, this.rootContext);
         }
 
         [Fact]
@@ -120,14 +120,6 @@ namespace UnitTests.Directory
             var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
             return ActivationAddress.NewActivationAddress(siloAddr, grainId);
-        }
-
-        public void Dispose()
-        {
-            if (this.taskScheduler != null)
-            {
-                this.taskScheduler.Stop();
-            }
         }
     }
 }

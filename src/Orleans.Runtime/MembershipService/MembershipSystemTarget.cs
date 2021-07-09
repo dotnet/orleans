@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -60,7 +61,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="remoteSilo">The remote silo to ping.</param>
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>
         /// <returns>The result of pinging the remote silo.</returns>
-        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber) => this.ScheduleTask(() => ProbeInternal(remoteSilo, probeNumber));
+        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber) => this.RunOrQueueTask(() => ProbeInternal(remoteSilo, probeNumber));
 
         /// <summary>
         /// Send a ping to a remote silo via an intermediary silo. This is intended to be called from a <see cref="SiloHealthMonitor"/>
@@ -79,7 +80,7 @@ namespace Orleans.Runtime.MembershipService
                 return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
             }
 
-            return this.ScheduleTask(ProbeIndirectly);
+            return this.RunOrQueueTask(ProbeIndirectly);
         }
 
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
@@ -130,7 +131,7 @@ namespace Orleans.Runtime.MembershipService
                 await Task.WhenAll(tasks);
             }
 
-            return this.ScheduleTask(Gossip);
+            return this.RunOrQueueTask(Gossip);
         }
 
         private async Task GossipToRemoteSilo(

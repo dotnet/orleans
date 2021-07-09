@@ -14,7 +14,7 @@ namespace Orleans.Serialization.TypeSystem
         private static readonly Assembly SystemAssembly = typeof(int).GetTypeInfo().Assembly;
         private static readonly char[] SimpleNameTerminators = { '`', '*', '[', '&' };
 
-        private static readonly ConcurrentDictionary<TypeInfo, string> Cache = new ConcurrentDictionary<TypeInfo, string>();
+        private static readonly ConcurrentDictionary<Type, string> Cache = new ConcurrentDictionary<Type, string>();
 
         /// <summary>
         /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
@@ -23,16 +23,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <returns>
         /// A <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
         /// </returns>
-        public static string Format(Type type) => Format(type?.GetTypeInfo());
-
-        /// <summary>
-        /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
-        /// </summary>
-        /// <param name="type">The type to format.</param>
-        /// <returns>
-        /// A <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
-        /// </returns>
-        public static string Format(TypeInfo type)
+        public static string Format(Type type)
         {
             if (type is null)
             {

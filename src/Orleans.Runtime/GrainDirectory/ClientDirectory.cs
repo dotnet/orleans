@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -422,7 +423,7 @@ namespace Orleans.Runtime.GrainDirectory
                     return;
                 }
 
-                _nextPublishTask = this.ScheduleTask(() => PublishUpdates());
+                _nextPublishTask = this.RunOrQueueTask(() => PublishUpdates());
             }
         }
 
@@ -522,7 +523,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ServiceLifecycleStage.RuntimeGrainServices,
                 ct =>
                 {
-                    this.ScheduleTask(() => _runTask = this.Run()).Ignore();
+                    this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
                     return Task.CompletedTask;
                 },
                 async ct =>

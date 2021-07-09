@@ -2,35 +2,37 @@ using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Monitors currently-active requests and sends status notifications to callers for long-running and blocked requests.
     /// </summary>
-    internal sealed class IncomingRequestMonitor : ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class IncomingRequestMonitor : ILifecycleParticipant<ISiloLifecycle>, IActivationWorkingSetObserver
     {
         private static readonly TimeSpan DefaultAnalysisPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InactiveGrainIdleness = TimeSpan.FromMinutes(1);
         private readonly IAsyncTimer _scanPeriodTimer;
-        private readonly IMessageCenter _messageCenter;
+        private readonly IServiceProvider _serviceProvider;
         private readonly MessageFactory _messageFactory;
         private readonly IOptionsMonitor<SiloMessagingOptions> _messagingOptions;
-        private readonly ConcurrentDictionary<ActivationData, ActivationData> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, ActivationData>(ReferenceEqualsComparer<ActivationData>.Instance);
+        private readonly ConcurrentDictionary<ActivationData, bool> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, bool>(ReferenceEqualsComparer<ActivationData>.Instance);
         private bool _enabled = true;
         private Task _runTask;
 
         public IncomingRequestMonitor(
             IAsyncTimerFactory asyncTimerFactory,
-            IMessageCenter messageCenter,
+            IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             IOptionsMonitor<SiloMessagingOptions> siloMessagingOptions)
         {
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromSeconds(1), nameof(IncomingRequestMonitor));
-            _messageCenter = messageCenter;
+            _serviceProvider = serviceProvider;
             _messageFactory = messageFactory;
             _messagingOptions = siloMessagingOptions;
         }
@@ -43,8 +45,26 @@ namespace Orleans.Runtime
                 return;
             }
             
-            _recentlyUsedActivations.TryAdd(activation, activation);
+            _recentlyUsedActivations.TryAdd(activation, true);
         }
+
+        public void OnActive(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                MarkRecentlyUsed(activation);
+            }
+        }
+
+        public void OnIdle(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                _recentlyUsedActivations.TryRemove(activation, out _);
+            }
+        }
+
+        public void OnEvicted(IActivationWorkingSetMember member) => OnIdle(member);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
@@ -68,6 +88,7 @@ namespace Orleans.Runtime
             var options = _messagingOptions.CurrentValue;
             var optionsPeriod = options.GrainWorkloadAnalysisPeriod;
             TimeSpan nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DefaultAnalysisPeriod;
+            var messageCenter = _serviceProvider.GetRequiredService<MessageCenter>();
 
             while (await _scanPeriodTimer.NextTick(nextDelay))
             {
@@ -97,16 +118,10 @@ namespace Orleans.Runtime
                 var now = DateTime.UtcNow;
                 foreach (var activationEntry in _recentlyUsedActivations)
                 {
-                    var activation = activationEntry.Value;
+                    var activation = activationEntry.Key;
                     lock (activation)
                     {
-                        if (activation.IsInactive && activation.GetIdleness(now) > InactiveGrainIdleness)
-                        {
-                            _recentlyUsedActivations.TryRemove(activation, out _);
-                            continue;
-                        }
-
-                        activation.AnalyzeWorkload(now, _messageCenter, _messageFactory, options);
+                        activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
                     }
 
                     // Yield execution frequently

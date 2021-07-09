@@ -5,6 +5,8 @@ using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
+using Orleans.Runtime.Versions.Compatibility;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime
 {
@@ -83,7 +85,7 @@ namespace Orleans.Runtime
         public void DeactivateOnIdle(Grain grain)
         {
             CheckRuntimeContext();
-            this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
+            grain.Data.DeactivateOnIdle();
         }
 
         public void DelayDeactivation(Grain grain, TimeSpan timeSpan)

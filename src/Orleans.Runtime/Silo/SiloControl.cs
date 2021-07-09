@@ -27,12 +27,10 @@ namespace Orleans.Runtime
         private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly VersionSelectorManager selectorManager;
-
-        private readonly IMessageCenter messageCenter;
-
+        private readonly ActivationCollector _activationCollector;
         private readonly ActivationDirectory activationDirectory;
 
-        private readonly ActivationCollector activationCollector;
+        private readonly IActivationWorkingSet activationWorkingSet;
 
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
 
@@ -52,8 +50,9 @@ namespace Orleans.Runtime
             IServiceProvider services,
             ILoggerFactory loggerFactory,
             IMessageCenter messageCenter,
-            ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
+            ActivationDirectory activationDirectory,
+            IActivationWorkingSet activationWorkingSet,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
@@ -67,9 +66,9 @@ namespace Orleans.Runtime
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.selectorManager = selectorManager;
-            this.messageCenter = messageCenter;
+            _activationCollector = activationCollector;
             this.activationDirectory = activationDirectory;
-            this.activationCollector = activationCollector;
+            this.activationWorkingSet = activationWorkingSet;
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
@@ -103,7 +102,7 @@ namespace Orleans.Runtime
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
             logger.Info("ForceActivationCollection");
-            return this.catalog.CollectActivations(ageLimit);
+            return _activationCollector.CollectActivations(ageLimit);
         }
 
         public Task ForceRuntimeStatisticsCollection()
@@ -116,10 +115,9 @@ namespace Orleans.Runtime
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics");
             var activationCount = this.activationDirectory.Count;
-            var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
             var stats = new SiloRuntimeStatistics(
                 activationCount,
-                recentlyUsedActivationCount,
+                activationWorkingSet.Count,
                 this.appEnvironmentStatistics,
                 this.hostEnvironmentStatistics,
                 this.loadSheddingOptions,

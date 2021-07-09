@@ -41,5 +41,20 @@ namespace Orleans.Serialization.Invocation
             TypedResult = default;
             ResponsePool.Return(this);
         }
+
+        public override string ToString()
+        {
+            if (Exception is { } exception)
+            {
+                return exception.ToString();
+            }
+
+            if (_result is { })
+            {
+                return _result.ToString();
+            }
+
+            return "[null]";
+        }
     }
 }

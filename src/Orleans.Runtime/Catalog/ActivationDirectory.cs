@@ -60,7 +60,9 @@ namespace Orleans.Runtime
         public void RecordNewTarget(ActivationData target)
         {
             if (!activations.TryAdd(target.ActivationId, target))
+            {
                 return;
+            }
 
             grainToActivationsMap.AddOrUpdate(target.GrainId,
                 (_, t) => new() { t },
@@ -138,19 +140,6 @@ namespace Orleans.Runtime
             return grainCounts
                 .Select(s => new KeyValuePair<string, long>(s.Key, s.Value.GetCurrentValue()))
                 .Where(p => p.Value > 0);
-        }
-
-        public void PrintActivationDirectory()
-        {
-            if (logger.IsEnabled(LogLevel.Information))
-            {
-                var all = activations.ToList();
-                string stats = Utils.EnumerableToString(all.Select(i => i.Value).OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), Environment.NewLine);
-                if (stats.Length > 0)
-                {
-                    logger.Info(ErrorCode.Catalog_ActivationDirectory_Statistics, $"ActivationDirectory.PrintActivationDirectory(): Size = { all.Count}, Directory:{Environment.NewLine}{stats}");
-                }
-            }
         }
 
         public IEnumerator<KeyValuePair<ActivationId, ActivationData>> GetEnumerator() => activations.GetEnumerator();

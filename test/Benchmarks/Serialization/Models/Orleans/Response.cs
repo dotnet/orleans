@@ -4,7 +4,7 @@ namespace FakeFx.Runtime
 {
     [Serializable]
     [Orleans.GenerateSerializer]
-    [Orleans.WellKnownId(103)]
+    [Orleans.WellKnownId(9901)]
     [Orleans.SuppressReferenceTracking]
     internal sealed class Response
     {

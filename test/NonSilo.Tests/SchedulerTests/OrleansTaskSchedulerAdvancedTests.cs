@@ -17,7 +17,6 @@ namespace UnitTests.SchedulerTests
     public class OrleansTaskSchedulerAdvancedTests : IDisposable
     {
         private readonly ITestOutputHelper output;
-        private OrleansTaskScheduler orleansTaskScheduler;
 
         private bool mainDone;
         private int stageNum1;
@@ -37,10 +36,6 @@ namespace UnitTests.SchedulerTests
 
         public void Dispose()
         {
-            if (this.orleansTaskScheduler != null)
-            {
-                this.orleansTaskScheduler.Stop();
-            }
             this.loggerFactory.Dispose();
         }
 
@@ -50,10 +45,11 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             this.output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
-            this.orleansTaskScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
                 {
                     for (int i = 0; i < 10; i++)
                     {
@@ -70,8 +66,7 @@ namespace UnitTests.SchedulerTests
                             // ReSharper restore AccessToModifiedClosure
                         }).Ignore();
                     }
-                },
-                context);
+                });
 
             // Pause to let things run
             Thread.Sleep(1500);
@@ -87,11 +82,12 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();
 
-            this.orleansTaskScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
                 {
                     var task1 = Task.Factory.StartNew(() => 
                     {
@@ -118,8 +114,7 @@ namespace UnitTests.SchedulerTests
                     });
                     task1.Ignore();
                     task2.Ignore();
-                },
-                context);
+                });
 
             var timeoutLimit = TimeSpan.FromMilliseconds(1500);
             try
@@ -135,17 +130,6 @@ namespace UnitTests.SchedulerTests
             Assert.Equal(15,  n);  // "Work items executed out of order"
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void Sched_AC_MainTurnWait_Test()
-        {
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext(), this.loggerFactory);
-            var promise = Task.Factory.StartNew(() =>
-            {
-                Thread.Sleep(1000);
-            });
-            promise.Wait();
-        }
-
         private void SubProcess1(int n)
         {
             string msg = string.Format("1-{0} MainDone={1} inside Task {2}", n, this.mainDone, Task.CurrentId);
@@ -153,6 +137,7 @@ namespace UnitTests.SchedulerTests
             Assert.True(this.mainDone, msg + " -- Main turn should be finished");
             this.stageNum1 = n;
         }
+
         private void SubProcess2(int n)
         {
             string msg = string.Format("2-{0} MainDone={1} inside Task {2}", n, this.mainDone, Task.CurrentId);
@@ -169,12 +154,13 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
 
-            this.orleansTaskScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
             {
                 this.mainDone = false;
                 this.stageNum1 = this.stageNum2 = 0;
@@ -191,8 +177,7 @@ namespace UnitTests.SchedulerTests
 
                 Thread.Sleep(TimeSpan.FromSeconds(1));
                 this.mainDone = true;
-            },
-            context);
+            });
 
             try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
             catch (TimeoutException) { Assert.True(false, "Timeout-1"); }
@@ -209,8 +194,8 @@ namespace UnitTests.SchedulerTests
         public async Task Sched_Stopped_WorkItemGroup()
         {
             var context = new UnitTestSchedulingContext();
-            var scheduler = this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            WorkItemGroup workItemGroup = this.orleansTaskScheduler.GetWorkItemGroup(context);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             void CheckScheduler(object state)
             {
@@ -241,8 +226,6 @@ namespace UnitTests.SchedulerTests
             // Check that the WorkItemGroup is functioning.
             await await ScheduleTask();
 
-            workItemGroup.Stop();
-
             var taskAfterStopped = ScheduleTask();
             var resultTask = await Task.WhenAny(taskAfterStopped, Task.Delay(TimeSpan.FromSeconds(10)));
             Assert.Same(taskAfterStopped, resultTask);
@@ -268,8 +251,8 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler masterScheduler = this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            WorkItemGroup workItemGroup = this.orleansTaskScheduler.GetWorkItemGroup(context);
+            WorkItemGroup workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
+            context.Scheduler = workItemGroup;
             ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
 
             this.mainDone = false;
@@ -281,7 +264,7 @@ namespace UnitTests.SchedulerTests
             Task wrapper = null;
             Task finalTask1 = null;
             Task finalPromise2 = null;
-            masterScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
             {
                 Log(1, "Outer ClosureWorkItem " + Task.CurrentId + " starting");
                 Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #0"
@@ -352,8 +335,7 @@ namespace UnitTests.SchedulerTests
 
                 Log(16, "Finished Outer ClosureWorkItem Task Id=" + wrapper.Id);
                 this.mainDone = true;
-            },
-            context);
+            });
 
             Log(17, "Waiting for ClosureWorkItem to spawn wrapper Task");
             for (int i = 0; i < 5 * WaitFactor; i++)
@@ -406,10 +388,9 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_Current_TaskScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            ActivationTaskScheduler activationScheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskScheduler;
-
-            // RuntimeContext.InitializeThread(masterScheduler);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory); 
+            context.Scheduler = workItemGroup;
+            ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
 
             this.mainDone = false;
 
@@ -417,7 +398,7 @@ namespace UnitTests.SchedulerTests
 
             Task wrapper = null;
             Task finalPromise = null;
-            orleansTaskScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
             {
                 Log(1, "Outer ClosureWorkItem " + Task.CurrentId + " starting");
                 Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #0"
@@ -462,8 +443,7 @@ namespace UnitTests.SchedulerTests
 
                 Log(12, "Finished Outer TaskWorkItem Task Id=" + wrapper.Id);
                 this.mainDone = true;
-            },
-            context);
+            });
 
             Log(13, "Waiting for ClosureWorkItem to spawn wrapper Task");
             for (int i = 0; i < 5 * WaitFactor; i++)
@@ -505,20 +485,20 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_ContinueWith_1_Test()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
-            this.orleansTaskScheduler.QueueAction(() =>
-                {
-                    Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 1b"); });
-                    Task task2 = task1.ContinueWith((_) => { n = n * 5; this.output.WriteLine("===> 2"); });
-                    Task task3 = task2.ContinueWith((_) => { n = n / 5; this.output.WriteLine("===> 3"); });
-                    Task task4 = task3.ContinueWith((_) => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
-                    task4.Ignore();
-                },
-                context);
+            context.Scheduler.QueueAction(() =>
+            {
+                Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 1b"); });
+                Task task2 = task1.ContinueWith((_) => { n = n * 5; this.output.WriteLine("===> 2"); });
+                Task task3 = task2.ContinueWith((_) => { n = n / 5; this.output.WriteLine("===> 3"); });
+                Task task4 = task3.ContinueWith((_) => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
+                task4.Ignore();
+            });
             // ReSharper restore AccessToModifiedClosure
 
             Assert.True(result.Task.Wait(TwoSeconds));
@@ -537,10 +517,11 @@ namespace UnitTests.SchedulerTests
             stopwatch.Start();
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             // ReSharper disable AccessToModifiedClosure
-            this.orleansTaskScheduler.QueueAction(() =>
+            context.Scheduler.QueueAction(() =>
             {
                 Task<int> task1 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 1b"); return 1; });
                 Task<int> task2 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 2a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 2b"); return 2; });
@@ -548,8 +529,7 @@ namespace UnitTests.SchedulerTests
                 Task<int> task4 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 4a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 4b"); return 4; });
                 tasks = new Task<int>[] { task1, task2, task3, task4 };
                 result.SetResult(true);
-            },
-            context);
+            });
             // ReSharper restore AccessToModifiedClosure
             Assert.True(result.Task.Wait(TwoSeconds)); // Wait for main (one that creates tasks) work item to finish.
 
@@ -581,14 +561,20 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_ContinueWith_2_OrleansSched()
         {
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext(), this.loggerFactory);
+            var context = new UnitTestSchedulingContext();
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
             bool failed1 = false;
             bool failed2 = false;
 
-            Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); throw new ArgumentException(); });
+            Task task1 = Task.Factory.StartNew(
+                () => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); throw new ArgumentException(); },
+                CancellationToken.None,
+                TaskCreationOptions.RunContinuationsAsynchronously,
+                workItemGroup.TaskScheduler);
             
             Task task2 = task1.ContinueWith((Task t) =>
             {
@@ -599,7 +585,8 @@ namespace UnitTests.SchedulerTests
                     failed1 = true; 
                     result1.SetResult(true);
                 }
-            });
+            },
+            workItemGroup.TaskScheduler);
             Task task3 = task1.ContinueWith((Task t) =>
             {
                 if (!t.IsFaulted) this.output.WriteLine("===> 4");
@@ -609,7 +596,8 @@ namespace UnitTests.SchedulerTests
                     failed2 = true; 
                     result2.SetResult(true);
                 }
-            });
+            },
+            workItemGroup.TaskScheduler);
     
             task1.Ignore();
             task2.Ignore();
@@ -623,9 +611,9 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_SchedulingContext()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            ActivationTaskScheduler scheduler = this.orleansTaskScheduler.GetWorkItemGroup(context).TaskScheduler;
+            var context = new UnitTestSchedulingContext();
+            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();
             Task endOfChain = null;
@@ -672,7 +660,7 @@ namespace UnitTests.SchedulerTests
                     Assert.False(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
             });
-            wrapper.Start(scheduler);
+            wrapper.Start(workItemGroup.TaskScheduler);
             bool ok = wrapper.Wait(TimeSpan.FromSeconds(1));
             if (!ok) throw new TimeoutException();
 

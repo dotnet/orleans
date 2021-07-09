@@ -2,16 +2,19 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies activations that have been idle long enough to be deactivated.
     /// </summary>
-    internal class ActivationCollector : IActivationCollector
+    internal class ActivationCollector : IActivationCollector, IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
     {
         internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
@@ -20,17 +23,26 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ActivationData> nothing = new(0);
         private readonly ILogger logger;
+        private IAsyncTimer _collectionTimer;
+        private Task _collectionLoopTask;
+        private int collectionNumber;
+        private int _activationCount;
+        private readonly IOptions<GrainCollectionOptions> _options;
+        private readonly CounterStatistic collectionCounter;
 
-        public ActivationCollector(IOptions<GrainCollectionOptions> options, ILogger<ActivationCollector> logger)
+        public ActivationCollector(
+            IAsyncTimerFactory timerFactory,
+            IOptions<GrainCollectionOptions> options,
+            ILogger<ActivationCollector> logger)
         {
-            var o = options.Value;
-            quantum = o.CollectionQuantum;
-            shortestAgeLimit = new(o.ClassSpecificCollectionAge.Values.Aggregate(o.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
+            _options = options;
+            collectionCounter = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
+            quantum = options.Value.CollectionQuantum;
+            shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             this.logger = logger;
+            _collectionTimer = timerFactory.Create(quantum, "Catalog.GCTimer");
         }
-
-        public TimeSpan Quantum => quantum;
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
@@ -46,10 +58,16 @@ namespace Orleans.Runtime
                 var timeSinceLastUsed = shortestAgeLimit - timeTillCollection;
                 if (timeSinceLastUsed <= recencyPeriod)
                 {
-                    sum += bucket.Value.ApproximateCount;
+                    sum += bucket.Value.Items.Count;
                 }
             }
+
             return sum;
+        }
+
+        public Task CollectActivations(TimeSpan ageLimit)
+        {
+            return CollectActivationsImpl(false, ageLimit);
         }
 
         public void ScheduleCollection(ActivationData item)
@@ -130,7 +148,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private bool DequeueQuantum(out IEnumerable<ActivationData> items, DateTime now)
+        private bool DequeueQuantum(out List<ActivationData> items, DateTime now)
         {
             DateTime key;
             lock (buckets)
@@ -161,10 +179,10 @@ namespace Orleans.Runtime
             var now = DateTime.UtcNow;
             var all = buckets.ToList();
             return string.Format("<#Activations={0}, #Buckets={1}, buckets={2}>",
-                    all.Sum(b => b.Value.ApproximateCount),
+                    all.Sum(b => b.Value.Items.Count),
                     all.Count,
                     Utils.EnumerableToString(
-                        all.Select(i => i.Value).OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
+                        all.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.Value.Items.Count + " items"));
         }
 
         /// <summary>
@@ -174,9 +192,8 @@ namespace Orleans.Runtime
         public List<ActivationData> ScanStale()
         {
             var now = DateTime.UtcNow;
-            List<ActivationData> result = null;
-            IEnumerable<ActivationData> activations;
-            while (DequeueQuantum(out activations, now))
+            List<ActivationData> condemned = null;
+            while (DequeueQuantum(out var activations, now))
             {
                 // at this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently. if the activation is to be reactivated, it's our job to clear the activation's copy of the ticket.
                 foreach (var activation in activations)
@@ -195,40 +212,22 @@ namespace Orleans.Runtime
                                 "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {0}",
                                 activation.ToDetailedString());
                         }
-                        else if (activation.ShouldBeKeptAlive)
+                        else if (activation.ShouldBeKeptAlive || !activation.IsInactive || !activation.IsStale(now))
                         {
-                            // Consider: need to reschedule to what is the remaining time for ShouldBeKeptAlive, not the full CollectionAgeLimit.
-                            ScheduleCollection(activation);
-                        }
-                        else if (!activation.IsInactive)
-                        {
-                            // This is essentialy a bug, an active activation should not be in the last bucket.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_2,
-                                "ActivationCollector found an active activation in it's last bucket. This is violation of ActivationCollector invariants. " +
-                                "For now going to defer it's collection. Activation: {0}",
-                                activation.ToDetailedString());
-                            ScheduleCollection(activation);
-                        }
-                        else if (!activation.IsStale(now))
-                        {
-                            // This is essentialy a bug, a non stale activation should not be in the last bucket.
-                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
-                                "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
-                                "For now going to defer it's collection. Activation: {1}",
-                                LogFormatter.PrintDate(now),
-                                activation.ToDetailedString());
+                            // Consider: if ShouldBeKeptAlive is set, should reschedule to what is the remaining time for ShouldBeKeptAlive, not the full CollectionAgeLimit.
                             ScheduleCollection(activation);
                         }
                         else
                         {
                             // Atomically set Deactivating state, to disallow any new requests or new timer ticks to be dispatched on this activation.
-                            activation.PrepareForDeactivation();
-                            DecideToCollectActivation(activation, ref result);
+                            activation.StartDeactivating();
+                            AddActivationToList(activation, ref condemned);
                         }
                     }
                 }
             }
-            return result ?? nothing;
+
+            return condemned ?? nothing;
         }
 
         /// <summary>
@@ -238,7 +237,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public List<ActivationData> ScanAll(TimeSpan ageLimit)
         {
-            List<ActivationData> result = null;
+            List<ActivationData> condemned = null;
             var now = DateTime.UtcNow;
             foreach (var kv in buckets)
             {
@@ -267,8 +266,8 @@ namespace Orleans.Runtime
                                 if (bucket.TryRemove(activation))
                                 {
                                     // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.PrepareForDeactivation();
-                                    DecideToCollectActivation(activation, ref result);
+                                    activation.StartDeactivating();
+                                    AddActivationToList(activation, ref condemned);
                                 }
                                 // someone else has already deactivated the activation, so there's nothing to do.
                             }
@@ -280,19 +279,14 @@ namespace Orleans.Runtime
                     }
                 }
             }
-            return result ?? nothing;
+
+            return condemned ?? nothing;
         }
 
-        private void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
+        private void AddActivationToList(ActivationData activation, ref List<ActivationData> condemned)
         {
-            if (null == condemned)
-            {
-                condemned = new List<ActivationData> { activation };
-            }
-            else
-            {
-                condemned.Add(activation);
-            }
+            condemned ??= new();
+            condemned.Add(activation);
 
             this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
@@ -338,25 +332,183 @@ namespace Orleans.Runtime
 
             item.ResetCollectionCancelledFlag();
 
-            var bucket = buckets.GetOrAdd(ticket, key => new Bucket(key));
+            var bucket = buckets.GetOrAdd(ticket, _ => new Bucket());
             bucket.Add(item);
             item.SetCollectionTicket(ticket);
         }
 
+        void IActivationWorkingSetObserver.OnAdded(IActivationWorkingSetMember member)
+        {
+            Interlocked.Increment(ref _activationCount);
+            if (member is ActivationData activation)
+            {
+                if (activation.CollectionTicket == default)
+                {
+                    ScheduleCollection(activation);
+                }
+                else
+                {
+                    TryRescheduleCollection(activation);
+                }
+            }
+        }
+
+        void IActivationWorkingSetObserver.OnActive(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                TryRescheduleCollection(activation);
+            }
+        }
+
+        void IActivationWorkingSetObserver.OnEvicted(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation && activation.CollectionTicket == default)
+            {
+                TryRescheduleCollection(activation);
+            }
+        }
+
+        void IActivationWorkingSetObserver.OnDeactivating(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                TryCancelCollection(activation);
+            }
+        }
+
+        void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
+        {
+            Interlocked.Decrement(ref _activationCount);
+            if (member is ActivationData activation)
+            {
+                TryCancelCollection(activation);
+            }
+        }
+
+        private Task Start(CancellationToken cancellationToken)
+        {
+            _collectionLoopTask = RunActivationCollectionLoop();
+            return Task.CompletedTask;
+        }
+
+        private async Task Stop(CancellationToken cancellationToken)
+        {
+            _collectionTimer?.Dispose();
+
+            if (_collectionLoopTask is Task task)
+            {
+                await task.WithCancellation(cancellationToken);
+            }
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(
+                nameof(ActivationCollector),
+                ServiceLifecycleStage.RuntimeServices,
+                async cancellation => await Start(cancellation),
+                async cancellation => await Stop(cancellation));
+        }
+
+        private async Task RunActivationCollectionLoop()
+        {
+            while (await _collectionTimer.NextTick())
+
+            {
+                try
+                {
+                    await this.CollectActivationsImpl(true);
+                }
+                catch (Exception exception)
+                {
+                    this.logger.LogError(exception, "Exception while collecting activations");
+                }
+            }
+        }
+
+        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        {
+            var watch = ValueStopwatch.StartNew();
+            var number = Interlocked.Increment(ref collectionNumber);
+            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_BeforeCollection,
+                    "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}",
+                    number,
+                    memBefore,
+                    _activationCount,
+                    ToString());
+            }
+
+            List<ActivationData> list = scanStale ? ScanStale() : ScanAll(ageLimit);
+            collectionCounter.Increment();
+            var count = 0;
+            if (list != null && list.Count > 0)
+            {
+                count = list.Count;
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                await DeactivateActivationsFromCollector(list);
+            }
+            
+            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+            watch.Stop();
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_AfterCollection,
+                    "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}",
+                    number,
+                    memAfter,
+                    _activationCount,
+                    count,
+                    ToString(),
+                    watch.Elapsed);
+            }
+        }
+
+        private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
+        {
+            var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
+            var mtcs = new MultiTaskCompletionSource(list.Count);
+
+            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
+            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
+
+            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            for (var i = 0; i < list.Count; i++)
+            {
+                var activationData = list[i];
+
+                // Continue deactivation when ready
+                _ = activationData.DeactivateAsync(cts.Token).ContinueWith(signalCompletion);
+            }
+
+            await mtcs.Task;
+        }
+
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            if (_collectionTimer is IAsyncTimer timer)
+            {
+                return timer.CheckHealth(lastCheckTime, out reason);
+            }
+
+            reason = default;
+            return true;
+        }
+
         private class Bucket
         {
-            private readonly DateTime key;
-            private readonly ConcurrentDictionary<ActivationId, ActivationData> items = new();
-
-            public DateTime Key => key;
-            public int ApproximateCount => items.Count;
-            public ConcurrentDictionary<ActivationId, ActivationData> Items => items;
-
-            public Bucket(DateTime key) => this.key = key;
+            public ConcurrentDictionary<ActivationData, ActivationData> Items { get; } = new(ReferenceEqualsComparer.Default);
 
             public void Add(ActivationData item)
             {
-                if (!items.TryAdd(item.ActivationId, item))
+                if (!Items.TryAdd(item, item))
                 {
                     throw new InvalidOperationException("item is already associated with this bucket");
                 }
@@ -365,22 +517,18 @@ namespace Orleans.Runtime
             public bool TryRemove(ActivationData item)
             {
                 if (!item.TrySetCollectionCancelledFlag()) return false;
-                return items.TryRemove(item.ActivationId, out _);
+                return Items.TryRemove(item, out _);
             }
 
-            public IEnumerable<ActivationData> CancelAll()
+            public List<ActivationData> CancelAll()
             {
                 List<ActivationData> result = null;
-                foreach (var pair in items)
+                foreach (var pair in Items)
                 {
                     // attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.
                     if (pair.Value.TrySetCollectionCancelledFlag())
                     {
-                        if (result == null)
-                        {
-                            // we only need to ensure there's enough space left for this element and any potential entries.
-                            result = new List<ActivationData>();
-                        }
+                        result ??= new List<ActivationData>();
                         result.Add(pair.Value);
                     }
                 }
