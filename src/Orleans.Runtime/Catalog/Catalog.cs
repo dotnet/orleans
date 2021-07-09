@@ -78,7 +78,6 @@ namespace Orleans.Runtime
             GrainVersionManifest grainInterfaceVersions,
             CompatibilityDirectorManager compatibilityDirectorManager,
             GrainPropertiesResolver grainPropertiesResolver,
-            IncomingRequestMonitor incomingRequestMonitor,
             PlacementService placementService)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
@@ -113,7 +112,7 @@ namespace Orleans.Runtime
                 messagingTrace,
                 localSiloDetails);
             messageCenter.Dispatcher = this.Dispatcher;
-            this.ActivationMessageScheduler = new ActivationMessageScheduler(this, this.Dispatcher, grainInterfaceVersions, messagingTrace, activationCollector, scheduler, compatibilityDirectorManager, incomingRequestMonitor);
+            this.ActivationMessageScheduler = new ActivationMessageScheduler(this, this.Dispatcher, grainInterfaceVersions, messagingTrace, scheduler, compatibilityDirectorManager);
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 

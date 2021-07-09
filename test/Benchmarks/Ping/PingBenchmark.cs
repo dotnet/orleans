@@ -12,7 +12,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Metadata;
 
 namespace Benchmarks.Ping
 {
@@ -20,6 +19,7 @@ namespace Benchmarks.Ping
     public class PingBenchmark : IDisposable 
     {
         private readonly List<IHost> hosts = new List<IHost>();
+
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
@@ -32,7 +32,8 @@ namespace Benchmarks.Ping
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var hostBuilder = new HostBuilder().UseOrleans(siloBuilder =>
                 {
-                    siloBuilder.UseLocalhostClustering(
+                    siloBuilder.ConfigureDefaults()
+                    .UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,
                         primarySiloEndpoint: primary);
@@ -40,10 +41,6 @@ namespace Benchmarks.Ping
                     if (i == 0 && grainsOnSecondariesOnly)
                     {
                         siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                        siloBuilder.ConfigureServices(services =>
-                        {
-                            services.Remove(services.First(s => s.ImplementationType?.Name == "ApplicationPartValidator"));
-                        });
                     }
                 });
 

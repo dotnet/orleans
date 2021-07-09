@@ -121,6 +121,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationDirectory>();
             services.AddSingleton<ActivationCollector>();
             services.AddFromExisting<IActivationCollector, ActivationCollector>();
+            services.AddFromExisting<IActivationWorkingSetObserver, ActivationCollector>();
+
+            services.AddSingleton<ActivationWorkingSet>();
+            services.AddFromExisting<IActivationWorkingSet, ActivationWorkingSet>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationWorkingSet>();
 
             // Directory
             services.TryAddSingleton<LocalGrainDirectory>();
@@ -251,6 +256,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainContextAccessor, GrainContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
+            services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
 
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>

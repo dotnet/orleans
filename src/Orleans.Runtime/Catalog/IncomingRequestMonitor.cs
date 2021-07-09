@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Monitors currently-active requests and sends status notifications to callers for long-running and blocked requests.
     /// </summary>
-    internal sealed class IncomingRequestMonitor : ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class IncomingRequestMonitor : ILifecycleParticipant<ISiloLifecycle>, IActivationWorkingSetObserver
     {
         private static readonly TimeSpan DefaultAnalysisPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InactiveGrainIdleness = TimeSpan.FromMinutes(1);
@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         private readonly IMessageCenter _messageCenter;
         private readonly MessageFactory _messageFactory;
         private readonly IOptionsMonitor<SiloMessagingOptions> _messagingOptions;
-        private readonly ConcurrentDictionary<ActivationData, ActivationData> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, ActivationData>(ReferenceEqualsComparer<ActivationData>.Instance);
+        private readonly ConcurrentDictionary<ActivationData, bool> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, bool>(ReferenceEqualsComparer<ActivationData>.Instance);
         private bool _enabled = true;
         private Task _runTask;
 
@@ -43,8 +43,27 @@ namespace Orleans.Runtime
                 return;
             }
             
-            _recentlyUsedActivations.TryAdd(activation, activation);
+            _recentlyUsedActivations.TryAdd(activation, true);
         }
+
+        public void OnActive(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                MarkRecentlyUsed(activation);
+            }
+        }
+
+        public void OnAdded(IActivationWorkingSetMember member) => OnActive(member);
+        public void OnIdle(IActivationWorkingSetMember member)
+        {
+            if (member is ActivationData activation)
+            {
+                _recentlyUsedActivations.TryRemove(activation, out _);
+            }
+        }
+
+        public void OnRemoved(IActivationWorkingSetMember member) => OnIdle(member);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
@@ -97,15 +116,9 @@ namespace Orleans.Runtime
                 var now = DateTime.UtcNow;
                 foreach (var activationEntry in _recentlyUsedActivations)
                 {
-                    var activation = activationEntry.Value;
+                    var activation = activationEntry.Key;
                     lock (activation)
                     {
-                        if (activation.IsInactive && activation.GetIdleness(now) > InactiveGrainIdleness)
-                        {
-                            _recentlyUsedActivations.TryRemove(activation, out _);
-                            continue;
-                        }
-
                         activation.AnalyzeWorkload(now, _messageCenter, _messageFactory, options);
                     }
 

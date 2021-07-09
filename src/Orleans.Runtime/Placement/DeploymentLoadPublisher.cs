@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory activationDirectory;
-        private readonly ActivationCollector activationCollector;
+        private readonly IActivationWorkingSet activationWorkingSet;
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IMessageCenter messageCenter,
             ActivationDirectory activationDirectory,
-            ActivationCollector activationCollector,
+            IActivationWorkingSet activationWorkingSet,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
             this.scheduler = scheduler;
             this.messageCenter = messageCenter;
             this.activationDirectory = activationDirectory;
-            this.activationCollector = activationCollector;
+            this.activationWorkingSet = activationWorkingSet;
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
@@ -89,7 +89,7 @@ namespace Orleans.Runtime
                 var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
-                var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
+                var recentlyUsedActivationCount = this.activationWorkingSet.Count;
                 var myStats = new SiloRuntimeStatistics(
                     activationCount,
                     recentlyUsedActivationCount,
