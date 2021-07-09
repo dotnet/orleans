@@ -57,8 +57,12 @@ namespace Orleans.Providers.Streams.Common
             this.streamId = streamId;
             this.logger = logger;
             current = null;
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {StreamId}, {NameSpace}", streamId);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("SimpleQueueCacheCursor New Cursor for {StreamId}", streamId);
+            }
         }
+
 
         /// <summary>
         /// Get the current value.
@@ -71,7 +75,10 @@ namespace Orleans.Providers.Streams.Common
         /// </returns>
         public virtual IBatchContainer GetCurrent(out Exception exception)
         {
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor.GetCurrent: {Current}", current);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("SimpleQueueCacheCursor.GetCurrent: {Current}", current);
+            }
 
             exception = null;
             return current;
