@@ -67,13 +67,38 @@ namespace Orleans.Runtime
             }
         }
 
+        public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            // TODO: Remove expensive interface type check
+            if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                var copy = this.deepCopier.Copy(request);
+                var responseCompletionSource = ResponseCompletionSourcePool.Get();
+                this.RuntimeClient.SendRequest(reference, copy, responseCompletionSource, options);
+                return responseCompletionSource.AsVoidValueTask();
+            }
+            else
+            {
+                return InvokeMethodWithFiltersAsync(reference, request, options);
+            }
+        }
+
         private async ValueTask<TResult> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
             var copy = this.deepCopier.Copy(request);
             var invoker = new OutgoingCallInvoker<TResult>(reference, copy, options, this.sendRequest, this.filters);
             await invoker.Invoke();
-            return invoker.Response.GetResult<TResult>();
+            return invoker.TypedResult;
+        }
+
+        private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            SetGrainCancellationTokensTarget(reference, request);
+            var copy = this.deepCopier.Copy(request);
+            var invoker = new OutgoingCallInvoker<object>(reference, copy, options, this.sendRequest, this.filters);
+            await invoker.Invoke();
         }
 
         public object Cast(IAddressable grain, Type grainInterface)

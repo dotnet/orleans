@@ -125,45 +125,123 @@ namespace Orleans.CodeGenerator
 
         private static void ValidateBaseClass(LibraryTypes l, INamedTypeSymbol baseClass)
         {
-            var found = false;
-            foreach (var member in baseClass.GetMembers("InvokeAsync"))
+            ValidateGenericInvokeAsync(l, baseClass);
+            ValidateNonGenericInvokeAsync(l, baseClass);
+
+            static void ValidateGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
             {
-                if (member is not IMethodSymbol method)
+                var found = false;
+                string complaint = null;
+                ISymbol complaintMember = null;
+                foreach (var member in baseClass.GetMembers("InvokeAsync"))
                 {
-                    Throw(member, "not a method");
+                    if (member is not IMethodSymbol method)
+                    {
+                        complaintMember = member;
+                        complaint = "not a method";
+                        continue;
+                    }
+
+                    if (method.TypeParameters.Length != 1)
+                    {
+                        complaintMember = member;
+                        complaint = "incorrect number of type parameters (expected one type parameter)";
+                        continue;
+                    }
+
+                    if (method.Parameters.Length != 1)
+                    {
+                        complaintMember = member;
+                        complaint = $"missing parameter (expected a parameter of type {l.IInvokable.ToDisplayString()})";
+                        continue;
+                    }
+
+                    if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
+                    {
+                        complaintMember = member;
+                        complaint = $"incorrect parameter type (found {method.Parameters[0].Type}, expected {l.IInvokable})";
+                        continue;
+                    }
+
+                    var expectedReturnType = l.ValueTask_1.Construct(method.TypeParameters[0]);
+                    if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, expectedReturnType))
+                    {
+                        complaintMember = member;
+                        complaint = $"incorrect return type (found: {method.ReturnType.ToDisplayString()}, expected {expectedReturnType.ToDisplayString()})";
+                        continue;
+                    }
+
+                    found = true;
                 }
 
-                if (method.TypeParameters.Length != 1)
+                if (!found)
                 {
-                    Throw(member, "incorrect number of type parameters");
-                }
+                    var notFoundMessage = $"Proxy base class {baseClass} does not contain a definition for ValueTask<T> InvokeAsync<T>(IInvokable)";
+                    if (complaint is { Length: > 0 })
+                    {
+                        throw new InvalidOperationException($"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}");
+                    }
 
-                if (method.Parameters.Length != 1)
-                {
-                    Throw(member, "missing parameter");
+                    throw new InvalidOperationException(notFoundMessage);
                 }
-
-                if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
-                {
-                    Throw(member, "incorrect parameter type");
-                }
-
-                if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, l.ValueTask_1.Construct(method.TypeParameters[0])))
-                {
-                    Throw(member, "incorrect return type");
-                }
-
-                found = true;
             }
-
-            if (!found)
+            
+            static void ValidateNonGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
             {
-                throw new InvalidOperationException(
-                    $"Proxy base class {baseClass} does not contain a definition for ValueTask<T> InvokeAsync<T>(IInvokable)");
-            }
+                var found = false;
+                string complaint = null;
+                ISymbol complaintMember = null;
+                foreach (var member in baseClass.GetMembers("InvokeAsync"))
+                {
+                    if (member is not IMethodSymbol method)
+                    {
+                        complaintMember = member;
+                        complaint = "not a method";
+                        continue;
+                    }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            static void Throw(ISymbol m, string x) => throw new InvalidOperationException("Complaint: " + x + " for symbol: " + m.ToDisplayString());
+                    if (method.TypeParameters.Length != 0)
+                    {
+                        complaintMember = member;
+                        complaint = "incorrect number of type parameters (expected zero)";
+                        continue;
+                    }
+
+                    if (method.Parameters.Length != 1)
+                    {
+                        complaintMember = member;
+                        complaint = $"missing parameter (expected a parameter of type {l.IInvokable.ToDisplayString()})";
+                        continue;
+                    }
+
+                    if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
+                    {
+                        complaintMember = member;
+                        complaint = $"incorrect parameter type (found {method.Parameters[0].Type}, expected {l.IInvokable})";
+                        continue;
+                    }
+
+                    if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, l.ValueTask))
+                    {
+                        complaintMember = member;
+                        complaint = $"incorrect return type (found: {method.ReturnType.ToDisplayString()}, expected {l.ValueTask.ToDisplayString()})";
+                        continue;
+                    }
+
+                    found = true;
+                }
+
+                if (!found)
+                {
+                    var notFoundMessage = $"Proxy base class {baseClass} does not contain a definition for ValueTask InvokeAsync(IInvokable)";
+                    if (complaint is { Length: > 0 })
+                    {
+                        throw new InvalidOperationException($"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}");
+                    }
+
+                    throw new InvalidOperationException(notFoundMessage);
+                }
+            }
         }
 
         private sealed class MethodSignatureComparer : IEqualityComparer<IMethodSymbol>, IComparer<IMethodSymbol>

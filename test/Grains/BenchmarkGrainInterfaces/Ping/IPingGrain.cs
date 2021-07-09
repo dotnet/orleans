@@ -6,11 +6,11 @@ namespace BenchmarkGrainInterfaces.Ping
 {
     public interface IPingGrain : IGrainWithIntegerKey
     {
-        Task Run();
+        ValueTask Run();
 
         [AlwaysInterleave]
-        Task PingPongInterleave(IPingGrain other, int count);
+        ValueTask PingPongInterleave(IPingGrain other, int count);
 
-        Task<int> GetSiloPort();
+        ValueTask<int> GetSiloPort();
     }
 }

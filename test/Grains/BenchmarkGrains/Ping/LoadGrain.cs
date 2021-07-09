@@ -50,11 +50,11 @@ namespace BenchmarkGrains.Ping
             {
                 if(all)
                 {
-                    await Task.WhenAll(pendingWork.Select(p => p.PendingCall).Where(t => t!=null));
+                    await Task.WhenAll(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
                 else
                 {
-                    await Task.WhenAny(pendingWork.Select(p => p.PendingCall).Where(t => t != null));
+                    await Task.WhenAny(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
             } catch (Exception) {}
             foreach (Pending pending in pendingWork.Where(p => p.PendingCall != null))
@@ -62,12 +62,12 @@ namespace BenchmarkGrains.Ping
                 if (pending.PendingCall.IsFaulted || pending.PendingCall.IsCanceled)
                 {
                     report.Failed++;
-                    pending.PendingCall = null;
+                    pending.PendingCall = default;
                 }
                 else if (pending.PendingCall.IsCompleted)
                 {
                     report.Succeeded++;
-                    pending.PendingCall = null;
+                    pending.PendingCall = default;
                 }
             }
         }
@@ -75,7 +75,7 @@ namespace BenchmarkGrains.Ping
         private class Pending
         {
             public IPingGrain Grain { get; set; }
-            public Task PendingCall { get; set; }
+            public ValueTask PendingCall { get; set; }
         }
     }
 }

@@ -29,6 +29,8 @@ namespace Orleans.Runtime
 
         ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
+        ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options);
+
         /// <summary>
         /// Converts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
         /// </summary>
