@@ -423,7 +423,7 @@ namespace Orleans.Runtime.Messaging
                 this.LocalEndPoint);
 
             // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
-            if (message?.Headers is null)
+            if (message is null)
             {
                 // Returning false here informs the caller that the exception should not be caught.
                 return false;
