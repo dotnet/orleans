@@ -1,0 +1,14 @@
+@page "/load-test"
+<h3>LoadTest</h3>
+
+<EditForm Model="@_model">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <InputNumber @bind-Value="_model.ParallelRequestCount" />
+    <InputNumber @bind-Value="_model.ShardCount" />
+    <InputNumber @bind-Value="_model.PayloadItemCount" />
+    <label>Target Parallel Items:</label>
+    <span>@(_model.ParallelRequestCount * _model.ShardCount * _model.PayloadItemCount)</span>
+    <button type="submit">Start</button>
+    <button type="button">Stop</button>
+</EditForm>
