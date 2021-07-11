@@ -88,7 +88,7 @@ namespace Orleans.Runtime
             MessagesSentPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                MessagesSentPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
+                MessagesSentPerDirection[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
 
@@ -96,7 +96,7 @@ namespace Orleans.Runtime
             MessagesReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                MessagesReceivedPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
+                MessagesReceivedPerDirection[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
 
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             ReroutedMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                ReroutedMessages[(int)direction] = CounterStatistic.FindOrCreate(
+                ReroutedMessages[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_REROUTED_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
 
@@ -154,13 +154,13 @@ namespace Orleans.Runtime
         {
             Debug.Assert(numTotalBytes >= 0, $"OnMessageSend(numTotalBytes={numTotalBytes})");
             MessagesSentTotal.Increment();
-            MessagesSentPerDirection[(int)msg.Direction].Increment();
+            MessagesSentPerDirection[(byte)msg.Direction].Increment();
 
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
             messageSendCounter?.Increment();
-            perSocketDirectionStatsSend[(int)connectionDirection].OnMessage(1, numTotalBytes);
+            perSocketDirectionStatsSend[(byte)connectionDirection].OnMessage(1, numTotalBytes);
         }
 
         private static CounterStatistic FindCounter(ConcurrentDictionary<string, CounterStatistic> counters, StatisticName name, CounterStorage storage)
@@ -184,12 +184,12 @@ namespace Orleans.Runtime
         internal static void OnMessageReceive(CounterStatistic messageReceivedCounter, Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection)
         {
             MessagesReceived.Increment();
-            MessagesReceivedPerDirection[(int)msg.Direction].Increment();
+            MessagesReceivedPerDirection[(byte)msg.Direction].Increment();
             totalBytesReceived.IncrementBy(numTotalBytes);
             headerBytesReceived.IncrementBy(headerBytes);
             receiveMsgSizeHistogram.AddData(numTotalBytes);
             messageReceivedCounter?.Increment();
-            perSocketDirectionStatsReceive[(int)connectionDirection].OnMessage(1, numTotalBytes);
+            perSocketDirectionStatsReceive[(byte)connectionDirection].OnMessage(1, numTotalBytes);
         }
 
         internal static void OnMessageExpired(Phase phase)
@@ -237,7 +237,7 @@ namespace Orleans.Runtime
         internal static void OnFailedSentMessage(Message msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            int direction = (int)msg.Direction;
+            int direction = (byte)msg.Direction;
             if (FailedSentMessages[direction] == null)
             {
                 FailedSentMessages[direction] = CounterStatistic.FindOrCreate(
@@ -249,7 +249,7 @@ namespace Orleans.Runtime
         internal static void OnDroppedSentMessage(Message msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            int direction = (int)msg.Direction;
+            int direction = (byte)msg.Direction;
             if (DroppedSentMessages[direction] == null)
             {
                 DroppedSentMessages[direction] = CounterStatistic.FindOrCreate(
@@ -261,7 +261,7 @@ namespace Orleans.Runtime
         internal static void OnRejectedMessage(Message msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            int direction = (int)msg.Direction;
+            int direction = (byte)msg.Direction;
             if (RejectedMessages[direction] == null)
             {
                 RejectedMessages[direction] = CounterStatistic.FindOrCreate(
@@ -272,7 +272,7 @@ namespace Orleans.Runtime
 
         internal static void OnMessageReRoute(Message msg)
         {
-            ReroutedMessages[(int)msg.Direction].Increment();
+            ReroutedMessages[(byte)msg.Direction].Increment();
         }
     }
 }

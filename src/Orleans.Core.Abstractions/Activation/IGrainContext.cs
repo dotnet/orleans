@@ -77,8 +77,8 @@ namespace Orleans.Runtime
         DateTime KeepAliveUntil { get; }
         DateTime CollectionTicket { get; set; }
         bool IsInactive { get; }
-        bool IsStale(DateTime now);
-        TimeSpan GetIdleness(DateTime now);
+        bool IsStale();
+        TimeSpan GetIdleness();
         void StartDeactivating();
         void DelayDeactivation(TimeSpan timeSpan);
     }
