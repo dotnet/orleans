@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
+using Orleans.Serialization.Invocation;
 using System;
 
 namespace Orleans.Serialization.Session
@@ -11,14 +12,14 @@ namespace Orleans.Serialization.Session
         public SerializerSessionPool(IServiceProvider serviceProvider)
         {
             var sessionPoolPolicy = new SerializerSessionPoolPolicy(serviceProvider, ReturnSession);
-            _sessionPool = new DefaultObjectPool<SerializerSession>(sessionPoolPolicy);
+            _sessionPool = new ConcurrentObjectPool<SerializerSession, SerializerSessionPoolPolicy>(sessionPoolPolicy);
         }
 
         public SerializerSession GetSession() => _sessionPool.Get();
 
         private void ReturnSession(SerializerSession session) => _sessionPool.Return(session);
 
-        private class SerializerSessionPoolPolicy : IPooledObjectPolicy<SerializerSession>
+        private readonly struct SerializerSessionPoolPolicy : IPooledObjectPolicy<SerializerSession>
         {
             private readonly IServiceProvider _serviceProvider;
             private readonly ObjectFactory _factory;

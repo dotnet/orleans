@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Invocation
 
         private static class TypedPool<T>
         {
-            public static readonly DefaultObjectPool<PooledResponse<T>> Pool = new DefaultObjectPool<PooledResponse<T>>(new DefaultPooledObjectPolicy<PooledResponse<T>>());
+            public static readonly ConcurrentObjectPool<PooledResponse<T>> Pool = new();
         }
     }
 }
