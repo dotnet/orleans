@@ -215,7 +215,7 @@ namespace Orleans.GrainReferences
         }
     }
 
-    internal class NewGrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
+    internal class GrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainPropertiesResolver _propertiesResolver;
@@ -223,7 +223,7 @@ namespace Orleans.GrainReferences
         private readonly GrainVersionManifest _grainVersionManifest;
         private IGrainReferenceRuntime _grainReferenceRuntime;
 
-        public NewGrainReferenceActivatorProvider(
+        public GrainReferenceActivatorProvider(
             IServiceProvider serviceProvider,
             GrainPropertiesResolver propertiesResolver,
             NewRpcProvider rpcProvider,
@@ -256,16 +256,16 @@ namespace Orleans.GrainReferences
             var invokeMethodOptions = unordered ? InvokeMethodOptions.Unordered : InvokeMethodOptions.None;
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
             var shared = new GrainReferenceShared(grainType, interfaceType, interfaceVersion, runtime, invokeMethodOptions, _serviceProvider);
-            activator = new NewGrainReferenceActivator(proxyType, shared);
+            activator = new GrainReferenceActivator(proxyType, shared);
             return true;
         }
 
-        private class NewGrainReferenceActivator : IGrainReferenceActivator
+        private class GrainReferenceActivator : IGrainReferenceActivator
         {
             private readonly Type _referenceType;
             private readonly GrainReferenceShared _shared;
 
-            public NewGrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
+            public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
             {
                 _referenceType = referenceType;
                 _shared = shared;
