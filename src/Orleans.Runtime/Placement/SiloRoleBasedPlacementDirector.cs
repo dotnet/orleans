@@ -10,6 +10,7 @@ namespace Orleans.Runtime.Placement
     internal class SiloRoleBasedPlacementDirector : IPlacementDirector
     {
         private readonly MembershipTableManager membershipTableManager;
+        private static readonly SafeRandom random = new SafeRandom();
 
         public SiloRoleBasedPlacementDirector(MembershipTableManager membershipTableManager)
         {
@@ -19,7 +20,7 @@ namespace Orleans.Runtime.Placement
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            string siloRole = target.GrainIdentity.Key.ToString();
+            string siloRole = target.GrainIdentity.PrimaryKeyString;
 
             List<SiloAddress> siloAddressesSameRole = membershipTableManager.MembershipTableSnapshot.Entries
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
@@ -32,7 +33,7 @@ namespace Orleans.Runtime.Placement
                 throw new OrleansException($"Cannot place grain with RoleName {siloRole}. Either Role name is invalid or there are no active silos with type {siloRole} in MembershipTableSnapshot registered yet.");
             }
 
-            return Task.FromResult(siloAddressesSameRole[ThreadSafeRandom.Next(siloAddressesSameRole.Count)]);
+            return Task.FromResult(siloAddressesSameRole[random.Next(siloAddressesSameRole.Count)]);
         }
     }
 }
