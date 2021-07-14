@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -34,7 +35,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Functional")]
         public async Task SiloRoleBasedPlacementDirector_CanFindSilo()
         {
-            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("testhost");
+            var roleName = Assembly.GetEntryAssembly()?.GetName().Name;
+            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>(roleName);
             bool result = await grain.Ping();
             Assert.True(result);
         }
