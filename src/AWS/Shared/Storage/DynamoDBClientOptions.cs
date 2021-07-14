@@ -31,5 +31,10 @@ namespace Orleans.Reminders.DynamoDB
         /// Token for DynamoDB storage
         /// </summary>
         public string Token { get; set; }
+
+        /// <summary>
+        /// AWS profile name.
+        /// </summary>
+        public string ProfileName { get; set; }
     }
 }
