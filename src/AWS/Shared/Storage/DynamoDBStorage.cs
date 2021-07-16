@@ -129,13 +129,8 @@ namespace Orleans.Transactions.DynamoDB
                 var chain = new CredentialProfileStoreChain();
                 if (chain.TryGetAWSCredentials(this.profileName, out var credentials))
                 {
-                    var immutableCredentials = credentials.GetCredentials();
-                    var sessionCredentials = new SessionAWSCredentials(
-                        immutableCredentials.AccessKey,
-                        immutableCredentials.SecretKey,
-                        immutableCredentials.Token);
                     this.ddbClient = new AmazonDynamoDBClient(
-                        sessionCredentials,
+                        credentials,
                         new AmazonDynamoDBConfig
                         {
                             RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)
