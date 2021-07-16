@@ -41,6 +41,7 @@ namespace Orleans.Clustering.DynamoDB
                 this.options.AccessKey,
                 this.options.SecretKey,
                 this.options.Token,
+                this.options.ProfileName,
                 this.options.ReadCapacityUnits,
                 this.options.WriteCapacityUnits);
 

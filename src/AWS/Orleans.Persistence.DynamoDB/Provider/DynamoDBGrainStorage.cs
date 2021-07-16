@@ -85,7 +85,7 @@ namespace Orleans.Storage
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
                 this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.Token, this.options.ReadCapacityUnits, this.options.WriteCapacityUnits, this.options.UseProvisionedThroughput);
+                 this.options.Token, this.options.ProfileName, this.options.ReadCapacityUnits, this.options.WriteCapacityUnits, this.options.UseProvisionedThroughput);
 
                 await storage.InitializeTable(this.options.TableName,
                     new List<KeySchemaElement>
