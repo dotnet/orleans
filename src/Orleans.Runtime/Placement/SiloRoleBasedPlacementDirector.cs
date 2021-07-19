@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Placement
 
             if (siloAddressesSameRole == null || siloAddressesSameRole.Count == 0)
             {
-                throw new OrleansException($"Available: {membershipTableManager.MembershipTableSnapshot.Entries.FirstOrDefault().Value?.RoleName}. Cannot place grain with RoleName {siloRole}. Either Role name is invalid or there are no active silos with type {siloRole} in MembershipTableSnapshot registered yet.");
+                throw new OrleansException($"Cannot place grain with RoleName {siloRole}. Either Role name is invalid or there are no active silos with type {siloRole} in MembershipTableSnapshot registered yet.");
             }
 
             return Task.FromResult(siloAddressesSameRole[random.Next(siloAddressesSameRole.Count)]);
