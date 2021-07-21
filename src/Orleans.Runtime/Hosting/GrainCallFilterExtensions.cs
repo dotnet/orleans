@@ -26,7 +26,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline via a delegate.
+        /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline via a delegate.
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
