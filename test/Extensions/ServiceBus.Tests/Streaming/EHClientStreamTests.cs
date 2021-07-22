@@ -58,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
                         b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
                         b.Configure<EventHubOptions>(ob => ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConfigureTestDefaults();
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }));
@@ -83,7 +83,7 @@ namespace ServiceBus.Tests.StreamingTests
                     .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
                         .Configure<EventHubOptions>(ob=>ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConfigureTestDefaults();
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         })))

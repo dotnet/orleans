@@ -4,13 +4,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Producer;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -47,7 +48,7 @@ namespace Orleans.ServiceBus.Providers
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
-        private EventHubClient client;
+        private EventHubProducerClient client;
         private ITelemetryProducer telemetryProducer;
 
         /// <summary>
@@ -110,7 +111,7 @@ namespace Orleans.ServiceBus.Providers
             string name,
             EventHubOptions ehOptions,
             EventHubReceiverOptions receiverOptions,
-            EventHubStreamCachePressureOptions cacheOptions, 
+            EventHubStreamCachePressureOptions cacheOptions,
             StreamCacheEvictionOptions cacheEvictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
@@ -226,7 +227,7 @@ namespace Orleans.ServiceBus.Providers
         {
             EventData eventData = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, token, requestContext);
             string partitionKey = this.dataAdapter.GetPartitionKey(streamGuid, streamNamespace);
-            return this.client.SendAsync(eventData, partitionKey);
+            return this.client.SendAsync(new[] { eventData }, new SendEventOptions { PartitionKey = partitionKey });
         }
 
         /// <summary>
@@ -255,11 +256,9 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(this.ehOptions.ConnectionString)
-            {
-                EntityPath = this.ehOptions.Path
-            };
-            this.client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+            this.client = ehOptions.TokenCredential != null
+                ? new EventHubProducerClient(ehOptions.FullyQualifiedNamespace, ehOptions.Path, ehOptions.TokenCredential)
+                : new EventHubProducerClient(ehOptions.ConnectionString, ehOptions.Path);
         }
 
         /// <summary>
@@ -291,7 +290,7 @@ namespace Orleans.ServiceBus.Providers
             };
             if (this.checkpointerFactory == null)
                 InitCheckpointerFactory();
-            return new EventHubAdapterReceiver(config, this.CacheFactory, this.checkpointerFactory.Create, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
+            return new EventHubAdapterReceiver(config, this.CacheFactory, this.checkpointerFactory.Create, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer),
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
                 this.telemetryProducer,
                 this.EventHubReceiverFactory);
@@ -303,8 +302,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-            EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
-            return runtimeInfo.PartitionIds;
+            return await client.GetPartitionIdsAsync();
         }
 
         public static EventHubAdapterFactory Create(IServiceProvider services, string name)

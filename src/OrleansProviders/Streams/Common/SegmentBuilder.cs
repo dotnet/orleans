@@ -1,5 +1,6 @@
 
 using System;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -23,6 +24,16 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
+        public static int CalculateAppendSize(ReadOnlyMemory<byte> memory)
+        {
+            return (memory.Length == 0)
+                ? sizeof(int)
+                : memory.Length + sizeof(int);
+        }
+
+        /// <summary>
+        /// Calculates how much space will be needed to append the provided bytes into the segment.
+        /// </summary>
         public static int CalculateAppendSize(ArraySegment<byte> segment)
         {
             return (segment.Count == 0)
@@ -40,6 +51,30 @@ namespace Orleans.Providers.Streams.Common
             return (string.IsNullOrEmpty(str))
                 ? sizeof(int)
                 : str.Length * sizeof(char) + sizeof(int);
+        }
+
+        /// <summary>
+        /// Appends a <see cref="ReadOnlyMemory{T}"/> of bytes to the end of the segment
+        /// </summary>
+        /// <param name="writerOffset"></param>
+        /// <param name="bytes"></param>
+        /// <param name="segment"></param>
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ReadOnlyMemory<byte> bytes)
+        {
+            if (segment.Array == null)
+            {
+                throw new ArgumentNullException(nameof(segment));
+            }
+
+            var length = bytes.Length;
+            MemoryMarshal.Write(segment.AsSpan(writerOffset), ref length);
+            writerOffset += sizeof(int);
+
+            if (bytes.Length > 0)
+            {
+                bytes.CopyTo(segment.AsMemory(writerOffset));
+                writerOffset += bytes.Length;
+            }
         }
 
         /// <summary>
