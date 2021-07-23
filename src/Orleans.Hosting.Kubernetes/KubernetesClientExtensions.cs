@@ -1,5 +1,6 @@
 using k8s;
 using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
