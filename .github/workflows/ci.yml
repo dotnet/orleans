@@ -1,29 +1,56 @@
-name: .NET Core CI
+name: Orleans .NET Build
 on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
+env: 
+  BUILD_CONFIGURATION: release
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_NOLOGO: true
+  NUGET_XMLDOC_MODE: skip
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        dotnet: ['2.1.x', '3.1.x', '5.x']
+    
+    steps:    
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 2.1
-      uses: actions/setup-dotnet@v1
+
+    # Orleans does not use lock files, yet.
+    # - name: Cache Nuget packages '${{ matrix.dotnet }}' on '${{ matrix.os }}'
+    #  uses: actions/cache@v2.1.6 
+    #  with:
+    #    path: ${{ env.NUGET_PACKAGES }}
+    #    key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+    #    restore-keys: |
+    #      ${{runner.os}}-nuget-
+    
+    - name: Setup .NET ${{ matrix.dotnet }} on ${{ matrix.os }}
+      uses: actions/checkout@v2.3.4
       with:
-        dotnet-version: '2.1.x'
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1
-    - name: Build
-      run: dotnet build
+        dotnet-version: ${{ matrix.dotnet }}
+
+    - name: Install dependencies ${{ matrix.dotnet }} on ${{ matrix.os }}
+      run: dotnet restore
+      # run: dotnet restore --locked-mode
+
+    - name: Build ${{ matrix.dotnet }} on ${{ matrix.os }}
+      run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      # run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore -property:ContinuousIntegrationBuild=true
+      timeout-minutes: 20
+            
+    - name: Test ${{ matrix.dotnet }} on ${{ matrix.os }}
+      run: |
+        dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }}
+      timeout-minutes: 20
