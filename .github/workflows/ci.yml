@@ -51,6 +51,5 @@ jobs:
       timeout-minutes: 40
             
     - name: Test ${{ matrix.dotnet }} on ${{ matrix.os }}
-      run: |
-        dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }}
+      run: dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }}
       timeout-minutes: 40
