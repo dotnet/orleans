@@ -48,8 +48,8 @@ jobs:
     - name: Build ${{ matrix.dotnet }} on ${{ matrix.os }}
       run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
       # run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore -property:ContinuousIntegrationBuild=true
-      timeout-minutes: 40
+      timeout-minutes: 60
             
     - name: Test ${{ matrix.dotnet }} on ${{ matrix.os }}
       run: dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }}
-      timeout-minutes: 40
+      timeout-minutes: 60
