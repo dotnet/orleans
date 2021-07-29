@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.AzureCosmos</PackageId>
+    <Title>Microsoft Orleans provider for Azure Cosmos DB</Title>
+    <Description>Microsoft Orleans clustering/persistence/reminder provider backed by Azure Cosmos DB</Description>
+    <PackageTags>$(PackageTags) Azure Cosmos CosmosDB</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.AzureCosmos</AssemblyName>
+    <RootNamespace>Orleans.AzureCosmos</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="$(MicrosoftAzureCosmosVersion)" ExcludeAssets="build;contentFiles" />
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+
+    <!-- workaround for .NET Core 3.1 build -->
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" Condition="$(TargetFramework)=='netcoreapp3.1'" />
+  </ItemGroup>
+</Project>

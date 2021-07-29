@@ -1,11 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Messaging;
@@ -102,7 +102,7 @@ namespace Orleans
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
         }
-        
+
         /// <summary>
         /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
         /// </summary>
@@ -144,7 +144,7 @@ namespace Orleans
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder ConfigureLogging(this IClientBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
-            return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
+            return builder.ConfigureServices(collection => collection.AddLogging(configureLogging));
         }
 
         /// <summary>
@@ -160,7 +160,7 @@ namespace Orleans
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
+            return builder.UseLocalhostClustering(new[] { gatewayPort }, serviceId, clusterId);
         }
 
         /// <summary>

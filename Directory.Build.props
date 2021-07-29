@@ -69,6 +69,7 @@
     <MicrosoftExtensionsHostingVersion>5.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.16.0</MicrosoftApplicationInsightsVersion>
+    <MicrosoftAzureCosmosVersion>3.20.1</MicrosoftAzureCosmosVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <AzureCoreVersion>1.9.0</AzureCoreVersion>
     <AzureMessagingEventHubs>5.3.0</AzureMessagingEventHubs>
