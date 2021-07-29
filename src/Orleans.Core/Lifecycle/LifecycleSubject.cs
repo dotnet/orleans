@@ -145,7 +145,7 @@ namespace Orleans
             var loggedCancellation = false;
             foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
                 // include up to highest started stage
-                .Where(orderedObserver => orderedObserver.Stage <= highStage)
+                .Where(orderedObserver => orderedObserver.Stage <= highStage && orderedObserver.Observer != null)
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key))
             {

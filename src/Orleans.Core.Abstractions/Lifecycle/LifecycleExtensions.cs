@@ -6,20 +6,23 @@ namespace Orleans
 {
     public static class LifecycleExtensions
     {
-        private static Func<CancellationToken, Task> NoOp => ct => Task.CompletedTask;
-
         public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
-            if (observable == null) throw new ArgumentNullException(nameof(observable));
-            if (onStart == null) throw new ArgumentNullException(nameof(onStart));
-            if (onStop == null) throw new ArgumentNullException(nameof(onStop));
+            if (observable is null) throw new ArgumentNullException(nameof(observable));
+            if (onStart is null) throw new ArgumentNullException(nameof(onStart));
+
+            if (onStop is null)
+            {
+                var observer = new StartupObserver(onStart);
+                return observer.Registration = observable.Subscribe(observerName, stage, observer);
+            }
 
             return observable.Subscribe(observerName, stage, new Observer(onStart, onStop));
         }
 
         public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart)
         {
-            return observable.Subscribe(observerName, stage, onStart, NoOp);
+            return observable.Subscribe(observerName, stage, onStart, null);
         }
 
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
@@ -34,7 +37,7 @@ namespace Orleans
 
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart)
         {
-            return observable.Subscribe<TObserver>(stage, onStart, NoOp);
+            return observable.Subscribe(typeof(TObserver).FullName, stage, onStart, null);
         }
 
         public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
@@ -65,6 +68,23 @@ namespace Orleans
 
             public Task OnStart(CancellationToken ct) => this.onStart(ct);
             public Task OnStop(CancellationToken ct) => this.onStop(ct);
+        }
+
+        private sealed class StartupObserver : ILifecycleObserver
+        {
+            private readonly Func<CancellationToken, Task> onStart;
+            public IDisposable Registration;
+
+            public StartupObserver(Func<CancellationToken, Task> onStart) => this.onStart = onStart;
+
+            public Task OnStart(CancellationToken ct)
+            {
+                var task = this.onStart(ct);
+                Registration?.Dispose();
+                return task;
+            }
+
+            public Task OnStop(CancellationToken ct) => Task.CompletedTask;
         }
     }
 }
