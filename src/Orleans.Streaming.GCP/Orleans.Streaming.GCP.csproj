@@ -1,13 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.GCP</PackageId>
     <Title>Microsoft Orleans stream provider for Google Cloud Platform</Title>
     <Description>Microsoft Orleans stream provider for Google Cloud Platform PubSub.</Description>
     <PackageTags>$(PackageTags)</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.Streaming.GCP</AssemblyName>
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
   </PropertyGroup>
@@ -18,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
   </ItemGroup>
 

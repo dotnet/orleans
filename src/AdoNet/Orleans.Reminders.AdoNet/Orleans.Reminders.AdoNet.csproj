@@ -17,4 +17,7 @@
     <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

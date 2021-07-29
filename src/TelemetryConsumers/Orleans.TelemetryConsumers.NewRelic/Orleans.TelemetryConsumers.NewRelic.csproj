@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <PackageReference Include="NewRelic.Agent.Api" Version="$(NewRelicAgentApiVersion)" />
   </ItemGroup>
   

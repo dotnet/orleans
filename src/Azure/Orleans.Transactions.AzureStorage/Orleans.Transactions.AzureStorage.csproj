@@ -5,9 +5,6 @@
     <Description>Azure Transaction library of Microsoft Orleans used on the server.</Description>
     <PackageTags>$(PackageTags) Azure Transactions</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.Transactions.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Transactions.AzureStorage</RootNamespace>
     <DefineConstants>$(DefineConstants);ORLEANS_TRANSACTIONS</DefineConstants>
@@ -25,9 +22,6 @@
     <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>
 </Project>

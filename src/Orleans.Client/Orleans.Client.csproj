@@ -1,11 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Client</PackageId>
     <Title>Microsoft Orleans Client Libraries</Title>
     <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <NoPackageAnalysis>true</NoPackageAnalysis>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+  </ItemGroup>
 
 </Project>

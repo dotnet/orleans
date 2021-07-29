@@ -6,14 +6,12 @@
     <PackageTags>$(PackageTags) EventSourcing</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.EventSourcing</AssemblyName>
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <PackageReference Include="Microsoft.CSharp" Version="$(MicrosoftCSharpVersion)" />
   </ItemGroup>
 </Project>

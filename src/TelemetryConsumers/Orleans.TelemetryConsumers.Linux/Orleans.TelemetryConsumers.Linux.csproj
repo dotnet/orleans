@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Linux</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Linux</Title>
@@ -11,4 +11,8 @@
     <AssemblyName>Orleans.TelemetryConsumers.Linux</AssemblyName>
     <RootNamespace>OrleansTelemetryConsumers.Linux</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

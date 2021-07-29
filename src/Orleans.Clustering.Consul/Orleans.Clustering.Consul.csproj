@@ -5,14 +5,12 @@
     <Description>Library of utility types for Consul of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Consul</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.Clustering.Consul</AssemblyName>
     <RootNamespace>OrleansConsulUtils</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <PackageReference Include="Consul" Version="$(ConsulVersion)" />
   </ItemGroup>
 

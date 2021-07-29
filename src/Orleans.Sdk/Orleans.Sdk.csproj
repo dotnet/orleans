@@ -7,13 +7,11 @@
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <NoWarn>MSB3277</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" PrivateAssets="None" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" PrivateAssets="None" />
-    <ProjectReference Include="..\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" PrivateAssets="None" />
-    <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" PrivateAssets="None" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\Orleans.Analyzers\Orleans.Analyzers.csproj" PrivateAssets="None" />
     <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="None" />
   </ItemGroup>

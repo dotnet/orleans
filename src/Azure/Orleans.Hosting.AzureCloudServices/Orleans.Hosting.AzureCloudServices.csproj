@@ -5,15 +5,13 @@
     <Description>Hosting utilities for Azure Cloud Services of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Azure Cloud Services</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.Hosting.AzureCloudServices</AssemblyName>
     <RootNamespace>Orleans.Hosting.AzureCloudServices</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <PackageReference Include="Microsoft.CSharp" Version="$(MicrosoftCSharpVersion)" />
   </ItemGroup>
 
