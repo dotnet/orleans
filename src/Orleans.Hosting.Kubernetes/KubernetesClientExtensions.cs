@@ -52,7 +52,7 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 catch (Exception)
                 {
-                    // Suppress exception set by channel writer and re-thrown by Completion task
+                    // suppress exception set by channel writer and re-thrown by Completion task
                 }
                 finally
                 {
