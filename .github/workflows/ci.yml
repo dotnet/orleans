@@ -82,5 +82,5 @@ jobs:
       timeout-minutes: 100
             
     - name: Test ${{ matrix.dotnet }} on ${{ matrix.os }}
-      run: dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }} --filter TestCategory=BVT,
+      run: dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }} --filter "TestCategory != BVT & TestCategory != SlowBVT & TestCategory != Functional"
       timeout-minutes: 100
