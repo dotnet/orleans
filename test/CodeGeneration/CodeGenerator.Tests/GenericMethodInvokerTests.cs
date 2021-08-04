@@ -13,6 +13,7 @@ namespace CodeGenerator.Tests
         Task<int> Method<T>(T x, string y, string z);
         Task<int> Method<T>(object[] x);
         Task<int> Method<T1, T2>(T1 x, T2 y);
+        ValueTask<int> Method<T>(string s);
     }
 
     public class FooGrain : IDummyGrain
@@ -31,6 +32,8 @@ namespace CodeGenerator.Tests
         public Task<int> Method<T>(object[] x) => Task.FromResult(5);
 
         public Task<int> Method<T1, T2>(T1 x, T2 y) => Task.FromResult(6);
+
+        public ValueTask<int> Method<T>(string s) => new(7);
     }
 
     public class GenericMethodInvokerTests
@@ -147,6 +150,22 @@ namespace CodeGenerator.Tests
             });
 
             Assert.Equal(6, result);
+        }
+
+        [Fact]
+        public async Task Overload_invoke_ValueTask_return()
+        {
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), "Method", 1);
+            var mock = new FooGrain();
+
+            var result = await invoker.Invoke(mock, new object[]
+            {
+                typeof(bool),
+                typeof(string),
+                "foo"
+            });
+
+            Assert.Equal(7, result);
         }
     }
 }
