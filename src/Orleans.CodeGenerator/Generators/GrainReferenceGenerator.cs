@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -152,6 +151,9 @@ namespace Orleans.CodeGenerator.Generators
                         allParameters.Add(TypeOfExpression(typeParameter.ToTypeSyntax()));
                     }
 
+                    // PR: 6844 (fix generic overload selector in GenericMethodInvoker)
+                    allParameters.AddRange(parameters.Select(p => TypeOfExpression(p.Symbol.Type.ToTypeSyntax())));
+
                     allParameters.AddRange(parameters.Select(p => GetParameterForInvocation(p.Symbol, p.Name)));
 
                     args =
@@ -212,7 +214,7 @@ namespace Orleans.CodeGenerator.Generators
                                 $"but has a return type which is not assignable from {typeof(Task)} or {typeof(ValueTask)}");
                         }
 
-                        
+
                     }
                 }
                 else if (method.ReturnType is INamedTypeSymbol methodReturnType)
