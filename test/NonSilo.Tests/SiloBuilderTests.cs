@@ -9,6 +9,7 @@ using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;
@@ -84,45 +85,6 @@ namespace NonSilo.Tests
                 .Build();
 
             var clusterClient = host.Services.GetRequiredService<IClusterClient>();
-        }
-
-        /// <summary>
-        /// Tests that a silo cannot be created without specifying a ClusterId and a ServiceId.
-        /// </summary>
-        [Fact]
-        public async Task SiloBuilder_ClusterOptionsTest()
-        {
-            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
-            {
-                await new HostBuilder().UseOrleans(siloBuilder =>
-                {
-                    siloBuilder
-                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                        .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
-                }).RunConsoleAsync();
-            });
-
-            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
-            {
-                await new HostBuilder().UseOrleans(siloBuilder =>
-                {
-                    siloBuilder
-                      .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
-                      .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                      .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
-                }).RunConsoleAsync();
-            });
-
-            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
-            {
-                await new HostBuilder().UseOrleans(siloBuilder =>
-                {
-                    siloBuilder
-                        .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
-                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                        .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
-                }).RunConsoleAsync();
-            });
         }
 
         /// <summary>
