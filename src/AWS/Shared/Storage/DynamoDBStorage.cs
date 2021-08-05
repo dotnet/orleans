@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.Runtime.CredentialManagement;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
@@ -30,6 +31,7 @@ namespace Orleans.Transactions.DynamoDB
     {
         private string accessKey;
         private string token;
+        private string profileName;
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
         private string service;
@@ -48,6 +50,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
         /// <param name="token"></param>
+        /// <param name="profileName"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
@@ -58,6 +61,7 @@ namespace Orleans.Transactions.DynamoDB
             string accessKey = "",
             string secretKey = "",
             string token = "",
+            string profileName = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits,
             bool useProvisionedThroughput = true)
@@ -66,6 +70,7 @@ namespace Orleans.Transactions.DynamoDB
             this.accessKey = accessKey;
             this.secretKey = secretKey;
             this.token = token;
+            this.profileName = profileName;
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
@@ -117,6 +122,25 @@ namespace Orleans.Transactions.DynamoDB
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
                 this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+            }
+            else if (!string.IsNullOrEmpty(this.profileName))
+            {
+                // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
+                var chain = new CredentialProfileStoreChain();
+                if (chain.TryGetAWSCredentials(this.profileName, out var credentials))
+                {
+                    this.ddbClient = new AmazonDynamoDBClient(
+                        credentials,
+                        new AmazonDynamoDBConfig
+                        {
+                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)
+                        });
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"AWS named profile '{this.profileName}' provided, but credentials could not be retrieved");
+                }
             }
             else
             {
