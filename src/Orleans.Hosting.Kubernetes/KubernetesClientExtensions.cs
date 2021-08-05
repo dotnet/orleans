@@ -1,5 +1,6 @@
 using k8s;
 using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -45,9 +46,19 @@ namespace Orleans.Hosting.Kubernetes
 
             _ = Task.Run(async () =>
             {
-                await channel.Reader.Completion.ConfigureAwait(false);
-                watcher[0].Dispose();
-                cancellationRegistration.Dispose();
+                try
+                {
+                    await channel.Reader.Completion.ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // suppress exception set by channel writer and re-thrown by Completion task
+                }
+                finally
+                {
+                    watcher[0].Dispose();
+                    cancellationRegistration.Dispose();
+                }
             });
 
 
