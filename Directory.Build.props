@@ -30,10 +30,7 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);1591;2003</NoWarn>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <!-- We use full (Windows PDBs) until cross platform support for source link will get better -->
-    <DebugType>full</DebugType>
-    <DebugType Condition="$(TargetFramework)=='netcoreapp3.1' or $(TargetFramework)=='net5.0'">embedded</DebugType>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <!-- FSharp SDK overrides -->
@@ -75,14 +72,6 @@
     <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
     <MicrosoftServiceFabricServicesVersion>4.1.456</MicrosoftServiceFabricServicesVersion>
-
-    <!-- used only in netstandard2.0 targets - dot not upgrade unless necessary -->
-    <!-- on .NET Core 3.1+ runtimes these are inbox, so these versions are actually used only on .NET Framework 4.6.2+ -->
-    <SystemCollectionsImmutableVersion>5.0.0</SystemCollectionsImmutableVersion>
-    <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
-    <SystemReflectionMetadataVersion>5.0.0</SystemReflectionMetadataVersion>
-    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
-    <MicrosoftBclHashCodeVersion>1.1.1</MicrosoftBclHashCodeVersion>
 
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
@@ -132,79 +121,6 @@
   <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" $(FullBuild)=='' ">
-    <FullBuild>true</FullBuild>
-  </PropertyGroup>
-
-  <!-- Inner dependency versions -->
-  <PropertyGroup Condition="$(FullBuild) != 'true'">
-    <OrleansCoreAbstractionsVersion>2.3.0</OrleansCoreAbstractionsVersion>
-    <OrleansSerializationVersion>2.3.0</OrleansSerializationVersion>
-    <OrleansRuntimeAbstractionsVersion>2.3.0</OrleansRuntimeAbstractionsVersion>
-    <OrleansCoreVersion>2.3.0</OrleansCoreVersion>
-    <OrleansStreamingAbstractionsVersion>2.3.0</OrleansStreamingAbstractionsVersion>
-    <OrleansStreamingVersion>2.3.0</OrleansStreamingVersion>
-    <OrleansRuntimeVersion>2.3.0</OrleansRuntimeVersion>
-    <OrleansPersistenceMemoryVersion>2.3.0</OrleansPersistenceMemoryVersion>
-    <OrleansExtensionsVersion>2.3.0</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>2.3.0</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>2.3.0</OrleansAdoNetVersion>
-    <OrleansAWSVersion>2.3.0</OrleansAWSVersion>
-    <OrleansAzureClusteringVersion>2.3.0</OrleansAzureClusteringVersion>
-    <OrleansAzureStreamingVersion>2.3.0</OrleansAzureStreamingVersion>
-    <OrleansAzureEventHubsVersion>2.3.0</OrleansAzureEventHubsVersion>
-    <OrleansAzurePersistenceVersion>2.3.0</OrleansAzurePersistenceVersion>
-    <OrleansAzureRemindersVersion>2.3.0</OrleansAzureRemindersVersion>
-    <OrleansAzureGrainDirectoryVersion>2.3.0</OrleansAzureGrainDirectoryVersion>
-    <OrleansAzureMetapackageVersion>2.3.0</OrleansAzureMetapackageVersion>
-    <OrleansGoogleCloudProviderVersion>2.3.0</OrleansGoogleCloudProviderVersion>
-    <OrleansAzureCloudServicesVersion>2.3.0</OrleansAzureCloudServicesVersion>
-    <OrleansTestingHostVersion>2.3.0</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.3.0</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>4.1.456</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.3.0</OrleansSerializersVersion>
-    <OrleansToolsVersion>2.3.0</OrleansToolsVersion>
-    <OrleansClientVersion>2.3.0</OrleansClientVersion>
-    <OrleansServerVersion>2.3.0</OrleansServerVersion>
-    <OrleansCodegenVersion>2.3.0</OrleansCodegenVersion>
-    <OrleansEventHubProviderVersion>2.3.0</OrleansEventHubProviderVersion>
-    <OrleansTelemetryConsumersVersion>2.3.0</OrleansTelemetryConsumersVersion>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="$(FullBuild) == 'true'">
-    <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
-    <OrleansSerializationVersion>$(VersionPrefix)</OrleansSerializationVersion>
-    <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
-    <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
-    <OrleansStreamingAbstractionsVersion>$(VersionPrefix)</OrleansStreamingAbstractionsVersion>
-    <OrleansStreamingVersion>$(VersionPrefix)</OrleansStreamingVersion>
-    <OrleansRuntimeVersion>$(VersionPrefix)</OrleansRuntimeVersion>
-    <OrleansPersistenceMemoryVersion>$(VersionPrefix)</OrleansPersistenceMemoryVersion>
-    <OrleansExtensionsVersion>$(VersionPrefix)</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>$(VersionPrefix)</OrleansAdoNetVersion>
-    <OrleansAWSVersion>$(VersionPrefix)</OrleansAWSVersion>
-    <OrleansAzureClusteringVersion>$(VersionPrefix)</OrleansAzureClusteringVersion>
-    <OrleansAzureStreamingVersion>$(VersionPrefix)</OrleansAzureStreamingVersion>
-    <OrleansAzureEventHubsVersion>$(VersionPrefix)</OrleansAzureEventHubsVersion>
-    <OrleansAzurePersistenceVersion>$(VersionPrefix)</OrleansAzurePersistenceVersion>
-    <OrleansAzureRemindersVersion>$(VersionPrefix)</OrleansAzureRemindersVersion>
-    <OrleansAzureGrainDirectoryVersion>$(VersionPrefix)</OrleansAzureGrainDirectoryVersion>
-    <OrleansAzureMetapackageVersion>$(VersionPrefix)</OrleansAzureMetapackageVersion>
-    <OrleansGoogleCloudProviderVersion>$(VersionPrefix)</OrleansGoogleCloudProviderVersion>
-    <OrleansAzureCloudServicesVersion>$(VersionPrefix)</OrleansAzureCloudServicesVersion>
-    <OrleansTestingHostVersion>$(VersionPrefix)</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>$(VersionPrefix)</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>$(VersionPrefix)</OrleansSerializersVersion>
-    <OrleansToolsVersion>$(VersionPrefix)</OrleansToolsVersion>
-    <OrleansClientVersion>$(VersionPrefix)</OrleansClientVersion>
-    <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
-    <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
-    <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
-    <OrleansTelemetryConsumersVersion>$(VersionPrefix)</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
 
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />

@@ -5,14 +5,12 @@
     <Description>Library of utility types for ZooKeeper of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) ZooKeeper</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <AssemblyName>Orleans.Clustering.ZooKeeper</AssemblyName>
     <RootNamespace>OrleansZooKeeperUtils</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <PackageReference Include="ZooKeeperNetEx" Version="$(ZooKeeperNetExVersion)" />
   </ItemGroup>
 

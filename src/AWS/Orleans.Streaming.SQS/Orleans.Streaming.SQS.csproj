@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.SQS</PackageId>
     <Title>Microsoft Orleans Streaming AWS SQS</Title>
@@ -13,20 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <PackageReference Include="AWSSDK.SQS" Version="$(AWSSDKSQSVersion)" />
   </ItemGroup>
-
-  <Choose>
-    <When Condition="$(OrleansStreamingVersion) == $(VersionPrefix) AND $(OrleansStreamingVersion) == $(OrleansAWSVersion)">
-      <ItemGroup>
-        <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Streaming" Version="$(OrleansStreamingVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
 
 </Project>

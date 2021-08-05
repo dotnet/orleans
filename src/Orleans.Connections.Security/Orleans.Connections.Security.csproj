@@ -5,10 +5,10 @@
     <Title>Microsoft Orleans TLS support</Title>
     <Description>Support for security communication using TLS in Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) TLS SSL</PackageTags>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

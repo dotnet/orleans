@@ -17,10 +17,6 @@
     <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;netcoreapp3.1</TestTargetFrameworks>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <DebugType>embedded</DebugType>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Include="*.xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
