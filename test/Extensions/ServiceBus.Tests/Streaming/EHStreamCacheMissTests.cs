@@ -23,12 +23,12 @@ using Tester.StreamingTests;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("StreamingCacheMiss")]
-    public class EHCustomBatchContainerTests : StreamingCacheMissTests
+    public class EHStreamCacheMissTests : StreamingCacheMissTests
     {
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
 
-        public EHCustomBatchContainerTests(ITestOutputHelper output)
+        public EHStreamCacheMissTests(ITestOutputHelper output)
             : base(output)
         {
         }
@@ -67,8 +67,9 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
                         }));
-                        b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<CustomDataAdapter>(sp));
-                    });
+                        b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<EventHubDataAdapter>(sp));
+                    })
+                    .AddStreamFilter<CustomStreamFilter>(StreamProviderName);
             }
         }
 
@@ -85,23 +86,9 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }));
-                        b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<CustomDataAdapter>(sp));
+                        b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<EventHubDataAdapter>(sp));
                     });
             }
-        }
-
-        private class CustomDataAdapter : EventHubDataAdapter
-        {
-            public CustomDataAdapter(Serializer serializer)
-                : base(serializer)
-            {
-            }
-
-            public override IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
-                => new CustomBatchContainer(base.GetBatchContainer(ref cachedMessage));
-
-            protected override IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
-                => new CustomBatchContainer(base.GetBatchContainer(eventHubMessage));
         }
 
         #endregion
