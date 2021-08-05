@@ -11,10 +11,10 @@ jobs:
       with:
         repository: 'dotnet/orleans-docs'
         ref: ${{ github.event.client_payload.ref }}
-    - name: Setup .NET Core 3.1
+    - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '3.1.x'
+        dotnet-version: '5.0.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Build
