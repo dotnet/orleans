@@ -149,7 +149,11 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) }),
+                var conditions = grainState.ETag == null
+                    ? new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+                    : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
+
+                await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: conditions),
                     blob, grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = null;
@@ -175,9 +179,13 @@ namespace Orleans.Storage
         {
             try
             {
+                var conditions = grainState.ETag == null
+                    ? new BlobRequestConditions { IfNoneMatch = new ETag("*") }
+                    : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
+
                 using var stream = new MemoryStream(contents);
                 var result = await DoOptimisticUpdate(() => blob.UploadAsync(stream,
-                        conditions: new BlobRequestConditions { IfMatch = grainState.ETag != null ? new ETag(grainState.ETag) : (ETag?)null },
+                        conditions: conditions,
                         httpHeaders: new BlobHttpHeaders { ContentType = mimeType }),
                     blob, grainState.ETag).ConfigureAwait(false);
 
