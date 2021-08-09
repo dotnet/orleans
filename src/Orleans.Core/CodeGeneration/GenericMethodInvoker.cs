@@ -111,8 +111,6 @@ namespace Orleans.CodeGeneration
                 $"GenericMethodInvoker_{this.grainInterfaceType}_{concreteMethod.Name}",
                 GenericMethodInvokerDelegateMethodInfo);
 
-            var temp = il.DeclareLocal(typeof(ValueTask<object>));
-
             // Load the grain and cast it to the type the concrete method is declared on.
             // Eg: cast from IAddressable to IGrainWithGenericMethod.
             il.LoadArgument(0);
@@ -146,6 +144,7 @@ namespace Orleans.CodeGeneration
                 // Convert ValueTask and ValueTask<T> to Task and Task<T> respectively
                 if (returnType == typeof(ValueTask))
                 {
+                    var temp = il.DeclareLocal(concreteMethod.ReturnType);
                     il.StoreLocal(temp);
                     il.LoadLocalAddress(temp);
                     il.Call(TypeUtils.Method((ValueTask vt) => vt.AsTask()));
@@ -154,6 +153,7 @@ namespace Orleans.CodeGeneration
                 else if (returnType.IsGenericType &&
                          returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
                 {
+                    var temp = il.DeclareLocal(concreteMethod.ReturnType);
                     il.StoreLocal(temp);
                     il.LoadLocalAddress(temp);
                     il.Call(returnType.GetMethod("AsTask"));
