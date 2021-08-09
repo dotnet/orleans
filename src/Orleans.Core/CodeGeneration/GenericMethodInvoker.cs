@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -20,14 +19,11 @@ namespace Orleans.CodeGeneration
     /// </remarks>
     public class GenericMethodInvoker : IEqualityComparer<object[]>
     {
-        private static readonly ConcurrentDictionary<Type, MethodInfo> BoxMethods =
-            new ConcurrentDictionary<Type, MethodInfo>();
+        private static readonly ConcurrentDictionary<Type, MethodInfo> BoxMethods = new();
 
         private static readonly Func<Type, MethodInfo> CreateBoxMethod = GetTaskConversionMethod;
-
         private static readonly MethodInfo GenericMethodInvokerDelegateMethodInfo =
             TypeUtils.Method((GenericMethodInvokerDelegate del) => del.Invoke(null, null));
-
         private static readonly ILFieldBuilder FieldBuilder = new ILFieldBuilder();
 
         private readonly Type grainInterfaceType;
@@ -144,8 +140,10 @@ namespace Orleans.CodeGeneration
             var returnType = concreteMethod.ReturnType;
             if (returnType != typeof(Task<object>))
             {
-                // Convert ValueTask and ValueTask<T> to Task and Task<T> respectively
+                // Do we need to convert retval to Task<object> ?
                 bool shouldBox = true;
+
+                // Convert ValueTask and ValueTask<T> to Task and Task<T> respectively
                 if (returnType == typeof(ValueTask))
                 {
                     il.StoreLocal(temp);
