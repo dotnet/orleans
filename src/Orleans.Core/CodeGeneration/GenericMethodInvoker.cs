@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -114,6 +115,8 @@ namespace Orleans.CodeGeneration
                 $"GenericMethodInvoker_{this.grainInterfaceType}_{concreteMethod.Name}",
                 GenericMethodInvokerDelegateMethodInfo);
 
+            var temp = il.DeclareLocal(typeof(ValueTask<object>));
+
             // Load the grain and cast it to the type the concrete method is declared on.
             // Eg: cast from IAddressable to IGrainWithGenericMethod.
             il.LoadArgument(0);
@@ -141,8 +144,36 @@ namespace Orleans.CodeGeneration
             var returnType = concreteMethod.ReturnType;
             if (returnType != typeof(Task<object>))
             {
-                var boxMethod = BoxMethods.GetOrAdd(returnType, CreateBoxMethod);
-                il.Call(boxMethod);
+                // Convert ValueTask and ValueTask<T> to Task and Task<T> respectively
+                bool shouldBox = true;
+                if (returnType == typeof(ValueTask))
+                {
+                    il.StoreLocal(temp);
+                    il.LoadLocalAddress(temp);
+                    il.Call(TypeUtils.Method((ValueTask vt) => vt.AsTask()));
+                    returnType = typeof(Task);
+                }
+                else if (returnType.IsGenericType &&
+                         returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+                {
+                    il.StoreLocal(temp);
+                    il.LoadLocalAddress(temp);
+                    il.Call(returnType.GetMethod("AsTask"));
+                    var typeArgument = returnType.GetGenericArguments()[0];
+                    returnType = typeof(Task<>).MakeGenericType(typeArgument);
+
+                    // Is result already Task<object> ?
+                    if (typeArgument == typeof(object))
+                    {
+                        shouldBox = false;
+                    }
+                }
+
+                if (shouldBox)
+                {
+                    var boxMethod = BoxMethods.GetOrAdd(returnType, CreateBoxMethod);
+                    il.Call(boxMethod);
+                }
             }
 
             // Return the resulting Task<object>.
@@ -230,7 +261,7 @@ namespace Orleans.CodeGeneration
         {
             MethodInfo methodInfo = null;
 
-            var typeParameterCount = typeParameters.Length;
+            var typeParameterCountLocal = typeParameters.Length;
 
             bool skipMethod = false;
 
@@ -243,11 +274,11 @@ namespace Orleans.CodeGeneration
                 if (!string.Equals(openMethod.Name, methodName, StringComparison.Ordinal)) continue;
 
                 // same type parameter count?
-                if (openMethod.GetGenericArguments().Length != typeParameterCount) continue;
+                if (openMethod.GetGenericArguments().Length != typeParameterCountLocal) continue;
 
                 // close the definition
                 MethodInfo closedMethod = openMethod.MakeGenericMethod(typeParameters);
-                
+
                 // obtain list of closed parameters (no generic placeholders any more)
                 var parameterInfos = closedMethod.GetParameters();
 
