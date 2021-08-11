@@ -13,17 +13,17 @@ namespace CodeGenerator.Tests
         Task<int> Method<T>(T x, string y, string z);
         Task<int> Method<T>(object[] x);
         Task<int> Method<T1, T2>(T1 x, T2 y);
+        ValueTask Method<T>(string s1, string s2);
+        ValueTask<int> Method<T>(string s);
+        ValueTask<object> Method<T>(int x, int y);
     }
 
     public class FooGrain : IDummyGrain
     {
-        /// <inheritdoc />
         public Task<int> Method<T>(int x) => Task.FromResult(1);
 
-        /// <inheritdoc />
         public Task<int> Method<T>(int x, string y) => Task.FromResult(2);
 
-        /// <inheritdoc />
         public Task<int> Method<T>(int x, string y, T z) => Task.FromResult(3);
 
         public Task<int> Method<T>(T x, string y, string z) => Task.FromResult(4);
@@ -31,6 +31,12 @@ namespace CodeGenerator.Tests
         public Task<int> Method<T>(object[] x) => Task.FromResult(5);
 
         public Task<int> Method<T1, T2>(T1 x, T2 y) => Task.FromResult(6);
+
+        public ValueTask Method<T>(string s1, string s2) => new();
+
+        public ValueTask<object> Method<T>(int x, int y) => new(7);
+
+        public ValueTask<int> Method<T>(string s) => new(8);
     }
 
     public class GenericMethodInvokerTests
@@ -42,7 +48,6 @@ namespace CodeGenerator.Tests
 
             var mock = new FooGrain();
 
-            // callsite: mock.Method<bool>(42);
             var result = await invoker.Invoke(mock, new object[]
             {
                 typeof(bool),   // type parameter(s)
@@ -147,6 +152,54 @@ namespace CodeGenerator.Tests
             });
 
             Assert.Equal(6, result);
+        }
+
+        [Fact]
+        public async Task Overload_invoke_ValueTask_return()
+        {
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), "Method", 1);
+            var mock = new FooGrain();
+
+            _ = await invoker.Invoke(mock, new object[]
+            {
+                typeof(bool),
+                typeof(string),typeof(string),
+                "foo","bar"
+            });
+
+            Assert.True(true);
+        }
+
+        [Fact]
+        public async Task Overload_invoke_ValueTaskObject_return()
+        {
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), "Method", 1);
+            var mock = new FooGrain();
+
+            var result = await invoker.Invoke(mock, new object[]
+            {
+                typeof(bool),
+                typeof(int),typeof(int),
+                42,43
+            });
+
+            Assert.Equal(7, result);
+        }
+
+        [Fact]
+        public async Task Overload_invoke_ValueTaskInt_return()
+        {
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), "Method", 1);
+            var mock = new FooGrain();
+
+            var result = await invoker.Invoke(mock, new object[]
+            {
+                typeof(bool),
+                typeof(string),
+                "foo"
+            });
+
+            Assert.Equal(8, result);
         }
     }
 }
