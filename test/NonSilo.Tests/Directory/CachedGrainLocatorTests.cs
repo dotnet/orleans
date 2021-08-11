@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
 using Orleans;
 using Orleans.GrainDirectory;
@@ -51,7 +50,7 @@ namespace UnitTests.Directory
             this.taskScheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.loggerFactory);
 
             this.grainLocator = new CachedGrainLocator(
-                this.grainDirectoryResolver, 
+                this.grainDirectoryResolver,
                 new DhtGrainLocator(this.localGrainDirectory, this.taskScheduler, this.rootContext),
                 this.mockMembershipService.Target);
 

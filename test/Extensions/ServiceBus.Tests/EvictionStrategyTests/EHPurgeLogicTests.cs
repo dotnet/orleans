@@ -1,6 +1,5 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
@@ -8,7 +7,6 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Microsoft.Azure.EventHubs;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -18,6 +16,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Hosting;
+using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -207,7 +206,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 EventHubPath = this.ehSettings.Hub.Path,
             };
 
-            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
+            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
@@ -237,17 +236,21 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private EventData MakeEventData(long sequenceNumber)
         {
             byte[] ignore = { 12, 23 };
-            var eventData = new EventData(ignore);
-            DateTime now = DateTime.UtcNow;
-            var offSet = Guid.NewGuid().ToString() + now.ToString();
-            eventData.SetOffset(offSet);
-            //set sequence number
-            eventData.SetSequenceNumber(sequenceNumber);
-            //set enqueue time
-            eventData.SetEnqueuedTimeUtc(now);
+            var now = DateTime.UtcNow;
+            var eventData = new TestEventData(ignore,
+                offset: now.Ticks,
+                sequenceNumber: sequenceNumber,
+                enqueuedTime: now);
             return eventData;
         }
-        
+
+        private class TestEventData : EventData
+        {
+            public TestEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
+            {
+            }
+        }
+
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
         {
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);

@@ -1,10 +1,10 @@
 using System;
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Azure.Messaging.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {

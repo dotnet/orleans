@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;

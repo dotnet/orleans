@@ -1,4 +1,3 @@
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
@@ -6,6 +5,7 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {

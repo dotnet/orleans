@@ -38,7 +38,7 @@ namespace ServiceBus.Tests.StreamingTests
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConfigureTestDefaults();
                                 options.ConsumerGroup = EHConsumerGroup;
                                 options.Path = EHPath;
 
@@ -58,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
-            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);            
+            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
         }
 
         [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
