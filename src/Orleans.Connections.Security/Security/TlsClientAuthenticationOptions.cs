@@ -50,6 +50,8 @@ namespace Orleans.Connections.Security
 
         public object SslClientAuthenticationOptions => this.Value;
 #else
+        public ClientCertificateSelectionCallback LocalCertificateSelectionCallback { get; set; }
+
         public X509CertificateCollection ClientCertificates { get; set; }
 
         public SslProtocols EnabledSslProtocols { get; set; }
