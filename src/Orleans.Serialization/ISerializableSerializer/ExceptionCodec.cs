@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -229,7 +229,11 @@ namespace Orleans.Serialization.ISerializableSupport
             // In order to handle null values.
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+                // Discard the result of consuming the reference and always return null.
+                // We do not allow exceptions to participate in reference cycles because cycles involving InnerException are not allowed by .NET
+                // Exceptions must never form cyclic graphs via their well-known properties/fields (eg, InnerException).
+                var _ = ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+                return null;
             }
 
             Type valueType = field.FieldType;
