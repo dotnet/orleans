@@ -2,7 +2,6 @@ namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
-    using System.Reflection;
     using Orleans.Runtime;
 
     /// <summary>
