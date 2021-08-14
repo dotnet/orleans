@@ -6,10 +6,10 @@ using Microsoft.Extensions.Logging;
 namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
-    /// We use the 'backward/clockwise' definition to assign responsibilities on the ring. 
-    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its predecessing range). 
+    /// We use the 'backward/clockwise' definition to assign responsibilities on the ring.
+    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its predecessing range).
     /// The backwards/clockwise approach is consistent with many overlays, e.g., Chord, Cassandra, etc.
-    /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
+    /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities.
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal sealed class VirtualBucketsRingProvider :
@@ -145,7 +145,13 @@ namespace Orleans.Runtime.ConsistentRing
                 List<uint> hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
                 foreach (var hash in hashes)
                 {
-                    bucketsMap.Remove(hash);
+                    if (bucketsMap.Remove(hash, out var removedSilo) && !removedSilo.Equals(silo))
+                    {
+                        // since hash collisions are very rare, it's better to remove bucket and then retroactively
+                        // add it if silos were different rather than doing 2 lookups (1st for checking if silos are
+                        // equal, then 2nd to remove bucket) each time
+                        bucketsMap[hash] = removedSilo;
+                    }
                 }
 
                 var myOldRange = this.myRange;
@@ -252,7 +258,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// <returns></returns>
         private SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
-            // put a private reference to point to sortedBucketsList, 
+            // put a private reference to point to sortedBucketsList,
             // so if someone is changing the sortedBucketsList reference, we won't get it changed in the middle of our operation.
             // The tricks of writing lock-free code!
             var snapshotBucketsList = sortedBucketsList;
