@@ -1697,8 +1697,24 @@ namespace Orleans.Serialization
             }
             else
             {
-                serializer = new BinaryFormatterSerializer();
+                // If the runtime version does not indicate that BinaryFormatter has been deprecated, use BinaryFormatter as the fallback serializer.
+                // Otherwise, if the developer has explicitly enabled the use of BinaryFormatter, use BinaryFormatter as the fallback serializer.
+                // Otherwise, use ILBasedSerializer as the fallback serializer.
+                var runtimeVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+                var isBinaryFormatterDeprecated = runtimeVersion.StartsWith(".NET ") && !runtimeVersion.StartsWith(".NET Framework") && !runtimeVersion.StartsWith(".NET Core");
+                AppContext.TryGetSwitch("System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization", out var enableBinaryFormatter);
+                if (!isBinaryFormatterDeprecated || enableBinaryFormatter)
+                {
+                    serializer = new BinaryFormatterSerializer();
+                }
+                else
+                {
+#pragma warning disable CS0618 // Type or member is obsolete
+                    serializer = new ILBasedSerializer(serviceProvider.GetRequiredService<ITypeResolver>());
+#pragma warning restore CS0618 // Type or member is obsolete
+                }
             }
+
             return serializer;
         }
 

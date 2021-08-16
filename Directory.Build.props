@@ -47,7 +47,7 @@
     <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
     <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
-    <SystemConfigurationConfigurationManagerVersion>4.7.0</SystemConfigurationConfigurationManagerVersion>
+    <SystemConfigurationConfigurationManagerVersion>5.0.0</SystemConfigurationConfigurationManagerVersion>
     <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
     <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemManagementVersion>4.7.0</SystemManagementVersion>
@@ -64,7 +64,7 @@
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
     <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
-    <SystemSecurityPermissionsVersion>4.7.0</SystemSecurityPermissionsVersion>
+    <SystemSecurityPermissionsVersion>5.0.0</SystemSecurityPermissionsVersion>
     <SystemSecurityCryptographyProtectedDataVersion>4.7.0</SystemSecurityCryptographyProtectedDataVersion>
     <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
     <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>

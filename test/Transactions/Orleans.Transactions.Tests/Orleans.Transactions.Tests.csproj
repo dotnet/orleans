@@ -21,7 +21,7 @@
     <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$(TargetFramework.StartsWith('netcore'))">
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
   </ItemGroup>
 

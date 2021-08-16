@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -111,7 +111,7 @@ namespace UnitTests
             var directories =
                 new Dictionary<string, SearchOption>
                     {
-                        { Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath), SearchOption.AllDirectories }
+                        { Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().Location).LocalPath), SearchOption.AllDirectories }
                     };
 
             var excludeCriteria =

@@ -594,6 +594,7 @@ namespace UnitTests.Serialization
             ValidateReadOnlyCollectionList(collection, deserialized, "string/string");
         }
 
+#if !NET5_0_OR_GREATER
         [Fact, TestCategory("Functional")]
         public void Serialize_UnserializableException()
         {
@@ -611,6 +612,7 @@ namespace UnitTests.Serialization
                                     typeof(UnserializableException).OrleansTypeName() + ": " + message;
             Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
         }
+#endif
 
         [Theory, TestCategory("Functional")]
         [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
@@ -940,13 +942,17 @@ namespace UnitTests.Serialization
             };
             using (var str = new MemoryStream())
             {
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
                 formatter.Serialize(str, input);
+#pragma warning restore SYSLIB0011 // Type or member is obsolete
                 str.Flush();
                 bytes = str.ToArray();
             }
             using (var inStream = new MemoryStream(bytes))
             {
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
                 deserialized = formatter.Deserialize(inStream);
+#pragma warning restore SYSLIB0011 // Type or member is obsolete
             }
             return deserialized;
         }

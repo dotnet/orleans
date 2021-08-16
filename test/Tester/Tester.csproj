@@ -29,7 +29,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$(TargetFramework.StartsWith('netcore'))">
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
   </ItemGroup>
 
