@@ -231,10 +231,14 @@ namespace DefaultCluster.Tests.General
                 {
                     Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(this.HostedCluster.SerializationManager))
                 };
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
                 formatter.Serialize(memoryStream, obj);
+#pragma warning restore SYSLIB0011 // Type or member is obsolete
                 memoryStream.Flush();
                 memoryStream.Position = 0; // Reset to start
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
                 other = (T)formatter.Deserialize(memoryStream);
+#pragma warning restore SYSLIB0011 // Type or member is obsolete
             }
             return other;
         }

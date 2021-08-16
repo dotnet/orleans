@@ -86,11 +86,14 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 throw new InvalidOperationException($"Number of directories found for pattern: '{BuildConfiguration}' under {testDirectory.FullName}: {directories.Length}");
             }
 
-            var files = Directory.GetFiles(directories[0], VersionTestBinaryName, SearchOption.AllDirectories)
-#if NETCOREAPP
+            var directory = directories[0];
+            var files = Directory.GetFiles(directory, VersionTestBinaryName, SearchOption.AllDirectories)
+#if NET5_0
+                .Where(f => f.Contains("net5"))
+#elif NETCOREAPP
                 .Where(f => f.Contains("netcoreapp"))
 #else
-                .Where(f => !f.Contains("netcoreapp"))
+                .Where(f => f.Contains("net4"))
 #endif
                 .ToArray();
 

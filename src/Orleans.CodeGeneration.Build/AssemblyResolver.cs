@@ -43,7 +43,7 @@ namespace Orleans.CodeGeneration
 
             this.dependencyContext = DependencyContext.Load(this.Assembly);
             this.resolverRependencyContext = DependencyContext.Load(typeof(AssemblyResolver).Assembly);
-            var codegenPath = Path.GetDirectoryName(new Uri(typeof(AssemblyResolver).Assembly.CodeBase).LocalPath);
+            var codegenPath = Path.GetDirectoryName(new Uri(typeof(AssemblyResolver).Assembly.Location).LocalPath);
             this.assemblyResolver = new CompositeCompilationAssemblyResolver(
                 new ICompilationAssemblyResolver[]
                 {

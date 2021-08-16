@@ -28,7 +28,7 @@
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$(TargetFramework.StartsWith('netcoreapp'))">
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
   </ItemGroup>
 
