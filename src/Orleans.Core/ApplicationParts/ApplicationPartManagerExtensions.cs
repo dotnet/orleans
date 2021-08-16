@@ -46,7 +46,6 @@ namespace Orleans
                 .Any(part => !part.IsFrameworkAssembly);
             if (!hasApplicationParts)
             {
-                applicationPartsManager.AddFromDependencyContext();
                 applicationPartsManager.AddFromAppDomain();
                 applicationPartsManager.AddFromApplicationBaseDirectory();
             }
