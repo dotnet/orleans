@@ -212,5 +212,4 @@ src/SetupTestScriptOutput.txt
 *.binlog
 
 # VS Code
-.vscode/
 .ionide/
