@@ -14,14 +14,12 @@ namespace Orleans.GrainDirectory
 
         ValueTask<ActivationAddress> Lookup(GrainId grainId);
 
-        bool TryLocalLookup(GrainId grainId, out ActivationAddress addresses);
-
         void CachePlacementDecision(ActivationAddress address);
 
         void InvalidateCache(GrainId grainId);
 
         void InvalidateCache(ActivationAddress address);
 
-        bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address);
+        bool TryLookupInCache(GrainId grainId, out ActivationAddress address);
     }
 }

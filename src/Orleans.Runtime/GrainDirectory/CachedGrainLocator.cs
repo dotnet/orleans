@@ -47,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Check cache first
-            if (TryLocalLookup(grainId, out var cachedResult))
+            if (TryLookupInCache(grainId, out var cachedResult))
             {
                 return cachedResult;
             }
@@ -107,32 +107,6 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache.AddOrUpdate(activationAddress, (int) result.MembershipVersion.Value);
 
             return activationAddress;
-        }
-
-        public bool TryLocalLookup(GrainId grainId, out ActivationAddress result)
-        {
-            var grainType = grainId.Type;
-            if (grainType.IsClient() || grainType.IsSystemTarget())
-            {
-                ThrowUnsupportedGrainType(grainId);
-            }
-
-            if (this.cache.LookUp(grainId, out result, out var version))
-            {
-                // If the silo is dead, remove the entry
-                if (IsKnownDeadSilo(result.Silo, new MembershipVersion(version)))
-                {
-                    result = default;
-                    this.cache.Remove(grainId);
-                }
-                else
-                {
-                    // Entry found and valid -> return it
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
@@ -219,7 +193,31 @@ namespace Orleans.Runtime.GrainDirectory
         public void CachePlacementDecision(ActivationAddress address) => cache.AddOrUpdate(address, 0);
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(ActivationAddress address) => cache.Remove(address);
-        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address) => TryLocalLookup(grainId, out address);
+        public bool TryLookupInCache(GrainId grainId, out ActivationAddress address)
+        {
+            var grainType = grainId.Type;
+            if (grainType.IsClient() || grainType.IsSystemTarget())
+            {
+                ThrowUnsupportedGrainType(grainId);
+            }
+
+            if (this.cache.LookUp(grainId, out address, out var version))
+            {
+                // If the silo is dead, remove the entry
+                if (IsKnownDeadSilo(address.Silo, new MembershipVersion(version)))
+                {
+                    address = default;
+                    this.cache.Remove(grainId);
+                }
+                else
+                {
+                    // Entry found and valid -> return it
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 
     internal static class AddressHelpers
