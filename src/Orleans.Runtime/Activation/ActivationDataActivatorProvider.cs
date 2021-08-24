@@ -15,6 +15,7 @@ namespace Orleans.Runtime
         private readonly PlacementStrategyResolver _placementStrategyResolver;
         private readonly IActivationCollector _activationCollector;
         private readonly GrainManifest _siloManifest;
+        private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly GrainTypeComponentsResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
         private readonly GrainCollectionOptions _collectionOptions;
@@ -36,8 +37,10 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             ILoggerFactory loggerFactory,
             GrainReferenceActivator grainReferenceActivator,
-            GrainTypeComponentsResolver sharedComponentsResolver)
+            GrainTypeComponentsResolver sharedComponentsResolver,
+            IActivationWorkingSet activationWorkingSet)
         {
+            _activationWorkingSet = activationWorkingSet;
             _sharedComponentsResolver = sharedComponentsResolver;
             _grainClassMap = grainClassMap;
             _serviceProvider = serviceProvider;
@@ -68,12 +71,11 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException($"Could not find a suitable {nameof(IGrainActivator)} implementation for grain type {grainType}");
             }
 
-            var (activationCollector, collectionAgeLimit) = GetCollectionAgeLimit(grainType, grainClass);
+            var collectionAgeLimit = GetCollectionAgeLimit(grainType, grainClass);
 
             activator = new ActivationDataActivator(
                 instanceActivator,
                 _placementStrategyResolver.GetPlacementStrategy(grainType),
-                activationCollector,
                 collectionAgeLimit,
                 _messagingOptions,
                 _maxWarningRequestProcessingTime,
@@ -83,39 +85,40 @@ namespace Orleans.Runtime
                 _grainRuntime ??= _serviceProvider.GetRequiredService<IGrainRuntime>(),
                 _grainReferenceActivator,
                 sharedComponents,
-                _activationMessageScheduler ??= _serviceProvider.GetRequiredService<ActivationMessageScheduler>());
+                _activationMessageScheduler ??= _serviceProvider.GetRequiredService<ActivationMessageScheduler>(),
+                _activationWorkingSet);
             return true;
         }
 
-        private (IActivationCollector, TimeSpan) GetCollectionAgeLimit(GrainType grainType, Type grainClass)
+        private TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass)
         {
             if (_siloManifest.Grains.TryGetValue(grainType, out var properties)
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.IdleDeactivationPeriod, out var idleTimeoutString))
             {
                 if (string.Equals(idleTimeoutString, WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue))
                 {
-                    return (null, default);
+                    return default;
                 }
 
                 if (TimeSpan.TryParse(idleTimeoutString, out var result))
                 {
-                    return (_activationCollector, result);
+                    return result;
                 }
             }
 
             if (_collectionOptions.ClassSpecificCollectionAge.TryGetValue(grainClass.FullName, out var specified))
             {
-                return (_activationCollector, specified);
+                return specified;
             }
 
-            return (_activationCollector, _collectionOptions.CollectionAge);
+            return _collectionOptions.CollectionAge;
         }
 
         private class ActivationDataActivator : IGrainContextActivator
         {
+            private readonly IActivationWorkingSet _activationWorkingSet;
             private readonly IGrainActivator _grainActivator;
             private readonly PlacementStrategy _placementStrategy;
-            private readonly IActivationCollector _activationCollector;
             private readonly TimeSpan _collectionAgeLimit;
             private readonly IOptions<SiloMessagingOptions> _messagingOptions;
             private readonly TimeSpan _maxWarningRequestProcessingTime;
@@ -130,7 +133,6 @@ namespace Orleans.Runtime
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
                 PlacementStrategy placementStrategy,
-                IActivationCollector activationCollector,
                 TimeSpan collectionAgeLimit,
                 IOptions<SiloMessagingOptions> messagingOptions,
                 TimeSpan maxWarningRequestProcessingTime,
@@ -140,11 +142,12 @@ namespace Orleans.Runtime
                 IGrainRuntime grainRuntime,
                 GrainReferenceActivator grainReferenceActivator,
                 GrainTypeComponents sharedComponents,
-                ActivationMessageScheduler activationMessageScheduler)
+                ActivationMessageScheduler activationMessageScheduler,
+                IActivationWorkingSet activationWorkingSet)
             {
+                _activationWorkingSet = activationWorkingSet;
                 _grainActivator = grainActivator;
                 _placementStrategy = placementStrategy;
-                _activationCollector = activationCollector;
                 _collectionAgeLimit = collectionAgeLimit;
                 _messagingOptions = messagingOptions;
                 _maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
@@ -162,7 +165,6 @@ namespace Orleans.Runtime
                 var context = new ActivationData(
                     activationAddress,
                     _placementStrategy,
-                    _activationCollector,
                     _collectionAgeLimit,
                     _messagingOptions,
                     _maxWarningRequestProcessingTime,
@@ -172,7 +174,8 @@ namespace Orleans.Runtime
                     _grainRuntime,
                     _grainReferenceActivator,
                     _sharedComponents,
-                    _activationMessageScheduler);
+                    _activationMessageScheduler,
+                    _activationWorkingSet);
 
                 RuntimeContext.SetExecutionContext(context, out var existingContext);
 

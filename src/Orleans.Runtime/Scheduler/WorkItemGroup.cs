@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Scheduler
         private long lastLongQueueWarningTimestamp;
 
         private Task currentTask;
-        private DateTime currentTaskStarted;
+        private long currentTaskStarted;
         private long shutdownSinceTimestamp;
         private long lastShutdownWarningTimestamp;
 
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Scheduler
             set
             {
                 currentTask = value;
-                currentTaskStarted = DateTime.UtcNow;
+                currentTaskStarted = Environment.TickCount64;
             }
         }
 
@@ -444,7 +444,7 @@ namespace Orleans.Runtime.Scheduler
                 if (CurrentTask is Task task)
                 {
                     sb.AppendFormat(" Executing Task Id={0} Status={1} for {2}.",
-                        task.Id, task.Status, Utils.Since(currentTaskStarted));
+                        task.Id, task.Status, TimeSpan.FromMilliseconds(Environment.TickCount64 - currentTaskStarted));
                 }
 
                 if (AverageQueueLength > 0)

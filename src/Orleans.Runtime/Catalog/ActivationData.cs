@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
+using Orleans.Internal;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -20,7 +22,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IActivationData, IGrainExtensionBinder, IAsyncDisposable
+    internal class ActivationData : IActivationData, IGrainExtensionBinder, IAsyncDisposable, IActivationWorkingSetMember
     {
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
@@ -31,6 +33,7 @@ namespace Orleans.Runtime
         public readonly TimeSpan CollectionAgeLimit;
         private readonly GrainTypeComponents _shared;
         private readonly ActivationMessageScheduler _messageScheduler;
+        private readonly IActivationWorkingSet activationWorkingSet;
         private readonly Action<object> _receiveMessageInScheduler;
         private HashSet<IGrainTimer> timers;
         private Dictionary<Type, object> _components;
@@ -38,7 +41,6 @@ namespace Orleans.Runtime
         public ActivationData(
             ActivationAddress addr,
             PlacementStrategy placedUsing,
-            IActivationCollector collector,
             TimeSpan ageLimit,
             IOptions<SiloMessagingOptions> messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
@@ -48,11 +50,11 @@ namespace Orleans.Runtime
             IGrainRuntime grainRuntime,
             GrainReferenceActivator referenceActivator,
             GrainTypeComponents sharedComponents,
-            ActivationMessageScheduler messageScheduler)
+            ActivationMessageScheduler messageScheduler,
+            IActivationWorkingSet activationWorkingSet)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
-            if (null == collector) throw new ArgumentNullException(nameof(collector));
 
             _receiveMessageInScheduler = state => this.ReceiveMessageInScheduler(state);
             _shared = sharedComponents;
@@ -62,20 +64,18 @@ namespace Orleans.Runtime
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.messagingOptions = messagingOptions.Value;
-            ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-            if (!this.GrainId.IsSystemTarget())
-            {
-                this.collector = collector;
-            }
 
             CollectionAgeLimit = ageLimit;
 
             this.GrainReference = referenceActivator.CreateReference(addr.Grain, default);
             this.serviceScope = applicationServices.CreateScope();
             this.Runtime = grainRuntime;
+            this.activationWorkingSet = activationWorkingSet;
+            this.activationWorkingSet.Add(this);
+            this.keepAliveUntil = DateTime.MinValue;
         }
 
         public IGrainRuntime Runtime { get; }
@@ -94,8 +94,6 @@ namespace Orleans.Runtime
                 {
                     this.SetState(ActivationState.Valid); // Activate calls on this activation are finished
                 }
-
-                this.collector.ScheduleCollection(this);
 
                 if (!this.IsCurrentlyExecuting)
                 {
@@ -224,13 +222,7 @@ namespace Orleans.Runtime
         /// </summary>
         public ActivationAddress ForwardingAddress { get; set; }
 
-        private IActivationCollector collector;
-
-        internal bool IsExemptFromCollection
-        {
-            get { return collector == null; }
-        }
-
+        internal bool IsExemptFromCollection => false;
         public DateTime CollectionTicket { get; private set; }
         private bool collectionCancelledFlag;
 
@@ -282,6 +274,7 @@ namespace Orleans.Runtime
         public Message Blocking { get; private set; }
         public Dictionary<Message, DateTime> RunningRequests { get; private set; } = new Dictionary<Message, DateTime>();
 
+        private bool isInWorkingSet = true;
         private DateTime currentRequestStartTime;
         private DateTime becameIdle;
         private DateTime deactivationStartTime;
@@ -308,10 +301,12 @@ namespace Orleans.Runtime
             if (RunningRequests.Count == 0)
             {
                 becameIdle = DateTime.UtcNow;
-                if (!IsExemptFromCollection)
-                {
-                    collector.TryRescheduleCollection(this);
-                }
+            }
+
+            if (!isInWorkingSet)
+            {
+                isInWorkingSet = true;
+                this.activationWorkingSet.AddOrUnmark(this);
             }
 
             // The below logic only works for non-reentrant activations.
@@ -546,7 +541,7 @@ namespace Orleans.Runtime
 
         private DateTime keepAliveUntil;
 
-        public bool ShouldBeKeptAlive { get { return keepAliveUntil >= DateTime.UtcNow; } }
+        public bool ShouldBeKeptAlive { get { return keepAliveUntil != default && keepAliveUntil >= DateTime.UtcNow; } }
 
         public void DelayDeactivation(TimeSpan timespan)
         {
@@ -836,6 +831,7 @@ namespace Orleans.Runtime
 
         public async ValueTask DisposeAsync()
         {
+            activationWorkingSet.Remove(this);
             var activator = this.GetComponent<IGrainActivator>();
             if (activator != null)
             {
@@ -935,6 +931,18 @@ namespace Orleans.Runtime
             finally
             {
                 this.DecrementEnqueuedOnDispatcherCount();
+            }
+        }
+
+        bool IActivationWorkingSetMember.IsCandidateForRemoval(bool wouldRemove)
+        {
+            lock (this)
+            {
+                var inactive = this.IsInactive;
+
+                // This instance will remain in the working set if it is either not pending removal or if it is currently active.
+                this.isInWorkingSet = !wouldRemove || !inactive;
+                return inactive;
             }
         }
     }
