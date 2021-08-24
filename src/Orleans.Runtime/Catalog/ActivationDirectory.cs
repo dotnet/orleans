@@ -142,6 +142,14 @@ namespace Orleans.Runtime
                 .Where(p => p.Value > 0);
         }
 
+        public void ForEachGrainId<T>(Action<T, GrainId> func, T context)
+        {
+            foreach (var pair in grainToActivationsMap)
+            {
+                func(context, pair.Key);
+            }
+        }
+
         public IEnumerator<KeyValuePair<ActivationId, ActivationData>> GetEnumerator() => activations.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

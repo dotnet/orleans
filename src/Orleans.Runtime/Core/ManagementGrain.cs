@@ -348,5 +348,24 @@ namespace Orleans.Runtime.Management
         {
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
+
+        public async ValueTask<List<GrainId>> GetActiveGrains(GrainType grainType)
+        {
+            var hosts = await GetHosts(true);
+            var tasks = new List<Task<List<GrainId>>>();
+            foreach (var siloAddress in hosts.Keys)
+            {
+                tasks.Add(GetSiloControlReference(siloAddress).GetActiveGrains(grainType));
+            }
+
+            await Task.WhenAll(tasks);
+            var results = new List<GrainId>();
+            foreach (var promise in tasks)
+            {
+                results.AddRange(await promise);
+            }
+
+            return results;
+        }
     }
 }
