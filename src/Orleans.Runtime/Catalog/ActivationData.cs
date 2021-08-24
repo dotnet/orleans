@@ -23,7 +23,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IActivationData, IGrainExtensionBinder, IAsyncDisposable, IActivationWorkingSetMember
+    internal class ActivationData : IActivationData, IGrainExtensionBinder, IAsyncDisposable, IActivationWorkingSetMember, IGrainManagementExtension
     {
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
@@ -889,7 +889,7 @@ namespace Orleans.Runtime
                     if (deactivatingTime > maxRequestProcessingTime && !IsStuckDeactivating)
                     {
                         IsStuckDeactivating = true;
-                        if (DeactivationReason.Text is { Length: > 0})
+                        if (DeactivationReason.Text is { Length: > 0 })
                         {
                             var msg = $"Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck";
                             DeactivationReason = new(DeactivationReason.Code, DeactivationReason.Text + ". " + msg);
@@ -1493,6 +1493,12 @@ namespace Orleans.Runtime
                 _extras ??= new();
                 return _extras.DeactivationTask ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+        }
+
+        Task IGrainManagementExtension.DeactivateOnIdle()
+        {
+            DeactivateOnIdle();
+            return Task.CompletedTask;
         }
 
         #endregion
