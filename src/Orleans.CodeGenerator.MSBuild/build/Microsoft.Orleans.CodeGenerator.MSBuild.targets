@@ -57,7 +57,7 @@
     Name="OrleansGenerateInputCache"
     DependsOnTargets="ResolveAssemblyReferences"
     BeforeTargets="OrleansGenerateCode"
-    Inputs="$(Orleans_CodeGenInputs)"
+    Inputs="@(Orleans_CodeGenInputs)"
     Outputs="$(Orleans_CodeGenInputCache)">
 
     <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
