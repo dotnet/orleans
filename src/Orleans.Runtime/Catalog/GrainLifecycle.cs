@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     {
         private static readonly ImmutableDictionary<int, string> StageNames = GetStageNames(typeof(GrainLifecycleStage));
 
-        public GrainLifecycle(ILogger<LifecycleSubject> logger) : base(logger)
+        public GrainLifecycle(ILogger logger) : base(logger)
         {
         }
 

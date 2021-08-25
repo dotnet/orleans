@@ -57,7 +57,6 @@ namespace Orleans.Hosting
             // Register system services.
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloHost>();
-            services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
             services.TryAddSingleton<SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
