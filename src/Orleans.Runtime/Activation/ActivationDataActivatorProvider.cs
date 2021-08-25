@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -118,7 +119,7 @@ namespace Orleans.Runtime
             {
                 if (string.Equals(idleTimeoutString, WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue))
                 {
-                    return default;
+                    return Timeout.InfiniteTimeSpan;
                 }
 
                 if (TimeSpan.TryParse(idleTimeoutString, out var result))
