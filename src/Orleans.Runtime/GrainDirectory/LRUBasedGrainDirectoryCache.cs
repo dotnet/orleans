@@ -6,6 +6,7 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
     {
+        private static readonly Func<ActivationAddress, (ActivationAddress Address, int Version), bool> ActivationAddressEqual = (a, b) => a.Equals(b.Address);
         private readonly LRU<GrainId, (ActivationAddress ActivationAddress, int Version)> cache;
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
@@ -17,6 +18,8 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
+
+        public bool Remove(ActivationAddress grainAddress) => cache.TryRemove(grainAddress.Grain, ActivationAddressEqual, grainAddress);
 
         public void Clear() => cache.Clear();
 

@@ -13,8 +13,7 @@ using System.Collections.Immutable;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class LocalGrainDirectory :
-        ILocalGrainDirectory, ISiloStatusListener
+    internal class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
@@ -851,6 +850,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        public void InvalidateCacheEntry(GrainId grainId)
+        {
+            DirectoryCache.Remove(grainId);
+        }
+
         public void InvalidateCacheEntry(ActivationAddress activationAddress)
         {
             var grainId = activationAddress.Grain;
@@ -966,6 +970,9 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return this.directoryMembership.MembershipCache.Contains(silo);
         }
+
+        public void CachePlacementDecision(ActivationAddress activation) => this.DirectoryCache.AddOrUpdate(activation, 0);
+        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => (address = GetLocalCacheData(grainId)) is not null;
 
         private class DirectoryMembership
         {

@@ -46,6 +46,11 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
+        public bool Remove(ActivationAddress key)
+        {
+            return false;
+        }
+
         public void Clear()
         {
         }

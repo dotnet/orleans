@@ -73,45 +73,34 @@ namespace Orleans.Runtime.GrainDirectory
                         continue;
                     }
 
-                    if (owner.Equals(router.MyAddress))
+                    if (entry == null)
                     {
-                        // we found our owned entry in the cache -- it is not supposed to happen unless there were 
-                        // changes in the membership
-                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {grain} owned by {owner} was found in the cache of {owner}", grain, owner, owner);
-                        cache.Remove(grain);
-                        cnt1++;                             // for debug
+                        // 0. If the entry was deleted in parallel, presumably due to cleanup after silo death
+                        cache.Remove(grain);            // for debug
+                        cnt3++;                            
+                    }
+                    else if (!entry.IsExpired())
+                    {
+                        // 1. If the entry is not expired, skip it
+                        cnt2++;                         // for debug
+                    }
+                    else if (entry.NumAccesses == 0)
+                    {
+                        // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
+                        cache.Remove(grain);            // for debug
+                        cnt3++;
                     }
                     else
                     {
-                        if (entry == null)
+                        // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
+                        if (!fetchInBatchList.TryGetValue(owner, out var list))
                         {
-                            // 0. If the entry was deleted in parallel, presumably due to cleanup after silo death
-                            cache.Remove(grain);            // for debug
-                            cnt3++;                            
+                            fetchInBatchList[owner] = list = new List<GrainId>();
                         }
-                        else if (!entry.IsExpired())
-                        {
-                            // 1. If the entry is not expired, skip it
-                            cnt2++;                         // for debug
-                        }
-                        else if (entry.NumAccesses == 0)
-                        {
-                            // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
-                            cache.Remove(grain);            // for debug
-                            cnt3++;
-                        }
-                        else
-                        {
-                            // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
-                            if (!fetchInBatchList.TryGetValue(owner, out var list))
-                            {
-                                fetchInBatchList[owner] = list = new List<GrainId>();
-                            }
-                            list.Add(grain);
-                            // And reset the entry's access count for next time
-                            entry.NumAccesses = 0;
-                            cnt4++;                         // for debug
-                        }
+                        list.Add(grain);
+                        // And reset the entry's access count for next time
+                        entry.NumAccesses = 0;
+                        cnt4++;                         // for debug
                     }
                 }
 
