@@ -48,11 +48,6 @@ namespace Orleans.Runtime
         /// <typeparam name="TComponent">The type used to lookup this component.</typeparam>
         /// <param name="value">The component instance.</param>
         void SetComponent<TComponent>(TComponent value);
-            
-        /// <summary>
-        /// Gets the component of the specified type.
-        /// </summary>
-        //TComponent GetComponent<TComponent>();
 
         void ReceiveMessage(object message);
 

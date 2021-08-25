@@ -29,18 +29,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async ValueTask<ActivationAddress> Lookup(GrainId grainId) => (await this.localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
-        {
-            if (this.localGrainDirectory.LocalLookup(grainId, out var addressAndTag))
-            {
-                address = addressAndTag.Address;
-                return true;
-            }
-
-            address = null;
-            return false;
-        }
-
         public async Task<ActivationAddress> Register(ActivationAddress address) => (await this.localGrainDirectory.RegisterAsync(address)).Address;
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause)
@@ -111,6 +99,6 @@ namespace Orleans.Runtime.GrainDirectory
         public void CachePlacementDecision(ActivationAddress address) => this.localGrainDirectory.CachePlacementDecision(address);
         public void InvalidateCache(GrainId grainId) => this.localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(ActivationAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
-        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
+        public bool TryLookupInCache(GrainId grainId, out ActivationAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
     }
 }

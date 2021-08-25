@@ -250,7 +250,7 @@ namespace Orleans.Runtime.Management
                 }
             }
 
-            if (grainLocator.TryLocalLookup(grainId, out var result))
+            if (grainLocator.TryLookupInCache(grainId, out var result))
             {
                 return new ValueTask<SiloAddress>(result?.Silo);
             }

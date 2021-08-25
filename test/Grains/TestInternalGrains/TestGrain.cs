@@ -277,7 +277,7 @@ namespace UnitTests.Grains
         public Task<string> GetActivationAddress(IGrain grain)
         {
             var grainId = ((GrainReference)grain).GrainId;
-            if (this.grainLocator.TryLocalLookup(grainId, out var result))
+            if (this.grainLocator.TryLookupInCache(grainId, out var result))
             {
                 return Task.FromResult(result.ToString());
             }

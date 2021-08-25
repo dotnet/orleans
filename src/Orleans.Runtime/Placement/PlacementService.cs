@@ -63,7 +63,7 @@ namespace Orleans.Runtime.Placement
         public SiloStatus LocalSiloStatus => _siloStatusOracle.CurrentStatus;
 
         /// <summary>
-        /// Gets or places an activation.a
+        /// Gets or places an activation.
         /// </summary>
         public Task AddressMessage(Message message)
         {
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Placement
             if (message.TargetGrain.IsDefault) ThrowMissingAddress();
 
             var grainId = message.TargetGrain;
-            if (_grainLocator.TryLocalLookup(grainId, out var result))
+            if (_grainLocator.TryLookupInCache(grainId, out var result))
             {
                 SetMessageTargetPlacement(message, result.Activation, result.Silo, false);
                 return Task.CompletedTask;
@@ -312,7 +312,7 @@ namespace Orleans.Runtime.Placement
                 var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
                 
                 // Give the grain locator one last chance to tell us that the grain has already been placed
-                if (_placementService._grainLocator.TryCacheOnlyLookup(targetGrain, out result))
+                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result))
                 {
                     return (result, false);
                 }

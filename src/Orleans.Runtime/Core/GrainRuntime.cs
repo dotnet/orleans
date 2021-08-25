@@ -12,7 +12,6 @@ namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        private readonly InsideRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly IServiceProvider serviceProvider;
         private readonly IReminderRegistry reminderRegistry;
@@ -26,10 +25,8 @@ namespace Orleans.Runtime
             ITimerRegistry timerRegistry,
             IReminderRegistry reminderRegistry,
             IServiceProvider serviceProvider,
-            InsideRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
         {
-            this.runtimeClient = runtimeClient;
             ServiceId = clusterOptions.Value.ServiceId;
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToLongString();

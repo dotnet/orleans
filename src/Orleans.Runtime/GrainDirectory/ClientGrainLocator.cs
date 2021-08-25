@@ -57,23 +57,6 @@ namespace Orleans.Runtime.GrainDirectory
             return null;
         }
 
-        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
-        {
-            if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
-            {
-                ThrowNotClientGrainId(grainId);
-            }
-
-            if (_clientDirectory.TryLocalLookup(clientGrainId.GrainId, out var addresses))
-            {
-                address = SelectAddress(addresses, grainId);
-                return address is object;
-            }
-
-            address = null;
-            return false;
-        }
-
         public Task<ActivationAddress> Register(ActivationAddress address) => throw new InvalidOperationException($"Cannot register client grain explicitly");
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause) => throw new InvalidOperationException($"Cannot unregister client grain explicitly");
@@ -87,9 +70,20 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCache(ActivationAddress address) { }
 
-        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address)
+        public bool TryLookupInCache(GrainId grainId, out ActivationAddress address)
         {
-            address = default;
+            if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
+            {
+                ThrowNotClientGrainId(grainId);
+            }
+
+            if (_clientDirectory.TryLocalLookup(clientGrainId.GrainId, out var addresses))
+            {
+                address = SelectAddress(addresses, grainId);
+                return address is not null;
+            }
+
+            address = null;
             return false;
         }
     }
