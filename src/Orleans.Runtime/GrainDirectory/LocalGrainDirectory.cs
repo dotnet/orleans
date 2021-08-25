@@ -76,6 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal readonly CounterStatistic UnregistrationsManyRemoteReceived;
 
         public LocalGrainDirectory(
+            IServiceProvider serviceProvider,
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
@@ -93,16 +94,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainFactory = grainFactory;
             ClusterId = clusterId;
 
-            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
-            /* TODO - investigate dynamic config changes using IOptions - jbragg
-                        clusterConfig.OnConfigChange("Globals/Caching", () =>
-                        {
-                            lock (membershipCache)
-                            {
-                                DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(globalConfig);
-                            }
-                        });
-            */
+            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
             maintainer =
                 GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
                     this,
@@ -857,14 +849,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCacheEntry(ActivationAddress activationAddress)
         {
-            var grainId = activationAddress.Grain;
-            var activationId = activationAddress.Activation;
-
-            // look up grainId activations
-            if (DirectoryCache.LookUp(grainId, out var entry, out _) && activationId.Equals(entry.Activation))
-            {
-                DirectoryCache.Remove(grainId);
-            }
+            DirectoryCache.Remove(activationAddress);
         }
 
         /// <summary>
