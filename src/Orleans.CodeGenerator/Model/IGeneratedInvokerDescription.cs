@@ -52,9 +52,9 @@ namespace Orleans.CodeGenerator
         public List<IMemberDescription> Members { get; }
         public InvokableInterfaceDescription InterfaceDescription { get; }
         public SemanticModel SemanticModel => InterfaceDescription.SemanticModel;
-        public bool IsEmptyConstructable => true;
+        public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
         public bool IsPartial => true;
-        public bool UseActivator => true;
+        public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
         public bool TrackReferences => false;
         public bool OmitDefaultMemberValues => false;
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _methodDescription.AllTypeParameters;
