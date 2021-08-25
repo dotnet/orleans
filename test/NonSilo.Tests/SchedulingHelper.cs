@@ -1,15 +1,16 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 
 namespace UnitTests.TesterInternal
 {
-    public class TestInternalHelper
+    public class SchedulingHelper
     {
-        internal static OrleansTaskScheduler InitializeSchedulerForTesting(
+        internal static WorkItemGroup CreateWorkItemGroupForTesting(
             IGrainContext context,
             ILoggerFactory loggerFactory)
         {
@@ -27,11 +28,15 @@ namespace UnitTests.TesterInternal
                 options.StoppedActivationWarningInterval = TimeSpan.FromMilliseconds(200);
             });
 
-            var serviceProvider = services.BuildServiceProvider();
-
-            var scheduler = ActivatorUtilities.CreateInstance<OrleansTaskScheduler>(serviceProvider);
-            scheduler.RegisterWorkContext(context);
-            return scheduler;
+            var s = services.BuildServiceProvider();
+            var result = new WorkItemGroup(
+                context,
+                s.GetRequiredService<ILogger<WorkItemGroup>>(),
+                s.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
+                s.GetRequiredService<SchedulerStatisticsGroup>(),
+                s.GetRequiredService<IOptions<StatisticsOptions>>(),
+                s.GetRequiredService<IOptions<SchedulingOptions>>());
+            return result;
         }
     }
 }

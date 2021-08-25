@@ -18,6 +18,7 @@ using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -38,11 +39,10 @@ namespace Orleans.Runtime
 
         private ILocalGrainDirectory directory;
         private Catalog catalog;
-        private Dispatcher dispatcher;
+        private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private DeepCopier _deepCopier;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
-        private Serializer _serializer;
         private HostedClient hostedClient;
 
         private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
@@ -54,7 +54,6 @@ namespace Orleans.Runtime
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
-            OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             ILoggerFactory loggerFactory,
@@ -64,18 +63,15 @@ namespace Orleans.Runtime
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
-            Serializer serializer,
             DeepCopier deepCopier)
         {
             this.interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
-            this._serializer = serializer;
             this._deepCopier = deepCopier;
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.disposables = new List<IDisposable>();
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.messageFactory = messageFactory;
-            this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
@@ -102,8 +98,6 @@ namespace Orleans.Runtime
 
         public IServiceProvider ServiceProvider { get; }
 
-        public OrleansTaskScheduler Scheduler { get; }
-
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
         private SiloAddress MySilo { get; }
@@ -118,7 +112,7 @@ namespace Orleans.Runtime
         private List<IIncomingGrainCallFilter> GrainCallFilters
             => this.grainCallFilters ?? (this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
 
-        private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
+        private MessageCenter MessageCenter => this.messageCenter ?? (this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>());
 
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
@@ -189,7 +183,7 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.Dispatcher.SendMessage(message, sendingActivation);
+            this.MessageCenter.AddressAndSendMessage(message);
         }
 
         public void SendResponse(Message request, Response response)
@@ -203,7 +197,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.Dispatcher.SendResponse(request, response);
+            this.MessageCenter.SendResponse(request, response);
         }
 
         /// <summary>
@@ -430,7 +424,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    this.Dispatcher.SendMessage(message).Ignore();
+                    this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 
@@ -507,10 +501,6 @@ namespace Orleans.Runtime
 
         public string CurrentActivationIdentity => RuntimeContext.CurrentGrainContext?.Address.ToString() ?? this.HostedClient.ToString();
 
-        public void Reset(bool cleanup)
-        {
-        }
-
         /// <inheritdoc />
         public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
@@ -541,7 +531,7 @@ namespace Orleans.Runtime
             if (!Catalog.TryGetActivationData(id, out data)) return; // already gone
 
             data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
-            Catalog.DeactivateActivationOnIdle(data);
+            data.DeactivateOnIdle();
         }
 
         private Task OnRuntimeInitializeStop(CancellationToken tc)

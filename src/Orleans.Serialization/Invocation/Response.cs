@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 
 namespace Orleans.Serialization.Invocation
@@ -27,6 +26,20 @@ namespace Orleans.Serialization.Invocation
         public abstract void Dispose();
 
         public virtual object GetResultOrDefault() => Exception is { } ? Result : default;
+
+        public override string ToString()
+        {
+            if (GetResultOrDefault() is { } result)
+            {
+                return result.ToString();
+            }
+            else if (Exception is { } exception)
+            {
+                return exception.ToString();
+            }
+
+            return "[null]";
+        }
     }
 
     [GenerateSerializer]
@@ -40,6 +53,8 @@ namespace Orleans.Serialization.Invocation
         public override T GetResult<T>() => default;
 
         public override void Dispose() { }
+
+        public override string ToString() => "[Completed]";
     }
 
     [GenerateSerializer]
@@ -67,11 +82,28 @@ namespace Orleans.Serialization.Invocation
         }
 
         public override void Dispose() { }
+
+        public override string ToString() => Exception?.ToString() ?? "[null]";
     }
 
     [GenerateSerializer]
     public abstract class Response<TResult> : Response
     {
         public abstract TResult TypedResult { get; set; }
+
+        public override string ToString()
+        {
+            if (Exception is { } exception)
+            {
+                return exception.ToString();
+            }
+
+            if (TypedResult is { } result)
+            {
+                return result.ToString();
+            }
+
+            return "[null]";
+        }
     }
 }

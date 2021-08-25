@@ -45,8 +45,6 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        public override WorkItemType ItemType => WorkItemType.Closure;
-
         public override IGrainContext GrainContext { get; }
         
         internal static string GetMethodName(Delegate action)
@@ -99,8 +97,6 @@ namespace Orleans.Runtime.Scheduler
                 RuntimeContext.ResetExecutionContext();
             }
         }
-
-        public override WorkItemType ItemType => WorkItemType.Closure;
 
         public override IGrainContext GrainContext { get; }
     }

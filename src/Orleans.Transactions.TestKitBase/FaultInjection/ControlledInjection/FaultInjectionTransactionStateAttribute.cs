@@ -40,7 +40,7 @@ namespace Orleans.Transactions.TestKit
         {
             var currentContext = this.contextAccessor.GrainContext;
             TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), this.contextAccessor);
-            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState, this.contextAccessor);
+            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState);
             deactivationTransactionalState.Participate(currentContext.ObservableLifecycle);
             return deactivationTransactionalState;
         }

@@ -43,8 +43,6 @@ namespace Orleans.Runtime.GrainDirectory
         public RemoteGrainDirectory RemoteGrainDirectory { get; private set; }
         public RemoteGrainDirectory CacheValidator { get; private set; }
 
-        internal OrleansTaskScheduler Scheduler { get; private set; }
-
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
 
         public string ClusterId { get; }
@@ -80,7 +78,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         public LocalGrainDirectory(
             ILocalSiloDetails siloDetails,
-            OrleansTaskScheduler scheduler,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
@@ -93,7 +90,6 @@ namespace Orleans.Runtime.GrainDirectory
             var clusterId = siloDetails.ClusterId;
             MyAddress = siloDetails.SiloAddress;
 
-            Scheduler = scheduler;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
             ClusterId = clusterId;
@@ -413,12 +409,12 @@ namespace Orleans.Runtime.GrainDirectory
                 if (status.IsTerminating())
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator);
+                    CacheValidator.Scheduler.QueueAction(() => RemoveServer(updatedSilo, status));
                 }
                 else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    Scheduler.QueueAction(() => AddServer(updatedSilo), CacheValidator);
+                    CacheValidator.Scheduler.QueueAction(() => AddServer(updatedSilo));
                 }
             }
         }

@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
@@ -16,6 +17,11 @@ namespace Orleans.Runtime
         private readonly IActivationCollector _activationCollector;
         private readonly GrainManifest _siloManifest;
         private readonly IActivationWorkingSet _activationWorkingSet;
+        private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
+        private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
+        private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
+        private readonly IOptions<SchedulingOptions> _schedulingOptions;
+        private readonly IOptions<StatisticsOptions> _statisticsOptions;
         private readonly GrainTypeComponentsResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
         private readonly GrainCollectionOptions _collectionOptions;
@@ -24,7 +30,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan _maxRequestProcessingTime;
         private readonly ILoggerFactory _loggerFactory;
         private readonly GrainReferenceActivator _grainReferenceActivator;
-        private ActivationMessageScheduler _activationMessageScheduler;
+        private InternalGrainRuntime _activationMessageScheduler;
         private IGrainRuntime _grainRuntime;
 
         public ActivationDataActivatorProvider(
@@ -38,9 +44,19 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             GrainReferenceActivator grainReferenceActivator,
             GrainTypeComponentsResolver sharedComponentsResolver,
-            IActivationWorkingSet activationWorkingSet)
+            IActivationWorkingSet activationWorkingSet,
+            ILogger<WorkItemGroup> workItemGroupLogger,
+            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
+            SchedulerStatisticsGroup schedulerStatisticsGroup,
+            IOptions<SchedulingOptions> schedulingOptions,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             _activationWorkingSet = activationWorkingSet;
+            _workItemGroupLogger = workItemGroupLogger;
+            _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
+            _schedulerStatisticsGroup = schedulerStatisticsGroup;
+            _schedulingOptions = schedulingOptions;
+            _statisticsOptions = statisticsOptions;
             _sharedComponentsResolver = sharedComponentsResolver;
             _grainClassMap = grainClassMap;
             _serviceProvider = serviceProvider;
@@ -85,8 +101,13 @@ namespace Orleans.Runtime
                 _grainRuntime ??= _serviceProvider.GetRequiredService<IGrainRuntime>(),
                 _grainReferenceActivator,
                 sharedComponents,
-                _activationMessageScheduler ??= _serviceProvider.GetRequiredService<ActivationMessageScheduler>(),
-                _activationWorkingSet);
+                _activationMessageScheduler ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>(),
+                _activationWorkingSet,
+                _workItemGroupLogger,
+                _activationTaskSchedulerLogger,
+                _schedulerStatisticsGroup,
+                _schedulingOptions,
+                _statisticsOptions);
             return true;
         }
 
@@ -117,6 +138,11 @@ namespace Orleans.Runtime
         private class ActivationDataActivator : IGrainContextActivator
         {
             private readonly IActivationWorkingSet _activationWorkingSet;
+            private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
+            private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
+            private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
+            private readonly IOptions<SchedulingOptions> _schedulingOptions;
+            private readonly IOptions<StatisticsOptions> _statisticsOptions;
             private readonly IGrainActivator _grainActivator;
             private readonly PlacementStrategy _placementStrategy;
             private readonly TimeSpan _collectionAgeLimit;
@@ -128,7 +154,8 @@ namespace Orleans.Runtime
             private readonly IGrainRuntime _grainRuntime;
             private readonly GrainReferenceActivator _grainReferenceActivator;
             private readonly GrainTypeComponents _sharedComponents;
-            private readonly ActivationMessageScheduler _activationMessageScheduler;
+            private readonly InternalGrainRuntime _runtime;
+            private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
 
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
@@ -142,10 +169,20 @@ namespace Orleans.Runtime
                 IGrainRuntime grainRuntime,
                 GrainReferenceActivator grainReferenceActivator,
                 GrainTypeComponents sharedComponents,
-                ActivationMessageScheduler activationMessageScheduler,
-                IActivationWorkingSet activationWorkingSet)
+                InternalGrainRuntime activationMessageScheduler,
+                IActivationWorkingSet activationWorkingSet,
+                ILogger<WorkItemGroup> workItemGroupLogger,
+                ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
+                SchedulerStatisticsGroup schedulerStatisticsGroup,
+                IOptions<SchedulingOptions> schedulingOptions,
+                IOptions<StatisticsOptions> statisticsOptions)
             {
                 _activationWorkingSet = activationWorkingSet;
+                _workItemGroupLogger = workItemGroupLogger;
+                _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
+                _schedulerStatisticsGroup = schedulerStatisticsGroup;
+                _schedulingOptions = schedulingOptions;
+                _statisticsOptions = statisticsOptions;
                 _grainActivator = grainActivator;
                 _placementStrategy = placementStrategy;
                 _collectionAgeLimit = collectionAgeLimit;
@@ -157,13 +194,21 @@ namespace Orleans.Runtime
                 _grainRuntime = grainRuntime;
                 _grainReferenceActivator = grainReferenceActivator;
                 _sharedComponents = sharedComponents;
-                _activationMessageScheduler = activationMessageScheduler;
+                _runtime = activationMessageScheduler;
+                _createWorkItemGroup = context => new WorkItemGroup(
+                    context,
+                    _workItemGroupLogger,
+                    _activationTaskSchedulerLogger,
+                    _schedulerStatisticsGroup,
+                    _statisticsOptions,
+                    _schedulingOptions);
             }
 
             public IGrainContext CreateContext(ActivationAddress activationAddress)
             {
                 var context = new ActivationData(
                     activationAddress,
+                    _createWorkItemGroup,
                     _placementStrategy,
                     _collectionAgeLimit,
                     _messagingOptions,
@@ -174,8 +219,7 @@ namespace Orleans.Runtime
                     _grainRuntime,
                     _grainReferenceActivator,
                     _sharedComponents,
-                    _activationMessageScheduler,
-                    _activationWorkingSet);
+                    _runtime);
 
                 RuntimeContext.SetExecutionContext(context, out var existingContext);
 

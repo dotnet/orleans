@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -30,7 +29,6 @@ namespace Orleans.Runtime.Providers
             IConsistentRingProvider consistentRingProvider,
             InsideRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
-            OrleansTaskScheduler scheduler,
             ILoggerFactory loggerFactory,
             ILocalSiloDetails siloDetails,
             IGrainContextAccessor grainContextAccessor)

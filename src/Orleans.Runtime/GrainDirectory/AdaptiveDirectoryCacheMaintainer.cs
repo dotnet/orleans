@@ -139,11 +139,11 @@ namespace Orleans.Runtime.GrainDirectory
                 // Send all of the items in one large request
                 var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
 
-                router.Scheduler.QueueTask(async () =>
+                router.CacheValidator.QueueTask(async () =>
                 {
                     var response = await validator.LookUpMany(cachedGrainAndETagList);
                     ProcessCacheRefreshResponse(silo, response);
-                }, router.CacheValidator).Ignore();
+                }).Ignore();
 
                 if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
             }

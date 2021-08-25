@@ -22,7 +22,7 @@ namespace DefaultCluster.Tests.General
 
             var sw = Stopwatch.StartNew();
 
-            await grain.SetA(99, true); // deactivate grain after setting A
+            await grain.SetA(99, true); // deactivate grain after setting A value
             var newVersion = await grain.GetVersion(); // get a new version from the new activation
             Assert.NotEqual(originalVersion, newVersion);
 

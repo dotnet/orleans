@@ -2,9 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -16,7 +18,7 @@ namespace Orleans.Runtime
         private static readonly TimeSpan DefaultAnalysisPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InactiveGrainIdleness = TimeSpan.FromMinutes(1);
         private readonly IAsyncTimer _scanPeriodTimer;
-        private readonly IMessageCenter _messageCenter;
+        private readonly IServiceProvider _serviceProvider;
         private readonly MessageFactory _messageFactory;
         private readonly IOptionsMonitor<SiloMessagingOptions> _messagingOptions;
         private readonly ConcurrentDictionary<ActivationData, bool> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, bool>(ReferenceEqualsComparer<ActivationData>.Instance);
@@ -25,12 +27,12 @@ namespace Orleans.Runtime
 
         public IncomingRequestMonitor(
             IAsyncTimerFactory asyncTimerFactory,
-            IMessageCenter messageCenter,
+            IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             IOptionsMonitor<SiloMessagingOptions> siloMessagingOptions)
         {
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromSeconds(1), nameof(IncomingRequestMonitor));
-            _messageCenter = messageCenter;
+            _serviceProvider = serviceProvider;
             _messageFactory = messageFactory;
             _messagingOptions = siloMessagingOptions;
         }
@@ -54,7 +56,6 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnAdded(IActivationWorkingSetMember member) => OnActive(member);
         public void OnIdle(IActivationWorkingSetMember member)
         {
             if (member is ActivationData activation)
@@ -63,7 +64,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnRemoved(IActivationWorkingSetMember member) => OnIdle(member);
+        public void OnEvicted(IActivationWorkingSetMember member) => OnIdle(member);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
@@ -87,6 +88,7 @@ namespace Orleans.Runtime
             var options = _messagingOptions.CurrentValue;
             var optionsPeriod = options.GrainWorkloadAnalysisPeriod;
             TimeSpan nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DefaultAnalysisPeriod;
+            var messageCenter = _serviceProvider.GetRequiredService<MessageCenter>();
 
             while (await _scanPeriodTimer.NextTick(nextDelay))
             {
@@ -119,7 +121,7 @@ namespace Orleans.Runtime
                     var activation = activationEntry.Key;
                     lock (activation)
                     {
-                        activation.AnalyzeWorkload(now, _messageCenter, _messageFactory, options);
+                        activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
                     }
 
                     // Yield execution frequently

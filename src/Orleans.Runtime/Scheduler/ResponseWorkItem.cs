@@ -13,8 +13,6 @@ namespace Orleans.Runtime.Scheduler
             response = m;
         }
 
-        public override WorkItemType ItemType { get { return WorkItemType.Response; } }
-
         public override string Name
         {
             get { return $"ResponseWorkItem:Id={response.Id},Type={response.Result}"; }

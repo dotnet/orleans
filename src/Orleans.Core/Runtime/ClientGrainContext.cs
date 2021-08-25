@@ -32,6 +32,8 @@ namespace Orleans
 
         IGrainContext IGrainContextAccessor.GrainContext => this;
 
+        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+
         public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
 
         public TComponent GetComponent<TComponent>()

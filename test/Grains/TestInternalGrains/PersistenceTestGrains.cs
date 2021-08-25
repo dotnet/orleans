@@ -875,7 +875,6 @@ namespace UnitTests.Grains
 
     internal class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
     {
-        private readonly OrleansTaskScheduler scheduler;
         private const int Multiple = 100;
         private ILogger logger;
         private bool executing;
@@ -884,27 +883,8 @@ namespace UnitTests.Grains
         private static int _counter = 1;
         private int _id;
 
-        // HACK for testing
-        private readonly Tuple<string, Severity>[] overridesOn =
-        {
-            new Tuple<string, Severity>("Scheduler", Severity.Verbose),
-            new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Verbose3)
-        };
-
-        private readonly Tuple<string, Severity>[] overridesOff =
-        {
-            new Tuple<string, Severity>("Scheduler", Severity.Info),
-            new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Info)
-        };
-        
-        public NonReentrentStressGrainWithoutState(OrleansTaskScheduler scheduler)
-        {
-            this.scheduler = scheduler;
-        }
-
         public override Task OnActivateAsync()
         {
-
             _id = _counter++;
             var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
             //if grain created outside a cluster
@@ -914,10 +894,6 @@ namespace UnitTests.Grains
 
             executing = false;
             Log("--> OnActivateAsync");
-//#if DEBUG
-//            // HACK for testing
-//            Logger.SetTraceLevelOverrides(overridesOn.ToList());
-//#endif
             Log("<-- OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -1014,7 +990,6 @@ namespace UnitTests.Grains
                     TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
                     callStack);
                 this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                this.scheduler.DumpSchedulerStatus();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
             }
