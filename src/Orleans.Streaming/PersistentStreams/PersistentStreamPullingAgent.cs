@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -37,6 +38,7 @@ namespace Orleans.Streams
         internal readonly QueueId QueueId;
         private Task receiverInitTask;
         private bool IsShutdown => timer == null;
+        private bool isTimerRunning = false;
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
@@ -153,6 +155,15 @@ namespace Orleans.Streams
                 IDisposable tmp = timer;
                 timer = null;
                 Utils.SafeExecute(tmp.Dispose, this.logger);
+                await WaitUntilNoTimerRunning(new CancellationTokenSource(5000).Token);
+
+                async Task WaitUntilNoTimerRunning(CancellationToken token)
+                {
+                    while (isTimerRunning && !token.IsCancellationRequested)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
             }
 
             this.queueCache = null;
@@ -271,6 +282,7 @@ namespace Orleans.Streams
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
+                         // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
                          DeliveryBackoffProvider);
@@ -292,6 +304,9 @@ namespace Orleans.Streams
                 }
                 if (exceptionOccured != null)
                 {
+                    // If we are shutting down, ignore the error
+                    if (IsShutdown) return false;
+
                     bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken?.Token);
                     if (faultedSubscription) return false;
                 }
@@ -338,6 +353,8 @@ namespace Orleans.Streams
             var queueId = (QueueId)state;
             try
             {
+                isTimerRunning = true;
+
                 Task localReceiverInitTask = receiverInitTask;
                 if (localReceiverInitTask != null)
                 {
@@ -372,6 +389,10 @@ namespace Orleans.Streams
             {
                 receiverInitTask = null;
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_12, $"Giving up reading from queue {queueId} after retry attempts {ReadLoopRetryMax}", exc);
+            }
+            finally
+            {
+                isTimerRunning = false;
             }
         }
 
