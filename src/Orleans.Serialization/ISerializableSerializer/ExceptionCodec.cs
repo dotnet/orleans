@@ -311,7 +311,7 @@ namespace Orleans.Serialization.ISerializableSupport
             }
             else if (typeof(Exception).IsAssignableFrom(type))
             {
-                result = (Exception)ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, type);
+                result = (Exception)Activator.CreateInstance(type);
             }
             else
             {
