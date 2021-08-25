@@ -20,6 +20,7 @@ namespace Orleans.Serialization.Serializers
         private static readonly Type ObjectType = typeof(object);
         private static readonly Type OpenGenericCodecType = typeof(IFieldCodec<>);
         private static readonly MethodInfo TypedCodecWrapperCreateMethod = typeof(CodecAdapter).GetMethod(nameof(CodecAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
+        private static readonly MethodInfo TypedBaseCodecWrapperCreateMethod = typeof(CodecAdapter).GetMethod(nameof(BaseCodecAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
 
         private static readonly Type OpenGenericCopierType = typeof(IDeepCopier<>);
         private static readonly MethodInfo TypedCopierWrapperCreateMethod = typeof(CopierAdapter).GetMethod(nameof(CopierAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
@@ -27,6 +28,7 @@ namespace Orleans.Serialization.Serializers
         private readonly object _initializationLock = new();
 
         private readonly ConcurrentDictionary<(Type, Type), IFieldCodec> _adaptedCodecs = new();
+        private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new();
         private readonly ConcurrentDictionary<(Type, Type), IDeepCopier> _adaptedCopiers = new();
 
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCodecs = new();
@@ -41,6 +43,8 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
         private readonly List<ISpecializableCodec> _specializableCodecs = new();
+        private readonly List<IGeneralizedBaseCodec> _generalizedBaseCodecs = new();
+        private readonly List<ISpecializableBaseCodec> _specializableBaseCodecs = new();
         private readonly List<IGeneralizedCopier> _generalizedCopiers = new();
         private readonly List<ISpecializableCopier> _specializableCopiers = new();
         private readonly VoidCodec _voidCodec = new();
@@ -79,36 +83,34 @@ namespace Orleans.Serialization.Serializers
                 }
 
                 _initialized = true;
+
                 _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
+                _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
                 _generalizedCopiers.AddRange(_serviceProvider.GetServices<IGeneralizedCopier>());
+
                 _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
                 _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
+                _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
             }
         }
 
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
-            Func<Type, bool> noFilter = _ => true;
-            AddFromMetadata(_baseCodecs, metadata.Serializers, typeof(IBaseCodec<>), noFilter);
-            AddFromMetadata(_valueSerializers, metadata.Serializers, typeof(IValueSerializer<>), noFilter);
-            AddFromMetadata(_fieldCodecs, metadata.Serializers, typeof(IFieldCodec<>), noFilter);
-            AddFromMetadata(_fieldCodecs, metadata.FieldCodecs, typeof(IFieldCodec<>), noFilter);
-            AddFromMetadata(_activators, metadata.Activators, typeof(IActivator<>), noFilter);
-            AddFromMetadata(_copiers, metadata.Copiers, typeof(IDeepCopier<>), noFilter);
-            AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>), noFilter);
+            AddFromMetadata(_baseCodecs, metadata.Serializers, typeof(IBaseCodec<>));
+            AddFromMetadata(_valueSerializers, metadata.Serializers, typeof(IValueSerializer<>));
+            AddFromMetadata(_fieldCodecs, metadata.Serializers, typeof(IFieldCodec<>));
+            AddFromMetadata(_fieldCodecs, metadata.FieldCodecs, typeof(IFieldCodec<>));
+            AddFromMetadata(_activators, metadata.Activators, typeof(IActivator<>));
+            AddFromMetadata(_copiers, metadata.Copiers, typeof(IDeepCopier<>));
+            AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
 
-            static void AddFromMetadata(IDictionary<Type, Type> resultCollection, IEnumerable<Type> metadataCollection, Type genericType, Func<Type, bool> predicate)
+            static void AddFromMetadata(IDictionary<Type, Type> resultCollection, IEnumerable<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length == 1);
 
                 foreach (var type in metadataCollection)
                 {
-                    if (!predicate(type))
-                    {
-                        continue;
-                    }
-
                     var interfaces = type.GetInterfaces();
                     foreach (var @interface in interfaces)
                     {
@@ -293,6 +295,130 @@ namespace Orleans.Serialization.Serializers
             return GetActivatorInner<T>(type, searchType) ?? ThrowActivatorNotFound<T>(type);
         }
 
+        private IBaseCodec<TField> TryGetBaseCodecInner<TField>(Type fieldType) where TField : class
+        {
+            if (!_initialized)
+            {
+                Initialize();
+            }
+
+            var resultFieldType = typeof(TField);
+            var wasCreated = false;
+
+            // Try to find the codec from the configured codecs.
+            IBaseCodec untypedResult;
+
+            if (!_adaptedBaseCodecs.TryGetValue((fieldType, resultFieldType), out untypedResult))
+            {
+                ThrowIfUnsupportedType(fieldType);
+
+                if (fieldType.IsConstructedGenericType)
+                {
+                    untypedResult = CreateBaseCodecInstance(fieldType, fieldType.GetGenericTypeDefinition());
+                }
+                else
+                {
+                    untypedResult = CreateBaseCodecInstance(fieldType, fieldType);
+                }
+
+                if (untypedResult is null)
+                {
+                    foreach (var specializableCodec in _specializableBaseCodecs)
+                    {
+                        if (specializableCodec.IsSupportedType(fieldType))
+                        {
+                            untypedResult = specializableCodec.GetSpecializedCodec(fieldType);
+                        }
+                    }
+                }
+
+                if (untypedResult is null)
+                {
+                    foreach (var dynamicCodec in _generalizedBaseCodecs)
+                    {
+                        if (dynamicCodec.IsSupportedType(fieldType))
+                        {
+                            untypedResult = dynamicCodec;
+                            break;
+                        }
+                    }
+                }
+
+                if (untypedResult is null && (fieldType.IsInterface || fieldType.IsAbstract))
+                {
+                    untypedResult = (IBaseCodec)GetServiceOrCreateInstance(typeof(AbstractTypeSerializer<>).MakeGenericType(fieldType));
+                }
+
+                wasCreated = untypedResult != null;
+            }
+
+            // Attempt to adapt the codec if it's not already adapted.
+            IBaseCodec<TField> typedResult;
+            var wasAdapted = false;
+            switch (untypedResult)
+            {
+                case null:
+                    return null;
+                case IBaseCodec<TField> typedCodec:
+                    typedResult = typedCodec;
+                    break;
+                case IWrappedCodec wrapped when wrapped.Inner is IBaseCodec<TField> typedCodec:
+                    typedResult = typedCodec;
+                    wasAdapted = true;
+                    break;
+                case IBaseCodec<object> objectCodec:
+                    typedResult = BaseCodecAdapter.CreateTypedFromUntyped<TField>(objectCodec);
+                    wasAdapted = true;
+                    break;
+                default:
+                    typedResult = TryWrapCodec(untypedResult);
+                    wasAdapted = true;
+                    break;
+            }
+
+            // Store the results or throw if adaptation failed.
+            if (typedResult != null && (wasCreated || wasAdapted))
+            {
+                untypedResult = typedResult;
+                var key = (fieldType, resultFieldType);
+                if (_adaptedBaseCodecs.TryGetValue(key, out var existing))
+                {
+                    typedResult = (IBaseCodec<TField>)existing;
+                }
+                else if (!_adaptedBaseCodecs.TryAdd(key, untypedResult))
+                {
+                    typedResult = (IBaseCodec<TField>)_adaptedBaseCodecs[key];
+                }
+            }
+            else if (typedResult is null)
+            {
+                ThrowCannotConvert(untypedResult);
+            }
+
+            return typedResult;
+
+            static IBaseCodec<TField> TryWrapCodec(object rawCodec)
+            {
+                var codecType = rawCodec.GetType();
+                if (typeof(TField) == ObjectType)
+                {
+                    foreach (var @interface in codecType.GetInterfaces())
+                    {
+                        if (@interface.IsConstructedGenericType
+                            && OpenGenericCodecType.IsAssignableFrom(@interface.GetGenericTypeDefinition()))
+                        {
+                            // Convert the typed codec provider into a wrapped object codec provider.
+                            return TypedBaseCodecWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()[0], codecType).Invoke(null, new[] { rawCodec }) as IBaseCodec<TField>;
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            static void ThrowCannotConvert(object rawCodec) => throw new InvalidOperationException($"Cannot convert codec of type {rawCodec.GetType()} to codec of type {typeof(IBaseCodec<TField>)}.");
+        }
+
         public IBaseCodec<TField> GetBaseCodec<TField>() where TField : class
         {
             if (!_initialized)
@@ -302,9 +428,15 @@ namespace Orleans.Serialization.Serializers
 
             ThrowIfUnsupportedType(typeof(TField));
             var type = typeof(TField);
-            var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
-            return GetBaseCodecInner<TField>(type, searchType) ?? ThrowBaseCodecNotFound<TField>(type);
+            var result = TryGetBaseCodecInner<TField>(type);
+
+            if (result is null)
+            {
+                ThrowBaseCodecNotFound<TField>(type);
+            }
+
+            return result;
         }
 
         public IValueSerializer<TField> GetValueSerializer<TField>() where TField : struct
@@ -476,27 +608,6 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        private IBaseCodec<TField> GetBaseCodecInner<TField>(Type concreteType, Type searchType) where TField : class
-        {
-            if (!_baseCodecs.TryGetValue(searchType, out var serializerType))
-            {
-                return null;
-            }
-
-            if (serializerType.IsGenericTypeDefinition)
-            {
-                serializerType = serializerType.MakeGenericType(concreteType.GetGenericArguments());
-            }
-
-            if (!_instantiatedBaseCodecs.TryGetValue(serializerType, out var result))
-            {
-                result = GetServiceOrCreateInstance(serializerType);
-                _ = _instantiatedBaseCodecs.TryAdd(serializerType, result);
-            }
-
-            return (IBaseCodec<TField>)result;
-        }
-
         private IValueSerializer<TField> GetValueSerializerInner<TField>(Type concreteType, Type searchType) where TField : struct
         {
             if (!_valueSerializers.TryGetValue(searchType, out var serializerType))
@@ -613,7 +724,7 @@ namespace Orleans.Serialization.Serializers
                     baseCodecType = baseCodecType.MakeGenericType(fieldType.GetGenericArguments());
                 }
 
-                // If there is a partial serializer for this type, create a codec which will then accept that partial serializer.
+                // If there is a base type serializer for this type, create a codec which will then accept that base type serializer.
                 codecType = typeof(ConcreteTypeSerializer<,>).MakeGenericType(fieldType, baseCodecType);
                 constructorArguments = new[] { GetServiceOrCreateInstance(baseCodecType) };
             }
@@ -657,6 +768,20 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
+        private IBaseCodec CreateBaseCodecInstance(Type fieldType, Type searchType)
+        {
+            object[] constructorArguments = null;
+            if (_baseCodecs.TryGetValue(searchType, out var codecType))
+            {
+                if (codecType.IsGenericTypeDefinition)
+                {
+                    codecType = codecType.MakeGenericType(fieldType.GetGenericArguments());
+                }
+            }
+
+            return codecType != null ? (IBaseCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
+        }
+
         private IDeepCopier CreateCopierInstance(Type fieldType, Type searchType)
         {
             object[] constructorArguments = null;
@@ -679,7 +804,7 @@ namespace Orleans.Serialization.Serializers
                     baseCopierType = baseCopierType.MakeGenericType(fieldType.GetGenericArguments());
                 }
 
-                // If there is a partial serializer for this type, create a copier which will then accept that partial serializer.
+                // If there is a base type copier for this type, create a copier which will then accept that base type copier.
                 copierType = typeof(ConcreteTypeCopier<,>).MakeGenericType(fieldType, baseCopierType);
                 constructorArguments = new[] { GetServiceOrCreateInstance(baseCopierType) };
             }
@@ -729,7 +854,7 @@ namespace Orleans.Serialization.Serializers
         private static IDeepCopier<T> ThrowCopierNotFound<T>(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static IBaseCodec<TField> ThrowBaseCodecNotFound<TField>(Type fieldType) where TField : class => throw new KeyNotFoundException($"Could not find a partial serializer for type {fieldType}.");
+        private static IBaseCodec<TField> ThrowBaseCodecNotFound<TField>(Type fieldType) where TField : class => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static IValueSerializer<TField> ThrowValueSerializerNotFound<TField>(Type fieldType) where TField : struct => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
@@ -738,6 +863,6 @@ namespace Orleans.Serialization.Serializers
         private static IActivator<T> ThrowActivatorNotFound<T>(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a partial copier for type {type}.");
+        private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
     }
 }
