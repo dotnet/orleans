@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    interface IGrainDirectoryCache
+    public interface IGrainDirectoryCache
     {
         /// <summary>
         /// Adds a new entry with the given version into the cache: key (grain) --> value
