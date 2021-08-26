@@ -1,12 +1,8 @@
 using System;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
-using Orleans.Runtime.Versions.Compatibility;
-using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime
 {
@@ -19,7 +15,6 @@ namespace Orleans.Runtime
         private readonly IGrainFactory grainFactory;
 
         public GrainRuntime(
-            IOptions<ClusterOptions> clusterOptions,
             ILocalSiloDetails localSiloDetails,
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
@@ -27,7 +22,6 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory)
         {
-            ServiceId = clusterOptions.Value.ServiceId;
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToLongString();
             this.grainFactory = grainFactory;
@@ -36,8 +30,6 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
         }
-
-        public string ServiceId { get; }
 
         public string SiloIdentity { get; }
 
