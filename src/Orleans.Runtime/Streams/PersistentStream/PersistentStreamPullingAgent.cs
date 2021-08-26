@@ -35,12 +35,11 @@ namespace Orleans.Streams
         private IQueueAdapterReceiver receiver;
         private IStreamFailureHandler streamFailureHandler;
         private DateTime lastTimeCleanedPubSubCache;
-        private IDisposable timer;
+        private IGrainTimer timer;
 
         internal readonly QueueId QueueId;
         private Task receiverInitTask;
         private bool IsShutdown => timer == null;
-        private bool isTimerRunning = false;
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
@@ -143,7 +142,7 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver. 
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = safeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
 
@@ -157,17 +156,17 @@ namespace Orleans.Streams
 
             if (timer != null)
             {
-                IDisposable tmp = timer;
+                var tmp = timer;
                 timer = null;
                 Utils.SafeExecute(tmp.Dispose, this.logger);
-                await WaitUntilNoTimerRunning(new CancellationTokenSource(5000).Token);
 
-                async Task WaitUntilNoTimerRunning(CancellationToken token)
+                try
                 {
-                    while (isTimerRunning && !token.IsCancellationRequested)
-                    {
-                        await Task.Delay(100);
-                    }
+                    await tmp.GetCurrentlyExecutingTickTask().WithTimeout(TimeSpan.FromSeconds(5));
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
                 }
             }
 
@@ -358,8 +357,6 @@ namespace Orleans.Streams
             var queueId = (QueueId)state;
             try
             {
-                isTimerRunning = true;
-
                 Task localReceiverInitTask = receiverInitTask;
                 if (localReceiverInitTask != null)
                 {
@@ -394,10 +391,6 @@ namespace Orleans.Streams
             {
                 receiverInitTask = null;
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_12, $"Giving up reading from queue {queueId} after retry attempts {ReadLoopRetryMax}", exc);
-            }
-            finally
-            {
-                isTimerRunning = false;
             }
         }
 
