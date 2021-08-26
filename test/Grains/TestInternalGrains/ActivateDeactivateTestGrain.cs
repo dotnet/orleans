@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
-            await watcher.RecordActivateCall(Data.ActivationId.ToString());
+            await watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
             Assert.True(doingActivate, "Activate method still running");
             doingActivate = false;
         }
@@ -41,7 +42,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
-            await watcher.RecordDeactivateCall(Data.ActivationId.ToString());
+            await watcher.RecordDeactivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
             Assert.True(doingDeactivate, "Deactivate method still running");
             doingDeactivate = false;
         }
@@ -51,7 +52,7 @@ namespace UnitTests.Grains
             logger.Info("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(RuntimeHelpers.GetHashCode(this).ToString("X"));
         }
 
         public Task DoDeactivate()
@@ -85,7 +86,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
-            return watcher.RecordActivateCall(Data.ActivationId.ToString())
+            return watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"))
                 .ContinueWith((Task t) =>
                 {
                     Assert.False(t.IsFaulted, "RecordActivateCall failed");
@@ -100,7 +101,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
-            return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
+            return watcher.RecordDeactivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"))
                 .ContinueWith((Task t) =>
                 {
                     Assert.False(t.IsFaulted, "RecordDeactivateCall failed");
@@ -114,7 +115,7 @@ namespace UnitTests.Grains
             logger.Info("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(RuntimeHelpers.GetHashCode(this).ToString("X"));
         }
 
         public Task DoDeactivate()
@@ -164,7 +165,7 @@ namespace UnitTests.Grains
 
             logger.Info("Started-OnActivateAsync");
 
-            await watcher.RecordActivateCall(Data.ActivationId.ToString());
+            await watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
             Assert.True(doingActivate, "Doing Activate");
 
             logger.Info("OnActivateAsync-Sleep");
@@ -185,7 +186,7 @@ namespace UnitTests.Grains
 
             logger.Info("Started-OnDeactivateAsync");
 
-            await watcher.RecordDeactivateCall(Data.ActivationId.ToString());
+            await watcher.RecordDeactivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
             Assert.True(doingDeactivate, "Doing Deactivate");
 
             logger.Info("OnDeactivateAsync-Sleep");
@@ -199,7 +200,7 @@ namespace UnitTests.Grains
             logger.Info("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(RuntimeHelpers.GetHashCode(this).ToString("X"));
         }
 
         public Task DoDeactivate()
@@ -259,7 +260,7 @@ namespace UnitTests.Grains
                     try
                     {
                         logger.Info("Calling RecordActivateCall");
-                        await watcher.RecordActivateCall(Data.ActivationId.ToString());
+                        await watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
                         logger.Info("Returned from calling RecordActivateCall");
                     }
                     catch (Exception exc)
@@ -292,7 +293,7 @@ namespace UnitTests.Grains
             doingDeactivate = true;
 
             logger.Info("Started-OnDeactivateAsync");
-            return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
+            return watcher.RecordDeactivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"))
                 .ContinueWith((Task t) =>
                 {
                     Assert.False(t.IsFaulted, "RecordDeactivateCall failed");
@@ -309,7 +310,7 @@ namespace UnitTests.Grains
             logger.Info("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(RuntimeHelpers.GetHashCode(this).ToString("X"));
         }
 
         public Task DoDeactivate()
@@ -440,7 +441,7 @@ namespace UnitTests.Grains
             {
                 throw new ArgumentException("Bad data: Null label returned");
             }
-            return Data.ActivationId.ToString();
+            return RuntimeHelpers.GetHashCode(this).ToString("X");
         }
 
         public async Task ForwardCall(IBadActivateDeactivateTestGrain otherGrain)

@@ -32,7 +32,7 @@ namespace UnitTests.Grains
         private IOptions<ReminderOptions> reminderOptions;
 
         private ILogger logger;
-        private string myId; // used to distinguish during debugging between multiple activations of the same grain
+        private string _id; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
 
@@ -46,7 +46,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            this.myId = this.Data.ActivationId.ToString();// new Random().Next();
+            this._id = Guid.NewGuid().ToString();
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
             this.period = GetDefaultPeriod(this.logger);
