@@ -68,7 +68,7 @@ namespace Orleans.Runtime
             _shared = sharedComponents;
             _runtime = runtime;
             logger = loggerFactory.CreateLogger<ActivationData>();
-            lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
+            lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<GrainLifecycle>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.messagingOptions = messagingOptions.Value;
