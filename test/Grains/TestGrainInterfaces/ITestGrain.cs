@@ -84,7 +84,20 @@ namespace UnitTests.GrainInterfaces
 
         Task<SiloAddress> GetPrimaryForGrain();
 
+        Task<string> GetActivationId();
+
         Task<string> GetActivationAddress(IGrain grain);
+
+        Task SignalSelfViaOther();
+
+        [OneWay]
+        Task SendSignalTo(IOneWayGrain grain);
+
+        [AlwaysInterleave]
+        Task<(int NumSignals, string SignallerId)> WaitForSignal();
+
+        [AlwaysInterleave]
+        Task Signal(string id);
     }
 
     public interface ICanBeOneWayGrain : IGrainWithGuidKey

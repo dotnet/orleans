@@ -25,6 +25,8 @@ namespace UnitTests.Grains
 
     internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
     {
+        private readonly string _id = Guid.NewGuid().ToString();
+
         private readonly ActivationCollector activationCollector;
         
         private int burstCount = 0;
@@ -46,7 +48,7 @@ namespace UnitTests.Grains
 
         public Task<string> IdentifyActivation()
         {
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(_id);
         }
 
         public Task EnableBurstOnCollection(int count)
@@ -104,6 +106,8 @@ namespace UnitTests.Grains
     [StatelessWorker]
     public class StatelessWorkerActivationCollectorTestGrain1 : Grain, IStatelessWorkerActivationCollectorTestGrain1
     {
+        private readonly string _id = Guid.NewGuid().ToString();
+
         public Task Nop()
         {
             return Task.CompletedTask;
@@ -116,7 +120,7 @@ namespace UnitTests.Grains
 
         public Task<string> IdentifyActivation()
         {
-            return Task.FromResult(Data.ActivationId.ToString());
+            return Task.FromResult(_id);
         }
 
     }
