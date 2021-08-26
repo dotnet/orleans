@@ -10,14 +10,6 @@ namespace Orleans.Runtime
     public interface IGrainRuntime
     {
         /// <summary>
-        /// Provides the ServiceId this cluster is running as.
-        /// ServiceId's are intended to be long lived Id values for a particular service which will remain constant 
-        /// even if the service is started / redeployed multiple times during its operations life.
-        /// </summary>
-        /// <returns>ServiceId Guid for this service.</returns>
-        string ServiceId { get; }
-
-        /// <summary>
         /// A unique identifier for the current silo.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
