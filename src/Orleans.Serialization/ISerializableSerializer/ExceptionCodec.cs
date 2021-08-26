@@ -5,7 +5,6 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.WireProtocol;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections;
@@ -18,7 +17,7 @@ namespace Orleans.Serialization.ISerializableSupport
     [RegisterSerializer]
     [RegisterCopier]
     [WellKnownAlias("Exception")]
-    public class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IBaseCopier<Exception>
+    public class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
     {
         private readonly StreamingContext _streamingContext;
         private readonly FormatterConverter _formatterConverter;
@@ -202,7 +201,7 @@ namespace Orleans.Serialization.ISerializableSupport
                 return false;
             }
 
-            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns && ns.StartsWith("System"))
+            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns && (ns.StartsWith("System") || ns.StartsWith("Microsoft")))
             {
                 return true;
             }
@@ -334,6 +333,9 @@ namespace Orleans.Serialization.ISerializableSupport
                 input.HResult,
                 _dictionaryCopier.DeepCopy(GetDataProperty(input), context));
         }
+
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte> => Serialize(ref writer, (Exception)value);
+        public void Deserialize<TInput>(ref Reader<TInput> reader, object value) => Deserialize(ref reader, (Exception)value);
     }
 
     [RegisterSerializer]
