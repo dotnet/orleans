@@ -111,6 +111,10 @@ namespace Orleans
 
             public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
+            public bool IsExemptFromCollection => true;
+
+            public PlacementStrategy PlacementStrategy => ClientObserversPlacement.Instance;
+
             void IGrainContext.SetComponent<TComponent>(TComponent value)
             {
                 if (this.LocalObject.Target is TComponent)
@@ -337,6 +341,10 @@ namespace Orleans
                         throw new InvalidOperationException($"Unrecognized direction for message {message}, request {request}, which resulted in exception: {exception}");
                 }
             }
+
+            public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+            public void Deactivate(CancellationToken? cancellationToken = null) { }
+            public Task Deactivated => Task.CompletedTask;
         }
     }
 }

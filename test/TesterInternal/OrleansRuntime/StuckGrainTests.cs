@@ -33,10 +33,10 @@ namespace UnitTests.StuckGrainTests
                 {
                     hostBuilder.Configure<GrainCollectionOptions>(options =>
                     {
-                        options.CollectionAge = TimeSpan.FromSeconds(3);
+                        options.CollectionAge = TimeSpan.FromSeconds(2);
                         options.CollectionQuantum = TimeSpan.FromSeconds(1);
 
-                        options.DeactivationTimeout = TimeSpan.FromSeconds(3);
+                        options.DeactivationTimeout = TimeSpan.FromSeconds(2);
                     });
 
                     hostBuilder.Configure<SiloMessagingOptions>(options =>
@@ -69,7 +69,7 @@ namespace UnitTests.StuckGrainTests
             await task.WithTimeout(TimeSpan.FromSeconds(1));
 
             // wait for activation collection
-            await Task.Delay(TimeSpan.FromSeconds(6)); 
+            await Task.Delay(TimeSpan.FromSeconds(6));
 
             Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
         }

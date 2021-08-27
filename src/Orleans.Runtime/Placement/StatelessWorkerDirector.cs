@@ -26,6 +26,6 @@ namespace Orleans.Runtime.Placement
             return Task.FromResult(compatibleSilos[ThreadSafeRandom.Next(compatibleSilos.Length)]);
         }
 
-        internal static ActivationData PickRandom(List<ActivationData> local) => local[local.Count == 1 ? 0 : ThreadSafeRandom.Next(local.Count)];
+        internal static IGrainContext PickRandom(List<IGrainContext> local) => local[local.Count == 1 ? 0 : ThreadSafeRandom.Next(local.Count)];
     }
 }

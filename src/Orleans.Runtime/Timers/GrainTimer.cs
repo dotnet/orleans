@@ -6,7 +6,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class GrainTimer : IGrainTimer
+    internal sealed class GrainTimer : IGrainTimer
     {
         private Func<object, Task> asyncCallback;
         private AsyncTaskSafeTimer timer;
@@ -17,13 +17,13 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private volatile Task currentlyExecutingTickTask;
         private object currentlyExecutingTickTaskLock = new();
-        private readonly IActivationData activationData;
+        private readonly IGrainContext grainContext;
 
         public string Name { get; }
         
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
-        private GrainTimer(IActivationData activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        private GrainTimer(IGrainContext activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
             var ctxt = RuntimeContext.CurrentGrainContext;
             if (ctxt is null)
@@ -34,7 +34,7 @@ namespace Orleans.Runtime
                      + "which will be the case if you create it inside Task.Run.");
             }
 
-            this.activationData = activationData;
+            this.grainContext = activationData;
             this.logger = logger;
             this.Name = name;
             this.asyncCallback = asyncCallback;
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
             TimeSpan dueTime,
             TimeSpan period,
             string name = null,
-            IActivationData activationData = null)
+            IGrainContext activationData = null)
         {
             return new GrainTimer(activationData, logger, asyncCallback, state, dueTime, period, name);
         }
@@ -170,17 +170,7 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        // Maybe called by finalizer thread with disposing=false. As per guidelines, in such a case do not touch other objects.
-        // Dispose() may be called multiple times
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-                DisposeTimer();
-            
+            DisposeTimer();
             asyncCallback = null;
         }
 
@@ -195,7 +185,8 @@ namespace Orleans.Runtime
             {
                 asyncCallback = null;
             }
-            activationData?.OnTimerDisposed(this);
+
+            grainContext?.GetComponent<IGrainTimerRegistry>().OnTimerDisposed(this);
         }
     }
 }

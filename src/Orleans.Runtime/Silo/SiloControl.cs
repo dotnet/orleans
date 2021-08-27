@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
-
+        private readonly GrainCountStatistics _grainCountStatistics;
         private readonly Dictionary<Tuple<string,string>, IControllable> controllables;
 
         public SiloControl(
@@ -55,7 +55,8 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            GrainCountStatistics grainCountStatistics)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
@@ -72,6 +73,7 @@ namespace Orleans.Runtime
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
+            _grainCountStatistics = grainCountStatistics;
             this.controllables = new Dictionary<Tuple<string, string>, IControllable>();
             IEnumerable<IKeyedServiceCollection<string, IControllable>> namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
             foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
@@ -140,7 +142,7 @@ namespace Orleans.Runtime
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.Info("GetSimpleGrainStatistics");
-            return Task.FromResult( this.catalog.GetSimpleGrainStatistics().Select(p =>
+            return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 

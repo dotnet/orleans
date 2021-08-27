@@ -314,9 +314,6 @@ namespace Orleans.Runtime.Messaging
             if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
                 result.IsAlwaysInterleave = true;
 
-            if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
-                result.IsNewPlacement = true;
-
             if ((headers & Headers.INTERFACE_VERSION) != Headers.NONE)
                 result.InterfaceVersion = (ushort)reader.ReadVarUInt32();
 

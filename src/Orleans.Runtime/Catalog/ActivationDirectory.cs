@@ -3,50 +3,29 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class ActivationDirectory : IEnumerable<KeyValuePair<ActivationId, ActivationData>>
+    internal class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IGrainContext>>
     {
-        private readonly ILogger logger;
-
-        private readonly ConcurrentDictionary<ActivationId, ActivationData> activations = new();                // Activation data (app grains) only.
+        private readonly ConcurrentDictionary<GrainId, IGrainContext> activations = new();                // Activation data (app grains) only.
         private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets = new();                // SystemTarget only.
-        private readonly ConcurrentDictionary<GrainId, List<ActivationData>> grainToActivationsMap = new();     // Activation data (app grains) only.
-        private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts = new();                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts = new();             // simple statistics systemTargetTypeName->count
-
-        public ActivationDirectory(ILogger<ActivationDirectory> logger) => this.logger = logger;
 
         public int Count => activations.Count;
 
         public IEnumerable<SystemTarget> AllSystemTargets() => systemTargets.Select(i => i.Value);
 
-        public ActivationData FindTarget(ActivationId key) => activations.TryGetValue(key, out var v) ? v : null;
-
-        public SystemTarget FindSystemTarget(ActivationId key) => systemTargets.TryGetValue(key, out var v) ? v : null;
-
-        internal void IncrementGrainCounter(string grainTypeName)
+        public IGrainContext FindTarget(GrainId key)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Increment Grain Counter {0}", grainTypeName);
-            CounterStatistic ctr = FindGrainCounter(grainTypeName);
-            ctr.Increment();
+            activations.TryGetValue(key, out var result);
+            return result;
         }
 
-        internal void DecrementGrainCounter(string grainTypeName)
+        public SystemTarget FindSystemTarget(ActivationId key)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
-            CounterStatistic ctr = FindGrainCounter(grainTypeName);
-            ctr.DecrementBy(1);
-        }
-
-        private CounterStatistic FindGrainCounter(string grainTypeName)
-        {
-            if (grainCounts.TryGetValue(grainTypeName, out var ctr)) return ctr;
-
-            var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainTypeName);
-            return grainCounts.GetOrAdd(grainTypeName, CounterStatistic.FindOrCreate(counterName, false));
+            systemTargets.TryGetValue(key, out var result);
+            return result;
         }
 
         private CounterStatistic FindSystemTargetCounter(string systemTargetTypeName)
@@ -57,16 +36,9 @@ namespace Orleans.Runtime
             return systemTargetCounts.GetOrAdd(systemTargetTypeName, CounterStatistic.FindOrCreate(counterName, false));
         }
 
-        public void RecordNewTarget(ActivationData target)
+        public void RecordNewTarget(IGrainContext target)
         {
-            if (!activations.TryAdd(target.ActivationId, target))
-            {
-                return;
-            }
-
-            grainToActivationsMap.AddOrUpdate(target.GrainId,
-                (_, t) => new() { t },
-                (_, list, t) => { lock (list) list.Add(t); return list; }, target);
+            activations.TryAdd(target.GrainId, target);
         }
 
         public void RecordNewSystemTarget(SystemTarget target)
@@ -89,68 +61,36 @@ namespace Orleans.Runtime
             }
         }
 
-        public void RemoveTarget(ActivationData target)
+        public void RemoveTarget(IGrainContext target)
         {
-            if (!activations.TryRemove(target.ActivationId, out _))
+            if (!TryRemove(target.GrainId, target))
+            {
                 return;
-
-            if (grainToActivationsMap.TryGetValue(target.GrainId, out var list))
-            {
-                lock (list)
-                {
-                    list.Remove(target);
-                    if (list.Count == 0)
-                    {
-                        List<ActivationData> list2; // == list
-                        if (grainToActivationsMap.TryRemove(target.GrainId, out list2))
-                        {
-                            lock (list2)
-                            {
-                                if (list2.Count > 0)
-                                {
-                                    grainToActivationsMap.AddOrUpdate(target.GrainId,
-                                        list2,
-                                        (g, list3) => { lock (list3) list3.AddRange(list2); return list3; });
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
-        /// <summary>
-        /// Returns null if no activations exist for this grain ID, rather than an empty list
-        /// </summary>
-        public List<ActivationData> FindTargets(GrainId key)
+        private bool TryRemove(GrainId grainId, IGrainContext target)
         {
-            List<ActivationData> tmp;
-            if (grainToActivationsMap.TryGetValue(key, out tmp))
-            {
-                lock (tmp)
-                {
-                    return tmp.ToList();
-                }
-            }
-            return null;
-        }
+            var entry = new KeyValuePair<GrainId, IGrainContext>(grainId, target);
 
-        public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
-        {
-            return grainCounts
-                .Select(s => new KeyValuePair<string, long>(s.Key, s.Value.GetCurrentValue()))
-                .Where(p => p.Value > 0);
+#if NET5_0_OR_GREATER
+            return activations.TryRemove(entry);
+#else
+            // Cast the dictionary to its interface type to access the explicitly implemented Remove method.
+            var cacheDictionary = (IDictionary<GrainId, IGrainContext>)activations;
+            return cacheDictionary.Remove(entry);
+#endif
         }
 
         public void ForEachGrainId<T>(Action<T, GrainId> func, T context)
         {
-            foreach (var pair in grainToActivationsMap)
+            foreach (var pair in activations)
             {
                 func(context, pair.Key);
             }
         }
 
-        public IEnumerator<KeyValuePair<ActivationId, ActivationData>> GetEnumerator() => activations.GetEnumerator();
+        public IEnumerator<KeyValuePair<GrainId, IGrainContext>> GetEnumerator() => activations.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

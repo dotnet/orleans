@@ -250,15 +250,6 @@ namespace FakeFx.Runtime
             }
         }
         
-        public bool IsNewPlacement
-        {
-            get { return Headers.IsNewPlacement; }
-            set
-            {
-                 Headers.IsNewPlacement = value;
-            }
-        }
-
         public ushort InterfaceVersion
         {
             get { return Headers.InterfaceVersion; }
@@ -381,7 +372,6 @@ namespace FakeFx.Runtime
             AppendIfExists(HeadersContainer.Headers.FORWARD_COUNT, sb, (m) => m.ForwardCount);
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
-            AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
             AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
@@ -434,16 +424,14 @@ namespace FakeFx.Runtime
                         break;
                 }
             }
-            return string.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}",
-                IsReadOnly ? "ReadOnly " : "", //0
-                IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
-                IsNewPlacement ? "NewPlacement " : "", // 2
-                response,  //3
-                Direction, //4
-                $"[{SendingSilo} {SendingGrain} {SendingActivation}]", //5
-                $"[{TargetSilo} {TargetGrain} {TargetActivation}]", //6
-                Id, //7
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //8
+
+            return $"{(IsReadOnly ? "ReadOnly " : "")}" +
+                $"{(IsAlwaysInterleave ? "IsAlwaysInterleave " : "")}" +
+                $"{response}" +
+                $"{Direction} " +
+                $"{$"[{SendingSilo} {SendingGrain} {SendingActivation}]"}->{$"[{TargetSilo} {TargetGrain} {TargetActivation}]"} " +
+                $"#{Id}" +
+                $"{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}";
         }
 
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
@@ -538,31 +526,17 @@ namespace FakeFx.Runtime
             public GrainId _sendingGrain;
             [Id(15)]
             public ActivationId _sendingActivation;
-            [Id(16)]
-            public bool _isNewPlacement;
-            [Id(17)]
             public ushort _interfaceVersion;
-            [Id(18)]
             public ResponseTypes _result;
-            [Id(19)]
             public object _transactionInfo;
-            [Id(20)]
             public TimeSpan? _timeToLive;
-            [Id(21)]
             public List<ActivationAddress> _cacheInvalidationHeader;
-            [Id(22)]
             public RejectionTypes _rejectionType;
-            [Id(23)]
             public string _rejectionInfo;
-            [Id(24)]
             public Dictionary<string, object> _requestContextData;
-            [Id(25)]
             public CorrelationId _callChainId;
-            [Id(26)]
             public readonly DateTime _localCreationTime;
-            [Id(27)]
             public TraceContext _traceContext;
-            [Id(28)]
             public GrainInterfaceType interfaceType;
 
             public HeadersContainer()
@@ -711,15 +685,6 @@ namespace FakeFx.Runtime
                 }
             }
 
-            public bool IsNewPlacement
-            {
-                get { return _isNewPlacement; }
-                set
-                {
-                    _isNewPlacement = value;
-                }
-            }
-
             public ushort InterfaceVersion
             {
                 get { return _interfaceVersion; }
@@ -850,7 +815,6 @@ namespace FakeFx.Runtime
                 headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
                 headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
-                headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
@@ -889,7 +853,6 @@ namespace FakeFx.Runtime
                     && EqualityComparer<SiloAddress>.Default.Equals(_sendingSilo, container._sendingSilo)
                     && _sendingGrain.Equals(container._sendingGrain)
                     && EqualityComparer<ActivationId>.Default.Equals(_sendingActivation, container._sendingActivation)
-                    && _isNewPlacement == container._isNewPlacement
                     && _interfaceVersion == container._interfaceVersion
                     && _result == container._result
                     && EqualityComparer<object>.Default.Equals(_transactionInfo, container._transactionInfo)
@@ -921,7 +884,6 @@ namespace FakeFx.Runtime
                 hash.Add(_sendingSilo);
                 hash.Add(_sendingGrain);
                 hash.Add(_sendingActivation);
-                hash.Add(_isNewPlacement);
                 hash.Add(_interfaceVersion);
                 hash.Add(_result);
                 hash.Add(_transactionInfo);
@@ -950,7 +912,6 @@ namespace FakeFx.Runtime
                 hash.Add(SendingSilo);
                 hash.Add(SendingGrain);
                 hash.Add(SendingActivation);
-                hash.Add(IsNewPlacement);
                 hash.Add(InterfaceVersion);
                 hash.Add(Result);
                 hash.Add(TransactionInfo);

@@ -268,15 +268,23 @@ namespace Orleans.Runtime.Messaging
             Exception exc = null,
             bool rejectMessages = false)
         {
-            foreach (var message in messages)
+            if (rejectMessages)
             {
-                if (rejectMessages)
+                foreach (var message in messages)
                 {
+                    if (oldAddress != null)
+                    {
+                        message.AddToCacheInvalidationHeader(oldAddress);
+                    }
+
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
                 }
-                else
+            }
+            else
+            {
+                this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
+                foreach (var message in messages)
                 {
-                    this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
                     TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
                 }
             }
@@ -385,7 +393,6 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.IsNewPlacement = false;
                 SendMessage(message);
             }
             else
@@ -529,7 +536,6 @@ namespace Orleans.Runtime.Messaging
                     {
                         var targetActivation = catalog.GetOrCreateActivation(
                             msg.TargetAddress,
-                            msg.IsNewPlacement,
                             msg.RequestContextData);
 
                         if (targetActivation is null)

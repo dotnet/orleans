@@ -248,9 +248,9 @@ namespace Orleans.Runtime
         [Id(7)]
         public string GrainClassTypeName { get; set; }
 
-        /// <summary>activations on this silo</summary>
+        /// <summary>activation on this silo</summary>
         [Id(8)]
-        public List<string> LocalActivations { get; set; }
+        public string LocalActivation { get; set; }
 
         public override string ToString()
         {
@@ -260,7 +260,7 @@ namespace Orleans.Runtime
                 + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
                 + "   PrimaryForGrain={5}" + Environment.NewLine 
                 + "   GrainClassTypeName={6}" + Environment.NewLine
-                + "   LocalActivations:" + Environment.NewLine
+                + "   LocalActivation:" + Environment.NewLine
                 + "{7}." + Environment.NewLine,
                     Grain.ToString(),                                   // {0}
                     SiloName,                                                   // {1}
@@ -269,8 +269,7 @@ namespace Orleans.Runtime
                     LocalDirectoryActivationAddress,// {4}
                     PrimaryForGrain,                                            // {5}
                     GrainClassTypeName,                                         // {6}
-                    Utils.EnumerableToString(LocalActivations,                  // {7}
-                        str => string.Format("      {0}", str), "\n"));
+                    LocalActivation); // {7}
         }
     }
 }

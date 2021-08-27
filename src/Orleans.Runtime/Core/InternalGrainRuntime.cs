@@ -20,7 +20,6 @@ namespace Orleans.Runtime
             GrainLocator grainLocator,
             CompatibilityDirectorManager compatibilityDirectorManager,
             IOptions<GrainCollectionOptions> collectionOptions,
-            ActivationCollector activationCollector,
             ILocalGrainDirectory localGrainDirectory,
             IActivationWorkingSet activationWorkingSet)
         {
@@ -32,7 +31,6 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager = compatibilityDirectorManager;
             GrainLocator = grainLocator;
             CollectionOptions = collectionOptions;
-            ActivationCollector = activationCollector;
             LocalGrainDirectory = localGrainDirectory;
             ActivationWorkingSet = activationWorkingSet;
         }
@@ -45,7 +43,6 @@ namespace Orleans.Runtime
         public CompatibilityDirectorManager CompatibilityDirectorManager { get; }
         public GrainLocator GrainLocator { get; }
         public IOptions<GrainCollectionOptions> CollectionOptions { get; }
-        public ActivationCollector ActivationCollector { get; }
         public ILocalGrainDirectory LocalGrainDirectory { get; }
         public IActivationWorkingSet ActivationWorkingSet { get; }
     }

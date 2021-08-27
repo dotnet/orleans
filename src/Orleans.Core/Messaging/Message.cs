@@ -234,15 +234,6 @@ namespace Orleans.Runtime
             }
         }
         
-        public bool IsNewPlacement
-        {
-            get { return Headers.IsNewPlacement; }
-            set
-            {
-                 Headers.IsNewPlacement = value;
-            }
-        }
-
         public ushort InterfaceVersion
         {
             get { return Headers.InterfaceVersion; }
@@ -369,7 +360,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.FORWARD_COUNT, sb, (m) => m.ForwardCount);
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
-            AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
@@ -399,7 +389,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            string response = String.Empty;
+            var response = "";
             if (Direction == Directions.Response)
             {
                 switch (Result)
@@ -420,17 +410,13 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6}{7} #{8}{9}",
-                IsReadOnly ? "ReadOnly " : "", //0
-                IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
-                IsNewPlacement ? "NewPlacement " : "", // 2
-                response,  //3
-                Direction, //4
-                $"[{SendingSilo} {SendingGrain} {SendingActivation}]", //5
-                $"[{TargetSilo} {TargetGrain} {TargetActivation}]", //6
-                BodyObject is { } request ? $" {request}" : string.Empty, // 7
-                Id, //8
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //9
+
+            return $"{(IsReadOnly ? "ReadOnly" : "")}" +
+                $"{(IsAlwaysInterleave ? " IsAlwaysInterleave" : "")}" +
+                $" {response}{Direction}" +
+                $" {$"[{SendingSilo} {SendingGrain} {SendingActivation}]"}->{$"[{TargetSilo} {TargetGrain} {TargetActivation}]"}" +
+                $"{(BodyObject is { } request ? $" {request}" : string.Empty)}" +
+                $" #{Id}{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}";
         }
 
         public string GetTargetHistory()
@@ -515,7 +501,7 @@ namespace Orleans.Runtime
                 SENDING_ACTIVATION = 1 << 15,
                 SENDING_GRAIN = 1 << 16,
                 SENDING_SILO = 1 << 17,
-                IS_NEW_PLACEMENT = 1 << 18,
+                //IS_NEW_PLACEMENT = 1 << 18,
 
                 TARGET_ACTIVATION = 1 << 19,
                 TARGET_GRAIN = 1 << 20,
@@ -544,7 +530,6 @@ namespace Orleans.Runtime
             public SiloAddress _sendingSilo;
             public GrainId _sendingGrain;
             public ActivationId _sendingActivation;
-            public bool _isNewPlacement;
             public ushort _interfaceVersion;
             public ResponseTypes _result;
             public GrainInterfaceType interfaceType;
@@ -678,15 +663,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool IsNewPlacement
-            {
-                get { return _isNewPlacement; }
-                set
-                {
-                    _isNewPlacement = value;
-                }
-            }
-
             public ushort InterfaceVersion
             {
                 get { return _interfaceVersion; }
@@ -796,7 +772,6 @@ namespace Orleans.Runtime
                 headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
                 headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
-                headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes) ? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;

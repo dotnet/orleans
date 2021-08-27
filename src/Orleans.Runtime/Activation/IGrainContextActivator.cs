@@ -7,8 +7,13 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
+using Orleans.Configuration;
+using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -156,29 +161,68 @@ namespace Orleans.Runtime
     /// <summary>
     /// Resolves components which are common to all instances of a given grain type.
     /// </summary>
-    public class GrainTypeComponentsResolver
+    public class GrainTypeSharedContextResolver
     {
-        private readonly ConcurrentDictionary<GrainType, GrainTypeComponents> _components = new ConcurrentDictionary<GrainType, GrainTypeComponents>();
+        private readonly ConcurrentDictionary<GrainType, GrainTypeSharedContext> _components = new();
         private readonly IConfigureGrainTypeComponents[] _configurators;
-        private readonly GrainPropertiesResolver _resolver;
-        private readonly Func<GrainType, GrainTypeComponents> _createFunc;
+        private readonly GrainPropertiesResolver _grainPropertiesResolver;
+        private readonly GrainReferenceActivator _grainReferenceActivator;
+        private readonly Func<GrainType, GrainTypeSharedContext> _createFunc;
+        private readonly IClusterManifestProvider _clusterManifestProvider;
+        private readonly GrainClassMap _grainClassMap;
+        private readonly IOptions<SiloMessagingOptions> _messagingOptions;
+        private readonly IOptions<GrainCollectionOptions> _collectionOptions;
+        private readonly PlacementStrategyResolver _placementStrategyResolver;
+        private readonly IGrainRuntime _grainRuntime;
+        private readonly ILogger<Grain> _logger;
+        private readonly IServiceProvider _serviceProvider;
 
-        public GrainTypeComponentsResolver(IEnumerable<IConfigureGrainTypeComponents> configurators, GrainPropertiesResolver resolver)
+        public GrainTypeSharedContextResolver(
+            IEnumerable<IConfigureGrainTypeComponents> configurators,
+            GrainPropertiesResolver grainPropertiesResolver,
+            GrainReferenceActivator grainReferenceActivator,
+            IClusterManifestProvider clusterManifestProvider,
+            GrainClassMap grainClassMap,
+            PlacementStrategyResolver placementStrategyResolver,
+            IOptions<SiloMessagingOptions> messagingOptions,
+            IOptions<GrainCollectionOptions> collectionOptions,
+            IGrainRuntime grainRuntime,
+            ILogger<Grain> logger,
+            IServiceProvider serviceProvider)
         {
             _configurators = configurators.ToArray();
-            _resolver = resolver;
-            _createFunc = this.Create;
+            _grainPropertiesResolver = grainPropertiesResolver;
+            _grainReferenceActivator = grainReferenceActivator;
+            _clusterManifestProvider = clusterManifestProvider;
+            _grainClassMap = grainClassMap;
+            _placementStrategyResolver = placementStrategyResolver;
+            _messagingOptions = messagingOptions;
+            _collectionOptions = collectionOptions;
+            _grainRuntime = grainRuntime;
+            _logger = logger;
+            _serviceProvider = serviceProvider;
+            _createFunc = Create;
         }
 
         /// <summary>
         /// Returns shared grain components for the provided grain type.
         /// </summary>
-        public GrainTypeComponents GetComponents(GrainType grainType) => _components.GetOrAdd(grainType, _createFunc);
+        public GrainTypeSharedContext GetComponents(GrainType grainType) => _components.GetOrAdd(grainType, _createFunc);
 
-        private GrainTypeComponents Create(GrainType grainType)
+        private GrainTypeSharedContext Create(GrainType grainType)
         {
-            var result = new GrainTypeComponents();
-            var properties = _resolver.GetGrainProperties(grainType);
+            var result = new GrainTypeSharedContext(
+                grainType,
+                _clusterManifestProvider,
+                _grainClassMap,
+                _placementStrategyResolver,
+                _messagingOptions,
+                _collectionOptions,
+                _grainRuntime,
+                _logger,
+                _grainReferenceActivator,
+                _serviceProvider);
+            var properties = _grainPropertiesResolver.GetGrainProperties(grainType);
             foreach (var configurator in _configurators)
             {
                 configurator.Configure(grainType, properties, result);
@@ -196,47 +240,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Configures shared components which are common for all instances of a given grain type.
         /// </summary>
-        void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared);
-    }
-
-    /// <summary>
-    /// Components common to all grains of a given <see cref="GrainType"/>.
-    /// </summary>
-    public class GrainTypeComponents
-    {
-        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
-
-        /// <summary>
-        /// Gets a component.
-        /// </summary>
-        /// <typeparam name="TComponent">The type specified in the corresponding <see cref="SetComponent{TComponent}"/> call.</typeparam>
-        public TComponent GetComponent<TComponent>()
-        {
-            if (_components is null) return default;
-            _components.TryGetValue(typeof(TComponent), out var resultObj);
-            return (TComponent)resultObj;
-        }
-
-        /// <summary>
-        /// Registers a component.
-        /// </summary>
-        /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent{TComponent}"/>.</typeparam>
-        public void SetComponent<TComponent>(TComponent instance)
-        {
-            if (instance == null)
-            {
-                _components?.Remove(typeof(TComponent));
-                return;
-            }
-
-            if (_components is null) _components = new Dictionary<Type, object>();
-            _components[typeof(TComponent)] = instance;
-        }
+        void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared);
     }
 
     internal class ReentrantSharedComponentsConfigurator : IConfigureGrainTypeComponents
     {
-        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
+        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
         {
             if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.Reentrant, out var value) && bool.Parse(value))
             {
@@ -361,7 +370,7 @@ namespace Orleans.Runtime
             _grainClassMap = grainClassMap;
         }
 
-        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
+        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
         {
             if (shared.GetComponent<IGrainActivator>() is object) return;
 

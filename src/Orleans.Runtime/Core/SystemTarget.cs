@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -90,6 +91,10 @@ namespace Orleans.Runtime
         IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException("IGrainContext.ObservableLifecycle is not implemented by SystemTarget");
 
         public IWorkItemScheduler Scheduler => WorkItemGroup;
+
+        public bool IsExemptFromCollection => true;
+
+        public PlacementStrategy PlacementStrategy => null;
 
         public TComponent GetComponent<TComponent>()
         {
@@ -269,5 +274,8 @@ namespace Orleans.Runtime
         }
 
         public TTarget GetTarget<TTarget>() => (TTarget)(object)this;
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+        public void Deactivate(CancellationToken? cancellationToken = null) { }
+        public Task Deactivated => Task.CompletedTask;
     }
 }

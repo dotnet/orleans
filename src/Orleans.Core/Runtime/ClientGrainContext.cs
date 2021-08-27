@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -33,6 +36,10 @@ namespace Orleans
         IGrainContext IGrainContextAccessor.GrainContext => this;
 
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+
+        public bool IsExemptFromCollection => true;
+
+        public PlacementStrategy PlacementStrategy => ClientObserversPlacement.Instance;
 
         public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
 
@@ -142,5 +149,9 @@ namespace Orleans
         {
             throw new NotImplementedException();
         }
+
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+        public void Deactivate(CancellationToken? cancellationToken = null) { }
+        public Task Deactivated => Task.CompletedTask;
     }
 }
