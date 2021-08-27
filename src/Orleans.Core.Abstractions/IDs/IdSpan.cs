@@ -208,7 +208,16 @@ namespace Orleans.Runtime
         public bool Equals(IdSpan obj)
         {
             if (object.ReferenceEquals(_value, obj._value)) return true;
-            if (_value is null || obj._value is null) return false;
+            if (_value is null || obj._value is null)
+            {
+                if (_value is { Length: 0 } || obj._value is { Length: 0 })
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
             return _value.AsSpan().SequenceEqual(obj._value);
         }
 
