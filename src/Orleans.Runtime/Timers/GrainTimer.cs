@@ -15,7 +15,8 @@ namespace Orleans.Runtime
         private DateTime previousTickTime;
         private int totalNumTicks;
         private readonly ILogger logger;
-        private Task currentlyExecutingTickTask;
+        private volatile Task currentlyExecutingTickTask;
+        private object currentlyExecutingTickTaskLock = new();
         private readonly IActivationData activationData;
 
         public string Name { get; }
@@ -92,18 +93,22 @@ namespace Orleans.Runtime
         private async Task ForwardToAsyncCallback(object state)
         {
             // AsyncSafeTimer ensures that calls to this method are serialized.
-            var callback = asyncCallback;
             if (TimerAlreadyStopped) return;
-            
-            totalNumTicks++;
-
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
             {
-                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
-                currentlyExecutingTickTask = callback(state);
+                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
+                lock (this.currentlyExecutingTickTaskLock)
+                {
+                    if (TimerAlreadyStopped) return;
+
+                    totalNumTicks++;
+
+                    if (logger.IsEnabled(LogLevel.Trace))
+                        logger.Trace(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
+
+                    currentlyExecutingTickTask = asyncCallback(state);
+                }
                 await currentlyExecutingTickTask;
                 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
@@ -186,7 +191,10 @@ namespace Orleans.Runtime
 
             Utils.SafeExecute(tmp.Dispose);
             timer = null;
-            asyncCallback = null;
+            lock (this.currentlyExecutingTickTaskLock)
+            {
+                asyncCallback = null;
+            }
             activationData?.OnTimerDisposed(this);
         }
     }
