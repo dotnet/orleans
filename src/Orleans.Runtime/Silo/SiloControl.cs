@@ -195,5 +195,20 @@ namespace Orleans.Runtime
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
+
+        public Task<List<GrainId>> GetActiveGrains(GrainType grainType)
+        {
+            var results = new List<GrainId>();
+            activationDirectory.ForEachGrainId(AddIfMatch, (grainType, results));
+            return Task.FromResult(results);
+
+            static void AddIfMatch((GrainType Type, List<GrainId> Result) context, GrainId id)
+            {
+                if (id.Type.Equals(context.Type))
+                {
+                    context.Result.Add(id);
+                }
+            }
+        }
     }
 }

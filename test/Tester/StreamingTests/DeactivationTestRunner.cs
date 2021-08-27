@@ -5,6 +5,7 @@ using Orleans.Streams;
 using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.Runtime;
 
 namespace UnitTests.StreamingTests
 {
@@ -61,8 +62,13 @@ namespace UnitTests.StreamingTests
             var consumerGrainReceivedStreamMessage = count[subscriptionHandle].Item1 == 1;
             Assert.True(consumerGrainReceivedStreamMessage);
 
-            //TODO: trigger deactivation programmatically
-            await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            // Deactivate all of the pub sub rendesvous grains
+            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"));
+            foreach (var grainId in rendesvousGrains)
+            {
+                var grain = client.GetGrain<IGrainManagementExtension>(grainId);
+                await grain.DeactivateOnIdle();
+            }
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
@@ -93,8 +99,13 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(1, count.Value);
 
-            //TODO: trigger deactivation programmatically
-            await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            // Deactivate all of the pub sub rendesvous grains
+            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"));
+            foreach (var grainId in rendesvousGrains)
+            {
+                var grain = client.GetGrain<IGrainManagementExtension>(grainId);
+                await grain.DeactivateOnIdle();
+            }
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
@@ -103,6 +114,5 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(2, count.Value); // Client consumer grain did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation
         }
-
     }
 }

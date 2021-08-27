@@ -18,7 +18,6 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
 
-
         /// <summary>
         /// Get the list of silo hosts and membership information currently known about in this cluster.
         /// </summary>
@@ -107,5 +106,10 @@ namespace Orleans.Runtime
         /// <param name="reference">The <see cref="Orleans.Runtime.IAddressable"/> to look up.</param>
         /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated taken from a snapshot of the last known state of the Grain Catalog.</returns>
         ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
+
+        /// <summary>
+        /// Returns all activations of the specified grain type.
+        /// </summary>
+        ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
     }
 }
