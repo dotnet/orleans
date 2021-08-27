@@ -315,12 +315,6 @@ namespace Orleans.Runtime
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 
-        protected void SendRequest(IResponseCompletionSource callback, IInvokable body)
-        {
-            var request = (RequestBase)body;
-            this.Runtime.SendRequest(this, callback, body, request.Options);
-        }
-
         protected ValueTask<T> InvokeAsync<T>(IInvokable body)
         {
             var request = (RequestBase)body;

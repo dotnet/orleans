@@ -6,7 +6,6 @@ using Orleans.Serialization.Invocation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -33,8 +32,8 @@ namespace Orleans.Runtime
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
-            this.sendRequest = this.SendRequest;
             this.deepCopier = deepCopier;
+            this.sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -51,14 +50,7 @@ namespace Orleans.Runtime
             throw new NotSupportedException();
         }
 
-        public void SendRequest(GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options)
-        {
-            SetGrainCancellationTokensTarget(reference, body);
-            var copy = body;//this.deepCopier.Copy(body);
-            this.RuntimeClient.SendRequest(reference, copy, callback, options);
-        }
-
-        public async ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        public ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
@@ -66,19 +58,12 @@ namespace Orleans.Runtime
                 SetGrainCancellationTokensTarget(reference, request);
                 var copy = this.deepCopier.Copy(request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                try
-                {
-                    SendRequest(reference, responseCompletionSource, copy, options);
-                    return await responseCompletionSource.AsValueTask();
-                }
-                finally
-                {
-                    ResponseCompletionSourcePool.Return(responseCompletionSource);
-                }
+                this.RuntimeClient.SendRequest(reference, copy, responseCompletionSource, options);
+                return responseCompletionSource.AsValueTask();
             }
             else
             {
-                return await InvokeMethodWithFiltersAsync<TResult>(reference, request, options);
+                return InvokeMethodWithFiltersAsync<TResult>(reference, request, options);
             }
         }
 

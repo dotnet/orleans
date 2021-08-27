@@ -126,36 +126,31 @@ namespace Orleans.CodeGenerator
         private static void ValidateBaseClass(LibraryTypes l, INamedTypeSymbol baseClass)
         {
             var found = false;
-            foreach (var member in baseClass.GetMembers("SendRequest"))
+            foreach (var member in baseClass.GetMembers("InvokeAsync"))
             {
                 if (member is not IMethodSymbol method)
                 {
-                    Throw(member, "not method");
+                    Throw(member, "not a method");
                 }
 
-                if (method.TypeParameters.Length != 0)
+                if (method.TypeParameters.Length != 1)
                 {
-                    Throw(member, "type params");
+                    Throw(member, "incorrect number of type parameters");
                 }
 
-                if (method.Parameters.Length != 2)
+                if (method.Parameters.Length != 1)
                 {
-                    Throw(member, "params length");
+                    Throw(member, "missing parameter");
                 }
 
-                if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IResponseCompletionSource))
+                if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
                 {
-                    Throw(member, "param 0");
+                    Throw(member, "incorrect parameter type");
                 }
 
-                if (!SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, l.IInvokable))
+                if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, l.ValueTask_1.Construct(method.TypeParameters[0])))
                 {
-                    Throw(member, "param 1");
-                }
-
-                if (!method.ReturnsVoid)
-                {
-                    Throw(member, "return type");
+                    Throw(member, "incorrect return type");
                 }
 
                 found = true;
@@ -164,7 +159,7 @@ namespace Orleans.CodeGenerator
             if (!found)
             {
                 throw new InvalidOperationException(
-                    $"Proxy base class {baseClass} does not contain a definition for void SendRequest(IResponseCompletionSource, IInvokable)");
+                    $"Proxy base class {baseClass} does not contain a definition for ValueTask<T> InvokeAsync<T>(IInvokable)");
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
