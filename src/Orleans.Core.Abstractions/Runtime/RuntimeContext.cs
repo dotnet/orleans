@@ -3,38 +3,30 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
-    internal class RuntimeContext
+    internal static class RuntimeContext
     {
-        public IGrainContext GrainContext { get; private set; }
-
         [ThreadStatic]
-        private static RuntimeContext threadLocalContext;
+        private static IGrainContext _threadLocalContext;
 
-        public static RuntimeContext Current => threadLocalContext;
-
-        internal static IGrainContext CurrentGrainContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => threadLocalContext?.GrainContext; }
+        public static IGrainContext Current => _threadLocalContext;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void SetExecutionContext(IGrainContext newContext)
         {
-            var ctx = threadLocalContext ??= new RuntimeContext();
-            ctx.GrainContext = newContext;
+            _threadLocalContext = newContext;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void SetExecutionContext(IGrainContext newContext, out IGrainContext existingContext)
         {
-            var ctx = threadLocalContext ??= new RuntimeContext();
-            existingContext = ctx.GrainContext;
-            ctx.GrainContext = newContext;
+            existingContext = _threadLocalContext;
+            _threadLocalContext = newContext;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void ResetExecutionContext()
         {
-            threadLocalContext.GrainContext = null;
+            _threadLocalContext = null;
         }
-
-        public override string ToString() => $"RuntimeContext: GrainContext={GrainContext?.ToString() ?? "null"}";
     }
 }

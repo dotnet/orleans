@@ -130,7 +130,7 @@ namespace Orleans.Runtime
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
 
-            IGrainContext sendingActivation = RuntimeContext.CurrentGrainContext;
+            IGrainContext sendingActivation = RuntimeContext.Current;
 
             if (sendingActivation == null)
             {
@@ -499,7 +499,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public string CurrentActivationIdentity => RuntimeContext.CurrentGrainContext?.Address.ToString() ?? this.HostedClient.ToString();
+        public string CurrentActivationIdentity => RuntimeContext.Current?.Address.ToString() ?? this.HostedClient.ToString();
 
         /// <inheritdoc />
         public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
@@ -509,13 +509,13 @@ namespace Orleans.Runtime
 
         public IAddressable CreateObjectReference(IAddressable obj)
         {
-            if (RuntimeContext.CurrentGrainContext is null) return this.HostedClient.CreateObjectReference(obj);
+            if (RuntimeContext.Current is null) return this.HostedClient.CreateObjectReference(obj);
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (RuntimeContext.CurrentGrainContext is null)
+            if (RuntimeContext.Current is null)
             {
                 this.HostedClient.DeleteObjectReference(obj);
             }

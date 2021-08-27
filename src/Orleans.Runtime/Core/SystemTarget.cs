@@ -162,7 +162,7 @@ namespace Orleans.Runtime
         /// </summary>
         internal IGrainTimer RegisterGrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
-            var ctxt = RuntimeContext.CurrentGrainContext;
+            var ctxt = RuntimeContext.Current;
             name = name ?? ctxt.GrainId + "Timer";
 
             var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, name);

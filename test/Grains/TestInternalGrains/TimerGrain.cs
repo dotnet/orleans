@@ -32,7 +32,7 @@ namespace UnitTestGrains
         public override Task OnActivateAsync()
         {
             ThrowIfDeactivating();
-            context = RuntimeContext.CurrentGrainContext;
+            context = RuntimeContext.Current;
             defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return Task.CompletedTask;
@@ -50,7 +50,7 @@ namespace UnitTestGrains
             logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
 
             // make sure we run in the right activation context.
-            if(!Equals(context, RuntimeContext.CurrentGrainContext))
+            if(!Equals(context, RuntimeContext.Current))
                 logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
 
             string name = (string)data;
@@ -150,7 +150,7 @@ namespace UnitTestGrains
 
         public override Task OnActivateAsync()
         {
-            context = RuntimeContext.CurrentGrainContext;
+            context = RuntimeContext.Current;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
@@ -231,12 +231,12 @@ namespace UnitTestGrains
 
         private void CheckRuntimeContext(string what)
         {
-            if (RuntimeContext.CurrentGrainContext == null 
-                || !RuntimeContext.CurrentGrainContext.Equals(context))
+            if (RuntimeContext.Current == null 
+                || !RuntimeContext.Current.Equals(context))
             {
                 throw new InvalidOperationException(
                     string.Format("{0} in timer callback with unexpected activation context: Expected={1} Actual={2}",
-                                  what, context, RuntimeContext.CurrentGrainContext));
+                                  what, context, RuntimeContext.Current));
             }
             if (TaskScheduler.Current.Equals(activationTaskScheduler) && TaskScheduler.Current is ActivationTaskScheduler)
             {

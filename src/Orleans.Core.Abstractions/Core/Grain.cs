@@ -45,7 +45,7 @@ namespace Orleans
         /// </summary>
         protected Grain()
         {
-            var context = RuntimeContext.CurrentGrainContext;
+            var context = RuntimeContext.Current;
             if (context is null)
             {
                 return;
