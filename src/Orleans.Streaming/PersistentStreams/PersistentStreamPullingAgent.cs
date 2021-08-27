@@ -161,7 +161,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogWarning("Waiting for the last timer tick failed", ex);
+                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
                 }
             }
 
