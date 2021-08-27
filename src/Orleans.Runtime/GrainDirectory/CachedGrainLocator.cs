@@ -227,7 +227,7 @@ namespace Orleans.Runtime.GrainDirectory
             return ActivationAddress.GetAddress(
                     addr.SiloAddress,
                     addr.GrainId,
-                    ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
+                    ActivationId.GetActivationId(Guid.Parse(addr.ActivationId.AsSpan())));
         }
 
         public static GrainAddress ToGrainAddress(this ActivationAddress addr)
@@ -236,7 +236,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 SiloAddress = addr.Silo,
                 GrainId = addr.Grain,
-                ActivationId = (addr.Activation.Key.ToHexString())
+                ActivationId = (addr.Activation.Key.ToString("N"))
             };
         }
     }

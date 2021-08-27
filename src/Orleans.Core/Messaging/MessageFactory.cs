@@ -53,7 +53,7 @@ namespace Orleans.Runtime
             if (!request.SendingGrain.IsDefault)
             {
                 response.TargetGrain = request.SendingGrain;
-                if (request.SendingActivation != null)
+                if (!request.SendingActivation.IsDefault)
                 {
                     response.TargetActivation = request.SendingActivation;
                 }
@@ -63,7 +63,7 @@ namespace Orleans.Runtime
             if (!request.TargetGrain.IsDefault)
             {
                 response.SendingGrain = request.TargetGrain;
-                if (request.TargetActivation != null)
+                if (!request.TargetActivation.IsDefault)
                 {
                     response.SendingActivation = request.TargetActivation;
                 }

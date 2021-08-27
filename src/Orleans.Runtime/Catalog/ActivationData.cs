@@ -580,7 +580,7 @@ namespace Orleans.Runtime
         {
             return string.Format("[Activation: {0}/{1}{2}{3} State={4}]",
                  Address.Silo,
-                 GrainId,
+                 GrainId.ToString(),
                  ActivationId,
                  GetActivationInfoString(),
                  State);

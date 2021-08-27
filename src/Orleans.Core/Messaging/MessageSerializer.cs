@@ -588,31 +588,40 @@ namespace Orleans.Runtime.Messaging
         {
             if (reader.ReadByte() == 0)
             {
-                return null;
+                return ActivationId.Zero;
             }
 
-            var n0 = reader.ReadUInt64();
-            var n1 = reader.ReadUInt64();
-            var typeCodeData = reader.ReadUInt64();
-            var keyExt = ReadString(ref reader);
-            var key = UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
-            return ActivationId.GetActivationId(key);
+            if (reader.TryReadBytes(16, out var readOnly))
+            {
+                return ActivationId.GetActivationId(new Guid(readOnly));
+            }
+
+            Span<byte> bytes = stackalloc byte[16];
+            for (var i = 0; i < 16; i++)
+            {
+                bytes[i] = reader.ReadByte();
+            }
+
+            return ActivationId.GetActivationId(new Guid(bytes));
         }
 
         private static void WriteActivationId<TBufferWriter>(ref Writer<TBufferWriter> writer, ActivationId value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is null || value.Key is null)
+            if (value.IsDefault)
             {
                 writer.WriteByte(0);
                 return;
             }
 
             writer.WriteByte(1);
-            var key = value.Key;
-            writer.WriteUInt64(key.N0);
-            writer.WriteUInt64(key.N1);
-            writer.WriteUInt64(key.TypeCodeData);
-            WriteString(ref writer, key.KeyExt);
+            writer.EnsureContiguous(16);
+            if (value.Key.TryWriteBytes(writer.WritableSpan))
+            {
+                writer.AdvanceSpan(16);
+                return;
+            }
+
+            writer.Write(value.Key.ToByteArray());
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         [Id(3)]
         public SiloAddress Silo { get; private set; }
 
-        public bool IsComplete => !Grain.IsDefault && Activation != null && Silo != null;
+        public bool IsComplete => !Grain.IsDefault && !Activation.IsDefault && Silo != null;
 
         private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
 
         public bool Equals(ActivationAddress other) => other != null && Matches(other) && (Silo?.Equals(other.Silo) ?? other.Silo is null);
 
-        public override int GetHashCode() => Grain.GetHashCode() ^ (Activation?.GetHashCode() ?? 0) ^ (Silo?.GetHashCode() ?? 0);
+        public override int GetHashCode() => Grain.GetHashCode() ^ Activation.GetHashCode() ^ (Silo?.GetHashCode() ?? 0);
 
         public override string ToString() => $"[{Silo} {Grain} {Activation}]";
 
@@ -55,9 +55,6 @@ namespace Orleans.Runtime
                     this.Activation.ToFullString());        // 2
         }
 
-        public bool Matches(ActivationAddress other)
-        {
-            return Grain.Equals(other.Grain) && (Activation?.Equals(other.Activation) ?? other.Activation is null);
-        }
+        public bool Matches(ActivationAddress other) => Grain.Equals(other.Grain) && Activation.Equals(other.Activation);
     }
 }
