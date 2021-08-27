@@ -127,6 +127,12 @@ namespace Orleans.Runtime
         /// <param name="name"></param>
         /// <returns></returns>
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
+            => RegisterGrainTimer(asyncCallback, state, dueTime, period, name);
+
+        /// <summary>
+        /// Internal version of <see cref="RegisterTimer(Func{object, Task}, object, TimeSpan, TimeSpan, string)"/> that returns the inner IGrainTimer
+        /// </summary>
+        internal IGrainTimer RegisterGrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
             var ctxt = RuntimeContext.CurrentGrainContext;
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
