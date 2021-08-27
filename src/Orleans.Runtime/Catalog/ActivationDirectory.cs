@@ -84,7 +84,7 @@ namespace Orleans.Runtime
 
         public void ForEachGrainId<T>(Action<T, GrainId> func, T context)
         {
-            foreach (var pair in grainToActivationsMap)
+            foreach (var pair in activations)
             {
                 func(context, pair.Key);
             }

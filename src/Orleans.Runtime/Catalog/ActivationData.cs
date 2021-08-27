@@ -1449,7 +1449,7 @@ namespace Orleans.Runtime
 
         Task IGrainManagementExtension.DeactivateOnIdle()
         {
-            DeactivateOnIdle();
+            Deactivate();
             return Task.CompletedTask;
         }
 
