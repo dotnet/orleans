@@ -171,7 +171,7 @@ namespace Orleans.Runtime
             report.LocalActivation = activation switch
             {
                 ActivationData data => data.ToDetailedString(),
-                _ => activation.ToString()
+                _ => activation?.ToString()
             };
 
             return report;

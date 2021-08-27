@@ -64,7 +64,7 @@ namespace UnitTests.General
             public record RemoveActivation(ActivationAddress Key, bool Result) : CacheOperation;
             public record Remove(GrainId Key, bool Result) : CacheOperation;
             public record Lookup(GrainId Key, (bool Exists, ActivationAddress Address, int Version) Result) : CacheOperation;
-            public record AddOrUpdate(ActivationAddress value, int version) : CacheOperation;
+            public record AddOrUpdate(ActivationAddress Value, int Version) : CacheOperation;
             public record Clear() : CacheOperation;
         }
     }
