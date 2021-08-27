@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -34,7 +35,7 @@ namespace Orleans.Streams
         private IQueueAdapterReceiver receiver;
         private IStreamFailureHandler streamFailureHandler;
         private DateTime lastTimeCleanedPubSubCache;
-        private IDisposable timer;
+        private IGrainTimer timer;
 
         internal readonly QueueId QueueId;
         private Task receiverInitTask;
@@ -141,7 +142,7 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver. 
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = safeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
 
@@ -155,9 +156,18 @@ namespace Orleans.Streams
 
             if (timer != null)
             {
-                IDisposable tmp = timer;
+                var tmp = timer;
                 timer = null;
                 Utils.SafeExecute(tmp.Dispose, this.logger);
+
+                try
+                {
+                    await tmp.GetCurrentlyExecutingTickTask().WithTimeout(TimeSpan.FromSeconds(5));
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
+                }
             }
 
             this.queueCache = null;
@@ -276,7 +286,8 @@ namespace Orleans.Streams
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
-                         (exception, i) => !(exception is ClientNotAvailableException),
+                         // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
+                         (exception, i) => !(exception is ClientNotAvailableException) && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
                          DeliveryBackoffProvider);
 
@@ -297,6 +308,9 @@ namespace Orleans.Streams
                 }
                 if (exceptionOccured != null)
                 {
+                    // If we are shutting down, ignore the error
+                    if (IsShutdown) return false;
+
                     bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken?.Token);
                     if (faultedSubscription) return false;
                 }
