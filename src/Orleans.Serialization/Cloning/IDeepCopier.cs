@@ -92,6 +92,11 @@ namespace Orleans.Serialization.Cloning
 
         public T Copy<T>(T value)
         {
+            if (!typeof(T).IsValueType)
+            {
+                if (value is null) return default;
+            }
+
             var copier = _copierProvider.GetDeepCopier(value.GetType());
             return (T)copier.DeepCopy(value, this);
         }

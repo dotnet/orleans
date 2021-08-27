@@ -1255,6 +1255,433 @@ namespace Orleans.Serialization
     }
 
     /// <summary>
+    /// Provides methods for serializing and deserializing values which have types which are not statically known.
+    /// </summary>
+    public sealed class ObjectSerializer 
+    {
+        private readonly SerializerSessionPool _sessionPool;
+        private readonly ICodecProvider _codecProvider;
+
+        public ObjectSerializer(SerializerSessionPool sessionPool, ICodecProvider codecProvider)
+        {
+            _sessionPool = sessionPool;
+            _codecProvider = codecProvider;
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
+        /// </summary>
+        public bool CanSerialize(Type type) => _codecProvider.TryGetCodec(type) is { };
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        public void Serialize(object value, ref Memory<byte> destination, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            destination = destination.Slice(0, writer.Position);
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        public void Serialize(object value, ref Memory<byte> destination, SerializerSession session, Type type)
+        {
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            destination = destination.Slice(0, writer.Position);
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
+        /// <remarks>The destination stream will not be flushed by this method.</remarks>
+        public void Serialize(object value, Stream destination, Type type, int sizeHint = 0)
+        {
+            if (destination is MemoryStream memoryStream)
+            {
+                using var session = _sessionPool.GetSession();
+                var writer = Writer.Create(memoryStream, session);
+                var codec = _codecProvider.GetCodec(type);
+                codec.WriteField(ref writer, 0, type, value);
+                writer.Commit();
+            }
+            else
+            {
+                using var session = _sessionPool.GetSession();
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
+                try
+                {
+                    var codec = _codecProvider.GetCodec(type);
+                    codec.WriteField(ref writer, 0, type, value);
+                    writer.Commit();
+                }
+                finally
+                {
+                    writer.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
+        /// <remarks>The destination stream will not be flushed by this method.</remarks>
+        public void Serialize(object value, Stream destination, SerializerSession session, Type type, int sizeHint = 0)
+        {
+            if (destination is MemoryStream memoryStream)
+            {
+                var buffer = new MemoryStreamBufferWriter(memoryStream);
+                var writer = Writer.Create(buffer, session);
+                var codec = _codecProvider.GetCodec(type);
+                codec.WriteField(ref writer, 0, type, value);
+                writer.Commit();
+            }
+            else
+            {
+                var buffer = new PoolingStreamBufferWriter(destination, sizeHint);
+                var writer = Writer.Create(buffer, session);
+                try
+                {
+                    var codec = _codecProvider.GetCodec(type);
+                    codec.WriteField(ref writer, 0, type, value);
+                    writer.Commit();
+                }
+                finally
+                {
+                    writer.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The output buffer writer.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, Type type) where TBufferWriter : IBufferWriter<byte>
+        {
+            using var session = _sessionPool.GetSession();
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+
+            // Do not dispose, since the buffer writer is not owned by the method.
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The output buffer writer.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, SerializerSession session, Type type) where TBufferWriter : IBufferWriter<byte>
+        {
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+
+            // Do not dispose, since the buffer writer is not owned by the method.
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The output buffer writer.</typeparam>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        public void Serialize<TBufferWriter>(object value, ref Writer<TBufferWriter> destination, Type type) where TBufferWriter : IBufferWriter<byte>
+        {
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref destination, 0, type, value);
+            destination.Commit();
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        public void Serialize(object value, ref Span<byte> destination, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            destination = destination.Slice(0, writer.Position);
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        public void Serialize(object value, ref Span<byte> destination, SerializerSession session, Type type)
+        {
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            destination = destination.Slice(0, writer.Position);
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The length of the serialized data.</returns>
+        public int Serialize(object value, byte[] destination, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            return writer.Position;
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The length of the serialized data.</returns>
+        public int Serialize(object value, ArraySegment<byte> destination, Type type)
+        {
+            var destinationSpan = destination.AsSpan();
+            Serialize(value, ref destinationSpan, type);
+            return destinationSpan.Length;
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The length of the serialized data.</returns>
+        public int Serialize(object value, ArraySegment<byte> destination, SerializerSession session, Type type)
+        {
+            var destinationSpan = destination.AsSpan();
+            Serialize(value, ref destinationSpan, session, type);
+            return destinationSpan.Length;
+        }
+
+        /// <summary>
+        /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        /// <param name="destination">The destination where serialized data will be written.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The length of the serialized data.</returns>
+        public int Serialize(object value, byte[] destination, SerializerSession session, Type type)
+        {
+            var writer = Writer.Create(destination, session);
+            var codec = _codecProvider.GetCodec(type);
+            codec.WriteField(ref writer, 0, type, value);
+            writer.Commit();
+            return writer.Position;
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(Stream source, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(Stream source, SerializerSession session, Type type)
+        {
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlySequence<byte> source, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlySequence<byte> source, SerializerSession session, Type type)
+        {
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlySpan<byte> source, Type type)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlySpan<byte> source, SerializerSession session, Type type)
+        {
+            var reader = Reader.Create(source, session);
+            var codec = _codecProvider.GetCodec(type);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(byte[] source, Type type) => Deserialize(source.AsSpan(), type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(byte[] source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlyMemory<byte> source, Type type) => Deserialize(source.Span, type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ReadOnlyMemory<byte> source, SerializerSession session, Type type) => Deserialize(source.Span, session, type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ArraySegment<byte> source, Type type) => Deserialize(source.AsSpan(), type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ArraySegment<byte> source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
+        
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize<TInput>(ref Reader<TInput> source, Type type)
+        {
+            var codec = _codecProvider.GetCodec(type);
+            var field = source.ReadFieldHeader();
+            return codec.ReadValue(ref source, field);
+        }
+    }
+
+    /// <summary>
     /// Provides functionality for copying object and values.
     /// </summary>
     public sealed class DeepCopier
