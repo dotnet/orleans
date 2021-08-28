@@ -162,7 +162,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && TargetActivation is object;
+        public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
 
         public ActivationAddress TargetAddress
         {
@@ -431,7 +431,7 @@ namespace Orleans.Runtime
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (TargetActivation is object)
+            if (!TargetActivation.IsDefault)
             {
                 history.Append(TargetActivation);
             }
@@ -768,10 +768,10 @@ namespace Orleans.Runtime
 
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
                 headers = _targetGrain.IsDefault ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
-                headers = _targetActivation is null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
+                headers = _targetActivation.IsDefault ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
                 headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
                 headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
-                headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
+                headers = _sendingActivation.IsDefault ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes) ? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;

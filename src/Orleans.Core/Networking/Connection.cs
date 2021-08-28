@@ -368,7 +368,7 @@ namespace Orleans.Runtime.Messaging
                         exception,
                         "Exception while processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
-                (serializer as IDisposable)?.Dispose();
+                    (serializer as IDisposable)?.Dispose();
                 }
 
                 error = exception;

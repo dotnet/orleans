@@ -76,7 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // the grain entry either does not exist in the local partition (curGen = -1) or has not been updated
 
-                    result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, null), VersionTag = curGen });
+                    result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, default), VersionTag = curGen });
                 }
                 else
                 {
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     else
                     {
-                        result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, null), VersionTag = GrainInfo.NO_ETAG });
+                        result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, default), VersionTag = GrainInfo.NO_ETAG });
                     }
                 }
             }

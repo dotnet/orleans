@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Messaging
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
             string stringToHash = clientId.ToString() + siloAddress.Endpoint + siloAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
-            var activationId = ActivationId.GetActivationId(UniqueKey.NewKey(hash));
+            var activationId = ActivationId.GetActivationId(hash);
             return ActivationAddress.GetAddress(siloAddress, clientId, activationId);
         }
 
