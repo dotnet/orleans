@@ -702,6 +702,22 @@ namespace Orleans.Runtime.GrainDirectory
                 return false;
             }
 
+            // handle cache
+            cacheLookups.Increment();
+            var address = GetLocalCacheData(grain);
+            if (address != default)
+            {
+                result = new AddressAndTag
+                {
+                    Address = address,
+                };
+
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Address);
+                cacheSuccesses.Increment();
+                localSuccesses.Increment();
+                return true;
+            }
+
             // check if we own the grain
             if (silo.Equals(MyAddress))
             {
@@ -720,25 +736,9 @@ namespace Orleans.Runtime.GrainDirectory
                 return true;
             }
 
-            // handle cache
-            cacheLookups.Increment();
-            var address = GetLocalCacheData(grain);
-            if (address == null)
-            {
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("TryFullLookup else {0}=null", grain);
-                result = default;
-                return false;
-            }
-
-            result = new AddressAndTag
-            {
-                Address = address,
-            };
-
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Address);
-            cacheSuccesses.Increment();
-            localSuccesses.Increment();
-            return true;
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("TryFullLookup else {0}=null", grain);
+            result = default;
+            return false;
         }
 
         public AddressAndTag GetLocalDirectoryData(GrainId grain)
