@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.Cloning
 {
@@ -224,19 +225,19 @@ namespace Orleans.Serialization.Cloning
 
     public sealed class CopyContextPool 
     {
-        private readonly ObjectPool<CopyContext> _pool;
+        private readonly ConcurrentObjectPool<CopyContext, PoolPolicy> _pool;
 
         public CopyContextPool(CodecProvider codecProvider)
         {
             var sessionPoolPolicy = new PoolPolicy(codecProvider, Return);
-            _pool = new DefaultObjectPool<CopyContext>(sessionPoolPolicy);
+            _pool = new ConcurrentObjectPool<CopyContext, PoolPolicy>(sessionPoolPolicy);
         }
 
         public CopyContext GetContext() => _pool.Get();
 
         private void Return(CopyContext session) => _pool.Return(session);
 
-        private class PoolPolicy : IPooledObjectPolicy<CopyContext>
+        private readonly struct PoolPolicy : IPooledObjectPolicy<CopyContext>
         {
             private readonly CodecProvider _codecProvider;
             private readonly Action<CopyContext> _onDisposed;
