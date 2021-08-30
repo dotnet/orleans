@@ -214,7 +214,7 @@ namespace Orleans.Runtime
                             var timeout = TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, activation.CollectionAgeLimit.Ticks));
                             ScheduleCollection(activation, timeout);
                         }
-                        else if (!activation.IsInactive || !activation.IsStale(now))
+                        else if (!activation.IsInactive || !activation.IsStale())
                         {
                             ScheduleCollection(activation, activation.CollectionAgeLimit);
                         }
@@ -262,7 +262,7 @@ namespace Orleans.Runtime
                         }
                         else
                         {
-                            if (activation.GetIdleness(now) >= ageLimit)
+                            if (activation.GetIdleness() >= ageLimit)
                             {
                                 if (bucket.TryRemove(activation))
                                 {

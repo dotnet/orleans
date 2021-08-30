@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         // without having to call AddOrUpdate, which is a nuisance
         private class TimestampedValue : IEquatable<TimestampedValue>
         {
-            public readonly DateTime WhenLoaded;
+            public readonly CoarseStopwatch Age;
             public readonly TValue Value;
             public long Generation;
 
@@ -33,12 +33,12 @@ namespace Orleans.Runtime
             {
                 Generation = Interlocked.Increment(ref l.nextGeneration);
                 Value = v;
-                WhenLoaded = DateTime.UtcNow;
+                Age = CoarseStopwatch.StartNew();
             }
 
             public override bool Equals(object obj) => obj is TimestampedValue value && Equals(value);
-            public bool Equals(TimestampedValue other) => WhenLoaded == other.WhenLoaded && EqualityComparer<TValue>.Default.Equals(Value, other.Value) && Generation == other.Generation;
-            public override int GetHashCode() => HashCode.Combine(WhenLoaded, Value, Generation);
+            public bool Equals(TimestampedValue other) => ReferenceEquals(this, other) || Age == other.Age && EqualityComparer<TValue>.Default.Equals(Value, other.Value) && Generation == other.Generation;
+            public override int GetHashCode() => HashCode.Combine(Age, Value, Generation);
         }
 
         private readonly ConcurrentDictionary<TKey, TimestampedValue> cache = new();
@@ -77,7 +77,7 @@ namespace Orleans.Runtime
             {
                 added = false;
                 // if multiple values are added at once for the same key, take the newest one
-                return old.WhenLoaded >= result.WhenLoaded && old.Generation > result.Generation ? old : result;
+                return old.Age.Elapsed >= result.Age.Elapsed && old.Generation > result.Generation ? old : result;
             });
 
             if (added) Interlocked.Increment(ref count);
@@ -138,7 +138,7 @@ namespace Orleans.Runtime
         {
             if (cache.TryGetValue(key, out var result))
             {
-                var age = DateTime.UtcNow.Subtract(result.WhenLoaded);
+                var age = result.Age.Elapsed;
                 if (age > requiredFreshness)
                 {
                     if (RemoveKey(key)) RaiseFlushEvent?.Invoke();
@@ -166,10 +166,9 @@ namespace Orleans.Runtime
         /// </summary>
         public void RemoveExpired()
         {
-            var frestTime = DateTime.UtcNow - requiredFreshness;
             foreach (var entry in this.cache)
             {
-                if (entry.Value.WhenLoaded < frestTime)
+                if (entry.Value.Age.Elapsed < requiredFreshness)
                 {
                     if (RemoveKey(entry.Key)) RaiseFlushEvent?.Invoke();
                 }

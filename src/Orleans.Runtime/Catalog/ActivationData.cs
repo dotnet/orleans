@@ -26,16 +26,16 @@ namespace Orleans.Runtime
         private readonly GrainTypeSharedContext _shared;
         private readonly IServiceScope serviceScope;
         private readonly WorkItemGroup _workItemGroup;
-        private readonly List<Message> _waitingRequests = new();
-        private readonly Dictionary<Message, DateTime> _runningRequests = new();
+        private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
+        private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
         private readonly GrainLifecycle lifecycle;
         private List<object> _pendingOperations;
         private Message _blockingRequest;
         private Dictionary<Type, object> _components;
         private bool isInWorkingSet;
-        private DateTime currentRequestStartTime;
-        private DateTime becameIdle;
+        private CoarseStopwatch _busyDuration;
+        private CoarseStopwatch _idleDuration;
         private GrainReference _selfReference;
 
         // Values which are needed less frequently and do not warrant living directly on activation for object size reasons.
@@ -330,7 +330,7 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                var tmp = _waitingRequests.ToList();
+                var tmp = _waitingRequests.Select(m => m.Item1).ToList();
                 _waitingRequests.Clear();
                 return tmp;
             }
@@ -339,20 +339,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns how long this activation has been idle.
         /// </summary>
-        public TimeSpan GetIdleness(DateTime now)
-        {
-            if (now == default)
-            {
-                throw new ArgumentException("default(DateTime) is not allowed; Use DateTime.UtcNow instead.", "now");
-            }
-
-            return now - becameIdle;
-        }
+        public TimeSpan GetIdleness() => _idleDuration.Elapsed;
 
         /// <summary>
         /// Returns whether this activation has been idle long enough to be collected.
         /// </summary>
-        public bool IsStale(DateTime now) => GetIdleness(now) >= _shared.CollectionAgeLimit;
+        public bool IsStale() => GetIdleness() >= _shared.CollectionAgeLimit;
 
         public void DelayDeactivation(TimeSpan timespan)
         {
@@ -408,7 +400,7 @@ namespace Orleans.Runtime
         private void DeactivateStuckActivation()
         {
             IsStuckProcessingMessage = true;
-            var msg = $"Activation {this} has been processing request {_blockingRequest} since {currentRequestStartTime} and is likely stuck";
+            var msg = $"Activation {this} has been processing request {_blockingRequest} since {_busyDuration} and is likely stuck";
             DeactivationReason = new(DeactivationReasonCode.StuckProcessingMessage, msg);
 
             // Mark the grain as deactivating so that messages are forwarded instead of being invoked
@@ -502,8 +494,13 @@ namespace Orleans.Runtime
                 if (_blockingRequest is object)
                 {
                     var message = _blockingRequest;
-                    var timeSinceQueued = now - message.QueuedTime;
-                    var executionTime = now - currentRequestStartTime;
+                    TimeSpan? timeSinceQueued = default;
+                    if (_runningRequests.TryGetValue(message, out var waitTime))
+                    {
+                        timeSinceQueued = waitTime.Elapsed;
+                    }
+                    
+                    var executionTime = _busyDuration.Elapsed;
                     if (executionTime >= slowRunningRequestDuration)
                     {
                         GetStatusList(ref diagnostics);
@@ -524,11 +521,11 @@ namespace Orleans.Runtime
                 foreach (var running in _runningRequests)
                 {
                     var message = running.Key;
-                    var startTime = running.Value;
+                    var runDuration = running.Value;
                     if (ReferenceEquals(message, _blockingRequest)) continue;
 
                     // Check how long they've been executing.
-                    var executionTime = now - startTime;
+                    var executionTime = runDuration.Elapsed;
                     if (executionTime >= slowRunningRequestDuration)
                     {
                         // Interleaving message X has been executing for a long time
@@ -544,16 +541,17 @@ namespace Orleans.Runtime
                 }
 
                 var queueLength = 1;
-                foreach (var message in _waitingRequests)
+                foreach (var pair in _waitingRequests)
                 {
-                    var waitTime = now - message.QueuedTime;
-                    if (waitTime >= longQueueTimeDuration)
+                    var message = pair.Message;
+                    var queuedTime = pair.QueuedTime.Elapsed;
+                    if (queuedTime >= longQueueTimeDuration)
                     {
                         // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
                         GetStatusList(ref diagnostics);
                         var messageDiagnostics = new List<string>(diagnostics)
                         {
-                           $"Message {message} has been enqueued on the target grain for {waitTime} and is currently position {queueLength} in queue for processing."
+                           $"Message {message} has been enqueued on the target grain for {queuedTime} and is currently position {queueLength} in queue for processing."
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
@@ -593,7 +591,7 @@ namespace Orleans.Runtime
                 return
                     $"[Activation: {Address.Silo.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
                     + $"State={State} NonReentrancyQueueSize={WaitingCount} NumRunning={_runningRequests.Count} "
-                    + $"IdlenessTimeSpan={GetIdleness(DateTime.UtcNow)} CollectionAgeLimit={_shared.CollectionAgeLimit}"
+                    + $"IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}"
                     + $"{((includeExtraDetails && _blockingRequest != null) ? " CurrentlyExecuting=" + _blockingRequest : "")}]";
             }
         }
@@ -743,7 +741,7 @@ namespace Orleans.Runtime
                             break;
                         }
 
-                        message = _waitingRequests[i];
+                        message = _waitingRequests[i].Message;
                         if (!MayInvokeRequest(message))
                         {
                             // The activation is not able to process this message right now, so try the next message.
@@ -751,7 +749,7 @@ namespace Orleans.Runtime
 
                             if (_blockingRequest != null)
                             {
-                                var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
+                                var currentRequestActiveTime = _busyDuration.Elapsed;
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
                                 {
                                     DeactivateStuckActivation();
@@ -796,15 +794,15 @@ namespace Orleans.Runtime
 
                         void RecordRunning(Message message, bool isInterleavable)
                         {
-                            var now = DateTime.UtcNow;
-                            _runningRequests.Add(message, now);
+                            var stopwatch = CoarseStopwatch.StartNew();
+                            _runningRequests.Add(message, stopwatch);
 
                             if (_blockingRequest != null || isInterleavable) return;
 
                             // This logic only works for non-reentrant activations
                             // Consider: Handle long request detection for reentrant activations.
                             _blockingRequest = message;
-                            currentRequestStartTime = now;
+                            _busyDuration = stopwatch;
                         }
                     }
 
@@ -969,7 +967,7 @@ namespace Orleans.Runtime
 
                 if (_runningRequests.Count == 0)
                 {
-                    becameIdle = DateTime.UtcNow;
+                    _idleDuration = CoarseStopwatch.StartNew();
                 }
 
                 if (!isInWorkingSet)
@@ -982,7 +980,7 @@ namespace Orleans.Runtime
                 if (_blockingRequest is null || message.Equals(_blockingRequest))
                 {
                     _blockingRequest = null;
-                    currentRequestStartTime = DateTime.MinValue;
+                    _busyDuration = default;
                 }
             }
 
@@ -1047,12 +1045,8 @@ namespace Orleans.Runtime
             {
                 state = State;
                 blockingMessage = _blockingRequest;
-                if (!message.QueuedTime.HasValue)
-                {
-                    message.QueuedTime = DateTime.UtcNow;
-                }
 
-                _waitingRequests.Add(message);
+                _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
             }
 
             _workSignal.Signal();

@@ -15,9 +15,6 @@ namespace Orleans.Runtime
         private string _targetHistory;
 
         [NonSerialized]
-        private DateTime? _queuedTime;
-
-        [NonSerialized]
         private int _retryCount;
 
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
@@ -29,7 +26,10 @@ namespace Orleans.Runtime
 
         // For statistical measuring of time spent in queues.
         [NonSerialized]
-        private ITimeInterval _timeInterval;
+        private CoarseStopwatch _timeInterval;
+
+        [NonSerialized]
+        public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
         public object BodyObject { get; set; }
 
@@ -38,27 +38,31 @@ namespace Orleans.Runtime
         public bool _isReadOnly;
         public bool _isAlwaysInterleave;
         public bool _isUnordered;
-        public CorrelationId _id;
         public int _forwardCount;
+        public CorrelationId _id;
+
+        public CorrelationId _callChainId;
+        public Dictionary<string, object> _requestContextData;
+
         public SiloAddress _targetSilo;
         public GrainId _targetGrain;
         public ActivationId _targetActivation;
+
+        public ushort _interfaceVersion;
+        public GrainInterfaceType _interfaceType;
+
         public SiloAddress _sendingSilo;
         public GrainId _sendingGrain;
         public ActivationId _sendingActivation;
-        public ushort _interfaceVersion;
-        public ResponseTypes _result;
-        public GrainInterfaceType _interfaceType;
         public TimeSpan? _timeToLive;
+
         public List<ActivationAddress> _cacheInvalidationHeader;
+        public ResponseTypes _result;
         public RejectionTypes _rejectionType;
         public string _rejectionInfo;
-        public Dictionary<string, object> _requestContextData;
-        public CorrelationId _callChainId;
-        public readonly DateTime _localCreationTime = DateTime.UtcNow;
 
         [GenerateSerializer]
-        public enum Categories
+        public enum Categories : byte
         {
             Ping,
             System,
@@ -66,7 +70,7 @@ namespace Orleans.Runtime
         }
 
         [GenerateSerializer]
-        public enum Directions
+        public enum Directions : byte
         {
             Request,
             Response,
@@ -74,7 +78,7 @@ namespace Orleans.Runtime
         }
 
         [GenerateSerializer]
-        public enum ResponseTypes
+        public enum ResponseTypes : byte
         {
             Success,
             Error,
@@ -83,7 +87,7 @@ namespace Orleans.Runtime
         }
 
         [GenerateSerializer]
-        public enum RejectionTypes
+        public enum RejectionTypes : byte
         {
             Transient,
             Overloaded,
@@ -156,12 +160,6 @@ namespace Orleans.Runtime
             set => _targetHistory = value;
         }
 
-        public DateTime? QueuedTime
-        {
-            get => _queuedTime;
-            set => _queuedTime = value;
-        }
-
         public int RetryCount
         {
             get => _retryCount;
@@ -170,7 +168,7 @@ namespace Orleans.Runtime
 
         public bool HasCacheInvalidationHeader => CacheInvalidationHeader is { Count: > 0 };
 
-        public TimeSpan Elapsed => _timeInterval == null ? TimeSpan.Zero : _timeInterval.Elapsed;
+        public TimeSpan Elapsed => _timeInterval.Elapsed;
 
         public Categories Category
         {
@@ -282,7 +280,7 @@ namespace Orleans.Runtime
 
         public TimeSpan? TimeToLive
         {
-            get => _timeToLive - (DateTime.UtcNow - _localCreationTime);
+            get => _timeToLive - _timeSinceCreation.Elapsed;
             set => _timeToLive = value;
         }
 
@@ -447,8 +445,7 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            _timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
-            _timeInterval.Start();
+            _timeInterval = CoarseStopwatch.StartNew();
         }
 
         public void Stop()

@@ -23,19 +23,19 @@ namespace Orleans.Runtime
             dispatcherMessagesProcessedOkPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                dispatcherMessagesProcessedOkPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
+                dispatcherMessagesProcessedOkPerDirection[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_OK_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
             dispatcherMessagesProcessedErrorsPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                dispatcherMessagesProcessedErrorsPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
+                dispatcherMessagesProcessedErrorsPerDirection[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_ERRORS_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
             dispatcherMessagesProcessingReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
-                dispatcherMessagesProcessingReceivedPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
+                dispatcherMessagesProcessingReceivedPerDirection[(byte)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_RECEIVED_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
             dispatcherMessagesProcessedTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_TOTAL);
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
         internal static void OnDispatcherMessageReceive(Message msg)
         {
             var context = RuntimeContext.Current;
-            dispatcherMessagesProcessingReceivedPerDirection[(int)msg.Direction].Increment();
+            dispatcherMessagesProcessingReceivedPerDirection[(byte)msg.Direction].Increment();
             dispatcherMessagesReceivedTotal.Increment();
             if (context == null)
             {
@@ -71,13 +71,13 @@ namespace Orleans.Runtime
 
         internal static void OnDispatcherMessageProcessedOk(Message msg)
         {
-            dispatcherMessagesProcessedOkPerDirection[(int)msg.Direction].Increment();
+            dispatcherMessagesProcessedOkPerDirection[(byte)msg.Direction].Increment();
             dispatcherMessagesProcessedTotal.Increment();
         }
 
         internal static void OnDispatcherMessageProcessedError(Message msg)
         {
-            dispatcherMessagesProcessedErrorsPerDirection[(int)msg.Direction].Increment();
+            dispatcherMessagesProcessedErrorsPerDirection[(byte)msg.Direction].Increment();
             dispatcherMessagesProcessedTotal.Increment();
         }
 
