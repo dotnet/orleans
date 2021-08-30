@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
 using static Orleans.Runtime.Message;
-using static Orleans.Runtime.Message.HeadersContainer;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Codecs;
@@ -91,23 +90,18 @@ namespace Orleans.Runtime.Messaging
                 var body = input.Slice(bodyOffset, bodyLength);
 
                 // build message
-                HeadersContainer headersContainer;
                 if (header.IsSingleSegment)
                 {
                     var headersReader = Reader.Create(header.First.Span, _deserializationSession);
-                    headersContainer = DeserializeFast(ref headersReader);
+                    message = DeserializeFast(ref headersReader);
                 }
                 else
                 {
                     var headersReader = Reader.Create(header, _deserializationSession);
-                    headersContainer = DeserializeFast(ref headersReader);
+                    message = DeserializeFast(ref headersReader);
                 }
 
                 _deserializationSession.PartialReset();
-                message = new Message
-                {
-                    Headers = headersContainer
-                };
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
@@ -143,7 +137,7 @@ namespace Orleans.Runtime.Messaging
                 Span<byte> lengthFields = stackalloc byte[FramingLength];
 
                 var headerWriter = Writer.Create(buffer, _serializationSession);
-                SerializeFast(ref headerWriter, message.Headers);
+                SerializeFast(ref headerWriter, message);
                 headerWriter.Commit();
 
                 var headerLength = bufferWriter.CommittedBytes;
@@ -183,7 +177,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private HeadersContainer SerializeFast<TBufferWriter>(ref Writer<TBufferWriter> writer, HeadersContainer value) where TBufferWriter : IBufferWriter<byte>
+        private Message SerializeFast<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value) where TBufferWriter : IBufferWriter<byte>
         {
             var headers = value.GetHeadersMask();
             writer.WriteVarUInt32((uint)headers);
@@ -286,10 +280,10 @@ namespace Orleans.Runtime.Messaging
             return value;
         }
 
-        private HeadersContainer DeserializeFast<TInput>(ref Reader<TInput> reader)
+        private Message DeserializeFast<TInput>(ref Reader<TInput> reader)
         {
             var headers = (Headers)reader.ReadVarUInt32();
-            var result = new HeadersContainer();
+            var result = new Message();
 
             if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
             {

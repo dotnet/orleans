@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnSendMessageFailure(Message message, string error)
         {
-            if (message?.Headers != null && message.IsPing())
+            if (message != null && message.IsPing())
             {
                 this.Log.LogWarning("Failed to send ping message {Message}", message);
             }
@@ -311,7 +311,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            if (msg?.Headers != null && msg.IsPing())
+            if (msg != null && msg.IsPing())
             {
                 this.Log.LogWarning("Failed ping message {Message}", msg);
             }
@@ -347,7 +347,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg == null) return;
 
-            if (msg?.Headers != null && msg.IsPing())
+            if (msg != null && msg.IsPing())
             {
                 this.Log.LogWarning("Retrying ping message {Message}", msg);
             }
