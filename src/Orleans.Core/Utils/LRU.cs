@@ -168,7 +168,7 @@ namespace Orleans.Runtime
         {
             foreach (var entry in this.cache)
             {
-                if (entry.Value.Age.Elapsed < requiredFreshness)
+                if (entry.Value.Age.Elapsed > requiredFreshness)
                 {
                     if (RemoveKey(entry.Key)) RaiseFlushEvent?.Invoke();
                 }
