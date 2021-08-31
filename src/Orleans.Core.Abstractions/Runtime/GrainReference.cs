@@ -156,6 +156,11 @@ namespace Orleans.Runtime
     /// <summary>
     /// This is the base class for all typed grain references.
     /// </summary>
+    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
+    [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
+    [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
+    [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
+    [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     public class GrainReference : IAddressable, IEquatable<GrainReference>
     {
         [NonSerialized]
@@ -265,14 +270,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Implemented in generated code.
         /// </summary>
-        public virtual ushort InterfaceVersion
-        {
-            get
-            {
-                throw new InvalidOperationException("Should be overridden by subclass");
-            }
-        }
-
+        public ushort InterfaceVersion => Shared.InterfaceVersion;
 
         /// <summary>
         /// Return the name of the interface for this GrainReference.
@@ -298,20 +296,6 @@ namespace Orleans.Runtime
         {
             return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options | _shared.InvokeMethodOptions);
         }
-    }
-
-    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
-    [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
-    [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
-    [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
-    [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
-    public abstract class NewGrainReference : GrainReference
-    {
-        protected NewGrainReference(GrainReferenceShared shared, IdSpan key) : base(shared, key)
-        {
-        }
-
-        public override ushort InterfaceVersion => Shared.InterfaceVersion;
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 

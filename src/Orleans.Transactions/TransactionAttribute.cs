@@ -14,10 +14,10 @@ namespace Orleans
     /// The TransactionAttribute attribute is used to mark methods that start and join transactions.
     /// </summary>
     [InvokableCustomInitializer("SetTransactionOptions")]
-    [InvokableBaseType(typeof(NewGrainReference), typeof(ValueTask), typeof(TransactionRequest))]
-    [InvokableBaseType(typeof(NewGrainReference), typeof(ValueTask<>), typeof(TransactionRequest<>))]
-    [InvokableBaseType(typeof(NewGrainReference), typeof(Task), typeof(TransactionTaskRequest))]
-    [InvokableBaseType(typeof(NewGrainReference), typeof(Task<>), typeof(TransactionTaskRequest<>))]
+    [InvokableBaseType(typeof(GrainReference), typeof(ValueTask), typeof(TransactionRequest))]
+    [InvokableBaseType(typeof(GrainReference), typeof(ValueTask<>), typeof(TransactionRequest<>))]
+    [InvokableBaseType(typeof(GrainReference), typeof(Task), typeof(TransactionTaskRequest))]
+    [InvokableBaseType(typeof(GrainReference), typeof(Task<>), typeof(TransactionTaskRequest<>))]
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class TransactionAttribute : Attribute
     {
