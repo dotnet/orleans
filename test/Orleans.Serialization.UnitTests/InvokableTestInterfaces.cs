@@ -24,10 +24,9 @@ namespace Orleans.Serialization.UnitTests
         
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
-        protected ValueTask<T> InvokeAsync<T>(IInvokable body)
-        {
-            return default;
-        }
+        protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+
+        protected ValueTask InvokeAsync(IInvokable body) => default;
     }
 
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
@@ -43,10 +42,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
-        protected ValueTask<T> InvokeAsync<T>(IInvokable request)
-        {
-            return default;
-        }
+        protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+
+        protected ValueTask InvokeAsync(IInvokable body) => default;
     }
 
     [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]

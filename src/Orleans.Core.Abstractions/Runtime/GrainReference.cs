@@ -304,6 +304,12 @@ namespace Orleans.Runtime
             var request = (RequestBase)body;
             return this.Runtime.InvokeMethodAsync<T>(this, body, request.Options);
         }
+
+        protected ValueTask InvokeAsync(IInvokable body)
+        {
+            var request = (RequestBase)body;
+            return this.Runtime.InvokeMethodAsync(this, body, request.Options);
+        }
     }
 
     [GenerateSerializer]

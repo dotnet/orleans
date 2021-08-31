@@ -50,7 +50,7 @@ namespace Orleans.Serialization.Invocation
             {
                 if (isValid)
                 {
-                    _core.Reset();
+                    Reset();
                 }
             }
         }
@@ -66,7 +66,7 @@ namespace Orleans.Serialization.Invocation
             {
                 if (isValid)
                 {
-                    _core.Reset();
+                    Reset();
                 }
             }
         }
@@ -186,7 +186,7 @@ namespace Orleans.Serialization.Invocation
             {
                 if (isValid)
                 {
-                    _core.Reset();
+                    Reset();
                 }
             }
         }

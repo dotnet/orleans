@@ -18,6 +18,7 @@ namespace Benchmarks.Ping
     [MemoryDiagnoser]
     public class PingBenchmark : IDisposable 
     {
+        private readonly ConsoleCancelEventHandler _onCancelEvent;
         private readonly List<IHost> hosts = new List<IHost>();
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
@@ -70,12 +71,20 @@ namespace Benchmarks.Ping
                 var grainFactory = this.client;
 
                 this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-                this.grain.Run().GetAwaiter().GetResult();
+                this.grain.Run().AsTask().GetAwaiter().GetResult();
             }
+
+            _onCancelEvent = CancelPressed;
+            Console.CancelKeyPress += _onCancelEvent;
         }
-        
+
+        private void CancelPressed(object sender, ConsoleCancelEventArgs e)
+        {
+            Environment.Exit(0);
+        }
+
         [Benchmark]
-        public Task Ping() => grain.Run();
+        public ValueTask Ping() => grain.Run();
 
         public async Task PingForever()
         {
@@ -142,6 +151,8 @@ namespace Benchmarks.Ping
         {
             (this.client as IDisposable)?.Dispose(); 
             this.hosts.ForEach(h => h.Dispose());
+
+            Console.CancelKeyPress -= _onCancelEvent;
         }
     }
 }

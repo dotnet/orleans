@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System;
 
 namespace Orleans.CodeGenerator
 {
@@ -150,21 +151,21 @@ namespace Orleans.CodeGenerator
                 // Task<T> / ValueTask<T>
                 resultType = methodReturnType.TypeArguments[0];
             }
-            else if (SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.Void))
-            {
-                // void
-                resultType = libraryTypes.Object;
-            }
             else
             {
-                // Task / ValueTask
-                resultType = libraryTypes.Object;
+                // void, Task / ValueTask
+                resultType = null;
             }
 
             // C#: base.InvokeAsync<TReturn>(request);
+            var baseInvokeExpression = resultType switch
+            {
+                not null => BaseExpression().Member(invokeMethodName, resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions)),
+                _ => BaseExpression().Member(invokeMethodName),
+            };
             var invocationExpression =
                          InvocationExpression(
-                             BaseExpression().Member(invokeMethodName, resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions)),
+                             baseInvokeExpression,
                              ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
 
             var rt = methodReturnType.ConstructedFrom;
@@ -173,18 +174,11 @@ namespace Orleans.CodeGenerator
                 // C#: return <invocation>.AsTask()
                 statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
             }
-            else if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.ValueTask_1))
+            else if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.ValueTask))
             {
+                // ValueTask<T> / ValueTask
                 // C#: return <invocation>
                 statements.Add(ReturnStatement(invocationExpression));
-            }
-            else if (SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.ValueTask))
-            {
-                // C#: return new ValueTask(<invocation>)
-                statements.Add(ReturnStatement(ObjectCreationExpression(libraryTypes.ValueTask.ToTypeSyntax()).WithArgumentList(ArgumentList(SeparatedList(new[]
-                {
-                    Argument(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList()))
-                })))));
             }
             else
             {

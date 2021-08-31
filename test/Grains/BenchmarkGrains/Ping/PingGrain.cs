@@ -7,25 +7,22 @@ namespace BenchmarkGrains.Ping
 {
     public class PingGrain : Grain, IPingGrain
     {
-        private IPingGrain self;
+        private IPingGrain _self;
 
         public override Task OnActivateAsync()
         {
-            this.self = this.AsReference<IPingGrain>();
+            _self = this.AsReference<IPingGrain>();
             return base.OnActivateAsync();
         }
 
-        public Task Run()
+        public ValueTask Run() => default;
+
+        public ValueTask PingPongInterleave(IPingGrain other, int count)
         {
-            return Task.CompletedTask;
+            if (count == 0) return default;
+            return other.PingPongInterleave(_self, count - 1);
         }
 
-        public Task PingPongInterleave(IPingGrain other, int count)
-        {
-            if (count == 0) return Task.CompletedTask;
-            return other.PingPongInterleave(this.self, count - 1);
-        }
-
-        public Task<int> GetSiloPort() => Task.FromResult(((ILocalSiloDetails)this.ServiceProvider.GetService(typeof(ILocalSiloDetails))).SiloAddress.Endpoint.Port);
+        public ValueTask<int> GetSiloPort() => new(((ILocalSiloDetails)ServiceProvider.GetService(typeof(ILocalSiloDetails))).SiloAddress.Endpoint.Port);
     }
 }

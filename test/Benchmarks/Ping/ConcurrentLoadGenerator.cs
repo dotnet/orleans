@@ -21,7 +21,7 @@ namespace Benchmarks.Ping
         }
 
         private Channel<WorkBlock> completedBlocks;
-        private readonly Func<TState, Task> issueRequest;
+        private readonly Func<TState, ValueTask> issueRequest;
         private readonly Func<int, TState> getStateForWorker;
         private readonly bool logIntermediateResults;
         private readonly Task[] tasks;
@@ -34,7 +34,7 @@ namespace Benchmarks.Ping
             int maxConcurrency,
             int blocksPerWorker,
             int requestsPerBlock,
-            Func<TState, Task> issueRequest,
+            Func<TState, ValueTask> issueRequest,
             Func<int, TState> getStateForWorker,
             bool logIntermediateResults = false)
         {
