@@ -109,6 +109,11 @@ namespace Orleans
                 return grainBase.Data.GrainId;
             }
 
+            if (grain is ISystemTargetBase systemTarget)
+            {
+                return systemTarget.GrainId;
+            }
+
             throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
