@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans
 {
@@ -17,16 +17,22 @@ namespace Orleans
         bool RecordExists { get; set; }
     }
 
+    /// <summary>Defines the state of a grain</summary>
+    public interface IGrainState<T> : IGrainState
+    {
+        public new T State { get; set; }
+    }
+
     /// <summary>
-    /// Typed default implementation of <see cref="IGrainState"/>.
+    /// Default implementation of <see cref="IGrainState{T}"/>.
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainState<T> : IGrainState
+    public class GrainState<T> : IGrainState<T>
     {
         [Id(1)]
-        public T State;
+        public T State { get; set; }
 
         object IGrainState.State
         {

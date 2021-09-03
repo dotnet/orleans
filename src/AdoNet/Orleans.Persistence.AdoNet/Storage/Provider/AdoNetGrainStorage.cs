@@ -154,8 +154,8 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ClearStateAsync(string, GrainReference, IGrainState)"/>.
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
@@ -208,8 +208,8 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ReadStateAsync(string, GrainReference, IGrainState)"/>.
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -317,7 +317,7 @@ namespace Orleans.Storage
                     state = Activator.CreateInstance(grainState.Type);
                 }
 
-                grainState.State = state;
+                grainState.State = (T)state;
                 grainState.ETag = etag;
                 grainState.RecordExists = recordExists;
                 if (logger.IsEnabled(LogLevel.Trace))
@@ -335,7 +335,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.

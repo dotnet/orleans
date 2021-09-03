@@ -52,7 +52,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading, "Reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
@@ -92,7 +92,7 @@ namespace Orleans.Storage
                 }
 
                 var loadedState = this.ConvertFromStorageFormat(contents, grainState.Type);
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                grainState.State = (T) (loadedState ?? Activator.CreateInstance(grainState.Type));
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Read: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -113,7 +113,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try
@@ -140,7 +140,7 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try

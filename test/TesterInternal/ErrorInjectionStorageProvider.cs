@@ -120,7 +120,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        public async override Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async override Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             logger.Info(0, "ReadStateAsync for {0} {1} ErrorInjection={2}", grainType, grainReference, ErrorInjection);
             try
@@ -136,7 +136,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        public async override Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async override Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             logger.Info(0, "WriteStateAsync for {grainType} {grainReference} ErrorInjection={errorInjection}", grainType, grainReference, ErrorInjection);
             try
