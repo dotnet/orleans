@@ -171,7 +171,11 @@ namespace Orleans.Serialization.Cloning
         /// <param name="original">The original object.</param>
         /// <param name="result">The previously recorded copy of <paramref name="original"/>.</param>
         /// <returns><see langword="true"/> if a copy of <paramref name="original"/> has been recorded, <see langword="false"/> otherwise.</returns>
-        public bool TryGetCopy<T>(object original, [NotNullWhen(true)] out T result) where T : class
+        public bool TryGetCopy<T>(object original,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out T result) where T : class
         {
             if (original is null)
             {

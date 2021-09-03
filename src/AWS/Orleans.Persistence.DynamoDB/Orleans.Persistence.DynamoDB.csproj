@@ -1,10 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Persistence.DynamoDB</PackageId>
     <Title>Microsoft Orleans Persistence DynamoDB</Title>
     <Description>Microsoft Orleans persistence providers for AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

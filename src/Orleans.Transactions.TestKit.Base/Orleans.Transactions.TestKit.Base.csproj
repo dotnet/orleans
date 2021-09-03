@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Transactions.TestKit.Base</PackageId>
@@ -7,7 +7,7 @@
     <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

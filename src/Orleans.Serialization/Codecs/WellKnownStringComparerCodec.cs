@@ -123,7 +123,11 @@ namespace Orleans.Serialization.Codecs
                 }
 
                 var cultureInfo = CultureInfo.GetCultureInfo(lcid);
+#if !NETCOREAPP3_1_OR_GREATER
+                var result = StringComparer.Create(cultureInfo, options.HasFlag(CompareOptions.IgnoreCase));
+#else
                 var result = StringComparer.Create(cultureInfo, options);
+#endif
                 return result;
             }
 
@@ -238,16 +242,22 @@ namespace Orleans.Serialization.Codecs
         }
 #endif
 
+#if NETCOREAPP3_1_OR_GREATER
         [DoesNotReturn]
+#endif
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for OrdinalComparer fields. {field}");
 
+#if NETCOREAPP3_1_OR_GREATER
         [DoesNotReturn]
+#endif
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotSupported(Field field, uint value) => throw new NotSupportedException($"Values of type {field.FieldType} are not supported. Value: {value}");
 
+#if NETCOREAPP3_1_OR_GREATER
         [DoesNotReturn]
+#endif
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotSupported(Type type) => throw new NotSupportedException($"Values of type {type} are not supported");
     }

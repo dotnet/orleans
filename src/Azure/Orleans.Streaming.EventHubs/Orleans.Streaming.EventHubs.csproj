@@ -5,7 +5,7 @@
     <Description>Microsoft Orleans. streaming provider for Azure EventHubs</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>
     <DefineConstants>$(DefineConstants);ORLEANS_EVENTHUBS</DefineConstants>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Streaming.EventHubs</AssemblyName>
     <RootNamespace>Orleans.Streaming.EventHubs</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

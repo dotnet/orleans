@@ -10,7 +10,11 @@ namespace Orleans.Serialization.TypeSystem
         /// <inheritdoc/>
         public bool? IsTypeNameAllowed(string typeName, string assemblyName)
         {
+#if !NETCOREAPP3_1_OR_GREATER
+            if (assemblyName is { } && assemblyName.Contains("Orleans.Serialization"))
+#else
             if (assemblyName is { } && assemblyName.Contains("Orleans.Serialization", StringComparison.Ordinal))
+#endif
             {
                 return true;
             }

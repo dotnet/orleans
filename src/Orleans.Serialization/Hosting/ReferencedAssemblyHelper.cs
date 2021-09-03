@@ -123,10 +123,17 @@ namespace Orleans.Serialization
 
             foreach (var lib in dependencyContext.RuntimeLibraries)
             {
+#if !NETCOREAPP3_1_OR_GREATER
+                if (!lib.Name.Contains("Orleans.Serialization") && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization")))
+                {
+                    continue;
+                }
+#else
                 if (!lib.Name.Contains("Orleans.Serialization", StringComparison.Ordinal) && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization", StringComparison.Ordinal)))
                 {
                     continue;
                 }
+#endif
 
                 try
                 {

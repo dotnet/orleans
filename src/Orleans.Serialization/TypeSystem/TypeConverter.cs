@@ -203,7 +203,11 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="formatted">The formatted type name.</param>
         /// <param name="result">The result.</param>
         /// <returns><see langword="true"/> if the type was parsed and loaded; otherwise <see langword="false"/>.</returns>
-        public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
+        public bool TryParse(string formatted,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out Type result)
         {
             if (ParseInternal(formatted, out result))
             {

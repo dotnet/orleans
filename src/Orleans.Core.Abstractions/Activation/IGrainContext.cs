@@ -213,6 +213,13 @@ namespace Orleans.Runtime
         void QueueWorkItem(IThreadPoolWorkItem workItem);
     }
 
+#if !NETCOREAPP3_1_OR_GREATER
+    public interface IThreadPoolWorkItem
+    {
+        void Execute();
+    }
+#endif
+
     /// <summary>
     /// Provides access to the currently executing grain context.
     /// </summary>

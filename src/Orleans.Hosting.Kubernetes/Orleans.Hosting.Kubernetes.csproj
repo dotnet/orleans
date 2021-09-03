@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Hosting.Kubernetes</PackageId>
     <Title>Microsoft Orleans Hosting for Kubernetes</Title>
     <Description>Microsoft Orleans hosting support for Kubernetes</Description>
     <PackageTags>$(PackageTags) Kubernetes k8s</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

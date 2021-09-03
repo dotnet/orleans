@@ -46,7 +46,11 @@ namespace Orleans.Serialization.Session
         /// <param name="value">The value.</param>
         /// <returns><see langword="true" /> if there was a referenced object with the specified id, <see langword="false" /> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetReferencedObject(uint reference, [NotNullWhen(true)] out object value)
+        public bool TryGetReferencedObject(uint reference,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out object value)
         {
             // Reference 0 is always null.
             if (reference == 0)

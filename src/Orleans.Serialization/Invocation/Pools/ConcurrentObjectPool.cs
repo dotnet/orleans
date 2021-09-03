@@ -44,4 +44,21 @@ namespace Orleans.Serialization.Invocation
             }
         }
     }
+
+#if !NETCOREAPP3_1_OR_GREATER
+    internal static class StackExtensions
+    {
+        public static bool TryPop<T>(this Stack<T> stack, out T result)
+        {
+            if (stack.Count == 0)
+            {
+                result = default;
+                return false;
+            }
+
+            result = stack.Pop();
+            return true;
+        }
+    }
+#endif
 }

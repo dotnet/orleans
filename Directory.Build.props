@@ -136,6 +136,16 @@
     <SourceLinkVersion>1.1.1</SourceLinkVersion>
   </PropertyGroup>
 
+  <!-- .NET Standard 2.0 dependencies -->
+  <PropertyGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
+    <SystemCollectionsImmutableVersion>6.0.0</SystemCollectionsImmutableVersion>
+    <SystemMemoryVersion>4.5.4</SystemMemoryVersion>
+    <SystemReflectionEmitLightweightVersion>4.7.0</SystemReflectionEmitLightweightVersion>
+    <SystemThreadingChannelsVersion>6.0.0</SystemThreadingChannelsVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.4</SystemThreadingTasksExtensionsVersion>
+    <MicrosoftBclHashCodeVersion>1.1.1</MicrosoftBclHashCodeVersion>
+  </PropertyGroup>
+
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>4.0.0.0</AssemblyVersion>

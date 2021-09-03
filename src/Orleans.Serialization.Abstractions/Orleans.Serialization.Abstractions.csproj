@@ -4,10 +4,14 @@
     <PackageId>Microsoft.Orleans.Serialization.Abstractions</PackageId>
     <Title>Microsoft Orleans Serialization Abstractions</Title>
     <Description>Serialization abstractions for Microsoft Orleans</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
+  </ItemGroup>
 
 </Project>

@@ -47,11 +47,19 @@ namespace Orleans.Runtime
         /// <returns>An activation id which has been computed deterministically and reproducibly from the provided grain id.</returns>
         public static ActivationId GetDeterministic(GrainId grain)
         {
+#if !NETCOREAPP3_1_OR_GREATER
+            byte[] temp = new byte[16];
+#else
             Span<byte> temp = stackalloc byte[16];
+#endif
             var a = (ulong)grain.Type.GetUniformHashCode();
             var b = (ulong)grain.Key.GetUniformHashCode();
             BinaryPrimitives.WriteUInt64LittleEndian(temp, a);
+#if !NETCOREAPP3_1_OR_GREATER
+            BinaryPrimitives.WriteUInt64LittleEndian(temp.AsSpan(8), b);
+#else
             BinaryPrimitives.WriteUInt64LittleEndian(temp[8..], b);
+#endif
             var key = new Guid(temp);
             return new ActivationId(key);
         }

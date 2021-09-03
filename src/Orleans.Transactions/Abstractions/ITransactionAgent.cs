@@ -7,10 +7,6 @@ namespace Orleans.Transactions
     /// The Transaction Agent it is used by the silo and activations to
     /// interact with the transactions system.
     /// </summary>
-    /// <remarks>
-    /// There is one Transaction Agent per silo.
-    /// TODO: does this belong in Runtime instead?
-    /// </remarks>
     public interface ITransactionAgent
     {
         /// <summary>

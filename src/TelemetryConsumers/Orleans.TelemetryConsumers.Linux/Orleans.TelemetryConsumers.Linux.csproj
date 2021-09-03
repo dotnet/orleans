@@ -1,9 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Linux</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Linux</Title>
     <Description>Microsoft Linux implementation of Orleans Telemetry API.</Description>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -15,6 +15,7 @@
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
     <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;net6.0;netcoreapp3.1</TestTargetFrameworks>
+    <LegacyTestTargetFrameworks>$(TestTargetFrameworks);net472</LegacyTestTargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

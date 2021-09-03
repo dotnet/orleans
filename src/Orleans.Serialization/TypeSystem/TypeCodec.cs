@@ -64,7 +64,11 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="reader">The reader.</param>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
-        public unsafe bool TryRead<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type)
+        public unsafe bool TryRead<TInput>(ref Reader<TInput> reader,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out Type type)
         {
             var version = reader.ReadByte();
             if (version != Version1)
@@ -156,7 +160,11 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="type">The type.</param>
         /// <param name="typeString">The type name as a string.</param>
         /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
-        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type, out string typeString)
+        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out Type type, out string typeString)
         {
             var version = reader.ReadByte();
             var hashCode = reader.ReadInt32();

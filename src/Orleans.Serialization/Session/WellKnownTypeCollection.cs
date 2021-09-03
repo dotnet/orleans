@@ -49,7 +49,11 @@ namespace Orleans.Serialization.Session
         /// <param name="typeId">The type identifier.</param>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the corresponding type was found, <see langword="false" /> otherwise.</returns>
-        public bool TryGetWellKnownType(uint typeId, [NotNullWhen(true)] out Type type)
+        public bool TryGetWellKnownType(uint typeId,
+#if NETCOREAPP3_1_OR_GREATER
+            [NotNullWhen(true)]
+#endif
+        out Type type)
         {
             if (typeId == 0)
             {

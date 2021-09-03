@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Transactions on Azure</Title>
     <Description>Azure Transaction library of Microsoft Orleans used on the server.</Description>
     <PackageTags>$(PackageTags) Azure Transactions</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Transactions.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Transactions.AzureStorage</RootNamespace>
     <DefineConstants>$(DefineConstants);ORLEANS_TRANSACTIONS</DefineConstants>

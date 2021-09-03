@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
-    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(LegacyTestTargetFrameworks)</TargetFrameworks>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>

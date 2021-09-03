@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.GrainDirectory.Redis</PackageId>
     <Title>Microsoft Orleans Grain Directory Redis</Title>
     <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
   </PropertyGroup>
 

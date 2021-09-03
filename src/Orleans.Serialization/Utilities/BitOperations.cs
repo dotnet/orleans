@@ -1,7 +1,10 @@
+#if !NETCOREAPP3_1_OR_GREATER
+using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
 namespace Orleans.Serialization.Utilities
 {
-#if NETCOREAPP3_1_OR_GREATER
-#else
     /// <summary>
     /// BitOperations polyfill.
     /// </summary>
@@ -126,5 +129,5 @@ namespace Orleans.Serialization.Utilities
             return TrailingZeroCount(lo);
         }
     }
-#endif
 }
+#endif

@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
@@ -84,7 +84,11 @@ namespace Orleans.Serialization
 
             bool IsEligibleType(Type type)
             {
+#if !NETCOREAPP3_1_OR_GREATER
+                if (type.IsGenericParameter || type.ContainsGenericParameters)
+#else
                 if (type.IsGenericTypeParameter || type.IsGenericMethodParameter || type.ContainsGenericParameters)
+#endif
                 {
                     return false;
                 }
