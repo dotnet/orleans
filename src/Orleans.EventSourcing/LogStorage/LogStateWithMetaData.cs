@@ -30,18 +30,6 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         public Type Type => typeof(LogStateWithMetaData<TEntry>);
 
-        object IGrainState.State
-        {
-            get
-            {
-                return StateAndMetaData;
-            }
-            set
-            {
-                StateAndMetaData = (LogStateWithMetaData<TEntry>)value;
-            }
-        }
-
         [Id(2)]
         public bool RecordExists { get; set; }
 

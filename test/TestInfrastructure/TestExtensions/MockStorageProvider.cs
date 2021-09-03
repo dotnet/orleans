@@ -171,7 +171,7 @@ namespace UnitTests.StorageTests
             return (T) LastState;
         }
 
-        private object GetLastState(string grainType, GrainReference grainReference, IGrainState grainState)
+        private object GetLastState<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             lock (StateStore)
             {

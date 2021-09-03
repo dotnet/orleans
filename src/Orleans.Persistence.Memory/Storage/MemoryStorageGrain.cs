@@ -13,7 +13,7 @@ namespace Orleans.Storage
     [KeepAlive]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
-        private readonly Dictionary<(string, string), IGrainState> _store = new();
+        private readonly Dictionary<(string, string), object> _store = new(); // BPETIT TODO
         private readonly ILogger _logger;
 
         public MemoryStorageGrain(ILogger<MemoryStorageGrain> logger)
@@ -21,20 +21,20 @@ namespace Orleans.Storage
             _logger = logger;
         }
 
-        public Task<IGrainState> ReadStateAsync(string stateStore, string grainStoreKey)
+        public Task<IGrainState<T>> ReadStateAsync<T>(string stateStore, string grainStoreKey)
         {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("ReadStateAsync for {StateStore} grain: {GrainStoreKey}", stateStore, grainStoreKey);
             _store.TryGetValue((stateStore, grainStoreKey), out var entry);
-            return Task.FromResult(entry is DeletedState ? null : entry);
+            return Task.FromResult((IGrainState<T>) (entry is DeletedState ? null : entry));
         }
 
-        public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IGrainState grainState)
+        public Task<string> WriteStateAsync<T>(string stateStore, string grainStoreKey, IGrainState<T> grainState)
         {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
             string currentETag = null;
             if (_store.TryGetValue((stateStore, grainStoreKey), out var entry))
             {
-                currentETag = entry.ETag;
+                currentETag = ((IGrainState<T>)entry).ETag;
             }
 
             ValidateEtag(currentETag, grainState.ETag, grainStoreKey, "Update");
@@ -44,12 +44,12 @@ namespace Orleans.Storage
             return Task.FromResult(grainState.ETag);
         }
 
-        public Task DeleteStateAsync(string grainType, string grainId, string etag)
+        public Task DeleteStateAsync<T>(string grainType, string grainId, string etag)
         {
             string currentETag = null;
             if (_store.TryGetValue((grainType, grainId), out var entry))
             {
-                currentETag = entry.ETag;
+                currentETag = ((IGrainState<T>)entry).ETag;
             }
 
             ValidateEtag(currentETag, etag, grainId, "Delete");
@@ -89,7 +89,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Marker to record deleted state so we can detect the difference between deleted state and state that never existed.
         /// </summary>
-        private sealed class DeletedState : IGrainState
+        private sealed class DeletedState : IGrainState<object>
         {
             public object State { get; set; }
             public Type Type => typeof(object);
@@ -97,6 +97,6 @@ namespace Orleans.Storage
             public bool RecordExists { get; set; }
         }
 
-        private readonly IGrainState deleted = new DeletedState();
+        private readonly IGrainState<object> deleted = new DeletedState();
     }
 }

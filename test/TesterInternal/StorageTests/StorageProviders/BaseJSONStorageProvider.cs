@@ -116,7 +116,7 @@ namespace Samples.StorageProviders
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        protected static string ConvertToStorageFormat(IGrainState grainState)
+        protected static string ConvertToStorageFormat<T>(IGrainState<T> grainState)
         {
             return JsonConvert.SerializeObject(grainState.State);
         }
@@ -126,9 +126,9 @@ namespace Samples.StorageProviders
         /// </summary>
         /// <param name="grainState">Grain state to be populated for storage.</param>
         /// <param name="entityData">JSON storage format representation of the grain state.</param>
-        protected static void ConvertFromStorageFormat(IGrainState grainState, string entityData)
+        protected static void ConvertFromStorageFormat<T>(IGrainState<T> grainState, string entityData)
         {
-            object data = JsonConvert.DeserializeObject(entityData, grainState.State.GetType());
+            var data = JsonConvert.DeserializeObject<T>(entityData);
             grainState.State = data;
         }
     }

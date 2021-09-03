@@ -175,7 +175,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists(string grainType, GrainReference grainId, IGrainState grainState, byte[] contents, string mimeType, BlobClient blob)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainReference grainId, IGrainState<T> grainState, byte[] contents, string mimeType, BlobClient blob)
         {
             try
             {

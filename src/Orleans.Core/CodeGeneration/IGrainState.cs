@@ -3,10 +3,9 @@ using System;
 namespace Orleans
 {
     /// <summary>Defines the state of a grain</summary>
-    public interface IGrainState
+    public interface IGrainState<T>
     {
-        /// <summary>The application level payload that is the actual state.</summary>
-        object State { get; set; }
+        T State { get; set; }
 
         /// <summary>Type of the grain state</summary>
         Type Type { get; }
@@ -15,12 +14,6 @@ namespace Orleans
         string ETag { get; set; }
 
         bool RecordExists { get; set; }
-    }
-
-    /// <summary>Defines the state of a grain</summary>
-    public interface IGrainState<T> : IGrainState
-    {
-        public new T State { get; set; }
     }
 
     /// <summary>
@@ -33,12 +26,6 @@ namespace Orleans
     {
         [Id(1)]
         public T State { get; set; }
-
-        object IGrainState.State
-        {
-            get => State;
-            set => State = (T)value;
-        }
 
         /// <inheritdoc />
         public Type Type => typeof(T);

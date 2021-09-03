@@ -29,18 +29,6 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         public Type Type => typeof(GrainStateWithMetaData<TView>);
 
-        object IGrainState.State
-        {
-            get
-            {
-                return StateAndMetaData;
-            }
-            set
-            {
-                StateAndMetaData = (GrainStateWithMetaData<TView>)value;
-            }
-        }
-
         [Id(2)]
         public bool RecordExists { get; set; }
 

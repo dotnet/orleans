@@ -186,7 +186,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateInternal(IGrainState grainState, GrainStateRecord record, bool clear = false)
+        private async Task WriteStateInternal<T>(IGrainState<T> grainState, GrainStateRecord record, bool clear = false)
         {
             var fields = new Dictionary<string, AttributeValue>();
             if (this.options.TimeToLive.HasValue)

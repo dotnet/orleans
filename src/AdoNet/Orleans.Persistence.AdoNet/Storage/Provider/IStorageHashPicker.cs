@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System.Collections.Generic;
 
 
@@ -23,6 +23,6 @@ namespace Orleans.Storage
         /// <param name="grainState">The grain state.</param>
         /// <param name="tag">An optional tag parameter that might be used by the storage parameter for "out-of-band" contracts.</param>
         /// <returns>A serializer or <em>null</em> if not match was found.</returns>
-        IHasher PickHasher(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null);
+        IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null);
     }
 }

@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -34,9 +34,9 @@ namespace Orleans.Storage
 
 
         /// <summary>
-        /// <see cref="IStorageHasherPicker.PickHasher(string, string, string, GrainReference, IGrainState, string)"/>.
+        /// <see cref="IStorageHasherPicker.PickHasher{T}"/>.
         /// </summary>
-        public IHasher PickHasher(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null)
+        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {
             return HashProviders.FirstOrDefault();
         }

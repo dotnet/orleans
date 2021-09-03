@@ -67,7 +67,7 @@ namespace Orleans.Storage
 
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
-            var state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
+            var state = await storageGrain.ReadStateAsync<T>(STATE_STORE_NAME, id);
             if (state != null)
             {
                 grainState.ETag = state.ETag;
@@ -105,7 +105,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<T>(STATE_STORE_NAME, key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
             }
