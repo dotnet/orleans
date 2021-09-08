@@ -7,9 +7,6 @@ namespace Orleans
     {
         T State { get; set; }
 
-        /// <summary>Type of the grain state</summary>
-        Type Type { get; }
-
         /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
 
@@ -26,9 +23,6 @@ namespace Orleans
     {
         [Id(1)]
         public T State { get; set; }
-
-        /// <inheritdoc />
-        public Type Type => typeof(T);
 
         /// <inheritdoc />
         [Id(2)]

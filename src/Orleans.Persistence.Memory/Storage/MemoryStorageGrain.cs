@@ -92,7 +92,6 @@ namespace Orleans.Storage
         private sealed class DeletedState : IGrainState<object>
         {
             public object State { get; set; }
-            public Type Type => typeof(object);
             public string ETag { get; set; } = string.Empty;
             public bool RecordExists { get; set; }
         }

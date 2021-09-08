@@ -136,8 +136,6 @@ namespace DefaultCluster.Tests.StorageTests
             [Id(0)]
             public object State { get; set; }
 
-            public Type Type => typeof(int);
-
             [Id(1)]
             public string ETag { get; set; }
 

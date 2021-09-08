@@ -258,7 +258,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetStream(binaryColumnPositionInSelect, Storage))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -266,7 +266,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(xmlColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -274,7 +274,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(jsonColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -299,7 +299,7 @@ namespace Orleans.Storage
 
                         if(payload != null)
                         {
-                            storageState = choice.Deserializer.Deserialize(payload, grainState.Type);
+                            storageState = choice.Deserializer.Deserialize(payload, typeof(T));
                         }
 
                         version = selector.GetNullableInt32("Version");

@@ -24,11 +24,6 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(1)]
         public string ETag { get; set; }
 
-        /// <summary>
-        /// Gets Type
-        /// </summary>
-        public Type Type => typeof(GrainStateWithMetaData<TView>);
-
         [Id(2)]
         public bool RecordExists { get; set; }
 
