@@ -191,7 +191,7 @@ namespace Tester.AzureUtils.Persistence
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainState));
+            var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainState>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);
@@ -211,7 +211,7 @@ namespace Tester.AzureUtils.Persistence
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainStateWithCustomJsonProperties)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainStateWithCustomJsonProperties));
+            var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainStateWithCustomJsonProperties>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.String, convertedState.String);
         }

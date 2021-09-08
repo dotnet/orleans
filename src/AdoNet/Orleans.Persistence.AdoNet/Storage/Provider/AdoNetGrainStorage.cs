@@ -308,16 +308,16 @@ namespace Orleans.Storage
                     return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
                 }, CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
 
-                object state = readRecords != null ? readRecords.Item1 : null;
+                T state = readRecords != null ? (T) readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
                 bool recordExists = readRecords != null;
                 if(state == null)
                 {
                     logger.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
-                    state = Activator.CreateInstance(grainState.Type);
+                    state = Activator.CreateInstance<T>();
                 }
 
-                grainState.State = (T)state;
+                grainState.State = state;
                 grainState.ETag = etag;
                 grainState.RecordExists = recordExists;
                 if (logger.IsEnabled(LogLevel.Trace))
