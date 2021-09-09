@@ -13,7 +13,7 @@ namespace Orleans.Storage
     [KeepAlive]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
-        private readonly Dictionary<(string, string), object> _store = new(); 
+        private readonly Dictionary<(string, string), object> _store = new();
         private readonly ILogger _logger;
 
         public MemoryStorageGrain(ILogger<MemoryStorageGrain> logger)
@@ -24,6 +24,7 @@ namespace Orleans.Storage
         public Task<IGrainState<T>> ReadStateAsync<T>(string stateStore, string grainStoreKey)
         {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("ReadStateAsync for {StateStore} grain: {GrainStoreKey}", stateStore, grainStoreKey);
+
             _store.TryGetValue((stateStore, grainStoreKey), out var entry);
             return Task.FromResult((IGrainState<T>)entry);
         }
@@ -31,12 +32,8 @@ namespace Orleans.Storage
         public Task<string> WriteStateAsync<T>(string stateStore, string grainStoreKey, IGrainState<T> grainState)
         {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
-            string currentETag = null;
-            if (_store.TryGetValue((stateStore, grainStoreKey), out var entry))
-            {
-                currentETag = ((IGrainState<T>)entry).ETag;
-            }
 
+            var currentETag = GetETagFromStorage<T>(stateStore, grainStoreKey);
             ValidateEtag(currentETag, grainState.ETag, grainStoreKey, "Update");
             grainState.ETag = NewEtag();
             _store[(stateStore, grainStoreKey)] = grainState;
@@ -44,22 +41,32 @@ namespace Orleans.Storage
             return Task.FromResult(grainState.ETag);
         }
 
-        public Task DeleteStateAsync<T>(string grainType, string grainId, string etag)
+        public Task DeleteStateAsync<T>(string stateStore, string grainStoreKey, string etag)
         {
-            string currentETag = null;
-            if (_store.TryGetValue((grainType, grainId), out var entry))
-            {
-                currentETag = ((IGrainState<T>)entry).ETag;
-            }
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("DeleteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, etag);
 
-            ValidateEtag(currentETag, etag, grainId, "Delete");
-            _store.Remove((grainType, grainId));
+            var currentETag = GetETagFromStorage<T>(stateStore, grainStoreKey);
+            ValidateEtag(currentETag, etag, grainStoreKey, "Delete");
+            // Do not remove it from the dictionary, just set the value to null to remember that this item
+            // was once in the store, and now is deleted
+            _store[(stateStore, grainStoreKey)] = null; 
             return Task.CompletedTask;
         }
 
         private static string NewEtag()
         {
             return Guid.NewGuid().ToString("N");
+        }
+
+        private string GetETagFromStorage<T>(string grainType, string grainId)
+        {
+            string currentETag = null;
+            if (_store.TryGetValue((grainType, grainId), out var entry))
+            {
+                // If the entry is null, it was removed from storage
+                currentETag = entry != null ? ((IGrainState<T>)entry).ETag : string.Empty;
+            }
+            return currentETag;
         }
 
         private void ValidateEtag(string currentETag, string receivedEtag, string grainStoreKey, string operation)
