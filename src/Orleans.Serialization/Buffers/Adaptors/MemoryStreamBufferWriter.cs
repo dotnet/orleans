@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 
@@ -20,11 +20,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <inheritdoc />
         public void Advance(int count)
         {
-            if (_stream.Position + count > _stream.Length)
-            {
-                //_stream.SetLength(_stream.Position + count);
-            }    
-
             _stream.Position += count;
         }
 
