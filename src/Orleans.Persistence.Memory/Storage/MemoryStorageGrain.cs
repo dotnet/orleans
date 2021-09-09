@@ -25,7 +25,7 @@ namespace Orleans.Storage
         {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("ReadStateAsync for {StateStore} grain: {GrainStoreKey}", stateStore, grainStoreKey);
             _store.TryGetValue((stateStore, grainStoreKey), out var entry);
-            return Task.FromResult((IGrainState<T>) (entry is DeletedState ? null : entry));
+            return Task.FromResult((IGrainState<T>)entry);
         }
 
         public Task<string> WriteStateAsync<T>(string stateStore, string grainStoreKey, IGrainState<T> grainState)
@@ -53,7 +53,7 @@ namespace Orleans.Storage
             }
 
             ValidateEtag(currentETag, etag, grainId, "Delete");
-            _store[(grainType, grainId)] = deleted;
+            _store.Remove((grainType, grainId));
             return Task.CompletedTask;
         }
 
@@ -85,17 +85,5 @@ namespace Orleans.Storage
 
             throw new MemoryStorageEtagMismatchException(currentETag, receivedEtag);
         }
-
-        /// <summary>
-        /// Marker to record deleted state so we can detect the difference between deleted state and state that never existed.
-        /// </summary>
-        private sealed class DeletedState : IGrainState<object>
-        {
-            public object State { get; set; }
-            public string ETag { get; set; } = string.Empty;
-            public bool RecordExists { get; set; }
-        }
-
-        private readonly IGrainState<object> deleted = new DeletedState();
     }
 }
