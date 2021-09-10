@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal struct ValueStopwatch
     {
+        private static readonly double TimeStampToMicroseconds = Stopwatch.Frequency / (double)1000000;
         private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double) Stopwatch.Frequency;
         private long value;
 
@@ -32,10 +33,26 @@ namespace Orleans.Runtime
         /// </summary>
         public TimeSpan Elapsed => TimeSpan.FromTicks(this.ElapsedTicks);
 
+        public double TotalMicroseconds
+        {
+            get
+            {
+                return ElapsedRaw / TimeStampToMicroseconds;
+            }
+        }
+
         /// <summary>
         /// Returns the elapsed ticks.
         /// </summary>
         public long ElapsedTicks
+        {
+            get
+            {
+                return (long) (ElapsedRaw * TimestampToTicks);
+            }
+        }
+
+        private long ElapsedRaw
         {
             get
             {
@@ -57,7 +74,7 @@ namespace Orleans.Runtime
                     delta = -timestamp;
                 }
 
-                return (long) (delta * TimestampToTicks);
+                return delta;
             }
         }
 
