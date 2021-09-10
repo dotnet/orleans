@@ -20,6 +20,7 @@ namespace Orleans.Streams
         private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
 
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
+        private readonly Dictionary<QueueId, PersistentStreamPullingAgent> deactivatedAgents = new();
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
 
@@ -217,23 +218,35 @@ namespace Orleans.Streams
             foreach (var queueId in myQueues)
             {
                 if (queuesToAgentsMap.ContainsKey(queueId))
-                    continue;
-                try
                 {
-                    var agentIdNumber = Interlocked.Increment(ref nextAgentId);
-                    var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
-                    IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo,  queueAdapter, queueAdapterCache, deliveryFailureHandler);
-                    this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
-                    queuesToAgentsMap.Add(queueId, agent);
+                    continue;
+                }
+                else if (deactivatedAgents.TryGetValue(queueId, out var agent))
+                {
+                    queuesToAgentsMap[queueId] = agent;
+                    deactivatedAgents.Remove(queueId);
                     agents.Add(agent);
                 }
-                catch (Exception exc)
+                else
                 {
-                    logger.Error(ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
-                    // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
-                    // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
-                    if (failOnInit) throw;
+                    // Create a new agent.
+                    try
+                    {
+                        var agentIdNumber = Interlocked.Increment(ref nextAgentId);
+                        var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
+                        IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
+                        agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo, queueAdapter, queueAdapterCache, deliveryFailureHandler);
+                        this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
+                        queuesToAgentsMap.Add(queueId, agent);
+                        agents.Add(agent);
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Error(ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
+                        // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
+                        // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
+                        if (failOnInit) throw;
+                    }
                 }
             }
 
@@ -285,10 +298,14 @@ namespace Orleans.Streams
             foreach (var queueId in queuesToRemove)
             {
                 PersistentStreamPullingAgent agent;
-                if (!queuesToAgentsMap.TryGetValue(queueId, out agent)) continue;
+                if (!queuesToAgentsMap.TryGetValue(queueId, out agent))
+                {
+                    continue;
+                }
 
                 agents.Add(agent);
                 queuesToAgentsMap.Remove(queueId);
+                deactivatedAgents[queueId] = agent;
                 var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
                 var task = OrleansTaskExtentions.SafeExecute(agentGrainRef.Shutdown);
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_11,
@@ -305,19 +322,6 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
             }
 
-            var catalog = ActivationServices.GetRequiredService<Catalog>();
-            foreach (var agent in agents)
-            {
-                try
-                {
-                    catalog.UnregisterSystemTarget(agent);
-                }
-                catch (Exception exc)
-                {
-                    Log(ErrorCode.PersistentStreamPullingManager_12, 
-                        "Exception while UnRegisterSystemTarget of PersistentStreamPullingAgent {0}. Ignoring. Exc.Message = {1}.", ((ISystemTargetBase)agent).GrainId, exc.Message);
-                }
-            }
             if (agents.Count > 0)
             {
                 Log(ErrorCode.PersistentStreamPullingManager_10, "Removed {0} queues: {1}. Now own total of {2} queues: {3}",

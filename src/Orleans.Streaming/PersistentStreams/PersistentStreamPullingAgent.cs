@@ -26,16 +26,17 @@ namespace Orleans.Streams
         private readonly ILogger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
-        private int numMessages;
-
+        private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
+        internal readonly QueueId QueueId;
+
+        private int numMessages;
         private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
         private DateTime lastTimeCleanedPubSubCache;
         private IGrainTimer timer;
 
-        internal readonly QueueId QueueId;
         private Task receiverInitTask;
         private bool IsShutdown => timer == null;
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
@@ -64,6 +65,7 @@ namespace Orleans.Streams
             this.options = options;
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler)); ;
+            this.queueAdapterCache = queueAdapterCache;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -72,31 +74,6 @@ namespace Orleans.Streams
                 GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
-            // TODO: move queue cache size statistics tracking into queue cache implementation once Telemetry APIs and LogStatistics have been reconciled.
-            //IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, statUniquePostfix), () => queueCache != null ? queueCache.Size : 0);
-
-            try
-            {
-                receiver = queueAdapter.CreateReceiver(QueueId);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
-                throw;
-            }
-
-            try
-            {
-                if (queueAdapterCache != null)
-                {
-                    queueCache = queueAdapterCache.CreateQueueCache(QueueId);
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
-                throw;
-            }
         }
 
         /// <summary>
@@ -121,6 +98,29 @@ namespace Orleans.Streams
                 GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), Silo, QueueId.ToStringWithHashCode());
 
             lastTimeCleanedPubSubCache = DateTime.UtcNow;
+
+            try
+            {
+                if (queueAdapterCache != null)
+                {
+                    queueCache = queueAdapterCache.CreateQueueCache(QueueId);
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
+                throw;
+            }
+
+            try
+            {
+                receiver = queueAdapter.CreateReceiver(QueueId);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
+                throw;
+            }
 
             try
             {
