@@ -1735,7 +1735,7 @@ namespace Orleans.Serialization
         public T Copy<T>(T value)
         {
             using var context = _contextPool.GetContext();
-            return context.Copy(value);
+            return context.DeepCopy(value);
         }
     }
 

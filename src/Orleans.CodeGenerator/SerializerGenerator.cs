@@ -1127,7 +1127,8 @@ namespace Orleans.CodeGenerator
                 _member = member;
             }
 
-            public IMemberDescription Member => _member;
+            IMemberDescription ISerializableMember.Member => _member;
+            public MethodParameterFieldDescription Member => _member;
 
             private LibraryTypes LibraryTypes => _member.Method.ContainingInterface.CodeGenerator.LibraryTypes;
 

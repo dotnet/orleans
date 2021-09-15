@@ -116,7 +116,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new Tuple<T>(_copier.DeepCopy(input.Item1, context));
@@ -247,7 +247,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -401,7 +401,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -572,7 +572,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3, T4>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -763,7 +763,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -971,7 +971,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -1197,7 +1197,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6, T7>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = Tuple.Create(
@@ -1439,7 +1439,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new Tuple<T1, T2, T3, T4, T5, T6, T7, T8>(

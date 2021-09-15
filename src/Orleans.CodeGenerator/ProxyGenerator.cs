@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System;
+using static Orleans.CodeGenerator.SerializerGenerator;
+using static Orleans.CodeGenerator.InvokableGenerator;
+using static Orleans.CodeGenerator.CopierGenerator;
 
 namespace Orleans.CodeGenerator
 {
@@ -14,6 +17,9 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal static class ProxyGenerator
     {
+        private const string CopyContextPoolMemberName = "CopyContextPool";
+        private const string CodecProviderMemberName = "CodecProvider";
+
         public static (ClassDeclarationSyntax, GeneratedProxyDescription) Generate(
             LibraryTypes libraryTypes,
             InvokableInterfaceDescription interfaceDescription,
@@ -21,8 +27,11 @@ namespace Orleans.CodeGenerator
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription);
 
-            var ctors = GenerateConstructors(generatedClassName, interfaceDescription.ProxyBaseType).ToArray();
-            var proxyMethods = CreateProxyMethods(libraryTypes, interfaceDescription, metadataModel).ToArray();
+            var fieldDescriptions = GetFieldDescriptions(interfaceDescription, metadataModel, libraryTypes);
+            var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
+            var proxyMethods = CreateProxyMethods(libraryTypes, fieldDescriptions, interfaceDescription, metadataModel).ToArray();
+
+            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType).ToArray();
 
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(
@@ -31,6 +40,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
                     AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddMembers(fieldDeclarations)
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);
 
@@ -45,8 +55,35 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(InvokableInterfaceDescription interfaceDescription) => $"Proxy_{interfaceDescription.Name}";
 
+        private static List<GeneratedFieldDescription> GetFieldDescriptions(
+            InvokableInterfaceDescription interfaceDescription,
+            MetadataModel metadataModel,
+            LibraryTypes libraryTypes)
+        {
+            var fields = new List<GeneratedFieldDescription>();
+
+            // Add a codec field for any method parameter which does not have a static codec.
+            var allTypes = interfaceDescription.Methods
+                .Where(method => method.MethodTypeParameters.Count == 0)
+                .SelectMany(method => metadataModel.GeneratedInvokables[method].Members);
+            fields.AddRange(GetCopierFieldDescriptions(allTypes, libraryTypes));
+            return fields;
+        }
+
+        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        {
+            return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
+
+            static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
+            {
+                return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+            }
+        }
+
         private static IEnumerable<MemberDeclarationSyntax> CreateProxyMethods(
             LibraryTypes libraryTypes,
+            List<GeneratedFieldDescription> fieldDescriptions,
             InvokableInterfaceDescription interfaceDescription,
             MetadataModel metadataModel)
         {
@@ -61,7 +98,7 @@ namespace Orleans.CodeGenerator
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
                     .AddParameterListParameters(method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions)).ToArray())
                     .WithBody(
-                        CreateAsyncProxyMethodBody(libraryTypes, metadataModel, methodDescription));
+                        CreateAsyncProxyMethodBody(libraryTypes, fieldDescriptions, metadataModel, methodDescription));
                 if (methodDescription.HasCollision)
                 {
                     declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)));
@@ -95,6 +132,7 @@ namespace Orleans.CodeGenerator
 
         private static BlockSyntax CreateAsyncProxyMethodBody(
             LibraryTypes libraryTypes,
+            List<GeneratedFieldDescription> fieldDescriptions,
             MetadataModel metadataModel,
             MethodDescription methodDescription)
         {
@@ -118,16 +156,48 @@ namespace Orleans.CodeGenerator
                                 .WithInitializer(
                                     EqualsValueClause(createRequestExpr))))));
 
+            var codecs = fieldDescriptions.OfType<ICopierDescription>()
+                    .Concat(libraryTypes.StaticCopiers)
+                    .ToList();
+
             // Set request object fields from method parameters.
             var parameterIndex = 0;
-            foreach (var parameter in methodDescription.Method.Parameters)
+            var parameters = requestDescription.Members.OfType<MethodParameterFieldDescription>().Select(member => new SerializableMethodMember(member));
+            ExpressionSyntax copyContextPool = BaseExpression().Member(CopyContextPoolMemberName);
+            ExpressionSyntax copyContextVariable = IdentifierName("copyContext");
+            var hasCopyContext = false;
+            foreach (var parameter in parameters)
             {
+                // Only create a copy context as needed.
+                if (!hasCopyContext && !parameter.IsShallowCopyable)
+                {
+                    // C#: using var copyContext = base.CopyContext.GetContext();
+                    statements.Add(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(
+                                    ParseTypeName("var"),
+                                    SingletonSeparatedList(
+                                        VariableDeclarator(Identifier("copyContext")).WithInitializer(
+                                            EqualsValueClause(InvocationExpression(
+                                                    copyContextPool.Member("GetContext"),
+                                                    ArgumentList())))))).WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+                    hasCopyContext = true;
+                }
+
+                var valueExpression = GenerateMemberCopy(
+                    fieldDescriptions,
+                    libraryTypes,
+                    IdentifierName(SyntaxFactoryUtility.GetSanitizedName(parameter.Member.Parameter, parameterIndex)),
+                    copyContextVariable,
+                    codecs,
+                    parameter);
+
                 statements.Add(
                     ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
                             requestVar.Member($"arg{parameterIndex}"),
-                            IdentifierName(SyntaxFactoryUtility.GetSanitizedName(parameter, parameterIndex)))));
+                            valueExpression)));
 
                 parameterIndex++;
             }
@@ -191,8 +261,11 @@ namespace Orleans.CodeGenerator
 
         private static IEnumerable<MemberDeclarationSyntax> GenerateConstructors(
             string simpleClassName,
+            List<GeneratedFieldDescription> fieldDescriptions,
             INamedTypeSymbol baseType)
         {
+            var bodyStatements = GetBodyStatements().ToList();
+
             if (baseType is null)
             {
                 yield break;
@@ -228,7 +301,7 @@ namespace Orleans.CodeGenerator
                             SyntaxKind.BaseConstructorInitializer,
                             ArgumentList(
                                 SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
-                    .WithBody(Block());
+                    .WithBody(Block(bodyStatements));
             }
 
             static IEnumerable<SyntaxToken> GetModifiers(IMethodSymbol method)
@@ -268,6 +341,46 @@ namespace Orleans.CodeGenerator
                 }
 
                 return result;
+            }
+
+            IEnumerable<StatementSyntax> GetBodyStatements()
+            {
+                foreach (var field in fieldDescriptions)
+                {
+                    switch (field)
+                    {
+                        case GeneratedFieldDescription _ when field.IsInjected:
+                            yield return ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                    Unwrapped(field.FieldName.ToIdentifierName())));
+                            break;
+                        case CopierFieldDescription codec:
+                            {
+                                yield return ExpressionStatement(
+                                    AssignmentExpression(
+                                        SyntaxKind.SimpleAssignmentExpression,
+                                        ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                        GetService(field.FieldType)));
+                            }
+                            break;
+                    }
+                }
+
+                static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
+                {
+                    return InvocationExpression(
+                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
+                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
+                }
+
+                static ExpressionSyntax GetService(TypeSyntax type)
+                {
+                    return InvocationExpression(
+                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
+                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName)) })));
+                }
             }
         }
 

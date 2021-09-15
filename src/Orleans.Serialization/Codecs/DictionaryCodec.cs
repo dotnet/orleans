@@ -170,7 +170,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Dictionary<TKey, TValue>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new Dictionary<TKey, TValue>(input.Count, input.Comparer);

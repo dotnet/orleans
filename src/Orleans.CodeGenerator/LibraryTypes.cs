@@ -26,6 +26,7 @@ namespace Orleans.CodeGenerator
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
+                CopyContextPool = Type("Orleans.Serialization.Cloning.CopyContextPool"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
                 Func_2 = Type("System.Func`2"),
                 GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute"),
@@ -268,6 +269,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SuppressReferenceTrackingAttribute { get; private set; }
         public INamedTypeSymbol OmitDefaultMemberValuesAttribute { get; private set; }
         public INamedTypeSymbol CopyContext { get; private set; }
+        public INamedTypeSymbol CopyContextPool { get; private set; }
         public Compilation Compilation { get; private set; }
         public List<ITypeSymbol> ImmutableTypes { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }

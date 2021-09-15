@@ -147,7 +147,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Queue<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new Queue<T>(input.Count);

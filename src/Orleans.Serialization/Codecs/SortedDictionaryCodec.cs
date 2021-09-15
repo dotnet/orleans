@@ -126,7 +126,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(SortedDictionary<TKey, TValue>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new SortedDictionary<TKey, TValue>(input.Comparer);

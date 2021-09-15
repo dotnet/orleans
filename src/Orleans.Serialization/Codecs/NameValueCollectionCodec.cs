@@ -92,7 +92,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(NameValueCollection))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new NameValueCollection(input.Count);

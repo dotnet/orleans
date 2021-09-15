@@ -1,4 +1,6 @@
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.UnitTests;
 using System;
 using System.Collections.Generic;
@@ -27,6 +29,10 @@ namespace Orleans.Serialization.UnitTests
         protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
 
         protected ValueTask InvokeAsync(IInvokable body) => default;
+
+        protected CopyContextPool CopyContextPool { get; }
+
+        protected CodecProvider CodecProvider { get; }
     }
 
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
@@ -45,6 +51,10 @@ namespace Orleans.Serialization.UnitTests
         protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
 
         protected ValueTask InvokeAsync(IInvokable body) => default;
+
+        protected CopyContextPool CopyContextPool { get; }
+
+        protected CodecProvider CodecProvider { get; }
     }
 
     [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
