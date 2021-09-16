@@ -48,7 +48,7 @@ namespace Orleans.Runtime
 
         public static bool operator ==(CorrelationId lhs, CorrelationId rhs)
         {
-            return (rhs.id == lhs.id);
+            return rhs.id == lhs.id;
         }
 
         public static bool operator !=(CorrelationId lhs, CorrelationId rhs)
