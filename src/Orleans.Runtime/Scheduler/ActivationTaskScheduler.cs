@@ -9,46 +9,50 @@ namespace Orleans.Runtime.Scheduler
     /// <summary>
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
-    [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
+    [DebuggerDisplay("ActivationTaskScheduler-{Id} RunQueue={workerGroup.WorkItemCount}")]
     internal class ActivationTaskScheduler : TaskScheduler
     {
-        private readonly ILogger logger;
-
-        private static long idCounter;
-        private readonly long myId;
-        private readonly WorkItemGroup workerGroup;
+        private readonly WorkItemGroup _workerGroup;
 #if EXTRA_STATS
         private readonly CounterStatistic turnsExecutedStatistic;
 #endif
 
-        internal ActivationTaskScheduler(WorkItemGroup workGroup, ILogger<ActivationTaskScheduler> logger)
+        internal ActivationTaskScheduler(WorkItemGroup workGroup)
         {
-            this.logger = logger;
-            myId = Interlocked.Increment(ref idCounter);
-            workerGroup = workGroup;
+            _workerGroup = workGroup;
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created {TaskScheduler} with GrainContext={GrainContext}", this, workerGroup.GrainContext);
+            if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Created {TaskScheduler} with GrainContext={GrainContext}", this, _workerGroup.GrainContext);
         }
+
+        private ILogger<ActivationTaskScheduler> Logger => _workerGroup.Shared.ActivationTaskSchedulerLogger;
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
         /// <returns>An enumerable of the tasks currently scheduled.</returns>
-        protected override IEnumerable<Task> GetScheduledTasks() => this.workerGroup.GetScheduledTasks();
+        protected override IEnumerable<Task> GetScheduledTasks() => this._workerGroup.GetScheduledTasks();
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
-            bool done = TryExecuteTask(task);
-            if (!done)
-                logger.LogWarning(
-                    (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
-                    "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
-                    task.Id,
-                    task.Status);
-            
-            //  Consider adding ResetExecutionContext() or even better:
-            //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
+            var original = SynchronizationContext.Current;
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(_workerGroup);
+                bool done = TryExecuteTask(task);
+                if (!done)
+                    Logger.LogWarning(
+                        (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
+                        "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
+                        task.Id,
+                        task.Status);
+
+                //  Consider adding ResetExecutionContext() or even better:
+                //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(original);
+            }
         }
 
         /// <summary>Queues a task to the scheduler.</summary>
@@ -56,9 +60,9 @@ namespace Orleans.Runtime.Scheduler
         protected override void QueueTask(Task task)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} QueueTask Task Id={TaskId}", myId, task.Id);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{TaskScheduler} QueueTask Task Id={TaskId}", Id, task.Id);
 #endif
-            workerGroup.EnqueueTask(task);
+            _workerGroup.EnqueueTask(task);
         }
 
         /// <summary>
@@ -72,19 +76,19 @@ namespace Orleans.Runtime.Scheduler
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
             var currentContext = RuntimeContext.Current;
-            bool canExecuteInline = currentContext != null && object.Equals(currentContext, workerGroup.GrainContext);
+            bool canExecuteInline = currentContext != null && object.Equals(currentContext, _workerGroup.GrainContext);
 
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
+            if (Logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace(
+                Logger.LogTrace(
                     "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}",
-                    myId,
+                    Id,
                     task.Id,
                     task.Status,
                     taskWasPreviouslyQueued,
                     canExecuteInline,
-                    workerGroup.ExternalWorkItemCount);
+                    _workerGroup.ExternalWorkItemCount);
             }
 #endif
             if (!canExecuteInline) return false;
@@ -97,7 +101,7 @@ namespace Orleans.Runtime.Scheduler
             if (!canExecuteInline)
             {
 #if DEBUG
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Status={Status} Execute=No", myId, task.Id, task.Status);
+                if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Status={Status} Execute=No", Id, task.Id, task.Status);
 #endif
                 return false;
             }
@@ -106,10 +110,10 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace(
+            if (Logger.IsEnabled(LogLevel.Trace))
+                Logger.LogTrace(
                     "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Yes",
-                    myId,
+                    Id,
                     task.Id,
                     Thread.CurrentThread.ManagedThreadId);
 #endif
@@ -117,17 +121,17 @@ namespace Orleans.Runtime.Scheduler
             bool done = TryExecuteTask(task);
             if (!done)
             {
-                logger.LogWarning(
+                Logger.LogWarning(
                     (int)ErrorCode.SchedulerTaskExecuteIncomplete3,
                     "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
                     task.Id,
                     task.Status);
             }
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace(
+            if (Logger.IsEnabled(LogLevel.Trace))
+                Logger.LogTrace(
                     "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}",
-                    myId,
+                    Id,
                     task.Id,
                     Thread.CurrentThread.ManagedThreadId,
                     done);
@@ -135,6 +139,6 @@ namespace Orleans.Runtime.Scheduler
             return done;
         }
 
-        public override string ToString() => $"{GetType().Name}-{myId}:Queued={workerGroup.ExternalWorkItemCount}";
+        public override string ToString() => $"{GetType().Name}-{Id}:Queued={_workerGroup.ExternalWorkItemCount}";
     }
 }

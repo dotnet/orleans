@@ -46,12 +46,12 @@ namespace Orleans.Runtime
         // The task representing this activation's message loop.
         // This field is assigned and never read and exists only for debugging purposes (eg, in memory dumps, to associate a loop task with an activation).
 #pragma warning disable IDE0052 // Remove unread private members
-        private readonly Task _messageLoopTask;
+        private Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
         public ActivationData(
             GrainAddress addr,
-            Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
+            WorkItemGroupShared workItemGroupShared,
             IServiceProvider applicationServices,
             GrainTypeSharedContext shared)
         {
@@ -61,8 +61,13 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             serviceScope = applicationServices.CreateScope();
             isInWorkingSet = true;
-            _workItemGroup = createWorkItemGroup(this);
-            _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
+            _workItemGroup = new WorkItemGroup(this, workItemGroupShared);
+            _workItemGroup.QueueAction(static state =>
+            {
+                var self = (ActivationData)state;
+                self._messageLoopTask = self.RunMessageLoop();
+            },
+            this);
         }
 
         public IGrainRuntime GrainRuntime => _shared.Runtime;
@@ -178,6 +183,8 @@ namespace Orleans.Runtime
         }
 
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
+
+        public WorkItemGroup SchedulingContext => _workItemGroup;
 
         public TTarget GetTarget<TTarget>() => (TTarget)GrainInstance;
 
@@ -948,6 +955,8 @@ namespace Orleans.Runtime
 
             try
             {
+                SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(SchedulingContext));
+
                 var task = _shared.InternalRuntime.RuntimeClient.Invoke(this, message);
 
                 // Note: This runs for all outcomes - both Success or Fault
@@ -964,6 +973,8 @@ namespace Orleans.Runtime
             {
                 OnCompletedRequest(message);
             }
+
+            SynchronizationContext.SetSynchronizationContext(SchedulingContext);
 
             static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
             {

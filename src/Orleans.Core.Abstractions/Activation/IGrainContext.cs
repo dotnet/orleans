@@ -201,16 +201,15 @@ namespace Orleans.Runtime
         void QueueAction(Action action);
 
         /// <summary>
-        /// Schedules a task to be started by this instance.
+        /// Schedules an action for execution by this instance.
         /// </summary>
-        /// <param name="task">The task.</param>
-        void QueueTask(Task task);
-
-        /// <summary>
-        /// Schedules a work item for execution by this instance.
-        /// </summary>
-        /// <param name="workItem">The work item.</param>
-        void QueueWorkItem(IThreadPoolWorkItem workItem);
+        /// <param name="action">
+        /// The action.
+        /// </param>
+        /// <param name="state">
+        /// The state passed to the action upon execution.
+        /// </param>
+        void QueueAction(Action<object> action, object state);
     }
 
     /// <summary>

@@ -230,11 +230,7 @@ namespace Orleans.Runtime
             var sp = this.serviceProvider;
             systemTarget.WorkItemGroup = new WorkItemGroup(
                 systemTarget,
-                sp.GetRequiredService<ILogger<WorkItemGroup>>(),
-                sp.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                sp.GetRequiredService<SchedulerStatisticsGroup>(),
-                sp.GetRequiredService<IOptions<StatisticsOptions>>(),
-                sp.GetRequiredService<IOptions<SchedulingOptions>>());
+                sp.GetRequiredService<WorkItemGroupShared>());
             activations.RecordNewSystemTarget(systemTarget);
         }
 

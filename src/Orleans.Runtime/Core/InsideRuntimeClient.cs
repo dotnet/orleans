@@ -264,7 +264,8 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContextExtensions.Import(message.RequestContextData, message);
+                RequestContextExtensions.Import(message.RequestContextData);
+                RequestContext.CurrentRequest = message;
 
                 Response response;
                 try
@@ -338,10 +339,6 @@ namespace Orleans.Runtime
                 {
                     SafeSendExceptionResponse(message, exc2);
                 }
-            }
-            finally
-            {
-                RequestContext.Clear();
             }
         }
 

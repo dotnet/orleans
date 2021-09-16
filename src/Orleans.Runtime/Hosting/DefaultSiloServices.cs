@@ -80,6 +80,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
+            services.AddSingleton<WorkItemGroupShared>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();

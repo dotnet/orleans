@@ -22,8 +22,8 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
-            var (requestContextData, runningRequest) = RequestContextExtensions.ExportInternal(this.deepCopier);
-            var callChainId = runningRequest switch
+            var requestContextData = RequestContextExtensions.Export(this.deepCopier);
+            var callChainId = RequestContext.CurrentRequest switch
             {
                 Message msg when msg.CallChainId != Guid.Empty => msg.CallChainId,
                 _ => Guid.NewGuid(),

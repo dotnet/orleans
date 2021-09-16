@@ -61,6 +61,8 @@ namespace UnitTests.SchedulerTests
         private readonly ITestOutputHelper output;
         private static readonly object Lockable = new object();
         private readonly UnitTestSchedulingContext rootContext;
+        private readonly ActivationTaskScheduler taskScheduler;
+
         private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)
         {
@@ -68,7 +70,10 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext.SetSynchronizationContext(null);
             this.loggerFactory = InitSchedulerLogging();
             this.rootContext = new UnitTestSchedulingContext();
-            rootContext.Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory);
+            rootContext.Scheduler = workItemGroup;
+
+            taskScheduler = new(workItemGroup);
         }
         
         public void Dispose()
@@ -82,7 +87,7 @@ namespace UnitTests.SchedulerTests
             int expected = 2;
             bool done = false;
             Task<int> t = new Task<int>(() => { done = true; return expected; });
-            rootContext.Scheduler.QueueTask(t);
+            t.Start(taskScheduler);
 
             int received = t.Result;
             Assert.True(t.IsCompleted, "Task should have completed");
@@ -127,8 +132,8 @@ namespace UnitTests.SchedulerTests
             Task task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
-            rootContext.Scheduler.QueueTask(task1);
-            rootContext.Scheduler.QueueTask(task2);
+            task1.Start(taskScheduler);
+            task2.Start(taskScheduler);
 
             await Task.WhenAll(task1, task2).WithTimeout(TimeSpan.FromSeconds(5));
 

@@ -144,14 +144,18 @@ namespace Orleans.Runtime
 
         internal void HandleNewRequest(Message request)
         {
+            SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(WorkItemGroup));
             running = request;
             this.RuntimeClient.Invoke(this, request).Ignore();
+            SynchronizationContext.SetSynchronizationContext(WorkItemGroup);
         }
 
         internal void HandleResponse(Message response)
         {
+            SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(WorkItemGroup));
             running = response;
             this.RuntimeClient.ReceiveResponse(response);
+            SynchronizationContext.SetSynchronizationContext(WorkItemGroup);
         }
 
         /// <summary>
@@ -279,7 +283,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
+                        this.WorkItemGroup.QueueAction(RequestWorkItem.ExecuteAction, workItem);
                         break;
                     }
 
@@ -287,7 +291,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new ResponseWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
+                        this.WorkItemGroup.QueueAction(ResponseWorkItem.ExecuteAction, workItem);
                         break;
                     }
 
