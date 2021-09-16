@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.Serializers
 {
@@ -30,9 +31,9 @@ namespace Orleans.Serialization.Serializers
 
         private readonly object _initializationLock = new();
 
-        private readonly ConcurrentDictionary<(Type, Type), IFieldCodec> _adaptedCodecs = new();
-        private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new();
-        private readonly ConcurrentDictionary<(Type, Type), IDeepCopier> _adaptedCopiers = new();
+        private readonly ConcurrentDictionary<(Type, Type), IFieldCodec> _adaptedCodecs = new(TypeTypeValueTupleComparer.Instance);
+        private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new(TypeTypeValueTupleComparer.Instance);
+        private readonly ConcurrentDictionary<(Type, Type), IDeepCopier> _adaptedCopiers = new(TypeTypeValueTupleComparer.Instance);
 
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCodecs = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
@@ -925,5 +926,12 @@ namespace Orleans.Serialization.Serializers
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
+
+        private sealed class TypeTypeValueTupleComparer : IEqualityComparer<(Type, Type)>
+        {
+            public static TypeTypeValueTupleComparer Instance { get; } = new();
+            public bool Equals([AllowNull] (Type, Type) x, [AllowNull] (Type, Type) y) => x.Item1 == y.Item1 && x.Item2 == y.Item2;
+            public int GetHashCode([DisallowNull] (Type, Type) obj) => obj.GetHashCode();
+        }
     }
 }
