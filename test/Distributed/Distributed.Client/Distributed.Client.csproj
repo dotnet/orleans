@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OutputPath Condition=" '$(DistributedOutputPath)'!='' ">$(DistributedOutputPath)/Distributed.Client</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\secrets.json" Link="secrets.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Client\Orleans.Client.csproj" />
+    <ProjectReference Include="..\Distributed.GrainInterfaces\Distributed.GrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Crank.EventSources" Version="$(CrankVersion)" />
+    <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Scenarios\" />
+  </ItemGroup>
+
+</Project>

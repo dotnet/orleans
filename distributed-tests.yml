@@ -1,0 +1,64 @@
+variables:
+  clusterId: '{{ "now" | date: "%s" }}'
+  serviceId: '{{ "now" | date: "%s" }}'
+  secretSource: KeyVault
+  framework: net5.0
+
+jobs:
+  silo:
+    source:
+      localFolder: Artifacts/Distributed/Distributed.Silo/{{framework}}
+    executable: Distributed.Silo.exe
+    readyStateText: Orleans Silo started.
+    framework: net5.0
+    arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
+    onConfigure: 
+      - if (job.endpoints.Count > 0) { 
+          job.endpoints.Reverse();
+          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances); 
+        }
+  client:
+    source:
+      localFolder: Artifacts/Distributed/Distributed.Client/{{framework}}
+    executable: Distributed.Client.exe
+    waitForExit: true
+    framework: net5.0
+    arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{commandOptions}}"
+    onConfigure: 
+      - if (job.endpoints.Count > 0) { 
+          job.endpoints.Reverse();
+          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances); 
+        }
+
+scenarios:
+  ping:
+    server:
+      job: silo
+      variables:
+        instances: 10
+        configurator: SimpleSilo
+    client:
+      job: client
+      variables:
+        command: ping
+        instances: 1
+        pipelineSize: 10000
+        requests: 10000000
+        routers: 10000
+        targetsPerRouter: 10
+        doWarmup: true
+        commandOptions: "--pipelineSize {{pipelineSize}} --requests {{requests}} --routers {{routers}} --targetsPerRouter {{targetsPerRouter}} --doWarmup {{doWarmup}}"
+
+profiles:
+  local:
+    variables:
+      secretSource: File
+    jobs: 
+      server:
+        endpoints: 
+          - http://localhost:5010
+        variables:
+          instances: 1
+      client:
+        endpoints: 
+          - http://localhost:5010
