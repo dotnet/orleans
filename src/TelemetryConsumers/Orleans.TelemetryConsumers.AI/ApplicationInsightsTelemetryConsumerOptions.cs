@@ -12,7 +12,7 @@ namespace Orleans.Configuration
         public string InstrumentationKey { get; set; }
 
         /// <summary>
-        /// The TelemetryClient instance.
+        /// The <see cref="TelemetryConfiguration" /> instance.
         /// </summary>
         public TelemetryConfiguration TelemetryConfiguration  { get; set; }
     }
