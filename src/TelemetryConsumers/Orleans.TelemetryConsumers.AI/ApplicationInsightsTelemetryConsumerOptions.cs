@@ -6,7 +6,7 @@ namespace Orleans.Configuration
     {
         /// <summary>
         /// Instrumentation Key of the Application Insights instance.
-        /// Will be ignored if <see cref="TelemetryClient" /> is provided.
+        /// Will be ignored if <see cref="TelemetryConfiguration" /> is provided.
         /// </summary>
         [Redact]
         public string InstrumentationKey { get; set; }
