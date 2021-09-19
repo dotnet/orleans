@@ -5,7 +5,7 @@ namespace Orleans.Configuration
     public class ApplicationInsightsTelemetryConsumerOptions
     {
         /// <summary>
-        /// Instrumentation Key of the App Insights instance.
+        /// Instrumentation Key of the Application Insights instance.
         /// Will be ignored if TelemetryClient is provided.
         /// </summary>
         [Redact]
