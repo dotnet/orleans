@@ -22,7 +22,6 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="hostBuilder"></param>
         /// <param name="telemetryConfiguration">The Application Insights TelemetryConfiguration.</param>
-
         public static ISiloBuilder AddApplicationInsightsTelemetryConsumer(this ISiloBuilder hostBuilder, TelemetryConfiguration telemetryConfiguration)
         {
             return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, telemetryConfiguration, null));
