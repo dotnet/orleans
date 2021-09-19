@@ -12,7 +12,6 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="hostBuilder"></param>
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
-
         public static ISiloBuilder AddApplicationInsightsTelemetryConsumer(this ISiloBuilder hostBuilder, string instrumentationKey = null)
         {
             return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, null, instrumentationKey));
