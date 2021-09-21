@@ -11,7 +11,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class OutgoingMethodInterceptionGrain : Grain, IOutgoingMethodInterceptionGrain
+    public class OutgoingMethodInterceptionGrain : IOutgoingMethodInterceptionGrain
     {
         public async Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message)
         {
@@ -32,7 +32,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IIncomingGrainCallFilter
+    public class MethodInterceptionGrain : IMethodInterceptionGrain, IIncomingGrainCallFilter
     {
         public Task<string> One()
         {
@@ -122,8 +122,8 @@ namespace UnitTests.Grains
         {
         }
     }
-    
-    public class GenericMethodInterceptionGrain<T> : Grain, IGenericMethodInterceptionGrain<T>, IIncomingGrainCallFilter
+
+    public class GenericMethodInterceptionGrain<T> : IGenericMethodInterceptionGrain<T>, IIncomingGrainCallFilter
     {
         public Task<string> SayHello() => Task.FromResult("Hello");
 
@@ -139,11 +139,11 @@ namespace UnitTests.Grains
             await context.Invoke();
         }
     }
-    
-    public class TrickyInterceptionGrain : Grain, ITrickyMethodInterceptionGrain, IIncomingGrainCallFilter
+
+    public class TrickyInterceptionGrain : ITrickyMethodInterceptionGrain, IIncomingGrainCallFilter
     {
         public Task<string> SayHello() => Task.FromResult("Hello");
-        
+
         public Task<string> GetInputAsString(string input) => Task.FromResult(input);
 
         public Task<string> GetInputAsString(bool input) => Task.FromResult(input.ToString(CultureInfo.InvariantCulture));
@@ -160,8 +160,8 @@ namespace UnitTests.Grains
             await context.Invoke();
         }
     }
-    
-    public class GrainCallFilterTestGrain : Grain, IGrainCallFilterTestGrain, IIncomingGrainCallFilter
+
+    public class GrainCallFilterTestGrain : IGrainCallFilterTestGrain, IIncomingGrainCallFilter
     {
         private const string Key = GrainCallFilterTestConstants.Key;
 
@@ -214,7 +214,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class CaterpillarGrain : Grain, ICaterpillarGrain, IIncomingGrainCallFilter
+    public class CaterpillarGrain : ICaterpillarGrain, IIncomingGrainCallFilter
     {
         Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext ctx)
         {

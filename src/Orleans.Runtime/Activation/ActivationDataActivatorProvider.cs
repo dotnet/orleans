@@ -1,6 +1,4 @@
 using System;
-using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -52,8 +50,7 @@ namespace Orleans.Runtime
 
         public bool TryGet(GrainType grainType, out IGrainContextActivator activator)
         {
-            if (!_grainClassMap.TryGetGrainClass(grainType, out var grainClass)
-                || !typeof(Grain).IsAssignableFrom(grainClass))
+            if (!_grainClassMap.TryGetGrainClass(grainType, out var grainClass) || !typeof(IGrain).IsAssignableFrom(grainClass))
             {
                 activator = null;
                 return false;
@@ -140,8 +137,8 @@ namespace Orleans.Runtime
                 try
                 {
                     // Instantiate the grain itself
-                    var grainInstance = (Grain)_grainActivator.CreateInstance(context);
-                    context.SetGrainInstance(grainInstance);
+                    var instance = _grainActivator.CreateInstance(context);
+                    context.SetGrainInstance(instance);
                 }
                 finally
                 {

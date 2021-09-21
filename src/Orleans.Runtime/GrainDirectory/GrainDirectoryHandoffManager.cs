@@ -292,8 +292,9 @@ namespace Orleans.Runtime.GrainDirectory
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing my copy from silo " + silo);
             // release this old copy, as we have got a new one
             silosHoldingMyPartition.Remove(silo);
-            localDirectory.RemoteGrainDirectory.QueueTask(() =>
-                localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress))
+            localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(
+                    () => localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
+                    localDirectory.RemoteGrainDirectory)
                 .Ignore();
         }
 
@@ -333,7 +334,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.pendingOperations.Enqueue((name, action));
                 if (this.pendingOperations.Count <= 2)
                 {
-                    this.localDirectory.RemoteGrainDirectory.QueueTask(this.ExecutePendingOperations);
+                    this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
                 }
             }
         }

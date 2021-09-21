@@ -185,14 +185,14 @@ namespace Orleans.Runtime
         {
             lock (siloStatisticsChangeListeners)
             {
-                return siloStatisticsChangeListeners.Contains(observer) && 
+                return siloStatisticsChangeListeners.Contains(observer) &&
                     siloStatisticsChangeListeners.Remove(observer);
             }
         }
 
         private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics stats)
         {
-            lock (siloStatisticsChangeListeners) 
+            lock (siloStatisticsChangeListeners)
             {
                 foreach (var subscriber in siloStatisticsChangeListeners)
                 {
@@ -211,7 +211,10 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            this.RunOrQueueAction(() => { Utils.SafeExecute(() => this.OnSiloStatusChange(updatedSilo, status), this.logger); }).Ignore();
+            WorkItemGroup.QueueAction(() =>
+            {
+                Utils.SafeExecute(() => this.OnSiloStatusChange(updatedSilo, status), this.logger);
+            });
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)

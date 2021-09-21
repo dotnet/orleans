@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IActivationData, IGrainExtensionBinder, ICollectibleGrainContext, IAsyncDisposable, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension
+    internal class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, IAsyncDisposable
     {
         private readonly GrainTypeSharedContext _shared;
         private readonly IServiceScope serviceScope;
@@ -66,7 +66,7 @@ namespace Orleans.Runtime
         }
 
         public IGrainRuntime GrainRuntime => _shared.Runtime;
-        public IAddressable GrainInstance { get; private set; }
+        public object GrainInstance { get; private set; }
         public GrainAddress Address { get; }
         public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
         public ActivationState State { get; private set; }
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
             _components[typeof(TComponent)] = instance;
         }
 
-        internal void SetGrainInstance(Grain grainInstance)
+        internal void SetGrainInstance(object grainInstance)
         {
             switch (GrainInstance, grainInstance)
             {

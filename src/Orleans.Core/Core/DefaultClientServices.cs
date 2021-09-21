@@ -62,7 +62,7 @@ namespace Orleans
             services.TryAddSingleton<GrainReferenceActivator>();
             services.AddSingleton<IGrainReferenceActivatorProvider, GrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
-            services.TryAddSingleton<NewRpcProvider>();
+            services.TryAddSingleton<RpcProvider>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<GrainPropertiesResolver>();

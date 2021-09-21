@@ -26,14 +26,15 @@ namespace UnitTests.Grains
     internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
     {
         private readonly string _id = Guid.NewGuid().ToString();
-
         private readonly ActivationCollector activationCollector;
-        
+        private readonly IGrainContext _grainContext;
+
         private int burstCount = 0;
 
-        public BusyActivationGcTestGrain1(ActivationCollector activationCollector)
+        public BusyActivationGcTestGrain1(ActivationCollector activationCollector, IGrainContext grainContext)
         {
             this.activationCollector = activationCollector;
+            _grainContext = grainContext;
         }
 
         public Task Nop()
@@ -66,7 +67,7 @@ namespace UnitTests.Grains
         private void OnCollectActivation(GrainId grainId)
         {
             var other = grainId.Type;
-            var self = Data.Address.GrainId.Type;
+            var self = _grainContext.Address.GrainId.Type;
             if (other == self)
             {
                 IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId);
@@ -74,7 +75,7 @@ namespace UnitTests.Grains
                 {
                     g.Delay(TimeSpan.FromMilliseconds(10)).Ignore();
                 }
-            }         
+            }
         }
     }
 

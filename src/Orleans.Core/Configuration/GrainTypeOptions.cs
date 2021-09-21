@@ -40,7 +40,7 @@ namespace Orleans.Configuration
 
             foreach (var type in _typeManifestOptions.InterfaceImplementations)
             {
-                if (typeof(Grain).IsAssignableFrom(type))
+                if (IsImplementationType(type))
                 {
                     options.Classes.Add(type switch
                     {
@@ -48,6 +48,21 @@ namespace Orleans.Configuration
                         _ => type
                     });
                 }
+            }
+
+            static bool IsImplementationType(Type type)
+            {
+                if (type.IsAbstract || type.IsInterface)
+                {
+                    return false;
+                }
+
+                if (typeof(IGrain).IsAssignableFrom(type))
+                {
+                    return true;
+                }
+
+                return false;
             }
         }
     }

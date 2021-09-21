@@ -128,12 +128,12 @@ namespace Orleans.GrainReferences
         }
     }
 
-    internal class NewRpcProvider
+    internal class RpcProvider
     {
         private readonly TypeConverter _typeConverter;
         private readonly Dictionary<GrainInterfaceType, Type> _mapping;
 
-        public NewRpcProvider(
+        public RpcProvider(
             IOptions<TypeManifestOptions> config,
             GrainInterfaceTypeResolver resolver,
             TypeConverter typeConverter)
@@ -219,14 +219,14 @@ namespace Orleans.GrainReferences
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainPropertiesResolver _propertiesResolver;
-        private readonly NewRpcProvider _rpcProvider;
+        private readonly RpcProvider _rpcProvider;
         private readonly GrainVersionManifest _grainVersionManifest;
         private IGrainReferenceRuntime _grainReferenceRuntime;
 
         public GrainReferenceActivatorProvider(
             IServiceProvider serviceProvider,
             GrainPropertiesResolver propertiesResolver,
-            NewRpcProvider rpcProvider,
+            RpcProvider rpcProvider,
             GrainVersionManifest grainVersionManifest)
         {
             _serviceProvider = serviceProvider;

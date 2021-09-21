@@ -80,7 +80,9 @@ namespace Orleans.Runtime.MembershipService
                 return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
             }
 
-            return this.RunOrQueueTask(ProbeIndirectly);
+            var workItem = new AsyncClosureWorkItem<IndirectProbeResponse>(ProbeIndirectly, this);
+            WorkItemGroup.QueueWorkItem(workItem);
+            return workItem.Task;
         }
 
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)

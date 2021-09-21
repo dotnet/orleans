@@ -12,11 +12,12 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
-    public class PingBenchmark : IDisposable 
+    public class PingBenchmark : IDisposable
     {
         private readonly ConsoleCancelEventHandler _onCancelEvent;
         private readonly List<IHost> hosts = new List<IHost>();
@@ -152,7 +153,7 @@ namespace Benchmarks.Ping
         [GlobalCleanup]
         public void Dispose()
         {
-            (this.client as IDisposable)?.Dispose(); 
+            (this.client as IDisposable)?.Dispose();
             this.hosts.ForEach(h => h.Dispose());
 
             Console.CancelKeyPress -= _onCancelEvent;
