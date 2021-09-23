@@ -221,7 +221,7 @@ namespace Orleans.Providers.Streams.Common
                 }
                 else
                 {
-                    throw new QueueCacheMissException(cursor.SequenceToken,
+                    throw new QueueCacheMissException(sequenceToken,
                         messageBlocks.Last.Value.GetOldestSequenceToken(cacheDataAdapter),
                         messageBlocks.First.Value.GetNewestSequenceToken(cacheDataAdapter));
                 }
