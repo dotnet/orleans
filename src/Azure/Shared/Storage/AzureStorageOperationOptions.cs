@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
+using Azure;
 using Azure.Core;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Orleans.Runtime;
 
 #if ORLEANS_CLUSTERING
@@ -26,46 +28,72 @@ namespace Orleans.GrainDirectory.AzureStorage
     public class AzureStorageOperationOptions
     {
         /// <summary>
+        /// Table name for Azure Storage
+        /// </summary>
+        public virtual string TableName { get; set; }
+
+        /// <summary>
         /// Azure Storage Policy Options
         /// </summary>
         public AzureStoragePolicyOptions StoragePolicyOptions { get; } = new AzureStoragePolicyOptions();
-        
+
         /// <summary>
-        /// Connection string for Azure Cosmos DB Table
+        /// Connection string.
         /// </summary>
+        /// <remarks>
+        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
+        /// </remarks>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>
-        /// Use AAD to retrieve the account key
+        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
         /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/>.
+        /// </remarks>
         public TokenCredential TokenCredential { get; set; }
 
         /// <summary>
-        /// The table endpoint (e.g. https://x.table.cosmos.azure.com.) Required for specifying <see cref="TokenCredential"/>.
+        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
         /// </summary>
-        public Uri TableEndpoint { get; set; }
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
+        /// </remarks>
+        public AzureSasCredential AzureSasCredential { get; set; }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines, sets the ID of the table storage account
-        /// (e.g. <c>/subscriptions/88e5ceb6-26bd-4bf5-8933-f4e05fd9efa6/resourceGroups/rg1/providers/Microsoft.DocumentDB/databaseAccounts/ac1</c>)
+        /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
         /// </summary>
-        public string TableResourceId { get; set; }
+        public TableClientOptions ClientOptions { get; set; }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines the type of key.
+        /// The table service endpoint (e.g. https://x.table.cosmos.azure.com.), which can included a shared access signature.
         /// </summary>
-        public TokenCredentialTableKey TokenCredentialTableKey { get; set; }
+        /// <remarks>
+        /// If this property contains a shared access signature, then no other credential properties are required.
+        /// Otherwise, the presence of any other credential property will take precedence over this.
+        /// </remarks>
+        public Uri ServiceUri { get; set; }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines the management endpoint.
+        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
         /// </summary>
-        public Uri TokenCredentialManagementUri { get; set; } = new Uri("https://management.azure.com/");
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
+        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
+        /// </remarks>
+        public TableSharedKeyCredential SharedKeyCredential { get; set; }
 
         /// <summary>
-        /// Table name for Azure Storage
+        /// The optional delegate used to create a <see cref="TableServiceClient"/> instance.
         /// </summary>
-        public virtual string TableName { get; set; }
+        /// <remarks>
+        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
+        /// </remarks>
+        public Func<Task<TableServiceClient>> CreateClient { get; set; }
     }
 
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
@@ -81,21 +109,39 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public virtual void ValidateConfiguration()
         {
-            if (Options.TokenCredential != null)
+            if (Options.CreateClient is { } createTableClient)
             {
-                if (Options.TableEndpoint == null)
-                    throw GetException($"{nameof(Options.TableEndpoint)} is required.");
-
-                if (string.IsNullOrEmpty(Options.TableResourceId))
-                    throw GetException($"{nameof(Options.TableResourceId)} is required.");
-
-                if (Options.TokenCredentialManagementUri == null)
-                    throw GetException($"{nameof(Options.TokenCredentialManagementUri)} is required.");
+                ThrowIfNotNull(Options.TokenCredential, nameof(Options.TokenCredential), nameof(Options.TokenCredential));
+                ThrowIfNotNull(Options.AzureSasCredential, nameof(Options.AzureSasCredential), nameof(Options.AzureSasCredential));
+                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
+                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
+                ThrowIfNotNull(Options.ServiceUri, nameof(Options.ServiceUri), nameof(Options.ServiceUri));
+            }
+            else if (Options.TokenCredential is { } tokenCredential)
+            {
+                ValidateUrl(Options, nameof(Options.TokenCredential));
+                ThrowIfNotNull(Options.AzureSasCredential, nameof(Options.AzureSasCredential), nameof(Options.AzureSasCredential));
+                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
+                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
+            }
+            else if (Options.AzureSasCredential is { } sasCredential)
+            {
+                ValidateUrl(Options, nameof(Options.AzureSasCredential));
+                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
+                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
+            }
+            else if (Options.SharedKeyCredential is { } tableSharedKeyCredential)
+            {
+                ValidateUrl(Options, nameof(Options.SharedKeyCredential));
+                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
+            }
+            else if (Options.ConnectionString is { Length: > 0 } connectionString)
+            {
+                ThrowIfNotNull(Options.ServiceUri, nameof(Options.ServiceUri), nameof(Options.ConnectionString));
             }
             else
             {
-                if (!CloudStorageAccount.TryParse(Options.ConnectionString, out _))
-                    throw GetException($"{nameof(Options.ConnectionString)} is not valid.");
+                throw new InvalidOperationException($"{nameof(Options.ServiceUri)} is null, but it is required when no other credential is specified");
             }
 
             try
@@ -109,12 +155,22 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             Exception GetException(string message, Exception inner = null) =>
                 new OrleansConfigurationException($"Configuration for {GetType().Name} {Name} is invalid. {message}", inner);
-        }
-    }
 
-    public enum TokenCredentialTableKey
-    {
-        Primary,
-        Secondary
+            static void ValidateUrl(AzureStorageOperationOptions options, string dependentOption)
+            {
+                if (options.ServiceUri is null)
+                {
+                    throw new InvalidOperationException($"{nameof(options.ServiceUri)} is null, but it is required when {dependentOption} is specified");
+                }
+            }
+
+            static void ThrowIfNotNull(object value, string propertyName, string dependentOption)
+            {
+                if (value is not null)
+                {
+                    throw new InvalidOperationException($"{propertyName} is not null, but it is not being used because {dependentOption} has been set and takes precedence");
+                }
+            }
+        }
     }
 }

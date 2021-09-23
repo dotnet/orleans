@@ -1,29 +1,77 @@
 using System;
+using System.Threading.Tasks;
+using Azure;
 using Azure.Core;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Configuration
 {
-    public class AzureBlobLeaseProviderOptions
+    public class AzureBlobLeaseProviderOptions : AzureBlobUtils.IBlobServiceClientOptions
     {
-        [RedactConnectionString]
-        public string DataConnectionString { get; set; }
+        public string BlobContainerName { get; set; } = DefaultBlobContainerName;
+        public const string DefaultBlobContainerName = "Leases";
 
         /// <summary>
-        /// The Service URI (e.g. https://x.blob.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
+        /// The service connection string.
         /// </summary>
+        /// <remarks>
+        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
+        /// </remarks>
+        [RedactConnectionString]
+        public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// The Service URI (e.g. https://x.blob.core.windows.net).
+        /// </summary>
+        /// <remarks>
+        /// If this property contains a shared access signature, then no other credential properties are required.
+        /// Otherwise, the presence of any other credential property will take precedence over this.
+        /// </remarks>
         public Uri ServiceUri { get; set; }
 
         /// <summary>
-        /// Use AAD to access the storage account
+        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
         /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/>.
+        /// </remarks>
         public TokenCredential TokenCredential { get; set; }
 
-        public string BlobContainerName { get; set; } = DefaultBlobContainerName;
-        public const string DefaultBlobContainerName = "Leases";
+        /// <summary>
+        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
+        /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
+        /// </remarks>
+        public AzureSasCredential AzureSasCredential { get; set; }
+
+        /// <summary>
+        /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
+        /// </summary>
+        public BlobClientOptions ClientOptions { get; set; }
+
+        /// <summary>
+        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
+        /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
+        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
+        /// </remarks>
+        public StorageSharedKeyCredential SharedKeyCredential { get; set; }
+
+        /// <summary>
+        /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
+        /// </summary>
+        /// <remarks>
+        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
+        /// </remarks>
+        public Func<Task<BlobServiceClient>> CreateClient { get; set; }
     }
 
     /// <summary>
@@ -79,14 +127,6 @@ namespace Orleans.Configuration
                 if (this.options.TokenCredential != null)
                 {
                     throw new OrleansConfigurationException($"Configuration for {nameof(AzureBlobLeaseProviderOptions)} of name {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
-                }
-
-                if (!CloudStorageAccount.TryParse(this.options.DataConnectionString, out _))
-                {
-                    var errorStr = string.IsNullOrEmpty(this.name)
-                        ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.DataConnectionString)} is not valid."
-                        : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.DataConnectionString)} is not valid.";
-                    throw new OrleansConfigurationException(errorStr);
                 }
             }
 

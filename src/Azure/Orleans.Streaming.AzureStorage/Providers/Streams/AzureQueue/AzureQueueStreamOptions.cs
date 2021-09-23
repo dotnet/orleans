@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Azure;
 using Azure.Core;
+using Azure.Storage;
+using Azure.Storage.Queues;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -10,18 +15,72 @@ namespace Orleans.Configuration
     /// </summary>
     public class AzureQueueOptions
     {
+        /// <summary>
+        /// The service connection string.
+        /// </summary>
+        /// <remarks>
+        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
+        /// </remarks>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>
         /// The Service URI (e.g. https://x.queue.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
         /// </summary>
+        /// <remarks>
+        /// If this property contains a shared access signature, then no other credential properties are required.
+        /// Otherwise, the presence of any other credential property will take precedence over this.
+        /// </remarks>
         public Uri ServiceUri { get; set; }
 
         /// <summary>
-        /// Use AAD to access the storage account
+        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
         /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/>.
+        /// </remarks>
         public TokenCredential TokenCredential { get; set; }
+
+        /// <summary>
+        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
+        /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
+        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
+        /// </remarks>
+        public AzureSasCredential AzureSasCredential { get; set; }
+
+        /// <summary>
+        /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
+        /// </summary>
+        public QueueClientOptions ClientOptions { get; set; } = new QueueClientOptions
+        {
+            Retry =
+            {
+                Mode = RetryMode.Fixed,
+                Delay = AzureQueueDefaultPolicies.PauseBetweenQueueOperationRetries,
+                MaxRetries = AzureQueueDefaultPolicies.MaxQueueOperationRetries,
+                NetworkTimeout = AzureQueueDefaultPolicies.QueueOperationTimeout,
+            }
+        };
+
+        /// <summary>
+        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
+        /// </summary>
+        /// <remarks>
+        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
+        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
+        /// </remarks>
+        public StorageSharedKeyCredential SharedKeyCredential { get; set; }
+
+        /// <summary>
+        /// The optional delegate used to create a <see cref="QueueServiceClient"/> instance.
+        /// </summary>
+        /// <remarks>
+        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
+        /// </remarks>
+        public Func<Task<QueueServiceClient>> CreateClient { get; set; }
 
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 

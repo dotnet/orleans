@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Data.Tables;
 using Azure.Identity;
-using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Streams.PersistentStreams;
@@ -39,8 +39,7 @@ namespace Tester.AzureUtils.Streaming
             var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else

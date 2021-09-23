@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Utilities;
@@ -112,7 +113,7 @@ namespace Orleans.Runtime.ReminderService
                 Period = remEntry.Period.ToString(),
 
                 GrainRefConsistentHash = string.Format("{0:X8}", consistentHash),
-                ETag = remEntry.ETag,
+                ETag = new ETag(remEntry.ETag),
             };
         }
 
@@ -200,7 +201,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 PartitionKey = ReminderTableEntry.ConstructPartitionKey(this.remTableManager.ServiceId, grainRef),
                 RowKey = ReminderTableEntry.ConstructRowKey(grainRef, reminderName),
-                ETag = eTag,
+                ETag = new ETag(eTag),
             };
             try
             {

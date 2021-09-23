@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureTableUtils.PrintStorageException);
+            LogFormatter.SetExceptionDecoder(typeof(RequestFailedException), AzureTableUtils.PrintStorageException);
 
             this.tableManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,

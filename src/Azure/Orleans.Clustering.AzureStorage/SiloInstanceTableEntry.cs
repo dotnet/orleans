@@ -2,12 +2,13 @@ using System;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
-using Microsoft.Azure.Cosmos.Table;
+using Azure;
+using Azure.Data.Tables;
 using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
-    internal class SiloInstanceTableEntry : TableEntity
+    internal class SiloInstanceTableEntry : ITableEntity
     {
         public string DeploymentId { get; set; }    // PartitionKey
         public string Address { get; set; }         // RowKey
@@ -30,6 +31,11 @@ namespace Orleans.AzureUtils
         public string StartTime       { get; set; }          // Time this silo was started. For diagnostics.
         public string IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
         public string MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
+
+        public string PartitionKey { get; set; }
+        public string RowKey { get; set; }
+        public DateTimeOffset? Timestamp { get; set; }
+        public ETag ETag { get; set; }
 
         internal const string TABLE_VERSION_ROW = "VersionRow"; // Row key for version row.
         internal const char Seperator = '-';

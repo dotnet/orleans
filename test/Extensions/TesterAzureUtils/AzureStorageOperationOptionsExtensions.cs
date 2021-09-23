@@ -9,8 +9,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else
@@ -25,8 +24,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else
@@ -41,8 +39,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else
@@ -57,8 +54,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else
@@ -108,7 +104,7 @@ namespace Tester.AzureUtils
             }
             else
             {
-                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;

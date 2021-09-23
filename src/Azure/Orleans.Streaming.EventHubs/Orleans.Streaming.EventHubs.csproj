@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.EventHubs</PackageId>
     <Title>Microsoft Orleans EventHubs Provider</Title>
@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
-    <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
+    <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
     <PackageReference Include="Azure.Messaging.EventHubs" Version="$(AzureMessagingEventHubs)" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />

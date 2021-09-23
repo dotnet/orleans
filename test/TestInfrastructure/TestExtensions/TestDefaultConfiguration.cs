@@ -36,7 +36,6 @@ namespace TestExtensions
         }
 
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
-        public static string TableResourceId => defaultConfiguration[nameof(TableResourceId)];
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];

@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Microsoft.Azure.Cosmos.Table;
+using Azure;
+using Azure.Data.Tables;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
 {
-    internal class StateEntity : ITableEntity
+    internal readonly struct StateEntity
     {
         // Each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
@@ -19,16 +20,19 @@ namespace Orleans.Transactions.AzureStorage
 
         private static readonly string[] StringDataPropertyNames = GetPropertyNames().ToArray();
 
-        private IDictionary<string, EntityProperty> properties = new Dictionary<string, EntityProperty>();
+        public TableEntity Entity { get; }
+
+        public StateEntity(TableEntity entity) => Entity = entity;
+
+        public string PartitionKey => Entity.PartitionKey;
+        public string RowKey => Entity.RowKey;
+        public DateTimeOffset? Timestamp => Entity.Timestamp;
+        public ETag ETag => Entity.ETag;
 
         public static string MakeRowKey(long sequenceId)
         {
             return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
         }
-
-        public string RowKey { get; set; }
-
-        public string PartitionKey { get; set; }
 
         public long SequenceId => long.Parse(this.RowKey.Substring(RK_PREFIX.Length), NumberStyles.AllowHexSpecifier);
 
@@ -39,36 +43,31 @@ namespace Orleans.Transactions.AzureStorage
 
         public string TransactionId
         {
-            get => this.GetPropertyOrDefault(nameof(this.TransactionId))?.StringValue;
-            set => this.properties[nameof(this.TransactionId)] = new EntityProperty(value);
+            get => this.GetPropertyOrDefault(nameof(this.TransactionId)) as string;
+            set => this.Entity[nameof(this.TransactionId)] = value;
         }
 
         public DateTime TransactionTimestamp
         {
-            get => this.GetPropertyOrDefault(nameof(this.TransactionTimestamp))?.DateTime ?? default;
-            set => this.properties[nameof(this.TransactionTimestamp)] = new EntityProperty(value);
+            get => this.Entity.GetDateTimeOffset(nameof(this.TransactionTimestamp)).GetValueOrDefault().UtcDateTime;
+            set => this.Entity[nameof(this.TransactionTimestamp)] = new DateTimeOffset(value.ToUniversalTime());
         }
 
         public string TransactionManager
         {
-            get => this.GetPropertyOrDefault(nameof(this.TransactionManager))?.StringValue;
-            set => this.properties[nameof(this.TransactionManager)] = new EntityProperty(value);
+            get => this.GetPropertyOrDefault(nameof(this.TransactionManager)) as string;
+            set => this.Entity[nameof(this.TransactionManager)] = value;
         }
 
         public string StateJson { get => this.GetStateInternal(); set => this.SetStateInternal(value); }
-
-        public DateTimeOffset Timestamp { get; set; }
-
-        public string ETag { get; set; }
 
         public static StateEntity Create<T>(JsonSerializerSettings JsonSettings,
             string partitionKey, PendingTransactionState<T> pendingState)
             where T : class, new()
         {
-            var result = new StateEntity
+            var entity = new TableEntity(partitionKey, MakeRowKey(pendingState.SequenceId));
+            var result = new StateEntity(entity)
             {
-                PartitionKey = partitionKey,
-                RowKey = MakeRowKey(pendingState.SequenceId),
                 TransactionId = pendingState.TransactionId,
                 TransactionTimestamp = pendingState.TimeStamp,
                 TransactionManager = JsonConvert.SerializeObject(pendingState.TransactionManager, JsonSettings),
@@ -94,15 +93,15 @@ namespace Orleans.Transactions.AzureStorage
 
             foreach (var key in StringDataPropertyNames)
             {
-                this.properties.Remove(key);
+                this.Entity.Remove(key);
             }
 
             foreach (var entry in SplitStringData(stringData))
             {
-                this.properties.Add(entry);
+                this.Entity[entry.Key] = entry.Value;
             }
 
-            static IEnumerable<KeyValuePair<string, EntityProperty>> SplitStringData(string stringData)
+            static IEnumerable<KeyValuePair<string, object>> SplitStringData(string stringData)
             {
                 if (string.IsNullOrEmpty(stringData)) yield break;
 
@@ -113,8 +112,8 @@ namespace Orleans.Transactions.AzureStorage
                     var chunkSize = Math.Min(MAX_STRING_PROPERTY_LENGTH, stringData.Length - stringStartIndex);
 
                     var key = StringDataPropertyNames[columnIndex];
-                    var value = new EntityProperty(stringData.Substring(stringStartIndex, chunkSize));
-                    yield return new KeyValuePair<string, EntityProperty>(key, value);
+                    var value = stringData.Substring(stringStartIndex, chunkSize);
+                    yield return new KeyValuePair<string, object>(key, value);
 
                     columnIndex++;
                     stringStartIndex += chunkSize;
@@ -124,17 +123,15 @@ namespace Orleans.Transactions.AzureStorage
 
         private string GetStateInternal()
         {
-            return string.Concat(ReadStringDataChunks(this.properties));
+            return string.Concat(ReadStringDataChunks(this.Entity));
 
-            static IEnumerable<string> ReadStringDataChunks(IDictionary<string, EntityProperty> properties)
+            static IEnumerable<string> ReadStringDataChunks(IDictionary<string, object> properties)
             {
                 foreach (var stringDataPropertyName in StringDataPropertyNames)
                 {
-                    EntityProperty dataProperty;
-                    if (properties.TryGetValue(stringDataPropertyName, out dataProperty))
+                    if (properties.TryGetValue(stringDataPropertyName, out var dataProperty))
                     {
-                        var data = dataProperty.StringValue;
-                        if (!string.IsNullOrEmpty(data))
+                        if (dataProperty is string { Length: >0 } data)
                         {
                             yield return data;
                         }
@@ -143,20 +140,10 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-        private EntityProperty GetPropertyOrDefault(string key)
+        private object GetPropertyOrDefault(string key)
         {
-            this.properties.TryGetValue(key, out var result);
+            this.Entity.TryGetValue(key, out var result);
             return result;
-        }
-
-        public void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
-        {
-            this.properties = properties;
-        }
-
-        public IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
-        {
-            return this.properties;
         }
 
         private void CheckMaxDataSize(int dataSize, int maxDataSize)

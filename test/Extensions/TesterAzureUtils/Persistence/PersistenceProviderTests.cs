@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
@@ -187,7 +187,7 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(useJson);
             var initialState = state.State;
 
-            var entity = new DynamicTableEntity();
+            var entity = new TableEntity();
 
             storage.ConvertToStorageFormat(initialState, entity);
 
@@ -207,7 +207,7 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(useJson: true, typeNameHandling: TypeNameHandling.None);
             var initialState = state.State;
 
-            var entity = new DynamicTableEntity();
+            var entity = new TableEntity();
 
             storage.ConvertToStorageFormat(initialState, entity);
 

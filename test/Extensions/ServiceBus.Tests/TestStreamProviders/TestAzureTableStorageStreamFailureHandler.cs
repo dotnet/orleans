@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Data.Tables;
 using Azure.Identity;
-using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
@@ -34,8 +34,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var dataManager = GetDataManager();
             await dataManager.InitTableAsync();
             IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
-                await
-                    dataManager.ReadAllTableEntriesForPartitionAsync(
+                await dataManager.ReadAllTableEntriesForPartitionAsync(
                         StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
             return deliveryErrors.Count();
         }
@@ -45,8 +44,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
                 options.TokenCredential = new DefaultAzureCredential();
             }
             else

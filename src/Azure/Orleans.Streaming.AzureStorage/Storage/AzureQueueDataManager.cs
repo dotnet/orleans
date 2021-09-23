@@ -54,7 +54,8 @@ namespace Orleans.AzureUtils
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger logger;
         private readonly TimeSpan? messageVisibilityTimeout;
-        private readonly QueueClient queueClient;
+        private readonly AzureQueueOptions options;
+        private QueueClient _queueClient;
 
         /// <summary>
         /// Constructor.
@@ -82,8 +83,18 @@ namespace Orleans.AzureUtils
             logger = loggerFactory.CreateLogger<AzureQueueDataManager>();
             QueueName = queueName;
             messageVisibilityTimeout = options.MessageVisibilityTimeout;
+            this.options = options;
+        }
 
-            queueClient = GetCloudQueueClient(options, logger);
+        private ValueTask<QueueClient> GetQueueClient()
+        {
+            if (_queueClient is { } client)
+            {
+                return new(client);
+            }
+
+            return GetQueueClientAsync();
+            async ValueTask<QueueClient> GetQueueClientAsync() => _queueClient ??= await GetCloudQueueClient(options, logger);
         }
 
         /// <summary>
@@ -96,8 +107,9 @@ namespace Orleans.AzureUtils
             try
             {
                 // Create the queue if it doesn't already exist.
-                var response = await queueClient.CreateIfNotExistsAsync();
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
+                var client = await GetQueueClient();
+                var response = await client.CreateIfNotExistsAsync();
+                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {QueueName}", QueueName);
             }
             catch (Exception exc)
             {
@@ -119,7 +131,8 @@ namespace Orleans.AzureUtils
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
-                if (await queueClient.DeleteIfExistsAsync())
+                var client = await GetQueueClient();
+                if (await client.DeleteIfExistsAsync())
                 {
                     logger.Info((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
                 }
@@ -144,7 +157,8 @@ namespace Orleans.AzureUtils
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
-                await queueClient.ClearMessagesAsync();
+                var client = await GetQueueClient();
+                await client.ClearMessagesAsync();
                 logger.Info((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (RequestFailedException exc)
@@ -174,7 +188,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Adding message {0} to queue: {1}", message, QueueName);
             try
             {
-                await queueClient.SendMessageAsync(message);
+                var client = await GetQueueClient();
+                await client.SendMessageAsync(message);
             }
             catch (Exception exc)
             {
@@ -195,7 +210,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Peeking a message from queue: {0}", QueueName);
             try
             {
-                var messages = await queueClient.PeekMessagesAsync(maxMessages: 1);
+                var client = await GetQueueClient();
+                var messages = await client.PeekMessagesAsync(maxMessages: 1);
                 return messages.Value.FirstOrDefault();
 
             }
@@ -223,7 +239,8 @@ namespace Orleans.AzureUtils
                 //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
                 // http://msdn.microsoft.com/en-us/library/ee758456.aspx
                 // If no messages are visible in the queue, GetMessage returns null.
-                var messages = await queueClient.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
+                var client = await GetQueueClient();
+                var messages = await client.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
                 return messages.Value.FirstOrDefault();
             }
             catch (Exception exc)
@@ -252,7 +269,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting up to {0} messages from queue: {1}", count, QueueName);
             try
             {
-                var messages = await queueClient.ReceiveMessagesAsync(count, messageVisibilityTimeout);
+                var client = await GetQueueClient();
+                var messages = await client.ReceiveMessagesAsync(count, messageVisibilityTimeout);
                 return messages.Value;
             }
             catch (Exception exc)
@@ -276,7 +294,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting a message from queue: {0}", QueueName);
             try
             {
-                await queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
+                var client = await GetQueueClient();
+                await client.DeleteMessageAsync(message.MessageId, message.PopReceipt);
 
             }
             catch (Exception exc)
@@ -304,7 +323,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("GetApproximateMessageCount a message from queue: {0}", QueueName);
             try
             {
-                var properties = await queueClient.GetPropertiesAsync();
+                var client = await GetQueueClient();
+                var properties = await client.GetPropertiesAsync();
                 return properties.Value.ApproximateMessagesCount;
 
             }
@@ -337,29 +357,72 @@ namespace Orleans.AzureUtils
             throw new AggregateException(errMsg, exc);
         }
 
-        private QueueClient GetCloudQueueClient(AzureQueueOptions options, ILogger logger)
+        private async Task<QueueClient> GetCloudQueueClient(AzureQueueOptions options, ILogger logger)
         {
             try
             {
-                var clientOptions = new QueueClientOptions
+                QueueServiceClient client;
+                if (options.CreateClient is { } createClient)
                 {
-                    Retry =
-                    {
-                        Mode = RetryMode.Fixed,
-                        Delay = AzureQueueDefaultPolicies.PauseBetweenQueueOperationRetries,
-                        MaxRetries = AzureQueueDefaultPolicies.MaxQueueOperationRetries,
-                        NetworkTimeout = AzureQueueDefaultPolicies.QueueOperationTimeout,
-                    }
-                };
+                    ThrowIfNotNull(options.TokenCredential, nameof(options.TokenCredential), nameof(options.TokenCredential));
+                    ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
+                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
+                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
+                    ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ServiceUri));
+                    client = await createClient();
+                }
+                else if (options.TokenCredential is { } tokenCredential)
+                {
+                    ValidateUrl(options, nameof(options.TokenCredential));
+                    ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
+                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
+                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
+                    client = new QueueServiceClient(options.ServiceUri, tokenCredential, options.ClientOptions);
+                }
+                else if (options.AzureSasCredential is { } sasCredential)
+                {
+                    ValidateUrl(options, nameof(options.AzureSasCredential));
+                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
+                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
+                    client = new QueueServiceClient(options.ServiceUri, sasCredential, options.ClientOptions);
+                }
+                else if (options.SharedKeyCredential is { } tableSharedKeyCredential)
+                {
+                    ValidateUrl(options, nameof(options.SharedKeyCredential));
+                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
+                    client = new QueueServiceClient(options.ServiceUri, tableSharedKeyCredential, options.ClientOptions);
+                }
+                else if (options.ConnectionString is { Length: > 0 } connectionString)
+                {
+                    ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ConnectionString));
+                    client = new QueueServiceClient(connectionString, options.ClientOptions);
+                }
+                else
+                {
+                    client = new QueueServiceClient(options.ServiceUri, options.ClientOptions);
+                }
 
-                var client = options.ServiceUri != null
-                    ? new QueueClient(new Uri(options.ServiceUri, QueueName), options.TokenCredential, clientOptions)
-                    : new QueueClient(options.ConnectionString, QueueName, clientOptions);
-                return client;
+                return client.GetQueueClient(QueueName);
+
+                static void ValidateUrl(AzureQueueOptions options, string dependentOption)
+                {
+                    if (options.ServiceUri is null)
+                    {
+                        throw new InvalidOperationException($"{nameof(options.ServiceUri)} is null, but it is required when {dependentOption} is specified");
+                    }
+                }
+
+                static void ThrowIfNotNull(object value, string propertyName, string dependentOption)
+                {
+                    if (value is not null)
+                    {
+                        throw new InvalidOperationException($"{propertyName} is not null, but it is not being used because {dependentOption} has been set and takes precedence");
+                    }
+                }
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureQueueErrorCode.AzureQueue_14, String.Format("Error creating GetCloudQueueOperationsClient."), exc);
+                logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, "Error creating Azure Storage Queues client");
                 throw;
             }
         }
