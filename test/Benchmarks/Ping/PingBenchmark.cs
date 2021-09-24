@@ -73,7 +73,6 @@ namespace Benchmarks.Ping
                 this.clientHost.StartAsync().GetAwaiter().GetResult();
 
                 this.client = this.clientHost.Services.GetRequiredService<IClusterClient>();
-                this.client.Connect().GetAwaiter().GetResult();
                 var grainFactory = this.client;
 
                 this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
@@ -138,14 +137,9 @@ namespace Benchmarks.Ping
 
         public async Task Shutdown()
         {
-            if (this.client is IClusterClient c)
-            {
-                await c.Close();
-                c.Dispose();
-            }
-
             await this.clientHost.StopAsync();
-            this.clientHost.Dispose();
+            if (clientHost is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
+            else clientHost.Dispose();
 
             this.hosts.Reverse();
             foreach (var h in this.hosts)

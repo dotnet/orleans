@@ -31,7 +31,7 @@ namespace Orleans.TestingHost
         /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>A new silo.</returns>
-        public static ISiloHost CreateSiloHost(string hostName, IConfiguration configuration)
+        public static IHost CreateSiloHost(string hostName, IConfiguration configuration)
         {
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
@@ -73,12 +73,12 @@ namespace Orleans.TestingHost
             });
 
             var host = hostBuilder.Build();
-            var silo = host.Services.GetRequiredService<ISiloHost>();
+            var silo = host.Services.GetRequiredService<IHost>();
             InitializeTestHooksSystemTarget(silo);
             return silo;
         }
 
-        public static IClusterClient CreateClusterClient(string hostName, IEnumerable<IConfigurationSource> configurationSources)
+        public static IHost CreateClusterClient(string hostName, IEnumerable<IConfigurationSource> configurationSources)
         {
             var configBuilder = new ConfigurationBuilder();
             foreach (var source in configurationSources)
@@ -104,7 +104,7 @@ namespace Orleans.TestingHost
 
             var host = hostBuilder.Build();
 
-            return host.Services.GetRequiredService<IClusterClient>();
+            return host;
         }
 
         public static string SerializeConfiguration(IConfiguration configuration)
@@ -275,7 +275,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static void InitializeTestHooksSystemTarget(ISiloHost host)
+        private static void InitializeTestHooksSystemTarget(IHost host)
         {
             var testHook = host.Services.GetRequiredService<TestHooksSystemTarget>();
             var catalog = host.Services.GetRequiredService<Catalog>();

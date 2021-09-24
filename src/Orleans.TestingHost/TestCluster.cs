@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -87,7 +88,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IInternalClusterClient InternalClient { get; private set; }
+        internal IHost ClientHost { get; private set; }
+
+        /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
         /// <summary>
         /// The client.
@@ -380,14 +386,14 @@ namespace Orleans.TestingHost
             await StopSiloAsync(Primary);
         }
 
-        private async Task StopClusterClientAsync()
+        public async Task StopClusterClientAsync()
         {
-            var client = this.InternalClient;
+            var client = this.ClientHost;
             try
             {
                 if (client != null)
                 {
-                    await client.Close().ConfigureAwait(false);
+                    await client.StopAsync().ConfigureAwait(false);
                 }                
             }
             catch (Exception exc)
@@ -396,12 +402,16 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                if (client is object)
+                if (client is IAsyncDisposable asyncDisposable)
                 {
-                    await client.DisposeAsync().ConfigureAwait(false);
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                else if (client is IDisposable disposable)
+                {
+                    disposable.Dispose();
                 }
 
-                this.InternalClient = null;
+                this.ClientHost = null;
             }
         }
 
@@ -479,10 +489,12 @@ namespace Orleans.TestingHost
         /// </summary>
         public async Task KillClientAsync()
         {
-            if (InternalClient != null)
+            if (ClientHost != null)
             {
-                await this.InternalClient.AbortAsync();
-                this.InternalClient = null;
+                var cancelled = new CancellationTokenSource();
+                cancelled.Cancel();
+                await this.ClientHost.StopAsync(cancelled.Token).ConfigureAwait(false);
+                this.ClientHost = null;
             }
         }
 
@@ -540,8 +552,8 @@ namespace Orleans.TestingHost
         {
             WriteLog("Initializing Cluster Client");
 
-            this.InternalClient = (IInternalClusterClient)TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
-            this.InternalClient.Connect().GetAwaiter().GetResult();
+            this.ClientHost = TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
+            this.ClientHost.StartAsync().Wait();
         }
 
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }
@@ -670,9 +682,13 @@ namespace Orleans.TestingHost
                     await this.Primary.DisposeAsync().ConfigureAwait(false);
                 }
 
-                if (this.Client is object)
+                if (this.ClientHost is IAsyncDisposable asyncDisposable)
                 {
-                    await this.Client.DisposeAsync().ConfigureAwait(false);
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                else if (ClientHost is IDisposable disposable)
+                {
+                    disposable.Dispose();
                 }
 
                 if (this.PortAllocator is object)
@@ -697,7 +713,7 @@ namespace Orleans.TestingHost
             }
 
             this.Primary?.Dispose();
-            this.Client?.Dispose();
+            this.ClientHost?.Dispose();
 
             if (this.PortAllocator is object)
             {

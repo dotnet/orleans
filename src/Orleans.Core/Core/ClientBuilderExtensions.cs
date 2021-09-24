@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans
 {
@@ -33,6 +35,45 @@ namespace Orleans
                     builder.Properties.Add(key, true);
                 }
             });
+        }
+
+        /// <summary>
+        /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="connectionRetryFilter">The connection retry filter.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter)
+        {
+            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
+        }
+
+        /// <summary>
+        /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="connectionRetryFilter">The connection retry filter.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter)
+        {
+            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
+        }
+
+        /// <summary>
+        /// Configures the provided <typeparamref name="TConnectionRetryFilter"/> type as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
+        {
+            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
+        }
+
+        private sealed class DelegateConnectionRetryFilter : IClientConnectionRetryFilter
+        {
+            private readonly Func<Exception, CancellationToken, Task<bool>> _filter;
+            public DelegateConnectionRetryFilter(Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter) => _filter = connectionRetryFilter ?? throw new ArgumentNullException(nameof(connectionRetryFilter));
+            public Task<bool> ShouldRetryConnectionAttempt(Exception exception, CancellationToken cancellationToken) => _filter(exception, cancellationToken);
         }
 
         /// <summary>

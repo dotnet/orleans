@@ -156,8 +156,7 @@ namespace Tester.HeterogeneousSilosTests
             if (restartClient)
             {
                 // Disconnect/Reconnect the client
-                await cluster.Client.Close();
-                cluster.Client.Dispose();
+                await cluster.StopClusterClientAsync();
                 cluster.InitializeClient();
             }
             else
@@ -179,8 +178,7 @@ namespace Tester.HeterogeneousSilosTests
             if (restartClient)
             {
                 // Disconnect/Reconnect the client
-                await cluster.Client.Close();
-                cluster.Client.Dispose();
+                await cluster.StopClusterClientAsync();
                 cluster.InitializeClient();
             }
             else
@@ -191,7 +189,7 @@ namespace Tester.HeterogeneousSilosTests
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
-        }        
+        }
 
         public Task InitializeAsync()
         {

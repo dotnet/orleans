@@ -19,6 +19,7 @@ using Orleans.Statistics;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans
 {
@@ -62,15 +63,10 @@ namespace Orleans
             services.TryAddSingleton<ClientProviderRuntime>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
-
-            // Perform lazy initialization of the OutsideRuntimeClient, which needs extra initialization.
-            services.AddSingleton<IClusterClient>(sp =>
-            {
-                ValidateSystemConfiguration(sp);
-                sp.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(sp);
-                return (IClusterClient)sp.GetRequiredService<IInternalClusterClient>();
-            });
+            services.TryAddSingleton<ClusterClient>();
+            services.TryAddFromExisting<IClusterClient, ClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, ClusterClient>();
+            services.AddFromExisting<IHostedService, ClusterClient>();
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
@@ -131,15 +127,6 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
-        }
-
-        private static void ValidateSystemConfiguration(IServiceProvider serviceProvider)
-        {
-            var validators = serviceProvider.GetServices<IConfigurationValidator>();
-            foreach (var validator in validators)
-            {
-                validator.ValidateConfiguration();
-            }
         }
 
         private class AllowOrleansTypes : ITypeFilter

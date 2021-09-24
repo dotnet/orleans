@@ -41,7 +41,6 @@ namespace Tester
             try
             {
                 await Task.WhenAll(host.StartAsync(), clientHost.StartAsync());
-                await client.Connect();
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);
@@ -49,10 +48,8 @@ namespace Tester
             finally
             {
                 await OrleansTaskExtentions.SafeExecute(() => host.StopAsync());
-                await OrleansTaskExtentions.SafeExecute(() => client.Close());
                 await OrleansTaskExtentions.SafeExecute(() => clientHost.StopAsync());
                 Utils.SafeExecute(() => host.Dispose());
-                Utils.SafeExecute(() => client.Close());
                 Utils.SafeExecute(() => clientHost.Dispose());
             }
         }
@@ -90,7 +87,6 @@ namespace Tester
             {
                 await Task.WhenAll(silo1.StartAsync(), silo2.StartAsync(), clientHost.StartAsync());
 
-                await client.Connect();
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);
@@ -104,8 +100,6 @@ namespace Tester
                 Utils.SafeExecute(() => clientHost.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo1.Dispose());
                 Utils.SafeExecute(() => silo2.Dispose());
-                Utils.SafeExecute(() => client.Close());
-                Utils.SafeExecute(() => client.Dispose());
                 Utils.SafeExecute(() => clientHost.Dispose());
             }
         }

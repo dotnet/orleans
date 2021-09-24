@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,7 +30,17 @@ namespace Tester.ClientConnectionTests
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.
             var gatewayProvider = new MockGatewayListProvider();
-            var host = new HostBuilder().UseOrleansClient(clientBuilder =>
+            var exceptions = new List<Exception>();
+
+            Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)
+            {
+                Assert.IsType<SiloUnavailableException>(exception);
+                exceptions.Add(exception);
+                gatewayProvider.Gateways = new List<Uri> { gwEndpoint }.AsReadOnly();
+                return Task.FromResult(true);
+            }
+
+            using var host = new HostBuilder().UseOrleansClient(clientBuilder =>
                 {
                     clientBuilder
                         .Configure<ClusterOptions>(options =>
@@ -39,25 +50,16 @@ namespace Tester.ClientConnectionTests
                             options.ClusterId = existingClientOptions.ClusterId;
                             options.ServiceId = existingClientOptions.ServiceId;
                         })
-                        .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(gatewayProvider));
+                        .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(gatewayProvider))
+                        .UseConnectionRetryFilter(RetryFunc);
                 })
                 .Build();
 
-            var exceptions = new List<Exception>();
-
-            Task<bool> RetryFunc(Exception exception)
-            {
-                Assert.IsType<SiloUnavailableException>(exception);
-                exceptions.Add(exception);
-                gatewayProvider.Gateways = new List<Uri> { gwEndpoint }.AsReadOnly();
-                return Task.FromResult(true);
-            }
-
             var client = host.Services.GetRequiredService<IClusterClient>();
 
-            await client.Connect(RetryFunc);
+            await host.StartAsync();
             Assert.Single(exceptions);
-            client.Dispose();
+            await host.StopAsync();
         }
 
         public class MockGatewayListProvider : IGatewayListProvider

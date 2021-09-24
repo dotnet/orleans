@@ -33,7 +33,7 @@ namespace Orleans.Runtime.TestHooks
     /// </summary>
     internal class TestHooksSystemTarget : SystemTarget, ITestHooksSystemTarget
     {
-        private readonly ISiloHost host;
+        private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
 
         private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.TestHooks
         private readonly IConsistentRingProvider consistentRingProvider;
 
         public TestHooksSystemTarget(
-            ISiloHost host,
+            IServiceProvider serviceProvider,
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
@@ -51,11 +51,11 @@ namespace Orleans.Runtime.TestHooks
             IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
-            this.host = host;
+            this.serviceProvider = serviceProvider;
             this.siloStatusOracle = siloStatusOracle;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
-            this.consistentRingProvider = this.host.Services.GetRequiredService<IConsistentRingProvider>();
+            this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
         }
 
         public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)
@@ -68,25 +68,25 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(consistentRingProvider.ToString()); 
         }
         
-        public Task<string> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
+        public Task<string> GetServiceId() => Task.FromResult(this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
         {
-            return Task.FromResult(this.host.Services.GetServiceByName<IGrainStorage>(providerName) != null);
+            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            return Task.FromResult(this.host.Services.GetServiceByName<IGrainStorage>(providerName) != null);
+            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<ICollection<string>> GetStorageProviderNames()
         {
-            var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
-            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
+            var storageProviderCollection = this.serviceProvider.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
+            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.serviceProvider).Select(keyedService => keyedService.Key).ToArray());
         }
 
-        public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.host.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
+        public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
         
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
         {

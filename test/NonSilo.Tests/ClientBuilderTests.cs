@@ -114,10 +114,8 @@ namespace NonSilo.Tests
                 })
                 .Build();
 
-            using (var client = host.Services.GetRequiredService<IClusterClient>())
-            {
-                Assert.NotNull(client);
-            }
+            var client = host.Services.GetRequiredService<IClusterClient>();
+            Assert.NotNull(client);
         }
 
         /// <summary>
@@ -135,10 +133,8 @@ namespace NonSilo.Tests
 
             var host = hostBuilder.Build();
 
-            using (var client = host.Services.GetRequiredService<IClusterClient>())
-            {
-                Assert.NotNull(client);
-            }
+            var client = host.Services.GetRequiredService<IClusterClient>();
+            Assert.NotNull(client);
         }
 
         [Fact]
@@ -197,22 +193,20 @@ namespace NonSilo.Tests
 
             var host = hostBuilder.Build();
 
-            using (var client = host.Services.GetRequiredService<IClusterClient>())
-            {
-                var services = client.ServiceProvider.GetServices<MyService>()?.ToList();
-                Assert.NotNull(services);
-                
-                // Both services should be registered.
-                Assert.Equal(2, services.Count);
-                Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 1));
-                Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 2));
+            var client = host.Services.GetRequiredService<IClusterClient>();
+            var services = client.ServiceProvider.GetServices<MyService>()?.ToList();
+            Assert.NotNull(services);
+            
+            // Both services should be registered.
+            Assert.Equal(2, services.Count);
+            Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 1));
+            Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 2));
 
-                // Service 1 should have been registered first - the pipeline order should be preserved.
-                Assert.Equal(1, registeredFirst[0]);
+            // Service 1 should have been registered first - the pipeline order should be preserved.
+            Assert.Equal(1, registeredFirst[0]);
 
-                // The last registered service should be provided by default.
-                Assert.Equal(2, client.ServiceProvider.GetRequiredService<MyService>().Id);
-            }
+            // The last registered service should be provided by default.
+            Assert.Equal(2, client.ServiceProvider.GetRequiredService<MyService>().Id);
         }
 
         [Fact]

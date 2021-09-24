@@ -264,7 +264,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     silo.Dispose();
                 }
                 primarySilo.Dispose();
-                this.Client?.Dispose();
             }
             finally
             {
@@ -288,10 +287,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
 
             await primarySilo.DisposeAsync();
-            if (Client is { } client)
+            if (Client is { })
             {
-                await client.Close();
-                await client.DisposeAsync();
+                await cluster.StopClusterClientAsync();
             }
         }
 
