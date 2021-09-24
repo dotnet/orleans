@@ -24,15 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Config_AzureBlobStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureTableStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="$(SourceRoot)src\Azure\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
   </ItemGroup>
 </Project>
