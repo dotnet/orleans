@@ -1,4 +1,3 @@
-using Orleans.Serialization.ISerializableSupport;
 using System;
 
 namespace Orleans.Serialization.Configuration
