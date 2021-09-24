@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.TelemetryConsumers.NewRelic;
 
@@ -24,15 +25,9 @@ namespace Orleans.Hosting
             return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
         }
 
-        private static void ConfigureServices(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection services)
-        {
-            services.Configure<TelemetryOptions>(options => options.AddConsumer<NRTelemetryConsumer>());
-        }
-
         private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
             services.Configure<TelemetryOptions>(options => options.AddConsumer<NRTelemetryConsumer>());
         }
-
     }
 }

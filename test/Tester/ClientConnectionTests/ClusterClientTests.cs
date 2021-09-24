@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
@@ -28,15 +29,20 @@ namespace Tester.ClientConnectionTests
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.
             var gatewayProvider = new MockGatewayListProvider();
-            var client = new ClientBuilder()
-                .Configure<ClusterOptions>(options =>
+            var host = new HostBuilder().UseOrleansClient(clientBuilder =>
                 {
-                    var existingClientOptions = this.HostedCluster.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
-                    options.ClusterId = existingClientOptions.ClusterId;
-                    options.ServiceId = existingClientOptions.ServiceId;
+                    clientBuilder
+                        .Configure<ClusterOptions>(options =>
+                        {
+                            var existingClientOptions = this.HostedCluster.ServiceProvider
+                                .GetRequiredService<IOptions<ClusterOptions>>().Value;
+                            options.ClusterId = existingClientOptions.ClusterId;
+                            options.ServiceId = existingClientOptions.ServiceId;
+                        })
+                        .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(gatewayProvider));
                 })
-                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(gatewayProvider))
                 .Build();
+
             var exceptions = new List<Exception>();
 
             Task<bool> RetryFunc(Exception exception)
@@ -47,8 +53,11 @@ namespace Tester.ClientConnectionTests
                 return Task.FromResult(true);
             }
 
+            var client = host.Services.GetRequiredService<IClusterClient>();
+
             await client.Connect(RetryFunc);
             Assert.Single(exceptions);
+            client.Dispose();
         }
 
         public class MockGatewayListProvider : IGatewayListProvider

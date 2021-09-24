@@ -1,3 +1,4 @@
+using System;
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,7 +63,14 @@ namespace Orleans
             services.TryAddSingleton<MessageFactory>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
-            services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+
+            // Perform lazy initialization of the OutsideRuntimeClient, which needs extra initialization.
+            services.AddSingleton<IClusterClient>(sp =>
+            {
+                ValidateSystemConfiguration(sp);
+                sp.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(sp);
+                return (IClusterClient)sp.GetRequiredService<IInternalClusterClient>();
+            });
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
@@ -123,6 +131,15 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+        }
+
+        private static void ValidateSystemConfiguration(IServiceProvider serviceProvider)
+        {
+            var validators = serviceProvider.GetServices<IConfigurationValidator>();
+            foreach (var validator in validators)
+            {
+                validator.ValidateConfiguration();
+            }
         }
 
         private class AllowOrleansTypes : ITypeFilter

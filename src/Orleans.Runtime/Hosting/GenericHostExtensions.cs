@@ -1,5 +1,6 @@
 using System;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Microsoft.Extensions.Hosting
 {
@@ -23,6 +24,8 @@ namespace Microsoft.Extensions.Hosting
             Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+
+            VerifyOrleansClientNotIncluded(hostBuilder);
 
             const string siloBuilderKey = "SiloBuilder";
             SiloBuilder siloBuilder;
@@ -58,6 +61,14 @@ namespace Microsoft.Extensions.Hosting
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             return hostBuilder.UseOrleans((ctx, siloBuilder) => configureDelegate(siloBuilder));
+        }
+
+        private static void VerifyOrleansClientNotIncluded(IHostBuilder hostBuilder)
+        {
+            if (hostBuilder.Properties.ContainsKey("ClientBuilder"))
+            {
+                throw new OrleansConfigurationException("Do not use UseOrleansClient with UseOrleans");
+            }
         }
     }
 }

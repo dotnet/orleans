@@ -186,6 +186,23 @@ namespace NonSilo.Tests
             await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
         }
 
+        [Fact]
+        public void SiloBuilderThrowsDuringStartupIfClientBuildersAdded()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+            {
+                _ = new HostBuilder()
+                    .UseOrleansClient(clientBuilder =>
+                    {
+                        clientBuilder.UseLocalhostClustering();
+                    })
+                    .UseOrleans(siloBuilder =>
+                    {
+                        siloBuilder.UseLocalhostClustering();
+                    });
+            });
+        }
+
         private class FakeHostEnvironmentStatistics : IHostEnvironmentStatistics
         {
             public long? TotalPhysicalMemory => 0;

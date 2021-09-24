@@ -87,18 +87,24 @@ namespace Orleans.TestingHost
             }
             var configuration = configBuilder.Build();
 
-            var builder = new ClientBuilder();
-            builder.Properties["Configuration"] = configuration;
-            builder.Configure<ClusterOptions>(configuration);
+            var hostBuilder = new HostBuilder()
+                .ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
+                .UseOrleansClient((context, clientBuilder) =>
+                {
+                    clientBuilder.Properties["Configuration"] = configuration;
+                    clientBuilder.Configure<ClusterOptions>(configuration);
 
-            builder.ConfigureServices(services =>
-            {
-                TryConfigureClientMembership(configuration, services);
-                TryConfigureFileLogging(configuration, services, hostName);
-            });
+                    ConfigureAppServices(configuration, clientBuilder);
+                })
+                .ConfigureServices(services =>
+                {
+                    TryConfigureClientMembership(configuration, services);
+                    TryConfigureFileLogging(configuration, services, hostName);
+                });
 
-            ConfigureAppServices(configuration, builder);
-            return builder.Build();
+            var host = hostBuilder.Build();
+
+            return host.Services.GetRequiredService<IClusterClient>();
         }
 
         public static string SerializeConfiguration(IConfiguration configuration)
@@ -171,7 +177,7 @@ namespace Orleans.TestingHost
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
                     var builderConfigurator = (IClientBuilderConfigurator)Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
-                    builderConfigurator.Configure(configuration, clientBuilder);
+                    builderConfigurator?.Configure(configuration, clientBuilder);
                 }
             }
         }
@@ -193,28 +199,62 @@ namespace Orleans.TestingHost
             }
         }
 
+        private static void TryConfigureClientMembership(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
+
+            if (useTestClusterMembership)
+            {
+                Action<StaticGatewayListProviderOptions> configureOptions = options =>
+                {
+                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
+
+                    if (gatewayPerSilo)
+                    {
+                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                            .ToList();
+                    }
+                    else
+                    {
+                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                    }
+                };
+
+                clientBuilder.Configure(configureOptions);
+
+                clientBuilder.ConfigureServices((context, services) =>
+                {
+                    services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
+                });
+            }
+        }
+
         private static void TryConfigureClientMembership(IConfiguration configuration, IServiceCollection services)
         {
             bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
             {
                 Action<StaticGatewayListProviderOptions> configureOptions = options =>
-                    {
-                        int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                        int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
-                        bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
+                {
+                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
 
-                        if (gatewayPerSilo)
-                        {
-                            options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                                .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                                .ToList();
-                        }
-                        else
-                        {
-                            options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
-                        }
-                    };
+                    if (gatewayPerSilo)
+                    {
+                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                            .ToList();
+                    }
+                    else
+                    {
+                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                    }
+                };
                 if (configureOptions != null)
                 {
                     services.Configure(configureOptions);
@@ -224,7 +264,6 @@ namespace Orleans.TestingHost
                     .ConfigureFormatter<StaticGatewayListProviderOptions>();
             }
         }
-
 
         private static void TryConfigureFileLogging(IConfiguration configuration, IServiceCollection services, string name)
         {

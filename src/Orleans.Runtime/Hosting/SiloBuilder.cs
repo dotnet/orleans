@@ -23,7 +23,7 @@ namespace Orleans.Hosting
             this.ConfigureDefaults();
         }
 
-        public void Build(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection serviceCollection)
+        public void Build(HostBuilderContext context, IServiceCollection serviceCollection)
         {
             foreach (var configurationDelegate in this.configureSiloDelegates)
             {
@@ -38,7 +38,7 @@ namespace Orleans.Hosting
             }
         }
 
-        public ISiloBuilder ConfigureSilo(Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder> configureDelegate)
+        public ISiloBuilder ConfigureSilo(Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             this.configureSiloDelegates.Add(configureDelegate);
@@ -46,7 +46,7 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloBuilder ConfigureServices(Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection> configureDelegate)
+        public ISiloBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             this.configureServicesDelegates.Add(configureDelegate);

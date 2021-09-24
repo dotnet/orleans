@@ -1,5 +1,6 @@
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.TelemetryConsumers.AI;
 
@@ -45,20 +46,6 @@ namespace Orleans.Hosting
         public static IClientBuilder AddApplicationInsightsTelemetryConsumer(this IClientBuilder clientBuilder, TelemetryConfiguration telemetryConfiguration)
         {
             return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, telemetryConfiguration, null));
-        }
-
-        private static void ConfigureServices(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection services, TelemetryConfiguration telemetryConfiguration, string instrumentationKey)
-        {
-            services.ConfigureFormatter<ApplicationInsightsTelemetryConsumerOptions>();
-            services.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>());
-            if (telemetryConfiguration != null)
-            {
-                services.Configure<ApplicationInsightsTelemetryConsumerOptions>(options => options.TelemetryConfiguration = telemetryConfiguration);
-            }
-            else if (!string.IsNullOrWhiteSpace(instrumentationKey))
-            {
-                services.Configure<ApplicationInsightsTelemetryConsumerOptions>(options => options.InstrumentationKey = instrumentationKey);
-            }
         }
 
         private static void ConfigureServices(HostBuilderContext context, IServiceCollection services, TelemetryConfiguration telemetryConfiguration, string instrumentationKey)
