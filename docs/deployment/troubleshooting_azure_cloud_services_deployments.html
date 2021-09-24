@@ -1,0 +1,178 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Troubleshooting Deployments | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Troubleshooting Deployments | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="troubleshooting-deployments">Troubleshooting Deployments</h1>
+
+<p>This page gives some general guidelines for troubleshooting any issues that occur while deploying to Azure Cloud Services.
+These are very common issues to watch out for. Be sure to check the logs for more information.</p>
+<h2 id="getting-a-silounavailableexception">Getting a SiloUnavailableException</h2>
+<p>First check to make sure that you are actually starting the silos before attempting to initialize the client. Sometimes the
+silos take a long time to start so it can be beneficial to try to initialize the client multiple times. If it still throws an
+exception, then there might be another issue with the silos.</p>
+<p>Check the silo configuration and make sure that the silos are starting up properly.</p>
+<h2 id="common-connection-string-issues">Common Connection String Issues</h2>
+<ul>
+<li>Using the local connection string when deploying to Azure – the website will fail to connect</li>
+<li>Using different connection strings for the silos and the front end (web and worker roles) – the website will fail to
+initialize the client because it cannot connect to the silos</li>
+</ul>
+<p>The connection string configuration can be checked in the Azure Portal. The logs may not display properly if the connection
+strings are not set up correctly.</p>
+<h2 id="modifying-the-configuration-files-improperly">Modifying the Configuration Files Improperly</h2>
+<p>Make sure that the proper endpoints are configured in the ServiceDefinition.csdef file or else the deployment will not work.
+It will give errors saying that it cannot get the endpoint information.</p>
+<h2 id="missing-logs">Missing Logs</h2>
+<p>Make sure that the connection strings are set up properly.</p>
+<p>It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly.
+Incorrect versions in these files can cause issues with the deployment. Be careful when dealing with updates.</p>
+<h2 id="version-issues">Version Issues</h2>
+<p>Make sure that the same version of Orleans is used in every project in the solution. Not doing this can lead to the worker
+role recycling. Check the logs for more information. Visual Studio provides some silo startup error messages in the deployment history.</p>
+<h2 id="role-keeps-recycling">Role Keeps Recycling</h2>
+<ul>
+<li>Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.</li>
+<li>Check the logs to see if there is an unhandled exception while initializing.</li>
+<li>Make sure that the connection strings are correct.</li>
+<li>Check the Azure Cloud Services troubleshooting pages for more information.</li>
+</ul>
+<h2 id="how-to-check-logs">How to Check Logs</h2>
+<ul>
+<li>Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.</li>
+<li>You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level.</li>
+</ul>
+<p>Programmatic configuration:</p>
+<ul>
+<li>When creating a <code>ClusterConfiguration</code> object, set <code>config.Defaults.DefaultTraceLevel = Severity.Info</code>.</li>
+<li>When creating a <code>ClientConfiguration</code> object, set <code>config.DefaultTraceLevel = Severity.Info</code>.</li>
+</ul>
+<p>Declarative configuration:</p>
+<ul>
+<li>Add <code>&lt;Tracing DefaultTraceLevel=&quot;Info&quot; /&gt;</code> to the <code>OrleansConfiguration.xml</code> and/or the <code>ClientConfiguration.xml</code> files.</li>
+</ul>
+<p>In the <code>diagnostics.wadcfgx</code> file for the web and worker roles, make sure to set the <code>scheduledTransferLogLevelFilter</code> attribute in the <code>Logs</code> element to <code>Information</code>, as this is an additional layer of trace filtering that defines which traces are sent to the <code>WADLogsTable</code> in Azure Storage.</p>
+<p>You can find more information about this in the Configuration Guide.</p>
+<h2 id="compatibility-with-aspnet">Compatibility with ASP.NET</h2>
+<p>The razor view engine included in ASP.NET uses the same code generation assemblies as Orleans (<code>Microsoft.CodeAnalysis</code> and <code>Microsoft.CodeAnalysis.CSharp</code>). This can present a version compatibility problem at runtime.</p>
+<p>To resolve this, try upgrading <code>Microsoft.CodeDom.Providers.DotNetCompilerPlatform</code> (this is the NuGet package ASP.NET uses to include the above assemblies) to the latest version, and setting binding redirects like this:</p>
+<pre><code class="lang-xml">&lt;dependentAssembly&gt;
+  &lt;assemblyIdentity name=&quot;Microsoft.CodeAnalysis.CSharp&quot; publicKeyToken=&quot;31bf3856ad364e35&quot; culture=&quot;neutral&quot; /&gt;
+  &lt;bindingRedirect oldVersion=&quot;0.0.0.0-2.0.0.0&quot; newVersion=&quot;1.3.1.0&quot; /&gt;
+&lt;/dependentAssembly&gt;
+&lt;dependentAssembly&gt;
+  &lt;assemblyIdentity name=&quot;Microsoft.CodeAnalysis&quot; publicKeyToken=&quot;31bf3856ad364e35&quot; culture=&quot;neutral&quot; /&gt;
+  &lt;bindingRedirect oldVersion=&quot;0.0.0.0-2.0.0.0&quot; newVersion=&quot;1.3.1.0&quot; /&gt;
+&lt;/dependentAssembly&gt;
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/troubleshooting_azure_cloud_services_deployments.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

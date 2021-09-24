@@ -1,0 +1,236 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Using Consul as a Membership Provider | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Using Consul as a Membership Provider | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="using-consul-as-a-membership-provider">Using Consul as a Membership Provider</h1>
+
+<h2 id="introduction-to-consul">Introduction to Consul</h2>
+<p><a href="https://www.consul.io">Consul</a> is a distributed, highly available and datacenter-aware service discovery platform which includes simple service registration, health checking, failure detection and key/value storage.
+It is built on the premise that every node in the datacenter is running a Consul agent which is either acting as a server or client which communicate via a scalable gossip protocol.</p>
+<p>There is a very detailed overview of Consul including comparisons with similar solutions <a href="https://www.consul.io/intro/index.html">here</a>.</p>
+<p>Consul is written in GO and is <a href="https://github.com/hashicorp/consul">open source</a>; compiled downloads are available for <a href="https://www.consul.io/downloads.html">Mac OS X, FreeBSD, Linux, Solaris and Windows</a></p>
+<h2 id="why-choose-consul">Why Choose Consul?</h2>
+<p>As an <a href="../implementation/cluster_management.html">Orleans Membership Provider</a>, Consul is a good choice when you need to deliver an <strong>on-premise solution</strong> which does not require your potential customers to have existing infrastructure <strong>and</strong> a co-operative IT provider.
+Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.
+And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation.
+We therefore implemented a membership table in Consul (also known as &quot;Orleans Custom System Store&quot;), which fully integrates with Orleans&#39;s <a href="../implementation/cluster_management.html">Cluster Management</a>.</p>
+<h2 id="setting-up-consul">Setting up Consul</h2>
+<p>There is very extensive documentation available on <a href="https://www.consul.io">Consul.io</a> about setting up a stable Consul cluster and it doesn&#39;t make sense to repeat that here; however for your convenience we include this guide so you can very quickly get Orleans running with a standalone Consul agent.</p>
+<p>1) Create a folder to install Consul into, e.g. C:\Consul</p>
+<p>2) Create a subfolder: C:\Consul\Data (Consul will not create this if it doesn&#39;t exist)</p>
+<p>3) <a href="https://www.consul.io/downloads.html">Download</a> and unzip Consul.exe into C:\Consul\</p>
+<p>4) Open a command prompt at C:\Consul\</p>
+<p>5) Enter <code>Consul.exe agent -server -bootstrap -data-dir &quot;C:\Consul\Data&quot; -client=0.0.0.0</code></p>
+<p><code>agent</code> Instructs Consul to run the agent process that hosts the services.
+Without this the Consul process will attempt to use RPC to configure a running agent.</p>
+<p><code>-server</code> Defines the agent as a server and not a client (A Consul <em>client</em> is an agent that hosts all the services and data, but does not have voting rights to decide, and cannot become, the cluster leader</p>
+<p><code>-bootstrap</code> The first (and only the first!) node in a cluster must be bootstrapped so that it assumes the cluster leadership.</p>
+<p><code>-data-dir [path]</code> Specifies the path where all Consul data is stored, including the cluster membership table</p>
+<p><code>-client=0.0.0.0</code> Informs Consul which IP to open the service on.</p>
+<p>There are many other parameters, and the option to use a json configuration file.
+Please consult the Consul documentation for a full listing of the options.</p>
+<p>6) Verify that Consul is running and ready to accept membership requests from Orleans by opening the <a href="http://localhost:8500/v1/catalog/services">services</a> endpoint in your browser.</p>
+<h2 id="configuration-of-orleans">Configuration of Orleans</h2>
+<h3 id="server">Server</h3>
+<p>There is currently a known issue with the &quot;Custom&quot; membership provider OrleansConfiguration.xml configuration file that will fail to parse correctly.
+For this reason you have to provide a placeholder SystemStore in the xml and then configure the provider in code before starting the Silo.</p>
+<p><strong>OrleansConfiguration.xml</strong></p>
+<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;Globals&gt;
+        &lt;SystemStore SystemStoreType=&quot;None&quot; DataConnectionString=&quot;http://localhost:8500&quot; DeploymentId=&quot;MyOrleansDeployment&quot; /&gt;
+    &lt;/Globals&gt;
+    &lt;Defaults&gt;
+        &lt;Networking Address=&quot;localhost&quot; Port=&quot;22222&quot; /&gt;
+        &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
+    &lt;/Defaults&gt;    
+&lt;/OrleansConfiguration&gt;
+</code></pre><p><strong>Code</strong></p>
+<pre><code class="lang-csharp">public void Start(ClusterConfiguration config)
+{
+    _siloHost = new SiloHost(System.Net.Dns.GetHostName(), config);
+
+    _siloHost.Config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
+    _siloHost.Config.Globals.MembershipTableAssembly = &quot;OrleansConsulUtils&quot;;
+    _siloHost.Config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
+
+    _siloHost.InitializeOrleansSilo();
+    var startedok = _siloHost.StartOrleansSilo();
+    if (!startedok)
+        throw new SystemException(String.Format(&quot;Failed to start Orleans silo &#39;{0}&#39; as a {1} node&quot;, _siloHost.Name, _siloHost.Type));
+
+    Log.Information(&quot;Orleans Silo is running.\n&quot;);
+}
+</code></pre><p>Alternatively you could configure the silo entirely in code.</p>
+<h3 id="client">Client</h3>
+<p>The client configuration is much simpler</p>
+<p><strong>ClientConfiguration.xml</strong></p>
+<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;SystemStore SystemStoreType=&quot;Custom&quot; CustomGatewayProviderAssemblyName=&quot;OrleansConsulUtils&quot; DataConnectionString=&quot;http://192.168.1.26:8500&quot; DeploymentId=&quot;MyOrleansDeployment&quot; /&gt;
+&lt;/ClientConfiguration&gt;
+</code></pre><h2 id="client-sdk">Client SDK</h2>
+<p>If you are interested in using Consul for your own service discovery there are <a href="https://www.consul.io/downloads_tools.html">Client SDKs</a> for most popular languages.</p>
+<h2 id="implementation-detail">Implementation Detail</h2>
+<p>The Membership Table Provider makes use of <a href="https://www.consul.io/intro/getting-started/kv.html">Consul&#39;s Key/Value store</a> functionality with CAS.
+When each Silo starts it registers two KV entries, one which contains the Silo details and one which holds the last time the Silo reported it was alive (the latter refers to diagnostics &quot;I am alive&quot; entries and not to failure detection hearbeats which are sent directly between the silos and are not written into the table).
+All writes to the table are performed with CAS to provide concurrency control, as necessitated by Orleans&#39;s <a href="../implementation/cluster_management.html">Cluster Management Protocol</a>.
+Once the Silo is running you can view these entries in your web browser <a href="http://localhost:8500/v1/kv/?keys">here</a>, this will display something like:</p>
+<pre><code class="lang-js">[
+    &quot;orleans/MyOrleansDeployment/192.168.1.26:11111@191780753&quot;,
+    &quot;orleans/MyOrleansDeployment/192.168.1.26:11111@191780753/iamalive&quot;
+]
+</code></pre><p>You will notice that the keys are prefixed with <em>&quot;orleans/&quot;</em> this is hard coded in the provider and is intended to avoid key space collision with other users of Consul.
+Each of these keys can be read by appending their key name <em>(sans quotes of course)</em> to the <a href="http://localhost:8500/v1/kv/">Consul KV root</a>.
+Doing so will present you with the following:</p>
+<pre><code class="lang-js">[
+    {
+        &quot;LockIndex&quot;: 0,
+        &quot;Key&quot;: &quot;orleans/MyOrleansDeployment/192.168.1.26:22222@191780753&quot;,
+        &quot;Flags&quot;: 0,
+        &quot;Value&quot;: &quot;[BASE64 UTF8 Encoded String]&quot;,
+        &quot;CreateIndex&quot;: 10,
+        &quot;ModifyIndex&quot;: 12
+    }
+]
+</code></pre><p>Decoding the string will give you the actual Orleans Membership data:</p>
+<p><strong>http://localhost:8500/v1/KV/orleans/MyOrleansDeployment/[SiloAddress]</strong></p>
+<pre><code>{
+    &quot;Hostname&quot;: &quot;[YOUR_MACHINE_NAME]&quot;,
+    &quot;ProxyPort&quot;: 22222,
+    &quot;StartTime&quot;: &quot;2016-01-29T16:25:54.9538838Z&quot;,
+    &quot;Status&quot;: 3,
+    &quot;SuspectingSilos&quot;: []
+}
+</code></pre><p><strong>http://localhost:8500/v1/KV/orleans/MyOrleansDeployment/[SiloAddress]/IAmAlive</strong></p>
+<pre><code>&quot;2016-01-29T16:35:58.9193803Z&quot;
+</code></pre><p>When the Clients connect, they read the KVs for all silos in the cluster in one HTTP GET by using the uri <code>http://192.168.1.26:8500/v1/KV/orleans/MyOrleansDeployment/?recurse</code>.</p>
+<h2 id="limitations">Limitations</h2>
+<h3 id="orleans-extended-membership-protocol-table-version--etag">Orleans Extended Membership Protocol (Table Version &amp; ETag)</h3>
+<p>Consul KV currrently does not currently support atomic updates.
+Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described <a href="../implementation/cluster_management.html">here</a> and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented.
+Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.</p>
+<h3 id="multiple-datacenters">Multiple Datacenters</h3>
+<p>The Key Value Pairs in Consul are not currently replicated between Consul datacenters.
+There is a <a href="https://github.com/hashicorp/consul-replicate">separate project</a> to address this but it has not yet been proven to support Orleans.</p>
+<h3 id="when-running-on-windows">When running on Windows</h3>
+<p>When Consul starts on Windows it logs the following message:</p>
+<pre><code>==&gt; WARNING: Windows is not recommended as a Consul server. Do not use in production.
+</code></pre><p>This is displayed simply due to lack of focus on testing when running in a Windows environment and not because of any actual known issues.
+Read the <a href="https://groups.google.com/forum/#!topic/consul-tool/DvXYgZtUZyU">discussion here</a> before deciding if Consul is the right choice for you.</p>
+<h2 id="potential-future-enhanecements">Potential Future Enhanecements</h2>
+<p>1) Prove that the Consul KV replication project is able to support an Orleans cluster in a WAN environment between multiple Consul datacenters.</p>
+<p>2) Implement the Reminder Table in Consul.</p>
+<p>3) Implement the Extended Membership Protocol.
+The team behind Consul does plan on implementing atomic operations, once this functionality is available it will be possible to remove the limitations in the provider.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/consul_deployment.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

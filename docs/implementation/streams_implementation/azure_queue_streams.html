@@ -1,0 +1,206 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Azure Queue Streams Implementation Details | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Azure Queue Streams Implementation Details | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-azure-queue-streams-implementation-details">Orleans Azure Queue Streams Implementation Details</h1>
+
+<p>Each stream provider (Azure Queues, EventHub, SMS, SQS, ...) has it&#39;s own queue specific details and configuration.
+This section provides some details about the usage, configuration and implementation of <strong>Orleans Azure Queue Streams</strong>.
+This section is not comprehensive, and more details are available in the streaming tests, which contain most of the configuration options, specifically <a href="https://github.com/dotnet/orleans/tree/master/test/Extensions/TesterAzureUtils/Streaming/AQClientStreamTests.cs"><strong><code>AQClientStreamTests</code></strong></a>, <a href="https://github.com/dotnet/orleans/tree/master/test/Extensions/TesterAzureUtils/Streaming/AQSubscriptionMultiplicityTests.cs"><strong><code>AQSubscriptionMultiplicityTests</code></strong></a>, and the extension functions for <a href="https://github.com/dotnet/orleans/tree/master/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueStreamBuilder.cs"><strong><code>IAzureQueueStreamConfigurator</code></strong></a>  and <a href="https://github.com/dotnet/orleans/tree/master/src/Orleans.Runtime.Abstractions/Streams/ISiloPersistentStreamConfigurator.cs"><strong><code>ISiloPersistentStreamConfigurator</code></strong></a>.</p>
+<h2 id="overview">Overview</h2>
+<p>Orleans Azure Queue requires the package <strong>Microsoft.Orleans.Streaming.AzureStorage</strong>.
+The package contains - in addition to the implementation - also some extension methods that make the configuration at silo startup easier.
+The minimal configuration requires at least to specify the connection string, as example:</p>
+<pre><code class="lang-csharp">hostBuilder
+  .AddAzureQueueStreams(&quot;AzureQueueProvider&quot;, configurator =&gt; {
+    configurator.ConfigureAzureQueue(
+      ob =&gt; ob.Configure(options =&gt; {
+        options.ConnectionString = &quot;xxx&quot;;
+        options.QueueNames = new List&lt;string&gt; { &quot;yourprefix-azurequeueprovider-0&quot; };
+      }));
+    configurator.ConfigureCacheSize(1024);
+    configurator.ConfigurePullingAgent(ob =&gt; ob.Configure(options =&gt; {
+      options.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(200);
+    }));
+  })
+  // a PubSubStore could be needed, as example Azure Table Storage
+  .AddAzureTableGrainStorage(&quot;PubSubStore&quot;, options =&gt; {
+    options.ConnectionString = &quot;xxx&quot;;
+  })
+</code></pre><p>The pulling agents will pull repeatedly until there are no more messages on a queue, then <strong>delay</strong> for a configurable period before continuing to pull. This process occurs for <strong>each queue</strong>.
+Internally the pulling agents place messages in a <strong>cache</strong> (one cache per queue) for delivery to consumers, but will stop reading if the cache fills up. 
+Messages are removed from the cache once consumers process the messages, so the read rate should roughly be throttled by the processing rate of the consumers.</p>
+<p>By default it uses <strong>8 queues</strong> (see <a href="https://github.com/dotnet/orleans/tree/master/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueStreamOptions.cs"><strong><code>AzureQueueOptions</code></strong></a>) and 8 related pulling agents, a delay of <strong>100ms</strong> (see <a href="https://github.com/dotnet/orleans/tree/master/src/Orleans.Core/Streams/PersistentStreams/Options/PersistentStreamProviderOptions.cs"><strong><code>StreamPullingAgentOptions.GetQueueMsgsTimerPeriod</code></strong></a>) and a cache size (<code>IQueueCache</code>) of <strong>4096 messages</strong> (see <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansProviders/Streams/Common/SimpleCache/SimpleQueueCacheOptions.cs"><strong><code>SimpleQueueCacheOptions.CacheSize</code></strong></a>).</p>
+<h2 id="configuration">Configuration</h2>
+<p>The default configuration should fit a production environment, but for special needs it&#39;s possible to configure the default behaviour.
+As example, in a development machine it&#39;s possible to reduce the number of the pulling agents to using just one queue.
+This can help to reduce CPU usage and resource pressure.</p>
+<pre><code class="lang-csharp">hostBuilder
+  .AddAzureQueueStreams&lt;AzureQueueDataAdapterV2&gt;(&quot;AzureQueueProvider&quot;, optionsBuilder =&gt; optionsBuilder.Configure(options =&gt; {
+    options.ConnectionString = &quot;xxx&quot;;
+    options.QueueNames = new List&lt;string&gt; { &quot;yourprefix-azurequeueprovider-0&quot; };
+  }))
+</code></pre><h2 id="tuning">Tuning</h2>
+<p>In a production system can emerge the need of tuning over the default configuration. When tuning there are some factors that should be considered, and it&#39;s service specific.</p>
+<ol>
+<li>First, most of the settings are per queue, so for a large number of streams, the load on each queue can be reduced by configuring more queues.</li>
+<li>Since streams process messages in order per stream, the gating factor will be the number of events being sent on a single stream.</li>
+<li>A reasonable balance of <strong>cache time</strong> (<code>StreamPullingAgentOptions.GetQueueMsgsTimerPeriod</code>) vs <strong>visibility time</strong> (<code>AzureQueueOptions.MessageVisibilityTimeout</code>) is that the visibility should be configured <strong>to double</strong> the time messages <strong>are expected</strong> to be in the cache.</li>
+</ol>
+<h3 id="example">Example</h3>
+<p>Assuming a system with this characteristics:</p>
+<ul>
+<li>100 streams,</li>
+<li>10 queues,</li>
+<li>Each stream processing 60 messages per minute,</li>
+<li>Each message takes around 30ms to process,</li>
+<li>1 minute worth of messages in cache (cache time).</li>
+</ul>
+<p>So we can calculate some parameters of the system:</p>
+<ul>
+<li><p>Streams/queue: Even balancing of streams across queues would be an ideal 10 streams/queue (100 streams / 10 queues).
+But since streams won&#39;t always be evenly balanced over the queues, doubling (or even tripling) the ideal is safer than expecting ideal distribution.
+Hence <strong>20 streams/queue</strong> (10 streams/queue x 2 as safety factor) is probably reasonable.</p>
+</li>
+<li><p>Messages/minute: This means each queue will be expected to process up to <strong>1200 messages/minute</strong> (60 messages x 20 streams).</p>
+</li>
+</ul>
+<p>Then we can determine the visibility time to use:</p>
+<ul>
+<li>Visibility time: The cache time (1 minute) is configured to hold 1 minute of messages (so 1200 messages, as we calculated messages/minute above).
+We assumed that each message takes 30 ms to process, then we can expect messages to spend up to 36 seconds in the cache (0.030 sec x 1200 msg = 36 sec), so the visibility time - doubled for safety - would need be over 72 seconds (36 sec of time in cache x 2).
+Accordingly, if we define a bigger cache, that would require a longer visibility time.</li>
+</ul>
+<p>Final considerations in a real world system:</p>
+<ul>
+<li>Since order is only per stream, and a queue consume many streams, it&#39;s likely that messages will be processed across multiple streams in parallel (as example: we have a grain for stream, which can run in parallel).
+This means we&#39;ll burn through the cache in far less time, but we planned for the worse case: it will give the system room to continue to function well even under intermittent delays and transient errors.</li>
+</ul>
+<p>So we can configure Azure Queue Streams using:</p>
+<pre><code class="lang-csharp">hostBuilder
+  .AddAzureQueueStreams(&quot;AzureQueueProvider&quot;, configurator =&gt; {
+    configurator.ConfigureAzureQueue(
+      ob =&gt; ob.Configure(options =&gt; {
+        options.ConnectionString = &quot;xxx&quot;;
+        options.QueueNames = new List&lt;string&gt; {
+          &quot;yourprefix-azurequeueprovider-1&quot;,
+          [...]
+          &quot;yourprefix-azurequeueprovider-10&quot;,
+        };
+        options.MessageVisibilityTimeout = TimeSpan.FromSeconds(72);
+      }));
+    configurator.ConfigureCacheSize(1200);
+  })
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/implementation/streams_implementation/azure_queue_streams.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

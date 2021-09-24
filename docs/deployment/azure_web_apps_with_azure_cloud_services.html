@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Using Azure Web Apps with Azure Cloud Services | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Using Azure Web Apps with Azure Cloud Services | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="using-azure-web-apps-with-azure-cloud-services">Using Azure Web Apps with Azure Cloud Services</h1>
+
+<p>If you would like to connect to an Azure Cloud Services Silo from an <a href="http://azure.microsoft.com/en-gb/services/app-service/web/">Azure Web App</a> rather than a Web Role hosted within the same cloud service you can.</p>
+<p>For this to work securely you will need to assign both the Azure Web App and the Worker Role hosting the Silo to an <a href="http://azure.microsoft.com/en-gb/services/virtual-network/">Azure Virtual Network</a>.</p>
+<p>First we&#39;ll setup the Azure Web App, you can follow <a href="https://azure.microsoft.com/en-us/blog/azure-websites-virtual-network-integration/">this guide</a> which will create the virtual network and assign it to the Azure Web App.</p>
+<p>Now we can assign the cloud service to the virtual network by modifying the <code>ServiceConfiguration</code> file.</p>
+<pre><code class="lang-xml">&lt;NetworkConfiguration&gt;
+  &lt;VirtualNetworkSite name=&quot;virtual-network-name&quot; /&gt;
+  &lt;AddressAssignments&gt;
+    &lt;InstanceAddress roleName=&quot;role-name&quot;&gt;
+      &lt;Subnets&gt;
+        &lt;Subnet name=&quot;subnet-name&quot; /&gt;
+      &lt;/Subnets&gt;
+    &lt;/InstanceAddress&gt;
+  &lt;/AddressAssignments&gt;
+&lt;/NetworkConfiguration&gt;
+</code></pre><p>Also make sure the Silo endpoints are configured.</p>
+<pre><code class="lang-xml">&lt;Endpoints&gt;
+  &lt;InternalEndpoint name=&quot;OrleansSiloEndpoint&quot; protocol=&quot;tcp&quot; port=&quot;11111&quot; /&gt;
+  &lt;InternalEndpoint name=&quot;OrleansProxyEndpoint&quot; protocol=&quot;tcp&quot; port=&quot;30000&quot; /&gt;
+&lt;/Endpoints&gt;
+</code></pre><p>You can now connect from the Web App to the rest of the cluster.</p>
+<h3 id="potential-issues">Potential Issues</h3>
+<p>If the Web App is having difficulty connecting to the Silo:</p>
+<ul>
+<li>Make sure you have at least <strong>two roles</strong>, or two instances of one role in your Azure Cloud Service, or the <code>InternalEndpoint</code> firewall rules may not be generated.</li>
+<li>Check that both the Web App and the Silo are using the same <code>ClusterId</code> and <code>ServiceId</code>.</li>
+<li>Make sure the network security group is set up to allow internal virtual network connections. If you haven&#39;t got one you can create and assign one easily using the following <code>PowerShell</code>:</li>
+</ul>
+<pre><code class="lang-c">New-AzureNetworkSecurityGroup -Name &quot;Default&quot; -Location &quot;North Europe&quot;
+Get-AzureNetworkSecurityGroup -Name &quot;Default&quot; | Set-AzureNetworkSecurityGroupToSubnet -VirtualNetworkName &quot;virtual-network-name&quot; -SubnetName &quot;subnet-name&quot;
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/azure_web_apps_with_azure_cloud_services.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

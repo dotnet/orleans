@@ -1,0 +1,184 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Hello World | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Hello World | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="hello-world">Hello World</h1>
+
+<h2 id="run-the-hello-world-sample">Run the Hello World sample</h2>
+<p>One way to run this sample is to download a local copy of HelloWorld from <a href="https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld/">the Samples/2.0/HelloWorld/ folder</a>.</p>
+<p>Open two Command Prompt windows and navigate to the HelloWorld folder in each one.</p>
+<p>Build the project.</p>
+<p>Start the silo in one window with the command:</p>
+<pre><code>dotnet run --project src\SiloHost
+</code></pre><p>After the silo is running, start the client in the other window with this: </p>
+<pre><code>dotnet run --project src\OrleansClient
+</code></pre><p>The silo and client windows will display greetings to each other.</p>
+<h2 id="how-orleans-says-hello">How Orleans says Hello</h2>
+<p>In this sample, a client connects with a grain, sends it a greeting and receives a greeting back.
+The client then prints that greeting and that&#39;s that.
+Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
+<p>There are four projects involved -- one for declaring the grain interfaces, one for the grain implementations, and one for the client, one for the silo host</p>
+<p>There&#39;s one grain interface, in IHello.cs:</p>
+<pre><code class="lang-csharp">public interface IHello : Orleans.IGrainWithIntegerKey
+{
+   Task&lt;string&gt; SayHello(string greeting);
+}
+</code></pre><p>This is simple enough, and we can see that all replies must be represented as a Task or Task<t> in communication interfaces.
+The implementation, found in HelloGrain.cs, is similarly trivial:<p>
+<pre><code class="lang-csharp">public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
+{
+    Task&lt;string&gt; HelloWorldInterfaces.IHello.SayHello(string greeting)
+    {
+        return Task.FromResult($&quot;You said: &#39;{greeting}&#39;, I say: Hello!&quot;);
+    }
+}
+</code></pre><p>The class inherits from the base class <code>Grain</code>, and implements the communication interface defined earlier.
+Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
+<p>The client, which orchestrates the grain code and is found in OrleansClient project, looks like this:</p>
+<pre><code class="lang-csharp">//configure the client with proper cluster options, logging and clustering
+ client = new ClientBuilder()
+   .UseLocalhostClustering()
+   .Configure&lt;ClusterOptions&gt;(options =&gt;
+   {
+       options.ClusterId = &quot;dev&quot;;
+       options.ServiceId = &quot;HelloWorldApp&quot;;
+   })
+   .ConfigureLogging(logging =&gt; logging.AddConsole())
+   .Build();
+
+//connect the client to the cluster, in this case, which only contains one silo
+await client.Connect();
+...
+// example of calling grains from the initialized client
+var friend = client.GetGrain&lt;IHello&gt;(0);
+var response = await friend.SayHello(&quot;Good morning, my friend!&quot;);
+Console.WriteLine(&quot;\n\n{0}\n\n&quot;, response);
+</code></pre><p>The silo host, which configures and starts the silo, in SiloHost project looks like this:</p>
+<pre><code class="lang-csharp"> //define the cluster configuration
+var builder = new SiloHostBuilder()
+//configure the cluster with local host clustering
+    .UseLocalhostClustering()
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
+    {
+        options.ClusterId = &quot;dev&quot;;
+        options.ServiceId = &quot;HelloWorldApp&quot;;
+    })
+    .Configure&lt;EndpointOptions&gt;(options =&gt; options.AdvertisedIPAddress = IPAddress.Loopback)
+    .ConfigureLogging(logging =&gt; logging.AddConsole());
+//build the silo
+var host = builder.Build();
+//start the silo
+await host.StartAsync();
+</code></pre></t></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/Hello-World.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

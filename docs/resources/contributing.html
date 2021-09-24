@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Contributing to Orleans | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Contributing to Orleans | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="contributing-to-orleans">Contributing to Orleans</h1>
+
+<p>Some notes and guidelines for developers who want to contribute to Orleans.</p>
+<h2 id="contributing-to-this-project">Contributing To This Project</h2>
+<p>Here are some pointers for anyone looking for mini-features and work items that would make a positive contribution to Orleans.</p>
+<p>These are just a few ideas, so if you think of something else that would be useful, then spin up a <a href="https://github.com/dotnet/orleans/issues">discussion thread</a> on GitHub to discuss the proposal, and go for it!</p>
+<ul>
+<li><strong><a href="https://github.com/dotnet/orleans">Orleans GitHub Repository</a></strong></li>
+</ul>
+<p>Pull requests are always welcome!</p>
+<ul>
+<li><strong><a href="student_projects.html">Intern and Student Projects</a></strong></li>
+</ul>
+<p>Some suggestions for possible intern / student projects.</p>
+<ul>
+<li><strong><a href="documentation_guidelines.html">Documentation Guidelines</a></strong> </li>
+</ul>
+<p>A style guide for writing documentation for this site.</p>
+<h2 id="code-contributions">Code Contributions</h2>
+<p>This project uses the same contribution process as the other <strong><a href="http://dotnet.github.io/">DotNet projects</a></strong> on GitHub.</p>
+<ul>
+<li><strong><a href="https://github.com/dotnet/corefx/wiki/Contributing">DotNet Project Contribution Guidelines</a></strong></li>
+</ul>
+<p>Guidelines and workflow for contributing to DotNet projects on GitHub.</p>
+<ul>
+<li><strong><a href="https://cla.dotnetfoundation.org/">DotNet CLA</a></strong></li>
+</ul>
+<p>Contribution License Agreement for DotNet projects on GitHub.</p>
+<ul>
+<li><strong><a href="https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest">.NET Framework Design Guidelines</a></strong></li>
+</ul>
+<p>Some basic API design rules, coding standards, and style guide for .NET Framework APIs.</p>
+<h2 id="coding-standards-and-conventions">Coding Standards and Conventions</h2>
+<p>We try not to be too OCD about coding style wars, but in case of disputes we do fall back to the core principles in the two &quot;.NET Coding Standards&quot; books used by the other DotNet OSS projects on GitHub:</p>
+<ul>
+<li><p><a href="https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md">C# Coding Style Guide</a></p>
+</li>
+<li><p><a href="https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/framework-design-guidelines-digest.md">.NET Framework Design Guidelines</a></p>
+</li>
+</ul>
+<p>There are lots of other useful documents on the <a href="https://github.com/dotnet/coreclr/tree/master/Documentation">.NET CoreCLR</a> and <a href="https://github.com/dotnet/corefx/tree/master/Documentation">.NET Core Framework</a> documentation sites which are worth reading, although most experienced C# developers will probably have picked up many of those best-practices by osmosis, particularly around performance and memory management.</p>
+<h2 id="source-code-organization">Source Code Organization</h2>
+<p>Orleans has not religiously followed a &quot;One Class Per File&quot; rule, but instead we have tried to use pragmatic judgment to maximize the change of &quot;code understand-ability&quot; for developers on the team.
+If lots of small-ish classes share a &quot;common theme&quot; and/or are always dealt with together, then it is OK to place those into one source code file in most cases.
+See for example the various &quot;log consumer&quot; classes were originally placed in single source file, as they represented a single unit of code comprehension.</p>
+<p>As a corollary, it is much easier to find the source code for a class if it is in a file with the same name as the class [similar to Java file naming rules], so there is a tension and value judgment here between code find-ability and minimizing / constraining the number of projects in a solution and files within a project [which both have direct impact on the Visual Studio &quot;Opening&quot; and &quot;Building&quot; times for large projects].</p>
+<p>Code search tools in VS and ReSharper definitely help here.</p>
+<h2 id="dependencies-and-inter-project-references">Dependencies and Inter-Project References</h2>
+<p>One topic that we are very strict about is around dependency references between components and sub-systems.</p>
+<h3 id="component--project-references">Component / Project References</h3>
+<p>References between projects in a solution must always use &quot;<strong>Project References</strong>&quot; rather than &quot;<em>DLL References</em>&quot; to ensure that component build relationships are known to the build tools.</p>
+<p><strong>Right</strong>:</p>
+<pre><code>&lt;ProjectReference Include=&quot;..\Orleans\Orleans.csproj&quot;&gt;
+  &lt;Project&gt;{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}&lt;/Project&gt;
+  &lt;Name&gt;Orleans&lt;/Name&gt;
+&lt;/ProjectReference&gt;
+</code></pre><p><em>Wrong</em>:</p>
+<pre><code>&lt;Reference Include=&quot;Orleans&quot; &gt;
+   &lt;HintPath&gt;..\Orleans\bin\Debug\Orleans.dll&lt;/HintPath&gt;
+&lt;/Reference&gt;
+</code></pre><p>In order to help ensure we keep inter-project references clean, then on the build servers [and local <code>Build.cmd</code> script] we deliberately use side-by-side input <code>.\src</code> and output <code>.\Binaries</code> directories rather than the more normal in-place build directory structure (eg. <code>[PROJ]\bin\Release</code>) used by VS on local dev machines.</p>
+<h3 id="unified-component-versions">Unified Component Versions</h3>
+<p>We use the same unified versions of external component throughout the Orleans code base, and so should never need to add <code>bindingRedirect</code> entries in <code>App.config</code> files.</p>
+<p>Also, in general it should almost never be necessary to have <code>Private=True</code> elements in Orleans project files, except to override a conflict with a Windows / VS &quot;system&quot; component.
+Some package management tools can occasionally get confused when making version changes, and sometimes think that we are using multiple versions of the same assembly within a solution, which of course we never do.</p>
+<p>We long for the day when package management tools for .NET can make version changes transactionally!
+Until then, it is occasionally necessary to &quot;fix&quot; the misguided actions of some .NET package management tools by hand-editing the .csproj files (they are just XML text files) back to sanity and/or using the &quot;Discard Edited Line&quot; functions that most good Git tools such as <a href="https://www.sourcetreeapp.com/">Atlassian SourceTree</a> provide.</p>
+<p>Using &quot;sort&quot; references and unified component versions avoids creating brittle links between Orleans run-time and/or external components, and has proved highly effective in the last several years at reducing stress levels for the Orleans Team during important deployment milestones. :)</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/contributing.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

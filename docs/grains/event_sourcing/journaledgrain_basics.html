@@ -1,0 +1,177 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>JournaledGrain API | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="JournaledGrain API | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="journaledgrain-basics">JournaledGrain Basics</h1>
+
+<p>Journaled grains derive from <code>JournaledGrain&lt;StateType,EventType&gt;</code>, with the following type parameters:</p>
+<ul>
+<li>The <code>StateType</code> represents the state of the grain. It must be a class with a public default constructor.  </li>
+<li><code>EventType</code> is a common supertype for all the events that can be raised for this grain, and can be any class or interface. </li>
+</ul>
+<p>All state and event objects should be serializable (because the log-consistency providers may need to persist them, and/or send them in notification messages). </p>
+<p>For grains whose events are POCOs (plain old C# objects),  <code>JournaledGrain&lt;StateType&gt;</code> can be used as a shorthand for <code>JournaledGrain&lt;StateType,Object&gt;</code>.</p>
+<h2 id="reading-the-grain-state">Reading the Grain State</h2>
+<p>To read the current grain state, and determine its version number, the JournaledGrain has properties</p>
+<pre><code class="lang-csharp">GrainState State { get; }
+int Version { get; }
+</code></pre><p>The version number is always equal to the total number of confirmed events, and the state is the result of applying all the confirmed events to the initial state. The initial state, which has version 0 (because no events have been applied to it), is determined by the default constructor of the GrainState class.</p>
+<p><em>Important:</em> The application should never directly modify the object returned by <code>State</code>. It is meant for reading only. Rather, when the application wants to modify the state, it must do so indirectly by raising events.</p>
+<h2 id="raising-events">Raising Events</h2>
+<p>Raising events is accomplished by calling the <code>RaiseEvent</code> function. For example, a grain representing a chat can raise a <code>PostedEvent</code> to indicate that a user submitted a post:</p>
+<pre><code class="lang-csharp">RaiseEvent(new PostedEvent() { Guid = guid, User = user, Text = text, Timestamp = DateTime.UtcNow });
+</code></pre><p>Note that <code>RaiseEvent</code> kicks off a write to storage access, but does not wait for the write to complete. For many applications, it is important to wait until we have confirmation that the event has been persisted. In that case, we always follow up by waiting for <code>ConfirmEvents</code>:</p>
+<pre><code class="lang-csharp">RaiseEvent(new DepositTransaction() { DepositAmount = amount, Description = description });
+await ConfirmEvents();
+</code></pre><p>Note that even if you don&#39;t explicitly call <code>ConfirmEvents</code>, the events will eventually be confirmed - it happens automatically in the background. </p>
+<h2 id="state-transition-methods">State Transition Methods</h2>
+<p>The runtime updates the grain state <em>automatically</em> whenever events are raised. There is no need for the application to explicitly update the state after raising an event. However, the application still has to provide the code that specifies <em>how</em> to update the state in response to an event. This can be done in two ways.</p>
+<p><strong>(a)</strong> The GrainState class can implement one or more <code>Apply</code> methods on the <code>StateType</code>. Typically, one would create multiple overloads, and the closest match is chosen for the runtime type of the event:</p>
+<pre><code class="lang-csharp">class GrainState {
+
+   Apply(E1 @event)  
+   {
+     // code that updates the state
+   }
+   Apply(E2 @event)  
+   {
+     // code that updates the state
+   }
+}
+</code></pre><p><strong>(b)</strong> The grain can override the TransitionState function:</p>
+<pre><code class="lang-csharp">protected override void TransitionState(State state, EventType @event)
+{
+   // code that updates the state
+}
+</code></pre><p>The transition methods are assumed to have no side effects other than modifying the state object, and should be deterministic (otherwise, the effects are unpredictable).  If the transition code throws an exception, that exception is caught and included in a warning in the Orleans log, issued by the log-consistency provider.  </p>
+<p>When, exactly, the runtime calls the transition methods depends on the chosen log consistency provider and its configuration. It is best for applications not to rely on a particular timing, except when specifically guaranteed by the log consistency provider. </p>
+<p>Some providers, such as the <code>LogStorage</code> log-consistency provider, replay the event sequence every time the grain is loaded. Therefore, as long as the event objects can still be properly deserialized from storage, it is possible to radically modify the GrainState class and the transition methods. But for other providers, such as the <code>StateStorage</code> log-consistency provider, only the <code>GrainState</code> object is persisted, so developers must ensure that it can be deserialized correctly when read from storage. </p>
+<h2 id="raising-multiple-events">Raising Multiple Events</h2>
+<p>It is possible to make multiple calls to RaiseEvent before calling ConfirmEvents:</p>
+<pre><code class="lang-csharp">RaiseEvent(e1);
+RaiseEvent(e2);
+await ConfirmEvents();
+</code></pre><p>However, this is likely to cause two successive storage accesses, and it incurs a risk that the grain fails after writing only the first event. Thus, it is usually better to raise multiple events at once, using</p>
+<pre><code class="lang-csharp">RaiseEvents(IEnumerable&lt;EventType&gt; events)
+</code></pre><p>This guarantees that the given sequence of events is written to storage atomically. Note that since the version number always matches the length of the event sequence, raising multiple events increases the version number by more than one at a time.</p>
+<h2 id="retrieving-the-event-sequence">Retrieving the Event Sequence</h2>
+<p>The following method from the base <code>JournaledGrain</code> class allows the application to retrieve a specified segment of the sequence of all confirmed events:</p>
+<pre><code class="lang-csharp">Task&lt;IReadOnlyList&lt;EventType&gt;&gt; RetrieveConfirmedEvents(int fromVersion, int toVersion)
+</code></pre><p>However, it is not supported by all log consistency providers. If not supported, or if the specified segment of the sequence is no longer available, a <code>NotSupportedException</code> is thrown. </p>
+<p>To retrieve all events up to the latest confirmed version, one would call </p>
+<pre><code class="lang-csharp">await RetrieveConfirmedEvents(0, Version);
+</code></pre><p>Only confirmed events can be retrieved: an exception is thrown if <code>toVersion</code> is larger than the current value of the property <code>Version</code>.</p>
+<p>Since confirmed events never change, there are no races to worry about, even in the presence of multiple instances or delayed confirmation. However, in such situations, it is possible that the value of the property <code>Version</code> is larger by the time the <code>await</code> resumes than at the time <code>RetrieveConfirmedEvents</code> is called, so it may be advisable to save its value in a variable. See also the section on Concurrency Guarantees.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/event_sourcing/journaledgrain_basics.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

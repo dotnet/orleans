@@ -1,0 +1,270 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Kubernetes hosting | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Kubernetes hosting | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="kubernetes-hosting">Kubernetes hosting</h1>
+
+<p>Kubernetes is a popular choice for hosting Orleans applications.
+Orleans will run in Kubernetes without specific configuration, however it can also take advantage of extra knowledge which the hosting platform can provide.</p>
+<p>The <a href="https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes"><code>Microsoft.Orleans.Hosting.Kubernetes</code></a> package adds integration for hosting an Orleans application in a Kubernetes cluster. The package provides an extension method, <code>ISiloBuilder.UseKubernetesHosting</code>, which performs the following actions:</p>
+<ul>
+<li><code>SiloOptions.SiloName</code> is set to the pod name.</li>
+<li><code>EndpointOptions.AdvertisedIPAddress</code> is set to the pod IP.</li>
+<li><code>EndpointOptions.SiloListeningEndpoint</code> &amp; <code>EndpointOptions.GatewayListeningEndpoint</code> are configured to listen on any address, with the configured <code>SiloPort</code> and <code>GatewayPort</code>. Defaults port values of <code>11111</code> and <code>30000</code> are used if no values are set explicitly).</li>
+<li><code>ClusterOptions.ServiceId</code> is set to the value of the pod label with the name <code>orleans/serviceId</code>.</li>
+<li><code>ClusterOptions.ClusterId</code> is set to the value of the pod label with the name <code>orleans/clusterId</code>.</li>
+<li>Early in the startup process, the silo will probe Kubernetes to find which silos do not have corresponding pods and mark those silos as dead.</li>
+<li>The same process will occur at runtime for a subset of all silos, in order to remove the load on Kubernetes&#39; API server. By default, 2 silos in the cluster will watch Kubernetes.</li>
+</ul>
+<p>Note that the Kubernetes hosting package does not use Kubernetes for clustering. For clustering, a separate clustering provider is still needed. For more information on configuring clustering, see the <a href="../host/configuration_guide/server_configuration.html">Server configuration</a> documentation.</p>
+<p>This functionality imposes some requirements on how the service is deployed:</p>
+<ul>
+<li>Silo names must match pod names.</li>
+<li>Pods must have an <code>orleans/serviceId</code> and <code>orleans/clusterId</code> label which corresponds to the silo&#39;s <code>ServiceId</code> and <code>ClusterId</code>. The above-mentioned method will propagate those labels into the corresponding options in Orleans from environment variables.</li>
+<li>Pods must have the following environment variables set: <code>POD_NAME</code>, <code>POD_NAMESPACE</code>, <code>POD_IP</code>, <code>ORLEANS_SERVICE_ID</code>, <code>ORLEANS_CLUSTER_ID</code>.</li>
+</ul>
+<p>The following example shows how to configure these labels and environment variables correctly:</p>
+<pre><code class="lang-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dictionary-app
+  labels:
+    orleans/serviceId: dictionary-app
+spec:
+  selector:
+    matchLabels:
+      orleans/serviceId: dictionary-app
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        # This label is used to identify the service to Orleans
+        orleans/serviceId: dictionary-app
+
+        # This label is used to identify an instance of a cluster to Orleans.
+        # Typically, this will be the same value as the previous label, or any 
+        # fixed value.
+        # In cases where you are not using rolling deployments (for example,
+        # blue/green deployments),
+        # this value can allow for distinct clusters which do not communicate
+        # directly with each others,
+        # but which still share the same storage and other resources.
+        orleans/clusterId: dictionary-app
+    spec:
+      containers:
+        - name: main
+          image: my-registry.azurecr.io/my-image
+          imagePullPolicy: Always
+          ports:
+          # Define the ports which Orleans uses
+          - containerPort: 11111
+          - containerPort: 30000
+          env:
+          # The Azure Storage connection string for clustering is injected as an
+          # environment variable
+          # It must be created separately using a command such as:
+          # &gt; kubectl create secret generic az-storage-acct `
+          #     --from-file=key=./az-storage-acct.txt
+          - name: STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: az-storage-acct
+                key: key
+          # Configure settings to let Orleans know which cluster it belongs to
+          # and which pod it is running in
+          - name: ORLEANS_SERVICE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels[&#39;orleans/serviceId&#39;]
+          - name: ORLEANS_CLUSTER_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels[&#39;orleans/clusterId&#39;]
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
+            value: &quot;120&quot;
+          request:
+            # Set resource requests
+      terminationGracePeriodSeconds: 180
+      imagePullSecrets:
+        - name: my-image-pull-secret
+  minReadySeconds: 60
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+</code></pre><p>For RBAC-enabled clusters, the Kubernetes service account for the pods may also need to be granted the required access:</p>
+<pre><code class="lang-yaml">kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader
+rules:
+- apiGroups: [ &quot;&quot; ]
+  resources: [&quot;pods&quot;]
+  verbs: [&quot;get&quot;, &quot;watch&quot;, &quot;list&quot;]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  apiGroup: &#39;&#39;
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: &#39;&#39;
+</code></pre><h2 id="liveness-readiness-and-startup-probes">Liveness, Readiness, and Startup Probes</h2>
+<p>Kubernetes is able to probe pods to determine the health of a service. For more information, see <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Configure Liveness, Readiness and Startup Probes</a> in Kubernetes&#39; documentation. </p>
+<p>Orleans uses a cluster membership protocol to promptly detect and recover from process or network failures.
+Each node monitors a subset of other nodes, sending periodic probes.
+If a node fails to respond to multiple successive probes from multiple other nodes, then it will be forcibly removed from the cluster.
+Once a failed node learns that is has been removed, it terminates immediately.
+Kubernetes will restart the terminated process and it will attempt to rejoin the cluster.</p>
+<p>Kubernetes&#39; probes can help to determine whether a process in a pod is executing and is not stuck in a zombie state. probes do not verify inter-pod connectivity or responsiveness or perform any application-level functionality checks.
+If a pod fails to respond to a liveness probe, then Kubernetes may eventually terminate that pod and reschedule it.
+Kubernetes&#39; probes and Orleans&#39; probes are therefore complimentary.</p>
+<p>The recommended approach is to configure Liveness Probes in Kubernetes which perform a simple local-only check that the application is performing as intended.
+These probes serve to terminate the process in the event that there is a total freeze, for example due to a runtime fault or another unlikely event.</p>
+<h2 id="resource-quotas">Resource quotas</h2>
+<p>Kubernetes works in conjunction with the operating system to implement <a href="https://kubernetes.io/docs/concepts/policy/resource-quotas/">resource quotas</a>.
+This allows CPU and memory reservations and/or limits to be enforced.
+For a primary application which is serving interactive load, we recommend not implementing restrictive limits unless necessary.
+It is important to note that requests and limits are substantially different in their meaning and where they are implemented.
+Before setting requests or limits, take the time to gain a detailed understanding of how they are implemented and enforced.
+For example, memory may not be measured uniformly between Kubernetes, the Linux kernel, and your monitoring system. CPU quotas may not be enforced in the way that you expect.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="pods-crash-complaining-that-kubernetesservicehost-and-kubernetesserviceport-must-be-defined">Pods crash, complaining that <code>KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined</code></h3>
+<p>Full exception message: </p>
+<pre><code>Unhandled exception. k8s.Exceptions.KubeConfigException: unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined
+at k8s.KubernetesClientConfiguration.InClusterConfig()
+</code></pre><ul>
+<li>Check that <code>KUBERNETES_SERVICE_HOST</code> and <code>KUBERNETES_SERVICE_PORT</code> environment variables are set inside your Pod.
+You can check by executing the following command <code>kubectl exec -it &lt;pod_name&gt; /bin/bash -c env</code>.</li>
+<li>Ensure that <code>automountServiceAccountToken</code> set to <strong>true</strong> on your Kubernetes <code>deployment.yaml</code>. For more information, see <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/">Configure Service Accounts for Pods</a></li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/kubernetes.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

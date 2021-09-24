@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Announcing Orleans 2.1 | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Announcing Orleans 2.1 | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="announcing-orleans-21">Announcing Orleans 2.1</h1>
+
+<p><a href="https://github.com/ReubenBond">Reuben Bond</a>
+10/1/2018 7:17:59 PM</p>
+<hr>
+<p>Today, we announced Orleans 2.1.
+This release includes significant performance improvements over 2.0, a major refresh of distributed transaction support, a new code generator, and new functionality for co-hosting scenarios as well as smaller fixes &amp; improvements.
+Read the <a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0">release notes here</a>.</p>
+<h2 id="new-scheduler">New Scheduler</h2>
+<p>Starting with Orleans 2.1, we have a <a href="https://github.com/dotnet/orleans/pull/3792">rewritten core scheduler</a> which takes advantage of <a href="https://blogs.msdn.microsoft.com/dotnet/2017/06/07/performance-improvements-in-net-core/">performance improvements to .NET Core&#39;s ThreadPool</a>.
+The new scheduler uses work stealing queues with local queue affinity to reduce contention and improve throughput and latency.
+These improvements are available on all platforms/frameworks.
+Community members have reported significant responsiveness and throughput improvements in their services and our testing indicates up to 30% higher throughput.
+This new scheduler also exhibits much lower CPU usage during low-load periods, benefiting co-hosting scenarios and improving the CPU profiling experience.
+Special thanks to <a href="https://twitter.com/dVakulen">Dmytro Vakulenko</a> from the community for driving this work from theory through to experimentation &amp; completion.</p>
+<h2 id="distributed-transactions">Distributed Transactions</h2>
+<p>Orleans originated from Microsoft Research and we continue to partner with MSR and product teams to bring features such as scalable distributed transactions into production.
+Distributed transactions support was first introduced as an experimental feature in Orleans 2.0, and in 2.1 we are refreshing the release with a new, fully decentralized, transaction manager.
+Aside from the improvements to the transaction manager, the entire transactions system has continued to receive heavy investment in order to ready the code for production and a stable release in a future version of Orleans. We consider distributed transactions to be in &quot;release candidate&quot; quality in 2.1.
+Learn about distributed transactions in Orleans from Sergey&#39;s talk, <a href="https://www.youtube.com/watch?v=8A5bRdyZXJw">Distributed Transactions are dead, long live distributed transactions! from J On the Beach 2018</a>.
+Read the research papers on transactions, actor-oriented database systems, and other topics from the <a href="https://www.microsoft.com/en-us/research/project/orleans-virtual-actors/#!publications">Orleans Microsoft Research site</a>.</p>
+<h2 id="direct-client">Direct Client</h2>
+<p>Orleans 2.1 introduces a new way to interact with grains and interoperate with frameworks like ASP.NET or gRPC.
+The feature is called <em>direct client</em> and it allows co-hosting a client and silo in a way that let the client communicate more efficiently with not just the silo it&#39;s attached to, but the entire cluster.
+Once direct client is enabled, <code>IClusterClient</code> and <code>IGrainFactory</code> can be resolved from the silo container and used to create grain references which can be called.
+These calls use the local silo&#39;s knowledge of the cluster and grain placement to avoid unnecessary copying, serialization, and networking hops.
+In addition, because this feature shares the same internals as the silo itself, it provides a seamless experience when it comes to passing grain references between threads.
+In Orleans 2.1 we have made direct client an opt-in feature.
+Enable it by calling <code>ISiloHostBuilder.EnableDirectClient()</code> during silo configuration.</p>
+<h2 id="new-code-generator">New Code Generator</h2>
+<p>This release includes a new code generation package, <code>Microsoft.Orleans.CodeGenerator.MSBuild</code>, an alternative to the existing package, <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>.
+The new code generator leverages Roslyn for code analysis to avoid loading application binaries.
+As a result, it avoids issues caused by clashing dependency versions and differing target frameworks.
+If you experience issues, please let us know by opening an issue on <a href="https://github.com/dotnet/orleans/">GitHub</a>.
+The new code generator also improves support for incremental builds, which should result in shorter build times.</p>
+<h2 id="other-improvements">Other Improvements</h2>
+<ul>
+<li><a href="https://github.com/dotnet/orleans/pull/4562">Grain methods can return
+<code>ValueTask&lt;T&gt;</code></a> -
+thanks to <a href="https://twitter.com/kutensky">@kutensky</a></li>
+<li><a href="https://github.com/dotnet/orleans/pull/4399">Removed per-call Timer
+allocation</a>, reducing
+.NET Timer queue contention</li>
+<li><a href="https://github.com/dotnet/orleans/pull/4853">Fixes</a>
+<a href="https://github.com/dotnet/orleans/pull/4883">for</a> silo shutdown
+behavior - thank you to <a href="https://twitter.com/yevhen">@yevhen</a> for
+reporting and
+<a href="https://github.com/dotnet/orleans/issues/4757">investigating</a></li>
+<li><a href="https://github.com/dotnet/orleans/pull/4890">Configure grain
+collection</a> idle time
+using <code>[CollectionAgeLimit(Minutes = x)]</code> - thanks to
+<a href="https://github.com/arajeshkumar">@aRajeshKumar</a></li>
+</ul>
+<h2 id="known-issues-with-net-core-21">Known Issues with .NET Core 2.1</h2>
+<p>User <a href="https://github.com/dotnet/orleans/issues/4990">Sun Zhongfeng reported an issue</a> running Orleans on .NET Core 2.1 with TieredCompilation enabled.
+We tracked this down to a <a href="https://github.com/dotnet/coreclr/issues/20040">JIT issue in CoreCLR</a>, which the CoreCLR team quickly diagnosed and fixed.
+TieredCompilation is not enabled by default in .NET Core 2.1 and this fix is <a href="https://github.com/dotnet/coreclr/pull/20083#issuecomment-424464934">not expected to land in .NET Core 2.1, but will be included in .NET Core 2.2</a>.
+<strong>Do not enable TieredCompilation if you are running Orleans on .NET Core 2.1.</strong> We would like to thank everyone in the community who contributed to this release and helped testing the pre-release builds.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/blog/announcing-orleans-2.1.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

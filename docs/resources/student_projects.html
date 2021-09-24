@@ -1,0 +1,173 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Student Projects | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Student Projects | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="student-projects">Student Projects</h1>
+
+<p>We suggest 2 types of projects for students:</p>
+<ol>
+<li><p>The first type includes exploratory, open-ended, <strong>research-oriented projects</strong> with the goal of enabling new capabilities in Orleans. These projects would usually have broad scope and would be suitable for M.S. or Ph.D. student or advanced undergraduate students in their last year of studies. The end goal of these projects would be to contribute ideas and design to Orleans. We do not necessarily expect the code produced in these projects to be directly contributed to this repository, however this would be nice.</p>
+</li>
+<li><p>The second type includes <strong>ideas for student education</strong>. These are either ideas for interesting applications that can be built on top of Orleans or some new capabilities for Orleans. These projects are suitable to be given in advanced undergraduate or graduate courses, where students  learn about Cloud Computing and modern distributed technologies and want to gain real-world hands-on experience in building Cloud applications. We do not expect the code produced in these projects to be contributed directly to this repository.</p>
+</li>
+</ol>
+<h3 id="research-projects">Research projects:</h3>
+<ol>
+<li><p><strong>Auto-scale.</strong> In this project students can start by exploring the existing auto-scaling mechanisms for controlling resource allocation in Windows Azure (<a href="http://azure.microsoft.com/en-us/documentation/articles/cloud-services-dotnet-autoscaling-application-block/">Autoscaling Application Block</a>).
+The next step involves exploring various statistics and resource consumption metrics collected by Orleans, and using them as an input for Azure Autoscaling. An advanced stage of this project may involve improving the internal Orleans mechanisms for reacting to elasticity changes, for example by implementing live actor migration to reduce the time taken to utilize new resources.</p>
+</li>
+<li><p><strong>Auto-generated front-ends for Orleans-based cloud services</strong>. This project seamlessly extends the Orleans actor model into the HTTP world. The ramp-up part of the project includes dynamically generating HTTP endpoints for actors based on their .NET interfaces and metadata. The main part involves automatically generating front-ends to support web sockets and bi-directional streaming of data, which requires complex code generation with optimizations for high performance. It also requires attention to fault tolerance, to maintain high availability of streaming sessions across server reboots and client reconnects and migration -- a significant research challenge.</p>
+</li>
+<li><p><strong>Storage provider for Entity Framework</strong>. This project involves enabling Orleans objects to store their state in a database and to subsequently query it. This might include adding support for Orleans object persistence on SQL Azure Database using Entity Framework (EF), which is Microsoft&#39;s open-source object-relational mapper for .NET, and exposing that data via LINQ queries. The implementation can be evaluated and tuned using standard database benchmarks and/or custom Orleans&#39; applications.</p>
+</li>
+<li><p><strong>Distributed system benchmark</strong>. Define a list of benchmarks suitable for distributed systems like Orleans. The benchmark applications may be analogous in spirit to the <a href="http://www.tpc.org/information/benchmarks.asp">TPC database benchmark</a> or <a href="https://paralleldwarfs.codeplex.com/">UCB &quot;Parallel Dwarfs&quot;</a> implemented <a href="http://view.eecs.berkeley.edu/wiki/Dwarfs">here</a> and may be used to characterize the performance and scalability of distributed frameworks. Consider developing a new benchmark targeted for Orleans, for example, to compare the performance of storage providers.</p>
+</li>
+<li><p><strong>Declarative dataflow language over streams</strong>. Define and build a <a href="https://storm.apache.org/documentation/Trident-tutorial.html">Trident-Storm</a> like declarative language over Orleans streams. Develop an optimizer that configures the stream processing to minimize overall cost.</p>
+</li>
+<li><p><strong>Programming model for client devices</strong>. Extend Orleans to client devices, such as sensors, phones, tablets, and desktops. Enable grain logic to execute on the client. Potentially support tier splitting, that is, dynamically deciding which parts of the code execute on the device and which is offloaded to the cloud.</p>
+</li>
+<li><p><strong>Queries over grain/actor classes, secondary indices</strong>. Build a distributed, scalable, and reliable grain index. This includes formally defining the query model and implementing the distributed index. The index itself can be implemented as Orleans grains and/or stored in a database.</p>
+</li>
+<li><p><strong>Large scale simulations</strong>. Orleans is a great fit for building large scale simulations. Explore the usage of Orleans for different simulations, for example, protein interactions, network simulations, simulated annealing, etc.</p>
+</li>
+</ol>
+<h3 id="course-projects">Course projects:</h3>
+<ol>
+<li><p><strong>Internet Of Things applications</strong>. For example, the application could enable sensors/devices to report their state to the cloud, where each device is represented in the cloud by an Orleans actor. Users can connect to the actor that represents their device via a web browser and check its status or control it. This project involves mastering a number of modern cloud technologies, including <a href="http://azure.microsoft.com/">Windows Azure</a>, Orleans, <a href="http://www.asp.net/web-api">WebApi</a> or ASP.NET, <a href="http://signalr.net/">SignalR</a> for streaming commands back from the cloud to the device, and writing a sensor/device/phone app.</p>
+</li>
+<li><p><strong>Twitter-like large scalable chat service in the cloud based on Orleans</strong>. Each user could be represented by an Orleans Actor, which contains its list of followers.</p>
+</li>
+<li><p><strong>Faceboook-like social app based on Orleans</strong>. Each user could be represented by an Orleans Actor, which includes a list of friends and wall on which friends can write.</p>
+</li>
+<li><p><strong>Simple storage provider</strong>. Add a storage provider for a storage system, such as a key-value store or database system. A simple one could use the <a href="https://github.com/dotnet/orleans/tree/master/src/Orleans/Serialization">Orleans serializer</a>, as in the existing <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/Storage/AzureTableStorage.cs">Azure Table storage provider</a>. A more sophisticated one would map state variables of an Orleans class to fine-grained structures of the storage system. A complex one is the Entity Framework storage provider mentioned above under <em>Research Projects</em>. Compare the performance of different storage providers for different types and sizes of actor state.</p>
+</li>
+<li><p><strong>Comparison with other distributed application frameworks</strong>. Take a sample application written for another application framework, such as <a href="https://cloud.google.com/appengine/docs">Google App Engine</a> or <a href="http://akka.io/">Akka</a>, and translate it into Orleans. Summarize the relative strengths and weaknesses of each framework by comparing the apps.</p>
+</li>
+</ol>
+<hr>
+<h3 id="concluded-research-projects">Concluded Research projects:</h3>
+<p>Below are a number of examples of previous successful research projects.</p>
+<ol>
+<li><p><strong>Distributed log analysis, correlation and debugging</strong>. Debugging large-scale distributed systems is a challenging task due to enormous amounts of data and complex dynamic interactions between the distributed components, running on different processes and different machines.
+The goal of this project was to analyze prior art on this topic, propose a solution, and then implement prototype tools for collecting, correlating and analyzing application error log file data across a multi-machine distributed application runtime environment. This involved exploring the problem space from a variety of perspectives, including:</p>
+<p>   a. Approaches to efficient logging, collection and analysis of failure information from various log-capture mechanisms in a distributed Orleans runtime environment.</p>
+<p>   b. Possible applications of machine learning to find log patterns that signal serious production issues, and then detecting these patterns in near real time as a production monitoring utility.</p>
+<p>   c. Ways to help individual developers perform real-time debugging of run-time issues with their applications.</p>
+<p>  This project was performed successfully and result in a published paper <a href="http://research.microsoft.com/apps/pubs/?id=217109">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems</a> and a proof of concept implementation of a distributed log analysis tool.</p>
+</li>
+<li><p><strong>Horton - Distributed Graph Database</strong>. Horton was a research project with a goal to build a system to store, manage and query large-scale distributed graphs. It was implemented entirely as an Orleans application. The project resulted in a number of <a href="http://research.microsoft.com/en-us/projects/ldg/">publications</a> and a number of very successful student projects.</p>
+</li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/student_projects.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

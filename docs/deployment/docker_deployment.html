@@ -1,0 +1,600 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Docker Deployment | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Docker Deployment | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="docker-deployment">Docker Deployment</h1>
+
+<blockquote><p><strong>Note</strong>: Even if you are very familiar with Docker and/or Orleans, as any other Orleans documentation, I recommend you to read it to the end in order to avoid problems you may face that we already worked around.</p>
+<p><strong>Note</strong>: This article and its sample are a work in progress. Any feedback, PR or suggestion is very welcome.</p>
+</blockquote>
+<h2 id="deploying-orleans-solutions-to-docker">Deploying Orleans solutions to Docker</h2>
+<p>Deploying Orleans to Docker can be tricky given the way Docker orchestrators and clustering stacks was designed. The most complicated thing is to understand the concept of <em>Overlay Network</em> from Docker Swarm and Kubernets Networking model. </p>
+<p>Docker containers and networking model were designed to run mostly stateless and immutable containers. So, spinning up a cluster running node.js or nginx applications, is pretty easy. However, if you try to use something more elaborate, like a real clustered or distributed application (like Orleans-based ones) you will eventually have trouble setting it up. It is possible, but not as simple as web-based applications.</p>
+<p>Docker clustering consists of putting together multiple hosts to work as a single pool of resources, managed using a <em>Container Orchestrator</em>. <em>Docker Inc.</em> provide <strong>Swarm</strong> as their option for Container Orchestration while <em>Google</em> has <strong>Kubernetes</strong> (aka <strong>K8s</strong>). There are other Orchestrators like <strong>DC/OS</strong>, <strong>Mesos</strong>, etc., but in this document we will talk about Swarm and K8s as they are more widely used. </p>
+<p>The same grain interfaces and implementation which run anywhere Orleans is already supported, will run on Docker containers as well, so no special considerations are needed in order to be able to run your application in Docker containers.</p>
+<p>The <a href="https://github.com/dotnet/orleans/tree/master/Samples/Orleans-Docker">Orleans-Docker</a> sample provides a working example of how to run two console applications. One as Orleans Client and another as Silo, and the details are described below.</p>
+<p>The concepts discussed here, can be used on both .Net Core and .Net 4.6.1 flavors of Orleans but to ilustrate the cross-platform nature of Docker and .Net Core, we are going to focus on the example considering you are using .Net Core. Platform-specific (Windows/Linux/OSX) details may be provide along this article.</p>
+<h2 id="pre-requisites">Pre-requisites</h2>
+<p>This article assume that you have the following prerequisites installed:</p>
+<ul>
+<li><a href="https://www.docker.com/community-edition#/download">Docker</a> - Docker4X has a easy-to-use installer for the major supported platforms. It contains Docker engine and also Docker Swarm.</li>
+<li><a href="https://kubernetes.io/docs/tutorials/stateless-application/hello-minikube/">Kubernetes (K8s)</a> - Google&#39;s offer for Container Orchestration. It contains a guidance to install <em>Minikube</em> (a local deployment of K8s) and <em>kubectl</em> along with all its dependencies.</li>
+<li><a href="https://dot.net">.Net Core</a> - Cross-platform flavor of .Net </li>
+<li><a href="https://code.visualstudio.com/">Visual Studio Code (VSCode)</a> - You can use whatever IDE you want. VSCode is cross-platform so we are using it to ensure it works on all platforms. Once you installed VSCode, install the <a href="https://marketplace.visualstudio.com/items?itemName=ms-vscode.csharp">C# extension</a>.</li>
+</ul>
+<blockquote><p><strong>Note</strong>: You are not required to have Kubernetes installed if you are not going to use it. Docker4X installer already includes Swarm so no extra installation is required to use it. </p>
+<p><strong>Note for Windows Users</strong>: On Windows, Docker installer will enable Hyper-V at installation process. As this article and its examples are using .Net Core, the container images used are based on <strong>Windows Server NanoServer</strong>. If you don&#39;t plan to use .Net Core and will target .Net 4.6.1 full framework, the image used should be <strong>Windows Server Core</strong> and the 1.4+ version of Orleans (which supports only .net full framework). </p>
+</blockquote>
+<h2 id="creating-orleans-solution">Creating Orleans Solution</h2>
+<p>The following instructions show how to create a regular Orleans solution using the new <code>dotnet</code> tooling. </p>
+<blockquote><p><strong>Note</strong>: Please adapt the commands to whatever is appropriate in your platform. Also, the directory structure is just a suggestion. Please adapt it to your needs.</p>
+</blockquote>
+<pre><code class="lang-bash">mkdir Orleans-Docker
+cd Orleans-Docker
+dotnet new sln
+mkdir -p src/OrleansSilo
+mkdir -p src/OrleansClient
+mkdir -p src/OrleansGrains
+mkdir -p src/OrleansGrainInterfaces
+dotnet new console -o src/OrleansSilo --framework netcoreapp1.1
+dotnet new console -o src/OrleansClient --framework netcoreapp1.1
+dotnet new classlib -o src/OrleansGrains --framework netstandard1.5
+dotnet new classlib -o src/OrleansGrainInterfaces --framework netstandard1.5
+dotnet sln add src/OrleansSilo/OrleansSilo.csproj
+dotnet sln add src/OrleansClient/OrleansClient.csproj
+dotnet sln add src/OrleansGrains/OrleansGrains.csproj
+dotnet sln add src/OrleansGrainInterfaces/OrleansGrainInterfaces.csproj
+dotnet add src/OrleansClient/OrleansClient.csproj reference src/OrleansGrainInterfaces/OrleansGrainInterfaces.csproj
+dotnet add src/OrleansSilo/OrleansSilo.csproj reference src/OrleansGrainInterfaces/OrleansGrainInterfaces.csproj
+dotnet add src/OrleansGrains/OrleansGrains.csproj reference src/OrleansGrainInterfaces/OrleansGrainInterfaces.csproj
+dotnet add src/OrleansSilo/OrleansSilo.csproj reference src/OrleansGrains/OrleansGrains.csproj
+</code></pre><p>What we did so far was just boilerplate code to create the solution structure, projects, and add references between projects. Nothing different than a regular Orleans project.</p>
+<p>By the time this article was written, Orleans 2.0 (which is the only version which support .Net Core and cross-platform) is in Technology Preview so its nugets are hosted in a MyGet feed and not published to Nuget.org official feed. In order to install the preview nugets, we will use <code>dotnet</code> cli forcing the source feed and version from MyGet:</p>
+<pre><code class="lang-bash">dotnet add src/OrleansClient/OrleansClient.csproj package Microsoft.Orleans.Core -s https://dotnet.myget.org/F/orleans-prerelease/api/v3/index.json -v 2.0.0-preview2-201705020000
+dotnet add src/OrleansGrainInterfaces/OrleansGrainInterfaces.csproj package Microsoft.Orleans.Core -s https://dotnet.myget.org/F/orleans-prerelease/api/v3/index.json -v 2.0.0-preview2-201705020000
+dotnet add src/OrleansGrains/OrleansGrains.csproj package Microsoft.Orleans.Core -s https://dotnet.myget.org/F/orleans-prerelease/api/v3/index.json -v 2.0.0-preview2-201705020000
+dotnet add src/OrleansSilo/OrleansSilo.csproj package Microsoft.Orleans.Core -s https://dotnet.myget.org/F/orleans-prerelease/api/v3/index.json -v 2.0.0-preview2-201705020000
+dotnet add src/OrleansSilo/OrleansSilo.csproj package Microsoft.Orleans.OrleansRuntime -s https://dotnet.myget.org/F/orleans-prerelease/api/v3/index.json -v 2.0.0-preview2-201705020000
+dotnet restore
+</code></pre><p>Ok, now you have all the basic dependencies to run a simple Orleans application. Note that so far, nothing changed from your regular Orleans application. Now, lets add some code so we can do something with it.</p>
+<h1 id="implementing-your-orleans-application">Implementing your Orleans Application</h1>
+<p>Assuming that you are using <strong>VSCode</strong>, from the solution directory, run <code>code .</code>. That will open the directory in <strong>VSCode</strong> and load the solution. </p>
+<p>This is the solution structure we just created previously. </p>
+<p><img src="docker-orleans-solution.png" alt=""></p>
+<p>We also added <code>Program.cs</code>, <code>OrleansHostWrapper</code>, <code>IGreetingGrain</code> and <code>GreetingGrain</code> files to the interfaces and grain projects respectively and here is the code for those files:</p>
+<p><code>IGreetingGrain.cs</code>:</p>
+<pre><code class="lang-csharp">using System;
+using System.Threading.Tasks;
+using Orleans;
+
+namespace OrleansGrainInterfaces
+{
+    public interface IGreetingGrain : IGrainWithGuidKey
+    {
+        Task&lt;string&gt; SayHello(string name);
+    }
+}
+</code></pre><p><code>GreetingGrain.cs</code>:</p>
+<pre><code class="lang-csharp">using System;
+using System.Threading.Tasks;
+using OrleansGrainInterfaces;
+
+namespace OrleansGrains
+{
+    public class GreetingGrain : Grain, IGreetingGrain
+    {
+        public Task&lt;string&gt; SayHello(string name)
+        {
+            return Task.FromResult($&quot;Hello from Orleans, {name}&quot;);
+        }
+    }
+}
+</code></pre><p><code>OrleansHostWrapper.cs</code>:</p>
+<pre><code class="lang-csharp">using System;
+using System.Net;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Host;
+
+namespace OrleansSilo
+{
+    public class OrleansHostWrapper
+    {
+        private readonly SiloHost siloHost;
+
+        public OrleansHostWrapper(ClusterConfiguration config)
+        {
+            siloHost = new SiloHost(Dns.GetHostName(), config);
+            siloHost.LoadOrleansConfig();
+        }
+
+        public int Run()
+        {
+            if (siloHost == null)
+            {
+                return 1;
+            }
+
+            try
+            {
+                siloHost.InitializeOrleansSilo();
+
+                if (siloHost.StartOrleansSilo())
+                {
+                    Console.WriteLine($&quot;Successfully started Orleans silo &#39;{siloHost.Name}&#39; as a {siloHost.Type} node.&quot;);
+                    return 0;
+                }
+                else
+                {
+                    throw new OrleansException($&quot;Failed to start Orleans silo &#39;{siloHost.Name}&#39; as a {siloHost.Type} node.&quot;);
+                }
+            }
+            catch (Exception exc)
+            {
+                siloHost.ReportStartupError(exc);
+                Console.Error.WriteLine(exc);
+                return 1;
+            }
+        }
+
+        public int Stop()
+        {
+            if (siloHost != null)
+            {
+                try
+                {
+                    siloHost.StopOrleansSilo();
+                    siloHost.Dispose();
+                    Console.WriteLine($&quot;Orleans silo &#39;{siloHost.Name}&#39; shutdown.&quot;);
+                }
+                catch (Exception exc)
+                {
+                    siloHost.ReportStartupError(exc);
+                    Console.Error.WriteLine(exc);
+                    return 1;
+                }
+            }
+            return 0;
+        }
+    }
+}
+</code></pre><p><code>Program.cs</code> (Silo):</p>
+<pre><code class="lang-csharp">using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using Orleans.Runtime.Configuration;
+
+namespace OrleansSilo
+{
+    public class Program
+    {
+        private static OrleansHostWrapper hostWrapper;
+
+        static int Main(string[] args)
+        {
+            int exitCode = InitializeOrleans();
+
+            Console.WriteLine(&quot;Press Enter to terminate...&quot;);
+            Console.ReadLine();
+
+            exitCode += ShutdownSilo();
+
+            return exitCode;
+        }
+
+        private static int InitializeOrleans()
+        {
+            var config = new ClusterConfiguration();
+            config.Globals.DataConnectionString = &quot;[AZURE STORAGE CONNECTION STRING HERE]&quot;;
+            config.Globals.DeploymentId = &quot;Orleans-Docker&quot;;
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
+            config.Defaults.PropagateActivityId = true;
+            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Any, 10400);
+            config.Defaults.Port = 10300;
+            var ips = Dns.GetHostAddressesAsync(Dns.GetHostName()).Result;
+            config.Defaults.HostNameOrIPAddress = ips.FirstOrDefault()?.ToString();
+            hostWrapper = new OrleansHostWrapper(config);
+            return hostWrapper.Run();
+        }
+
+        private static int ShutdownSilo()
+        {
+            if (hostWrapper != null)
+            {
+                return hostWrapper.Stop();
+            }
+            return 0;
+        }
+    }
+}
+</code></pre><p><code>Program.cs</code>(client):</p>
+<pre><code class="lang-csharp">using System;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime.Configuration;
+using OrleansGrainInterfaces;
+
+namespace OrleansClient
+{
+    class Program
+    {
+        private static IClusterClient client;
+        private static bool running;
+
+        static void Main(string[] args)
+        {
+            Task.Run(() =&gt; InitializeOrleans());
+
+            Console.ReadLine();
+
+            running = false;
+        }
+
+        static async Task InitializeOrleans()
+        {
+            var config = new ClientConfiguration();
+            config.DeploymentId = &quot;Orleans-Docker&quot;;
+            config.PropagateActivityId = true;
+            var hostEntry = await Dns.GetHostEntryAsync(&quot;orleans-silo&quot;);
+            var ip = hostEntry.AddressList[0];
+            config.Gateways.Add(new IPEndPoint(ip, 10400));
+
+            Console.WriteLine(&quot;Initializing...&quot;);
+
+            client = new ClientBuilder().UseConfiguration(config).Build();
+            await client.Connect();
+            running = true;
+            Console.WriteLine(&quot;Initialized!&quot;);
+
+            var grain = client.GetGrain&lt;IGreetingGrain&gt;(Guid.Empty);
+
+            while(running)
+            {
+                var response = await grain.SayHello(&quot;Gutemberg&quot;);
+                Console.WriteLine($&quot;[{DateTime.UtcNow}] - {response}&quot;);
+                await Task.Delay(1000);
+            }
+            client.Dispose();
+        }
+    }
+}
+</code></pre><p>We are not going into details about the grain implementation here since it is out of the scope of this article. Please check other documents related to it. Those files are essentially a minimal Orleans application and we will start from it to move forward with the remaining of this article.</p>
+<blockquote><p><strong>Note</strong>: In this article we are using <code>OrleansAzureUtils</code> membership provider but you can use any other already supported by Orleans.</p>
+</blockquote>
+<h1 id="dockerfile">Dockerfile</h1>
+<p>In order to create your container, Docker uses images. For more details on how to create your own, you can check <a href="https://docs.docker.com/engine/userguide/">Docker documentation</a>. In this article we are going to use official <a href="https://hub.docker.com/r/microsoft/dotnet/">Microsoft images</a>. Based on the target and development platforms, you need to pick the appropriate image. In this article, we are using <code>microsoft/dotnet:1.1.2-sdk</code> which is a linux-based image. You can use <code>microsoft/dotnet:1.1.2-sdk-nanoserver</code> for Windows for example. Pick one that suit your needs.</p>
+<blockquote><p><strong>Note for Windows users</strong>: As previously mentioned, to be cross-platform, we are using .Net Core and Orleans Technical preview 2.0 in this article. If you want to use Docker on Windows with the fully released Orleans 1.4+, you need to use the images that are based on Windows Server Core since NanoServer and Linux based images, only support .Net Core.</p>
+</blockquote>
+<p><code>Dockerfile.debug</code>:</p>
+<pre><code class="lang-dockerfile">FROM microsoft/dotnet:1.1.2-sdk
+ENV NUGET_XMLDOC_MODE skip
+WORKDIR /vsdbg
+RUN apt-get update \
+    &amp;&amp; apt-get install -y --no-install-recommends \
+        unzip \
+    &amp;&amp; rm -rf /var/lib/apt/lists/* \
+    &amp;&amp; curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg 
+WORKDIR /app
+ENTRYPOINT [&quot;tail&quot;, &quot;-f&quot;, &quot;/dev/null&quot;]
+</code></pre><p>This dockerfile essentially downloads and installs the VSdbg debugger and starts an empty container, keeping it alive forever so we don&#39;t need tear down/up while debugging.</p>
+<p>Now, for production, the image is smaller since it contains only the .Net Core runtime and not the whole SDK, and the dockerfile is a bit simpler:</p>
+<p><code>Dockerfile</code>:</p>
+<pre><code class="lang-dockerfile">FROM microsoft/dotnet:1.1.2-runtime
+WORKDIR /app
+ENTRYPOINT [&quot;dotnet&quot;, &quot;OrleansSilo.dll&quot;]
+COPY . /app
+</code></pre><h1 id="docker-compose">docker-compose</h1>
+<p>The <code>docker-compose.yml</code> file, essentially defines (within a project) a set of services and its dependencies at service level. Each service contains one or more instances of a given container, which is based on the images you selected on your Dockerfile. More details on the <code>docker-compose</code> can be found on <a href="https://docs.docker.com/compose/">docker-compose documentation</a>. </p>
+<p>For an Orleans deployment, a common use case is to have a <code>docker-compose.yml</code> which contains two services. One for Orleans Silo, and other for Orleans Client. The Client would have a dependency on the Silo and that means, it will only start after the Silo service is up. Another case is to add a storage/database service/container, like for example SQL Server, which should start first before the client and the silo, so both services should take a dependency on it.</p>
+<blockquote><p><strong>Note</strong>: Before you read further (and eventually get crazy with it), please note that <em>identation</em> <strong>matters</strong> in <code>docker-compose</code> files. So pay attention to it if you have any problem.</p>
+</blockquote>
+<p>Here is how we will describe our services for this article:</p>
+<p><code>docker-compose.override.yml</code> (Debug):</p>
+<pre><code class="lang-yml">version: &#39;3.1&#39;
+
+services:
+  orleans-client:
+    image: orleans-client:debug
+    build:
+      context: ./src/OrleansClient/bin/PublishOutput/
+      dockerfile: Dockerfile.Debug
+    volumes: 
+      - ./src/OrleansClient/bin/PublishOutput/:/app
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+    depends_on: 
+      - orleans-silo
+  orleans-silo:
+    image: orleans-silo:debug
+    build:
+      context: ./src/OrleansSilo/bin/PublishOutput/
+      dockerfile: Dockerfile.Debug
+    volumes: 
+      - ./src/OrleansSilo/bin/PublishOutput/:/app
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+</code></pre><p><code>docker-compose.yml</code> (production):</p>
+<pre><code class="lang-yml">version: &#39;3.1&#39;
+
+services:
+  orleans-client:
+    image: orleans-client
+    depends_on: 
+      - orleans-silo
+  orleans-silo:
+    image: orleans-silo
+</code></pre><p>Note that in production, we don&#39;t map the local directory and neither we have the <code>build:</code> action. The reason is that in production, the images should be built and pushed to your own Docker Registry.</p>
+<h1 id="put-everything-together">Put everything together</h1>
+<p>Now we have all the moving parts required to run your Orleans Application, we are going to put it together so we can run our Orleans solution inside Docker (Finally!).</p>
+<blockquote><p><strong>Note</strong>: The following commands should be performed from the solution directory.</p>
+</blockquote>
+<p>First, lets make sure we restore all NuGet packages from our solution. You only need to do it once. You are only required to do it again if you change any package dependency on your project.</p>
+<p><code># dotnet restore</code></p>
+<p>Now, let&#39;s build our solution using <code>dotnet</code> CLI as usual and publish it to an output directory:</p>
+<p><code># dotnet publish -o ./bin/PublishOutput</code></p>
+<blockquote><p><strong>Note</strong>: We are using <code>publish</code> here instead of build, to avoid problems with our dynamicaly loaded assemblied in Orleans. We are still looking for a better solution for it.</p>
+</blockquote>
+<p>With the application built and published, you need to build your Dockerfile images. This step is only required to be performed once per project and should be only performed again if you change the Dockerfile, docker-compose, or for any reason you cleaned up your local image registry.</p>
+<p><code># docker-compose build</code></p>
+<p>All the images used in both <code>Dockerfile</code> and <code>docker-compose.yml</code> are pulled from the registry and cached on your development machine. Your images are built, and you are all set to run.</p>
+<p>Now lets run it!</p>
+<pre><code class="lang-shell"># docker-compose up -d
+Creating network &quot;orleansdocker_default&quot; with the default driver
+Creating orleansdocker_orleans-silo_1 ... 
+Creating orleansdocker_orleans-silo_1 ... done
+Creating orleansdocker_orleans-client_1 ... 
+Creating orleansdocker_orleans-client_1 ... done
+#
+</code></pre><p>Now if you run a <code>docker-compose ps</code>, you will see 2 containers running for the <code>orleansdocker</code> project:</p>
+<pre><code class="lang-shell"># docker-compose ps
+             Name                     Command        State   Ports 
+------------------------------------------------------------------
+orleansdocker_orleans-client_1   tail -f /dev/null   Up            
+orleansdocker_orleans-silo_1     tail -f /dev/null   Up 
+</code></pre><blockquote><p><strong>Note for Windows users</strong>: If you are on Windows, and your container is using a Windows image as base, the <strong>Command</strong> column will show you the Powershell relative command to a <code>tail</code> on *NIX systems so the container will keep up the same way.</p>
+</blockquote>
+<p>Now that you have your containers up, you don&#39;t need to stop it every time you want to start your Orleans application. All you need is to integrate your IDE to debug the application inside the container which was previously mapped in your <code>docker-compose.yml</code>.</p>
+<h2 id="scaling">Scaling</h2>
+<p>Once you have your compose project running, you can easily scale up or down your application using <code>docker-compose scale</code> command:</p>
+<pre><code class="lang-shell"># docker-compose scale orleans-silo=15
+Starting orleansdocker_orleans-silo_1 ... done
+Creating orleansdocker_orleans-silo_2 ... 
+Creating orleansdocker_orleans-silo_3 ... 
+Creating orleansdocker_orleans-silo_4 ... 
+Creating orleansdocker_orleans-silo_5 ... 
+Creating orleansdocker_orleans-silo_6 ... 
+Creating orleansdocker_orleans-silo_7 ... 
+Creating orleansdocker_orleans-silo_8 ... 
+Creating orleansdocker_orleans-silo_9 ... 
+Creating orleansdocker_orleans-silo_10 ... 
+Creating orleansdocker_orleans-silo_11 ... 
+Creating orleansdocker_orleans-silo_12 ... 
+Creating orleansdocker_orleans-silo_13 ... 
+Creating orleansdocker_orleans-silo_14 ... 
+Creating orleansdocker_orleans-silo_15 ... 
+Creating orleansdocker_orleans-silo_6
+Creating orleansdocker_orleans-silo_5
+Creating orleansdocker_orleans-silo_3
+Creating orleansdocker_orleans-silo_2
+Creating orleansdocker_orleans-silo_4
+Creating orleansdocker_orleans-silo_9
+Creating orleansdocker_orleans-silo_7
+Creating orleansdocker_orleans-silo_8
+Creating orleansdocker_orleans-silo_10
+Creating orleansdocker_orleans-silo_11
+Creating orleansdocker_orleans-silo_15
+Creating orleansdocker_orleans-silo_12
+Creating orleansdocker_orleans-silo_14
+Creating orleansdocker_orleans-silo_13
+</code></pre><p>Few seconds later, you will see the services scaled to the specific number of instances you requested.</p>
+<pre><code class="lang-shell"># docker-compose ps
+             Name                     Command        State   Ports 
+------------------------------------------------------------------
+orleansdocker_orleans-client_1   tail -f /dev/null   Up            
+orleansdocker_orleans-silo_1     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_10    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_11    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_12    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_13    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_14    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_15    tail -f /dev/null   Up            
+orleansdocker_orleans-silo_2     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_3     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_4     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_5     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_6     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_7     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_8     tail -f /dev/null   Up            
+orleansdocker_orleans-silo_9     tail -f /dev/null   Up 
+</code></pre><blockquote><p><strong>Note</strong>: The <code>Command</code> column on those examples are showing the <code>tail</code> command just because we are using the debugger container. If we were in production, it would be showing <code>dotnet OrleansSilo.dll</code> for example.</p>
+</blockquote>
+<h1 id="docker-swarm">Docker Swarm</h1>
+<p>Docker clustering stack is called <strong>Swarm</strong> and you can find more by reading its <a href="https://docs.docker.com/engine/swarm/">documentation here</a>.</p>
+<p>To run this article in a <code>Swarm</code> cluster, you don&#39;t have any extra work. When you run <code>docker-compose up -d</code> in a <code>Swarm</code> node, it will schedule containers based on the configured rules. The same applies to other Swarm-based services like <a href="https://www.docker.com/enterprise-edition">Docker Datacenter</a>, <a href="https://azure.microsoft.com/en-us/services/container-service/">Azure ACS</a> (in Swarm mode), <a href="https://aws.amazon.com/ecs/">AWS ECS Container Service</a> and so on. All you need to do is to deploy your <code>Swarm</code> cluster before deploy your <strong>dockerized</strong> Orleans application.</p>
+<blockquote><p><strong>Note</strong>: If you are using a Docker engine with the Swarm mode that already have support to <code>stack</code>, <code>deploy</code> and <code>compose</code> v3, a better approach to deploy your solution would be <code>docker stack deploy -c docker-compose.yml &lt;name&gt;</code>. Just keep in mind that it requires v3 compose file support at your Docker engine and the majority of hosted services like Azure and AWS still use v2 and older engines.</p>
+</blockquote>
+<h1 id="google-kubernetes-k8s">Google Kubernetes (K8s)</h1>
+<p>If you plan to use <a href="https://kubernetes.io/">Kubernetes</a> to host Orleans, there is a community-maintained clustering provider available at <a href="https://github.com/OrleansContrib/Orleans.Clustering.Kubernetes">OrleansContrib\Orleans.Clustering.Kubernetes</a> and there you can find documentation and samples on how to host Orleans in Kubernetes seamlessly using the provider.</p>
+<h1 id="bonus-topic-debugging-orleans-inside-containers">[Bonus topic] Debugging Orleans inside Containers</h1>
+<p>Well, now that you know how to run Orleans in a container from scratch, would be good to leverage one of the most important principles in Docker. Containers are immutable. And they should have (almost) the same image, dependencies, and runtime in development as in production. This ensures the good old statement <em>&quot;It works on my machine!&quot;</em> never happens again. To make that possible, you need to have a way to develop <em>inside</em> the container and that includes have a debugger attached to your application inside the container.</p>
+<p>There are multiple ways to achieve that using multiple tools. After evaluating several, by the time I wrote this article, I ended up choosing one that looks more simple and is less intrusive in the application.</p>
+<p>As mentioned ealier in this article, we are using <code>VSCode</code> to develop the sample, so here is how to get the debugger attached to your Orleans Application inside the container.</p>
+<p>First, change two files inside your <code>.vscode</code> directory in your solution:</p>
+<p><code>tasks.json</code>:</p>
+<pre><code class="lang-json">{
+    &quot;version&quot;: &quot;0.1.0&quot;,
+    &quot;command&quot;: &quot;dotnet&quot;,
+    &quot;isShellCommand&quot;: true,
+    &quot;args&quot;: [],
+    &quot;tasks&quot;: [
+        {
+            &quot;taskName&quot;: &quot;publish&quot;,
+            &quot;args&quot;: [
+                &quot;${workspaceRoot}/Orleans-Docker.sln&quot;, &quot;-c&quot;, &quot;Debug&quot;, &quot;-o&quot;, &quot;./bin/PublishOutput&quot;
+            ],
+            &quot;isBuildCommand&quot;: true,
+            &quot;problemMatcher&quot;: &quot;$msCompile&quot;
+        }
+    ]
+}
+</code></pre><p>This file essentially tells <code>VSCode</code> that whenever you build the project, it will actually execute the <code>publish</code> command as we manually did earlier.</p>
+<p><code>launch.json</code>:</p>
+<pre><code class="lang-json">{
+   &quot;version&quot;: &quot;0.2.0&quot;,
+   &quot;configurations&quot;: [
+        {
+            &quot;name&quot;: &quot;Silo&quot;,
+            &quot;type&quot;: &quot;coreclr&quot;,
+            &quot;request&quot;: &quot;launch&quot;,
+            &quot;cwd&quot;: &quot;/app&quot;,
+            &quot;program&quot;: &quot;/app/OrleansSilo.dll&quot;,
+            &quot;sourceFileMap&quot;: {
+                &quot;/app&quot;: &quot;${workspaceRoot}/src/OrleansSilo&quot;
+            },
+            &quot;pipeTransport&quot;: {
+                &quot;debuggerPath&quot;: &quot;/vsdbg/vsdbg&quot;,
+                &quot;pipeProgram&quot;: &quot;/bin/bash&quot;,
+                &quot;pipeCwd&quot;: &quot;${workspaceRoot}&quot;,
+                &quot;pipeArgs&quot;: [
+                    &quot;-c&quot;,
+                    &quot;docker exec -i orleansdocker_orleans-silo_1 /vsdbg/vsdbg --interpreter=vscode&quot;
+                ]
+            }
+        },
+        {
+            &quot;name&quot;: &quot;Client&quot;,
+            &quot;type&quot;: &quot;coreclr&quot;,
+            &quot;request&quot;: &quot;launch&quot;,
+            &quot;cwd&quot;: &quot;/app&quot;,
+            &quot;program&quot;: &quot;/app/OrleansClient.dll&quot;,
+            &quot;sourceFileMap&quot;: {
+                &quot;/app&quot;: &quot;${workspaceRoot}/src/OrleansClient&quot;
+            },
+            &quot;pipeTransport&quot;: {
+                &quot;debuggerPath&quot;: &quot;/vsdbg/vsdbg&quot;,
+                &quot;pipeProgram&quot;: &quot;/bin/bash&quot;,
+                &quot;pipeCwd&quot;: &quot;${workspaceRoot}&quot;,
+                &quot;pipeArgs&quot;: [
+                    &quot;-c&quot;,
+                    &quot;docker exec -i orleansdocker_orleans-client_1 /vsdbg/vsdbg --interpreter=vscode&quot;
+                ]
+            }
+        }
+    ]
+}
+</code></pre><p>Now you can just build the solution from <code>VSCode</code> (which will publish) and start both the Silo and the Client. It will send a <code>docker exec</code> command to the running <code>docker-compose</code> service instance/container to start the debugger to the application and thats it. You have the debugger attached to the container and use it as if it was a locally running Orleans application. The difference now is that it is inside the container, and once you are done, you can just publish the container to your registry and pull it on your Docker hosts in production.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/docker_deployment.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

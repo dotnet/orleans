@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>List of Options Classes | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="List of Options Classes | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="list-of-options-classes">List of Options Classes</h1>
+
+<p>All Options classes used to configure Orleans should be in the <code>Orleans.Configuration</code> namespace. Many of them have helper methods in the <code>Orleans.Hosting</code> namespace.</p>
+<h2 id="common-core-options-for-iclientbuilder-and-isilohostbuilder">Common core options for IClientBuilder and ISiloHostBuilder</h2>
+<table>
+<thead>
+<tr>
+<th>Option type</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ClusterOptions</code></td>
+<td>Setting the <code>ClusterId</code> and the <code>ServiceId</code></td>
+</tr>
+<tr>
+<td><code>NetworkingOptions</code></td>
+<td>Setting timeout values for sockets and opened connections</td>
+</tr>
+<tr>
+<td><code>SerializationProviderOptions</code></td>
+<td>Setting the serialization providers</td>
+</tr>
+<tr>
+<td><code>TypeManagementOptions</code></td>
+<td>Setting the refresh period of the Type Map (see Heterogeneous silos and Versioning)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="iclientbuilder-specific-options">IClientBuilder specific options</h2>
+<table>
+<thead>
+<tr>
+<th>Option type</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ClientMessagingOptions</code></td>
+<td>Setting the number of connections to keep open, and specify what network interface to use</td>
+</tr>
+<tr>
+<td><code>ClientStatisticsOption</code></td>
+<td>Setting various setting related to statistics output</td>
+</tr>
+<tr>
+<td><code>GatewayOptions</code></td>
+<td>Setting the refresh period of the list of available gateways</td>
+</tr>
+<tr>
+<td><code>StaticGatewayListProviderOptions</code></td>
+<td>Setting URIs a client will use to connect to cluster</td>
+</tr>
+</tbody>
+</table>
+<h2 id="isilohostbuilder-specific-options">ISiloHostBuilder specific options</h2>
+<table>
+<thead>
+<tr>
+<th>Option type</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ClusterMembershipOptions</code></td>
+<td>Settings for cluster membership</td>
+</tr>
+<tr>
+<td><code>ConsistentRingOptions</code></td>
+<td>Configuration options for consistent hashing algorithm, used to balance resource allocations across the cluster.</td>
+</tr>
+<tr>
+<td><code>EndpointOptions</code></td>
+<td>Setting the Silo endpoint options</td>
+</tr>
+<tr>
+<td><code>GrainCollectionOptions</code></td>
+<td>Options for grain garbage collection</td>
+</tr>
+<tr>
+<td><code>GrainVersioningOptions</code></td>
+<td>Governs grain implementation selection in heterogeneous deployments</td>
+</tr>
+<tr>
+<td><code>LoadSheddingOptions</code></td>
+<td>Settings for load shedding configuration. Must have a registered implementation of <code>IHostEnvironmentStatistics</code> such as through <code>builder.UsePerfCounterEnvironmentStatistics()</code> (Windows only) for <code>LoadShedding</code> to function.</td>
+</tr>
+<tr>
+<td><code>MultiClusterOptions</code></td>
+<td>Options for configuring multi-cluster support</td>
+</tr>
+<tr>
+<td><code>PerformanceTuningOptions</code></td>
+<td>Performance tuning options (networking, number of threads)</td>
+</tr>
+<tr>
+<td><code>ProcessExitHandlingOptions</code></td>
+<td>Configure silo behavior on process exit</td>
+</tr>
+<tr>
+<td><code>SchedulingOptions</code></td>
+<td>Configuring scheduler behavior</td>
+</tr>
+<tr>
+<td><code>SiloMessagingOptions</code></td>
+<td>Configuring global messaging options that are silo related.</td>
+</tr>
+<tr>
+<td><code>SiloOptions</code></td>
+<td>Setting the name of the Silo</td>
+</tr>
+<tr>
+<td><code>SiloStatisticsOptions</code></td>
+<td>Setting various setting related to statistics output</td>
+</tr>
+<tr>
+<td><code>TelemetryOptions</code></td>
+<td>Setting telemetry consumer settings</td>
+</tr>
+</tbody>
+</table>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/list_of_options_classes.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

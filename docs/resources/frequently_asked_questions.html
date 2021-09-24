@@ -1,0 +1,192 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Frequently Asked Questions | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Frequently Asked Questions | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="frequently-asked-questions">Frequently Asked Questions</h1>
+
+<h2 id="availability">Availability</h2>
+<h3 id="can-i-freely-use-orleans-in-my-project">Can I freely use Orleans in my project?</h3>
+<p>Absolutely. The source code has been released under the <a href="https://github.com/dotnet/orleans/blob/master/LICENSE">MIT license</a>. NuGet packages are published on <a href="https://www.nuget.org/profiles/Orleans">nuget.org</a>.</p>
+<h3 id="is-orleans-production-ready-i-heard-its-a-research-project">Is Orleans production ready? I heard it&#39;s a research project.</h3>
+<p>Orleans, indeed, initially started as a research project within Microsoft Research.
+It later grew into a product and has been used in production within Microsoft since 2011, and by other companies after it was publicly released in 2015.
+Orleans is definitely production ready, and powers many highly available systems and cloud services.</p>
+<h3 id="does-microsoft-support-orleans">Does Microsoft support Orleans?</h3>
+<p>Source code of Orleans has been released under an MIT license on <a href="https://github.com/dotnet/orleans">GitHub</a>.
+Microsoft continues to invest in Orleans and accepts community contributions to the codebase.</p>
+<h2 id="positioning">Positioning</h2>
+<h3 id="is-orleans-a-server-product-how-do-i-run-orleans">Is Orleans a server product? How do I run Orleans?</h3>
+<p>Orleans is a framework, a set of libraries, that helps you build an application.
+Orleans-based applications can be run in various hosting environments, in the Cloud or on on-premises clusters or even on a single machine.
+It is the responsibility of application developer to build, deploy, and run an Orleans-based application in their target hosting environment.</p>
+<h3 id="where-can-i-run-orleans">Where can I run Orleans?</h3>
+<p>Orleans can run in any environment where .NET application can run.
+Prior to Orleans 2.0, it required full .NET Framework. Starting with 2.0, Orleans conforms to .NET Standard 2.0, and hence can run on .NET Core in Windows and non-Windows environments that support .NET Core.</p>
+<h3 id="is-orleans-built-for-azure">Is Orleans built for Azure?</h3>
+<p>No.
+We believe that you should be able to run Orleans anywhere you need, the way you need.
+Orleans is very flexible, and has a number of optional providers that help host it in cloud environment, such as Azure, AWS or GCP, or on on-premises clusters, with a choice of technologies to support Orleans&#39; clustering protocol.</p>
+<h3 id="what-is-the-difference-between-orleans-and-other-actor-languages-and-frameworks-such-as-erlang-or-akka">What is the difference between Orleans and other actor languages and frameworks, such as Erlang or Akka?</h3>
+<p>While based on the same base principles of the Actor Model, Orleans took a step forward, and introduced a notion of Virtual Actors that greatly simplifies developer&#39;s experience and is much more suitable for cloud services and high-scale systems.</p>
+<h2 id="design">Design</h2>
+<h3 id="how-big-or-how-small-should-a-grain-be-in-my-application">How big or how small should a grain be in my application?</h3>
+<p>The grain isolation model makes them very good at representing independent isolated contexts of state and computation.
+In most cases, grains naturally map to such application entities as users, sessions, accounts.
+Those entities are generally isolated from each other, can be accessed and updated independently, and expose a well defined set of supported operations.
+This works well with the intuitive &quot;one entity - one grain&quot; modeling.</p>
+<p>An application entity may be too big to be efficiently represented by a single grain if it encapsulates too much state, and as a result has to handle a high rate of requests to it.
+Even though a single grain can generally handle up to a few thousand trivial calls per second, the rule of thumb is to be wary of individual grain receiving hundreds of requests per second.
+That may be a sign of the grain being too large, and decomposing it into a set of smaller grains may lead to a more stable and balanced system.</p>
+<p>An application entity may be too small to be a grain if that would cause constant interaction of other grains with it, and as a result, cause too much of a messaging overhead.
+In such cases, it may make more sense to make those closely interacting entities part of a single grain, so that they would invoke each other directly.</p>
+<h3 id="how-should-you-avoid-grain-hot-spots">How should you avoid grain hot spots?</h3>
+<p>The throughput of a grain is limited by a single thread that its activation can execute on.
+Therefore, it is advisable to avoid designs where a single grain receives a disproportionate share of requests or is involved in processing requests to other grains.
+There are various patterns that help prevent overloading of a single grain even when logically it is a central point of communication.</p>
+<p>For example, if a grain is an aggregator of some counters or statistics that are reported by a large number of grains on a regular basis, one proven approach is to add a controlled number of intermediate aggregator grains and assign each of the reporting grains (using a modulo on a key or a hash) to an intermediate aggregator, so that the load is more or less evenly distributed across all intermediate aggregator grains that in their turn periodically report partial aggregates to the central aggregator grain.</p>
+<h2 id="how-to">How To</h2>
+<h3 id="how-do-i-tear-down-a-grain">How do I tear down a grain?</h3>
+<p>In general there is no need for application logic to force deactivation of a grain, as the Orleans runtime automatically detects and deactivates idle activations of a grain to reclaim system resources.
+Letting Orleans do that is more efficient because it batches deactivation operations instead of executing them one by one.
+In the rare cases when you think you do need to expedite deactivation of a grain, the grain can do that by calling the <code>base.DeactivateOnIdle()</code> method.</p>
+<h3 id="can-i-tell-orleans-where-to-activate-a-grain">Can I tell Orleans where to activate a grain?</h3>
+<p>It is possible to do so using restrictive placement strategies, but we generally consider this a rather advanced pattern that requires careful consideration.
+By doing what the question suggests, the application would take on the burden of resource management without necessarily having enough information about the global state of the system to do so well.
+This is especially counter-productive in cases of silo restarts, which in cloud environments may happen on a regular basis for OS patching.
+Thus, specific placement may have a negative impact on your application&#39;s scalability as well as resilience to system failure.</p>
+<p>That being said, for the rare cases where the application indeed knows where a particular grain should be activated, for example, if it has a knowledge of the locality of grain&#39;s persistent state, in 1.5.0 we introduced custom placement policies and directors.</p>
+<h3 id="how-do-you-version-grains-or-add-new-grain-classes-and-interfaces">How do you version grains or add new grain classes and interfaces?</h3>
+<p>You can add silos with new grain classes or new versions of existing grain classes to a running cluster.</p>
+<h3 id="can-i-connect-to-orleans-silos-from-the-public-internet">Can I Connect to Orleans silos from the public Internet?</h3>
+<p>Orleans is designed to be hosted as the back-end part of a service, and you are expected to create a front-end tier to which external clients will connect.
+It can be an HTTP based Web API project, a socket server, a SignalR server or anything else fits the needs of the application.
+You can connect to Orleans from the Internet if you expose TCP endpoints of silos to it, but it is not a good practice from the security point of view.</p>
+<h3 id="what-happens-if-a-silo-fails-before-my-grain-call-returns-a-response-for-my-call">What happens if a silo fails before my grain call returns a response for my call?</h3>
+<p>In case of a silo failure in the middle of a grain call, you&#39;ll receive an exception that you can catch in your code and retry or do something else to handle the error according to your application logic.
+The grain that failed with the silo will get automatically re-instantiated upon a next call to it.
+The Orleans runtime does not eagerly recreate grains from a failed silo because many of them may not be needed immediately or at all.
+Instead, the runtime recreates such grains individually and only when a new request arrives for a particular grain.
+For each grain it picks one of the available silos as a new host.</p>
+<p>The benefit of this approach is that the recovery process is performed only for grains that are actually being used and it is spread in time and across all available silos, which improves the responsiveness of the system and the speed of recovery.
+Note also that there is a delay between the time when a silo fails and when the Orleans cluster detects the failure.
+The delay is a configurable tradeoff between the speed of detection and the probability of false positives.
+During this transition period all calls to the grain will fail, but after the detection of the failure the grain will be created, upon a new call to it, on another silo, so it will be eventually available.</p>
+<h3 id="what-happens-if-a-grain-call-takes-too-long-to-execute">What happens if a grain call takes too long to execute?</h3>
+<p>Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them.
+Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking.
+Keep in mind that grain calls should not execute any long running tasks like IO operations synchronously and should not block on other tasks to complete.
+All waiting should be done asynchronously using the <code>await</code> keyword or other asynchronous waiting mechanisms.
+Grains should return as soon as possible to let other grains execute for maximum throughput.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/frequently_asked_questions.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

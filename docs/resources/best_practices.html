@@ -1,0 +1,573 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Best Practices | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Best Practices | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="best-practices">Best Practices</h1>
+
+<p>Orleans was built with the goal to greatly simplify building of distributed scalable applications, especially for the cloud. 
+Orleans invented the Virtual Actor Model as an evolution of the Actor Model optimized for the cloud scenarios.</p>
+<p>Grains (virtual actors) are the base building blocks of an Orleans-based application. 
+They encapsulate state and behavior of application entities and maintain their lifecycle. 
+The programming model of Orleans and the characteristics of its runtime fit some types of applications better than others. 
+This document is intended to capture some of the tried and proven application patterns that work well in Orleans.</p>
+<h2 id="orleans-should-be-considered-when">Orleans should be considered when:</h2>
+<ul>
+<li><p>Significant number (hundreds, millions, billions, and even trillions) of loosely coupled entities. To put the number in perspective, Orleans can easily create a grain for every person on Earth in a small cluster, so long as a subset of that total number is active at any point in time. </p>
+<ul>
+<li>Examples: user profiles, purchase orders, application/game sessions, stocks</li>
+</ul>
+</li>
+<li><p>Entities are small enough to be single-threaded</p>
+<ul>
+<li>Example: Determine if stock should be purchased based on current price</li>
+</ul>
+</li>
+<li><p>Workload is interactive</p>
+<ul>
+<li>Example: request-response, start/monitor/complete</li>
+</ul>
+</li>
+<li><p>More than one server is expected or may be required</p>
+<ul>
+<li>Orleans runs on a cluster which is expanded by adding servers to expand
+the cluster</li>
+</ul>
+</li>
+<li><p>Global coordination is not needed or on a smaller scale between a few
+entities at a time</p>
+<ul>
+<li>Scalability and performance of execution is achieved by parallelizing and distributed a large number of mostly independent tasks with no single point of synchronization.</li>
+</ul>
+</li>
+</ul>
+<h2 id="orleans-is-not-the-best-fit-when">Orleans is not the best fit when:</h2>
+<ul>
+<li><p>Memory must be shared between entities</p>
+<ul>
+<li>Each grain maintains its own states and should not be shared.</li>
+</ul>
+</li>
+<li><p>A small number of large entities that may be multithreaded</p>
+<ul>
+<li>A microservice may be a better option when supporting complex logic in a
+single service</li>
+</ul>
+</li>
+<li><p>Global coordination and/or consistency is needed</p>
+<ul>
+<li>Such global coordination would severely limit performance of an Orleans-based application. Orleans was built to easily scale to a global scale without the need of in-depth manual coordination. </li>
+</ul>
+</li>
+<li><p><em>Operations that run for a long time</em></p>
+<ul>
+<li><p>Batch jobs, Single Instruction Multiple Data (SIMD) tasks</p>
+</li>
+<li><p>This depends on the need of the application and may be a fit for Orleans</p>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="grains">Grains</h2>
+<p><strong>Overview</strong>:</p>
+<ul>
+<li><p>Grains resemble objects. However, they are distributed, virtual, and asynchronous.</p>
+</li>
+<li><p>They are loosely coupled, isolated, and primarily independent</p>
+<ul>
+<li><p>Each grain is encapsulated which also maintains its own state
+independently of other grains</p>
+</li>
+<li><p>Grains fail independently</p>
+</li>
+</ul>
+</li>
+<li><p>Avoid chatty communication between grains</p>
+<ul>
+<li><p>Direct memory use is significantly less expensive than message passing</p>
+</li>
+<li><p>Highly chatty grains may be better combined as a single grain</p>
+</li>
+<li><p>Complexity/Size of arguments and serialization need to be considered</p>
+<ul>
+<li>Deserializing twice may be more expensive than resending a binary
+message</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Avoid bottleneck grains</p>
+<ul>
+<li><p>Single coordinator/Registry/Monitor</p>
+</li>
+<li><p>Do staged aggregation if required</p>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>Asynchronicity</strong>:</p>
+<ul>
+<li><p>No thread blocking: All items must be Async (Task Asynchronous Programming
+(TAP))</p>
+</li>
+<li><p><a href="https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/async/">await</a>
+is the best syntax to use when composing async operations</p>
+</li>
+<li><p>Common Scenarios:</p>
+<ul>
+<li><p>Return a concrete value:</p>
+<ul>
+<li>return Task.FromResult(value);</li>
+</ul>
+</li>
+<li><p>Return a Task of the same type:</p>
+<ul>
+<li>return foo.Bar();</li>
+</ul>
+</li>
+<li><p>Await a Task and continue execution:</p>
+<ul>
+<li><code>var x = await bar.Foo();  
+var y = DoSomething(x);  
+return y;</code></li>
+</ul>
+</li>
+<li><p>Fan-out:</p>
+<ul>
+<li><code>var tasks = new List&lt;Task&gt;();  
+foreach(var grain in grains)  
+{ tasks.Add(grain.Foo()) }  
+await Task.WhenAll(tasks);  
+DoMoreWork();</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>Implementation of Grains</strong>:</p>
+<ul>
+<li><p>Never perform a thread-blocking operation within a grain. All operations other than local computations must be explicitly asynchronous.</p>
+<ul>
+<li>Examples: Synchronously waiting for an IO operation or a web service call, locking, running an excessive loop that is waiting for a condition, etc. </li>
+</ul>
+</li>
+<li><p>When to use a [StatelessWorker]</p>
+<ul>
+<li><p>Functional operations such as: decryption, decompression, and before
+forwarding for processing</p>
+</li>
+<li><p>When only <em>local</em> grains are required in multiple activations</p>
+</li>
+<li><p>Example: Performs well with staged aggregation within local silo first</p>
+</li>
+</ul>
+</li>
+<li><p>Grains are non-reentrant by default</p>
+<ul>
+<li><p>Deadlock can occur due to call cycles</p>
+<ul>
+<li><p>Examples: </p>
+<ul>
+<li><p>The grain calls itself</p>
+</li>
+<li><p>Grains A calls B while C is also calling A (A-&gt;B-&gt;C-&gt;A)</p>
+</li>
+<li><p>Grain A calls Grain B as Grain B is calling Grain A (A-&gt;B-&gt;A)</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Timeouts are used to automatically break deadlocks</p>
+</li>
+<li><p>Attribute [Reentrant] can be used to allow the grain class reentrant</p>
+</li>
+<li><p>Reentrant is still single-threaded however, it may interleave (divide
+processing/memory between tasks)</p>
+</li>
+<li><p>Handling interleaving increases risk by being error prone</p>
+</li>
+</ul>
+</li>
+<li><p>Inheritance</p>
+<ul>
+<li><p>Grain classes inherit from the Grain base class. Grain intrerfaces (one or more) can be added to each grain.</p>
+</li>
+<li><p>Disambiguation may be needed to implement the same interface in multiple
+grain classes</p>
+</li>
+</ul>
+</li>
+<li><p>Generics are supported</p>
+</li>
+</ul>
+<h2 id="grain-state-persistence">Grain State Persistence</h2>
+<p>Orleans’ grain state persistence APIs are designed to be easy-to-use and provide
+extensible storage functionality.</p>
+<ul>
+<li>Tutorial: <em>Needs to be created</em></li>
+</ul>
+<p><strong>Overview</strong>:</p>
+<ul>
+<li><p>Orleans.IGrainState is extended by a .NET interface which contains fields
+that should be included in the grain’s persisted state.</p>
+</li>
+<li><p>Grains are persisted by using <a href="../grains/grain_persistence/index.html">IPersistentState&lt;TState></a> is extended by the grain class that adds a strongly typed State property into the grain’s base class.</p>
+</li>
+<li><p>The initial State.ReadStateAsync() automatically occurs prior to
+ActiveAsync() has been called for a grain.</p>
+</li>
+<li><p>When the grain’s state object’s data is changed, then the grain should call
+State.WriteStateAsync()</p>
+<ul>
+<li><p>Typically, grains call State.WriteStateAsync() at the end of grain
+method to return the Write promise.</p>
+</li>
+<li><p>The Storage provider <em>could</em> try to batch Writes that may increase
+efficiency, but behavioral contract and configurations are orthogonal
+(independent) to the storage API used by the grain.</p>
+</li>
+<li><p>A <strong>timer</strong> is an alternative method to write updates periodically.</p>
+<ul>
+<li><p>The timer allows the application to determine the amount of
+“eventual consistency”/statelessness allowed.</p>
+</li>
+<li><p>Timing (immediate/none/minutes) can also be controlled as to when to
+update.</p>
+</li>
+</ul>
+</li>
+<li><p>PersistetState classes, like other grain classes, can only be associated with one storage provider.</p>
+<ul>
+<li><p>[StorageProvider(ProviderName=”name”)] attribute associates the
+grain class with a particular provider</p>
+</li>
+<li><p>&lt;StorageProvider> will need to be added to the Silo config file
+which should also include the corresponding “name” from
+[StorageProvider(ProviderName=”name”)]</p>
+</li>
+<li><p>A composite storage provider can be used with SharedStorageProvider</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="storage-providers">Storage Providers</h2>
+<p>Built-in Storage Providers</p>
+<ul>
+<li><p>Orleans.Storage houses all of the built-in storage providers. The namespace
+is: OrleansProviders.dll</p>
+</li>
+<li><p>MemoryStorage (Data stored in memory without durable persistence) is used
+<em>only</em> for debugging and unit testing.</p>
+</li>
+<li><p>AzureTableStorage</p>
+<ul>
+<li><p>Configure the Azure storage account information with an optional
+DeleteStateOnClear (hard or soft deletions)</p>
+</li>
+<li><p>Orleans serializer efficiently stores JSON data in one Azure table
+cell</p>
+</li>
+<li><p>Data size limit == max size of the Azure column which is 64kb of binary
+data</p>
+</li>
+<li><p>Community contributed code that extends the use of multiple table
+columns which increases the overall maximum size to 1mb.</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>Storage Provider Debugging Tips</p>
+<ul>
+<li><p>TraceOverride Verbose3 will log much more information about storage
+operations.</p>
+<ul>
+<li><p>Update silo config file</p>
+<ul>
+<li>LogPrefix=”Storage” for all providers, or specific type using
+“Storage.Memory” / ”Storage.Azure” / “Storage.Shard”</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>How to deal with Storage Operation Failures</p>
+<ul>
+<li><p>Grains and storage providers can await storage operations and <em>retry</em>
+failures as needed</p>
+</li>
+<li><p>Unhandled failures will propagate back to the caller and will be seen by the
+client as a broken promise</p>
+</li>
+<li><p>Other than the initial read, there is not a concept that automatically
+destroys activations if a storage operation fails</p>
+</li>
+<li><p>Retrying a failing storage is <em>not</em> a default feature for built-in storage
+providers</p>
+</li>
+</ul>
+<p>Grain Persistence Tips</p>
+<p>Grain Size</p>
+<ul>
+<li><p>Optimal throughput is achieved by using <em>multiple smaller grains</em> rather
+than a few larger grains. However, the best practice of choosing a grain
+size and type is base on the <em>application domain model</em>.</p>
+<ul>
+<li>Example: Users, Orders, etc.</li>
+</ul>
+</li>
+</ul>
+<p>External Changing Data</p>
+<ul>
+<li><p>Grain are able to re-read the current state data from storage by using
+State.ReadStateAsyc()</p>
+</li>
+<li><p>A timer can also be used to re-read data from storage periodically as well</p>
+<ul>
+<li><p>The functional requirements could be based on a suitable “staleness” of
+the information</p>
+<ul>
+<li>Example: Content Cache Grain</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Adding and Removing Fields</p>
+<ul>
+<li><p>The storage provider will determine the effects of adding and removing
+additional fields from its persisted state.</p>
+</li>
+<li><p>Azure table does not support schemas and should automatically adjust to
+the additional fields.</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>Writing Custom Providers</p>
+<ul>
+<li><p>Storage providers are simple to write which is also a significant extension
+element for Orleans</p>
+<ul>
+<li>Tutorial: <em>need tutorial</em></li>
+</ul>
+</li>
+<li><p>The API GrainState API contract drives the storage API contract (Write,
+Clear, ReadStateAsync())</p>
+</li>
+<li><p>The storage behavior is typically configurable (Batch writing, Hard or Soft
+Deletions, etc.) and defined by the storage provider</p>
+</li>
+</ul>
+<h2 id="cluster-management">Cluster Management</h2>
+<ul>
+<li><p>Orleans automatically manages clusters</p>
+<ul>
+<li><p>Failed nodes --that is that can fail and join at any moment-- are automatically handled by Orleans</p>
+</li>
+<li><p>The same silo instance table that is created for the clustering protocol can also be used for diagnostics. The table keeps a history of all of the silos in the cluster.</p>
+</li>
+<li><p>There are also configuration options of an aggressive or a more lenient
+failure detection</p>
+</li>
+</ul>
+</li>
+<li><p>Failures can happen at any time and are a normal occurrence</p>
+<ul>
+<li><p>In the event a silo fails, the grains that were activated on the failed silo will automatically be reactived later on other silos within the cluster. </p>
+</li>
+<li><p>Grains have an ability to timeout. A retry solution such as Polly can assist with retries. </p>
+</li>
+<li><p>Orleans provides a message delivery guaruntee where each message is delivered at-most-once. </p>
+</li>
+<li><p>It is a responsibility of the caller to <a href="https://github.com/App-vNext/Polly/wiki/Retry">retry</a> any failed calls if needed. </p>
+<ul>
+<li>Common practice is to retry from end-to-end from the client/front
+end</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="deployment-and-production-management">Deployment and Production Management</h2>
+<p>Scaling out and in</p>
+<ul>
+<li><p>Monitor the Service-Level Agreement (SLA)</p>
+</li>
+<li><p>Add or Remove instances</p>
+</li>
+<li><p>Orleans automatically rebalances and takes advantage of the new hardware. However, activated grains are not rebalanced when a new silo is added to the cluster. </p>
+</li>
+</ul>
+<h2 id="logging-and-testing">Logging and Testing</h2>
+<ul>
+<li><p>Logging, Tracing, and Monitoring</p>
+<ul>
+<li><p>Inject <a href="https://github.com/dotnet/orleans/blob/master/Samples/3.0/HelloWorld/src/HelloWorld.Grains/HelloGrain.cs#L14through">logging</a> Dependency injection</p>
+<ul>
+<li><code>public HelloGrain(ILogger&lt;HelloGrain&gt; logger) {this.logger = logger;}</code></li>
+</ul>
+</li>
+<li><p><a href="https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.logging?view=dotnet-plat-ext-3.1">Microsoft.Extensions.Logging</a> is utilized for functional and flexible logging</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>Testing</p>
+<ul>
+<li><p>Microsoft.Orleans.TestingHost NuGet package contains TestCluster which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.</p>
+</li>
+<li><p>Additional information can be found <a href="../tutorials_and_samples/testing.html">here</a></p>
+</li>
+</ul>
+<p>Troubleshooting</p>
+<ul>
+<li><p>Use Azure table-based membership for development and testing</p>
+<ul>
+<li><p>Works with Azure Storage Emulator for local troubleshooting</p>
+</li>
+<li><p>OrleansSiloInstances table displays the state of the cluster</p>
+</li>
+<li><p>Use unique deployment Ids (partition keys) in order to keep it simple</p>
+</li>
+</ul>
+</li>
+<li><p>Silo isn’t starting</p>
+<ul>
+<li><p>Check OrleansSiloInstances to determine if the silo registered there.</p>
+</li>
+<li><p>Make sure that firewall is open for TCP ports: 11111 and 30000</p>
+</li>
+<li><p>Check the logs, including the extra log that contains startup errors</p>
+</li>
+</ul>
+</li>
+<li><p>Frontend (Client) cannot connect to the silo cluster</p>
+<ul>
+<li><p>The client must be hosted in the same service as the silos</p>
+</li>
+<li><p>Check OrleansSiloInstances to make sure the silos (gateways) are
+registered</p>
+</li>
+<li><p>Check the client log to make sure that the gateways match the ones
+listed in the OrleansSiloInstances’ table</p>
+</li>
+<li><p>Check the client log to validate that the client was able to connect to
+one or more of the gateways</p>
+</li>
+</ul>
+</li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/best_practices.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>JournaledGrain Diagnostics | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="JournaledGrain Diagnostics | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="journaledgrain-diagnostics">JournaledGrain Diagnostics</h1>
+
+<h2 id="monitoring-connection-errors">Monitoring Connection Errors</h2>
+<p>By design, log consistency providers are resilient under connection errors (including both connections to storage, and connections between clusters). But just tolerating errors is not enough, as applications usually need to monitor any such issues, and bring them to the attention of an operator if they are serious.</p>
+<p>JournaledGrain subclasses can override the following methods to receive notifications when there are connection errors observed, and when those errors are resolved:</p>
+<pre><code class="lang-csharp">protected override void OnConnectionIssue(ConnectionIssue issue) 
+{
+    /// handle the observed error described by issue             
+}
+protected override void OnConnectionIssueResolved(ConnectionIssue issue) 
+{
+    /// handle the resolution of a previously reported issue             
+}
+</code></pre><p><code>ConnectionIssue</code> is an abstract class, with several common fields describing the issue, including how many times it has been observed since the last time connection was successful. The actual type of connection issue is defined by subclasses. Connection issues are categorized into types, such as <code>PrimaryOperationFailed</code> or <code>NotificationFailed</code>, and sometimes have extra keys (such as <code>RemoteCluster</code>) that further narrow the category.</p>
+<p>If the same category of issue happens several times (for example, we keep getting a <code>NotificationFailed</code> that targets the same <code>RemoteCluster</code>), it is reported each time by <code>OnConnectionIssue</code>. Once this category of issue is resolved (for example, we are finally successful with sending a notification to this <code>RemoteCluster</code>), then <code>OnConnectionIssueResolved</code> is called once, with the same <code>issue</code> object that was last reported by <code>OnConnectionIssue</code>. Connection issues, and their resolution, for independent categories, are reported independently.</p>
+<h2 id="simple-statistics">Simple Statistics</h2>
+<p>We currently offer a simple support for basic statistics (in the future, we will probably replace this with a more standard telemetry mechanism).
+Statistics collection can be enabled or disabled for a JournaledGrain by calling</p>
+<pre><code class="lang-csharp">void EnableStatsCollection()
+void DisableStatsCollection()
+</code></pre><p>The statistics can be retrieved by calling</p>
+<pre><code class="lang-csharp">LogConsistencyStatistics GetStats()
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/event_sourcing/journaledgrain_diagnostics.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

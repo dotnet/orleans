@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Multi-Cluster Support | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Multi-Cluster Support | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="multi-cluster-support">Multi-Cluster Support</h1>
+
+<p>Orleans v.1.3.0 added support for federating several Orleans clusters into a loosely connected <em>multi-cluster</em> that acts like a single service. </p>
+<p>Multi-clusters facilitate <em>geo-distribution</em> of a service, that is, make it easier to run an Orleans application in multiple data-centers around the world. Also, a multi-cluster can be run within a single datacenter to get better failure and performance isolation. </p>
+<p>All mechanisms are designed with particular attention to (1) minimize communication between clusters, and (2) let each cluster run autonomously even if other clusters fail or become unreachable. </p>
+<h2 id="configuration-and-operation">Configuration and Operation</h2>
+<p>Below we document how to configure and operate a multi-cluster. </p>
+<p><a href="GossipChannels.html"><strong>Communication</strong></a>. Clusters communicate via the same silo-to-silo connections that are used within a cluster. To exchange status and configuration information, Clusters use a gossip mechanism and gossip channel implementations.</p>
+<p><a href="SiloConfiguration.html"><strong>Silo Configuration</strong></a>. Silos need to be configured so they know which cluster they belong to (each cluster is identified by a unique string). Also, each silo needs to be configured with connection strings that allow them to connect to one or more <a href="GossipChannels.html">gossip channels</a> on startup. </p>
+<p><a href="MultiClusterConfiguration.html"><strong>Multi-Cluster Configuration Injection</strong></a>. At runtime, the service operator can specify and/or change the <em>multi-cluster configuration</em>, which contains a list of cluster ids, to specify which clusters are part of the current multi-cluster. This is done by calling the management grain in any one of the clusters.</p>
+<h2 id="multi-cluster-grains">Multi-Cluster Grains</h2>
+<p>Below we document how to use multi-cluster functionality at the application level.</p>
+<p><a href="GlobalSingleInstance.html"><strong>Global-Single-Instance Grains</strong></a>. Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  <code>[GlobalSingleInstance]</code> attribute means we want the same behavior as as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the <code>[OneInstancePerCluster]</code> attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.</p>
+<p><strong>Log-View Grains</strong>  <em>(not in v.1.3.0)</em>. A special type of grain that uses a new API, similar to event sourcing, for synchronizing or persisting grain state. It can be used to automatically and efficiently synchronize the state of  a grain between clusters and with storage. Because its synchronization algorithms are safe to use with reentrant grains, and are optimized to use batching and replication, it can perform better than standard grains when a grain is frequently accessed in multiple clusters, and/or when it is written to storage frequently. Support for log-view grains is not part of the master branch yet. We have a prerelease including samples and a bit of documentation in the <a href="https://github.com/sebastianburckhardt/orleans/tree/geo-samples">geo-orleans branch</a>. It is currently being evaluated in production by an early adopter. </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/multi-cluster_support/Overview.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

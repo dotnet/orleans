@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Messaging Delivery Guarantees | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Messaging Delivery Guarantees | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="messaging-delivery-guarantees">Messaging Delivery Guarantees</h1>
+
+<p>Orleans messaging delivery guarantees are <strong>at-most-once</strong>, by default.
+Optionally, if configured to do retries upon timeout, Orleans provides at-least-once deliv­ery instead.</p>
+<p>In more detail:</p>
+<ul>
+<li><p>Every message in Orleans has automatic timeout (the exact timeout can be configured). If the reply does not arrive on time, the return Task is broken with timeout exception.</p>
+</li>
+<li><p>Orleans can be configured to do automatic retries upon timeout. By default it does NOT do automatic retries.</p>
+</li>
+<li><p>Application code of course can also choose to do retries upon timeout.</p>
+</li>
+</ul>
+<p>If the Orleans system is configured not to do automatic retries (default setting) and the application is not resending – <strong>Orleans provides at-most-once message delivery</strong>. A message will either be delivered once or not at all. <strong>It will never be delivered twice.</strong></p>
+<p>In the system with retries (either by the runtime or by the application) the message may arrive multiple times. Orleans currently does nothing to durably store which messages already arrived and suppress the second delivery. (We believe this would be pretty costly.) So in a system with retries Orleans does NOT guarantee at most once delivery.</p>
+<p><strong>If you keep retrying potentially indefinitely</strong>, <strong>the message will eventually arrive</strong>, thus providing at-least-once delivery guarantee. Notice that “will eventually arrive” is something that the runtime needs to guarantee. It does not come for free just by itself even if you keep retrying. Orleans provides eventual delivery since grains never go into any permanent failure state and a failed grain will eventually be re-activated on another silo.</p>
+<p><strong>So to summarize</strong>: in the system without retries Orleans guarantees at-most-once message delivery. In the system with infinite retries Orleans guarantees at-least-once (and does NOT guarantee at-most-once).</p>
+<p><strong>Note</strong>:
+In the <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf">Orleans technical report</a> we accidentally only mentioned the 2nd option with automatic retries. We forgot to mention that by default with no retries, Orleans provides at-most-once delivery.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/implementation/messaging_delivery_guarantees.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

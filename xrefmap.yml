@@ -1,0 +1,6 @@
+### YamlMime:XRefMap
+sorted: true
+references:
+- uid: serialization
+  name: Serialization and Writing Custom Serializers
+  href: docs/host/configuration_guide/serialization.html

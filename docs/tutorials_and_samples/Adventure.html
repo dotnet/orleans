@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Adventure | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Adventure | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="adventure">Adventure</h1>
+
+<p>A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.</p>
+<h3 id="instructions">Instructions</h3>
+<ol>
+<li>Open OrleansAdventure.sln in Visual Studio. Found <a href="https://github.com/dotnet/orleans/tree/main/samples/Adventure">here.</a></li>
+<li>Start the &#39;AdventureSetup&#39; project.</li>
+<li>Once AdventureSetup is running, start the &#39;AdventureClient&#39; project.</li>
+<li>You will then be prompted to enter your name on the command line. Enter it and begin the game.</li>
+</ol>
+<h3 id="overview">Overview</h3>
+<p>The AdventureSetup program reads a game description (&quot;map&quot;) from AdventureConfig.txt.</p>
+<p>It sets up a series of &quot;rooms&quot; e.g. forest, beach, caves, a clearing etc . These locations are connected to other rooms to model the places and layout of the game. The sample configuration describes only a handful of locations.</p>
+<p>Rooms can contain &quot;things&quot; such as keys, swords etc.</p>
+<p>The AdventureClient program sets up your player and provides a simple text based user interface to allow you to play the game.</p>
+<p>You can move around rooms and interact with things using a simple command language, saying things such as &quot;go north&quot; or &quot;take brass key&quot;.</p>
+<h3 id="why-orleans">Why Orleans?</h3>
+<p>Orleans allows the game to be described via very simple C# code while allowing it to scale to a massive multiplayer game. For this motivation to be meaningful, the labyrinth of rooms needs to be very large and need to support a large number of simultaneous players. One value of Orleans is that the service can be designed for growth, the overhead of running it at a small scale is not significant, and you can remain confident that it will scale if the need arises.</p>
+<h3 id="how-is-it-modeled">How is it modeled?</h3>
+<p>Player and Rooms are modeled as grains. These grains allow us to distribute the game with each grain modelling state and functionality.</p>
+<p>Things such as keys are modeled as plain old objects - they are really just simple immutable data structures that move around rooms and among players; they don&#39;t need to be grains.</p>
+<h3 id="possible-improvements">Possible improvements</h3>
+<ol>
+<li>Make the map much, much, bigger</li>
+<li>Make the brass key unlock something</li>
+<li>Allow players to message each other</li>
+<li>Make eating food and drinking water possible and meaningful</li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/Adventure.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

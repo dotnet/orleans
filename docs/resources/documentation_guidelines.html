@@ -1,0 +1,208 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Documentation Guidelines | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Documentation Guidelines | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="documentation-guidelines">Documentation Guidelines</h1>
+
+<p>The Orleans documentation is built in <a href="https://help.github.com/articles/markdown-basics/">Markdown</a>.
+We use a few simple conventions to ensure a homogeneous style throughout the full set of documents.</p>
+<p>These standards are being introduced.
+If you have issues with these guidelines then raise an issue or a Pull Request.
+If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request. Also if you are using windows 10 you can go to the store and find free MarkDown editors like <a href="https://www.microsoft.com/store/apps/9wzdncrdd2p3">this</a></p>
+<h1 id="structure">Structure</h1>
+<h2 id="language">Language</h2>
+<p>The documentation will follow US-English spelling.
+Desktop tools like <a href="http://markdownpad.com">http://markdownpad.com</a> and <a href="https://code.visualstudio.com/">Visual Studio Code</a> have spell checking features.</p>
+<h2 id="paragraph-structure">Paragraph structure</h2>
+<p>Each sentence should be written on a single line, and only one sentence per line.
+This makes merging changes easier and helps identify verbose language.
+Paragraphs in Markdown are just one or more lines of consecutive text followed by one or more blank lines.</p>
+<h2 id="headings">Headings</h2>
+<p>Headings should be used to structure a document.
+Avoid using other emphasis features like ALLCAPS, <em>Italics</em> or <strong>bold</strong> to identify a new topic.
+Using a header is not only more consistent, but also allows linking to the header.</p>
+<h2 id="footers">Footers</h2>
+<p>At the end of a page, it is helpful to link to the next logical page in the documentation.
+If the page is the last in a sub-section, then linking back to the index page is useful.</p>
+<h1 id="styles">Styles</h1>
+<h2 id="code-formatting">Code formatting</h2>
+<p>Blocks of example code should be formatted with the triple back tick format followed by the language.</p>
+<pre><code class="lang-csharp">    [StorageProvider(ProviderName=&quot;store1&quot;)]
+    public class MyGrain&lt;IMyGrainState&gt;
+    {
+      ...
+    }
+</code></pre><p>Which will render as</p>
+<pre><code class="lang-csharp">
+[StorageProvider(ProviderName=&quot;store1&quot;)]
+public class MyGrain&lt;IMyGrainState&gt; ...
+{
+  ...
+}
+</code></pre><p>Inline code should be marked with a single backtick (`).</p>
+<p>This include references to:</p>
+<ul>
+<li>type names e.g. <code>Task&lt;T&gt;</code></li>
+<li>variable names e.g. <code>game</code></li>
+<li>namespaces e.g. <code>Orleans.Storage.AzureTableStorage</code></li>
+</ul>
+<p>If showing text that is an output (e.g. text file content or console output) you can either use the triple back tick without specifying a language or you can indent the content. For example:</p>
+<pre><code>1 said: Welcome to my team!
+0 said: Thanks!
+1 said: Thanks!
+0 said: Thanks!
+</code></pre><h2 id="file-names-and-paths">File names and paths</h2>
+<p>When referencing a filename, directory/folder or URI then use standard italics to format.
+This can be done by surrounding the string with either with a single asterisk (<code>*</code>) or a single underscore (<code>_</code>)</p>
+<p>Examples:</p>
+<ul>
+<li><em>OrleansRuntimeInterfaces.dll</em></li>
+<li><em>C:\Binaries</em></li>
+<li><em>../src/Grain.cs</em></li>
+</ul>
+<h2 id="tables">Tables</h2>
+<p>Markdown supports <a href="https://help.github.com/articles/github-flavored-markdown/#tables">tabular data</a>.
+Tables could be used to structure data so that is is easily consumable for the reader.</p>
+<table>
+<thead>
+<tr>
+<th>Suffix</th>
+<th>Unit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ms</td>
+<td>millisecond(s)</td>
+</tr>
+<tr>
+<td>s</td>
+<td>second(s)</td>
+</tr>
+<tr>
+<td>m</td>
+<td>minute(s)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="links">Links</h2>
+<p>When referencing another concept, provide a link to that concept.
+Forward and backward references within a page can be linked via the header. e.g. link back to <a href="#structure">Structure</a>
+Links to other documents can either link to the page or to a sub-section/header within the page.
+External links should be exposed as the full link. e.g. <a href="https://github.com/dotnet/roslyn">https://github.com/dotnet/roslyn</a></p>
+<h1 id="contribution">Contribution</h1>
+<p>The Orleans documentation is managed as Markdown files in a Git repository hosted on <a href="https://github.com/dotnet/orleans/tree/docs">GitHub in the gh-pages branch</a>.
+See the <a href="https://pages.github.com/">GitHub Pages</a> documentation on how to use the <code>gh-pages</code> branch convention for &quot;Project site&quot; documents.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/documentation_guidelines.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

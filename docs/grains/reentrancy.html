@@ -1,0 +1,308 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Reentrancy | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Reentrancy | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="request-scheduling">Request scheduling</h1>
+
+<p>Grain activations have a <em>single-threaded</em> execution model and, by default, process each request from beginning to completion before the next request can begin processing.
+In some circumstances, it may be desirable for an activation to process other requests while one request is waiting for an asynchronous operation to complete.
+For this and other reasons, Orleans gives the developer some control over the request interleaving behavior, as described below in the <a href="#reentrancy">Reentrancy</a> section.
+What follows is an example of non-reentrant request scheduling, which is the default behavior in Orleans.</p>
+<p>Our initial examples with focus on the following <code>PingGrain</code> definition:</p>
+<pre><code class="lang-csharp">public interface IPingGrain : IGrainWithStringKey
+{
+    Task Ping();
+    Task CallOther(IPingGrain other);
+}
+
+public class PingGrain : Grain, IPingGrain
+{
+    private readonly ILogger&lt;PingGrain&gt; _logger;
+
+    public PingGrain(ILogger&lt;PingGrain&gt; logger) =&gt; _logger = logger;
+
+    public Task Ping() =&gt; Task.CompletedTask;
+
+    public async Task CallOther(IPingGrain other)
+    {
+        _logger.LogInformation(&quot;1&quot;);
+        await other.Ping();
+        _logger.LogInformation(&quot;2&quot;);
+    }
+}
+</code></pre><p>Two grains of type <code>PingGrain</code> are involved in our example, <em>A</em> and <em>B</em>.
+A caller invokes the following call:</p>
+<pre><code class="lang-csharp">var a = grainFactory.GetGrain(&quot;A&quot;);
+var b = grainFactory.GetGrain(&quot;B&quot;);
+await a.CallOther(b);
+</code></pre><p align="center">
+    <img src="../../images/scheduling_7.png">
+</p>
+
+<p>The flow of execution is as follows:</p>
+<ol>
+<li>The call arrives at <em>A</em>, which logs <code>&quot;1&quot;</code> and then issues a call to <em>B</em></li>
+<li><em>B</em> returns immediately from <code>Ping()</code> back to <em>A</em></li>
+<li><em>A</em> logs <code>&quot;2&quot;</code> an returns back to the original caller</li>
+</ol>
+<p>While <em>A</em> is awaiting the call to <em>B</em>, it cannot process any incoming requests.
+Because of this, if <em>A</em> and <em>B</em> were to call each other simultaneously, they may <em>deadlock</em> while waiting for those calls to complete.
+Here is an example, based on the client issuing the following call:</p>
+<pre><code class="lang-csharp">var a = grainFactory.GetGrain(&quot;A&quot;);
+var b = grainFactory.GetGrain(&quot;B&quot;);
+
+// A calls B at the same time as B calls A.
+// This might deadlock, depending on the non-deterministic timing of events.
+await Task.WhenAll(a.CallOther(b), b.CallOther(a));
+</code></pre><h2 id="case-1-the-calls-do-not-deadlock">Case 1: the calls do not deadlock</h2>
+<p align="center">
+    <img src="../../images/scheduling_8.png">
+</p>
+
+<p>In this example:</p>
+<ol>
+<li>The <code>Ping()</code> call from <em>A</em> arrives at <em>B</em> before the <code>CallOther(a)</code> call arrives at <em>B</em>.</li>
+<li>Therefore, <em>B</em> processes the <code>Ping()</code> call before the <code>CallOther(a)</code> call.</li>
+<li>Because <em>B</em> processes the <code>Ping()</code> call, <em>A</em> is able to return back to the caller.</li>
+<li>When <em>B</em> issues its <code>Ping()</code> call to <em>A</em>, <em>A</em> is still busy logging its message (<code>&quot;2&quot;</code>), so the call has to wait a short duration,
+but it is soon able to be processed.</li>
+<li><em>A</em> processes the <code>Ping()</code> call and returns to <em>B</em> which returns to the original caller.</li>
+</ol>
+<p>Now, we will examine a less fortunate series of events: one in which the same code results in a <em>deadlock</em> due to slightly different timing.</p>
+<h2 id="case-2-the-calls-deadlock">Case 2: the calls deadlock</h2>
+<p align="center">
+    <img src="../../images/scheduling_5.png">
+</p>
+
+<p>In this example:</p>
+<ol>
+<li>The <code>CallOther</code> calls arrive at their respective grains and are processed simultaneously.</li>
+<li>Both grains log <code>&quot;1&quot;</code> and proceed to <code>await other.Ping()</code>.</li>
+<li>Since both grains are still <em>busy</em> (processing the <code>CallOther</code> request, which has not finished yet), the <code>Ping()</code> requests wait</li>
+<li>After some period of time, Orleans determines that the call has <strong>timed out</strong> and each <code>Ping()</code> call results in an exception being thrown.</li>
+<li>This exception is not handled by the <code>CallOther</code> method body and so it bubbles up to the original caller.</li>
+</ol>
+<p>The following section describes how to prevent deadlocks by allowing multiple requests to interleave their execution with each other.</p>
+<h2 id="reentrancy">Reentrancy</h2>
+<p>Orleans defaults to choosing a safe execution flow: one in which the internal state of a grain is not modified concurrently by multiple requests.
+Concurrent modification of internal state complicates logic and puts a greater burden on the developer.
+This protection against those kinds of concurrency bugs has a cost which we saw above, primarily <em>liveness</em>: certain call patterns can lead to deadlocks.
+One way to avoid deadlocks is to ensure that grain calls never form a cycle.
+Often times, it is difficult to write code which is cycle-free and cannot deadlock.
+Waiting for each request to run from beginning to completion before processing the next request can also hurt performance.
+For example, by default, if a grain method performs some asynchronous request to a database service then the grain will pause request execution until the response from the database arrives at the grain.</p>
+<p>Each of those cases are discussed in the sections which follow.
+For these reasons, Orleans provides developers with options to allow some or all requests to be executed <em>concurrently</em>, interleaving their execution with each other.
+In Orleans, this is called <em>reentrancy</em> or <em>interleaving</em>.
+By executing requests concurrently, grains which perform asynchronous operations can process more requests in a shorter period of time.</p>
+<p>Multiple requests may be interleaved in the following cases:</p>
+<ul>
+<li>The grain class is marked as <code>[Reentrant]</code></li>
+<li>The interface method is marked as <code>[AlwaysInterleave]</code></li>
+<li>The grain&#39;s <code>[MayInterleave(x)]</code> predicate returns <code>true</code></li>
+</ul>
+<p>With reentrancy, the following case becomes a valid execution and the possibility of the above deadlock is removed.</p>
+<h3 id="case-3-the-grain-or-method-is-reentrant">Case 3: the grain or method is reentrant</h3>
+<p align="center">
+    <img src="../../images/scheduling_6.png">
+</p>
+
+<p>In this example, grains <em>A</em> and <em>B</em> are able to call each other simultaneously without any potential for request scheduling deadlocks because both grains are <em>reentrant</em>.
+The following sections provide more details on reentrancy.</p>
+<h3 id="reentrant-grains">Reentrant grains</h3>
+<p><code>Grain</code> implementation classes may be marked with the <code>[Reentrant]</code> attribute to indicate that different requests may be freely interleaved.</p>
+<p>In other words, a reentrant activation may start executing another request while a previous request has not finished processing.
+Execution is still limited to a single thread, so the activation is still executing one turn at a time, and each turn is executing on behalf of only one of the activation’s requests.</p>
+<p>Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains <strong>may</strong> see the execution of code for different requests interleaving.
+That is, the continuation turns from different requests may interleave.</p>
+<p>For example, with the pseudo-code below, when Foo and Bar are 2 methods of the same grain class:</p>
+<pre><code class="lang-csharp">Task Foo()
+{
+    await task1;    // line 1
+    return Do2();   // line 2
+}
+
+Task Bar()
+{
+    await task2;   // line 3
+    return Do2();  // line 4
+}
+</code></pre><p>If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
+<p>For example, the following order of execution is possible:</p>
+<p>Line 1, line 3, line 2 and line 4.
+That is, the turns from different requests interleave.</p>
+<p>If the grain was not reentrant, the only possible executions would be: line 1, line 2, line 3, line 4 OR: line 3, line 4, line 1, line 2 (a new request cannot start before the previous one finished).</p>
+<p>The main tradeoff in choosing between reentrant and non-reentrant grains is the code complexity to make interleaving work correctly, and the difficulty to reason about it.</p>
+<p>In a trivial case when the grains are stateless and the logic is simple, fewer (but not too few, so that all the hardware threads are used) reentrant grains should, in general, be slightly more efficient.</p>
+<p>If the code is more complex, then a larger number of non-reentrant grains, even if slightly less efficient overall, should save you a lot of grief of figuring out non-obvious interleaving issues.</p>
+<p>In the end, the answer will depend on the specifics of the application.</p>
+<h3 id="interleaving-methods">Interleaving methods</h3>
+<p>Grain interface methods marked with <code>[AlwaysInterleave]</code> will be interleaved regardless of whether the grain is reentrant or not. Consider the following example:</p>
+<pre><code class="lang-csharp">public interface ISlowpokeGrain : IGrainWithIntegerKey
+{
+    Task GoSlow();
+
+    [AlwaysInterleave]
+    Task GoFast();
+}
+
+public class SlowpokeGrain : Grain, ISlowpokeGrain
+{
+    public async Task GoSlow()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+    }
+
+    public async Task GoFast()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+    }
+}
+</code></pre><p>Now consider the call flow initiated by the following client request:</p>
+<pre><code class="lang-csharp">var slowpoke = client.GetGrain&lt;ISlowpokeGrain&gt;(0);
+
+// A) This will take around 20 seconds
+await Task.WhenAll(slowpoke.GoSlow(), slowpoke.GoSlow());
+
+// B) This will take around 10 seconds.
+await Task.WhenAll(slowpoke.GoFast(), slowpoke.GoFast(), slowpoke.GoFast());
+</code></pre><p>Calls to <code>GoSlow</code> will not be interleaved, so the execution of the two <code>GoSlow()</code> calls will take around 20 seconds.
+On the other hand, because <code>GoFast</code> is marked <code>[AlwaysInterleave]</code>, the three calls to it will be executed concurrently and will complete in approximately 10 seconds total instead of requiring at least 30 seconds to complete.</p>
+<h3 id="reentrancy-using-a-predicate">Reentrancy using a predicate</h3>
+<p>Grain classes can specify a predicate to determine interleaving on a call-by-call basis by inspecting the request.
+The <code>[MayInterleave(string methodName)]</code> attribute provides this functionality.
+The argument to the attribute is the name of a static method within the grain class which accepts an <code>InvokeMethodRequest</code> object and returns a <code>bool</code> indicating whether or not the request should be interleaved.</p>
+<p>Here is an example which allows interleaving if the request argument type has the <code>[Interleave]</code> attribute:</p>
+<pre><code class="lang-csharp">[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+public sealed class InterleaveAttribute : Attribute { }
+
+// Specify the may-interleave predicate.
+[MayInterleave(nameof(ArgHasInterleaveAttribute))]
+public class MyGrain : Grain, IMyGrain
+{
+    public static bool ArgHasInterleaveAttribute(InvokeMethodRequest req)
+    {
+        // Returning true indicates that this call should be interleaved with other calls.
+        // Returning false indicates the opposite.
+        return req.Arguments.Length == 1
+            &amp;&amp; req.Arguments[0]?.GetType().GetCustomAttribute&lt;InterleaveAttribute&gt;() != null;
+    }
+
+    public Task Process(object payload)
+    {
+        // Process the object.
+    }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/reentrancy.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

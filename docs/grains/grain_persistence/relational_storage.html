@@ -1,0 +1,300 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>ADO.NET Grain Persistence | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="ADO.NET Grain Persistence | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="adonet-grain-persistence">ADO.NET Grain Persistence</h1>
+
+<p>Relational storage backend code in Orleans is built on generic ADO.NET functionality, and is consequently database vendor agnostic.
+The Orleans data storage layout has been explained already in Runtime Tables.
+Setting up the connection strings is done as explained in <a href="../../host/configuration_guide/index.html">Orleans Configuration Guide</a>.</p>
+<p>To make Orleans code function with a given relational database backend, the following is required:</p>
+<ol>
+<li>The appropriate ADO.NET library must be loaded into the process. This should be defined as usual, e.g. via the <a href="https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/obtaining-a-dbproviderfactory">DbProviderFactories</a> element in the application configuration.</li>
+<li>Configure the ADO.NET invariant via the <code>Invariant</code> property in the options.</li>
+<li>The database needs to exist and be compatible with the code. This is done by running a vendor-specific database creation script. For more information, see <a href="../../host/configuration_guide/adonet_configuration.html">ADO.NET Configuration</a>.</li>
+</ol>
+<p>The ADO .NET grain storage provider allows you to store the grain state in relational databases.
+Currently, the following databases are supported:</p>
+<ul>
+<li>SQL Server</li>
+<li>MySQL/MariaDB</li>
+<li>PostgreSQL</li>
+<li>Oracle</li>
+</ul>
+<p>First, install the base package:</p>
+<pre><code class="lang-powershell">Install-Package Microsoft.Orleans.Persistence.AdoNet
+</code></pre><p>Read the <a href="../../host/configuration_guide/adonet_configuration.html">ADO.NET Configuration</a> article for information on configuring your database, including the corresponding ADO.NET Invariant and the setup scripts.</p>
+<p>The following is an example of how to configure an ADO.NET storage provider via <code>ISiloHostBuilder</code>:</p>
+<pre><code class="lang-csharp">var siloHostBuilder = new SiloHostBuilder()
+    .AddAdoNetGrainStorage(&quot;OrleansStorage&quot;, options =&gt;
+    {
+        options.Invariant = &quot;&lt;Invariant&gt;&quot;;
+        options.ConnectionString = &quot;&lt;ConnectionString&gt;&quot;;
+        options.UseJsonFormat = true;
+    });
+</code></pre><p>Essentially, you only need to set the database-vendor-specific connection string and an
+<code>Invariant</code> (see <a href="../../host/configuration_guide/adonet_configuration.html">ADO.NET Configuration</a>) that identifies the vendor. You may also choose the format in which the data
+is saved, which may be either binary (default), JSON, or XML. While binary is the most compact
+option, it is opaque, and you will not be able to read or work with the data. JSON is the
+recommended option.</p>
+<p>You can set the following properties via <code>AdoNetGrainStorageOptions</code>:</p>
+<pre><code class="lang-csharp">/// &lt;summary&gt;
+/// Options for AdoNetGrainStorage
+/// &lt;/summary&gt;
+public class AdoNetGrainStorageOptions
+{
+    /// &lt;summary&gt;
+    /// Define the property of the connection string for AdoNet storage.
+    /// &lt;/summary&gt;
+    [Redact]
+    public string ConnectionString { get; set; }
+
+    /// &lt;summary&gt;
+    /// Set the stage of the silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
+    /// &lt;/summary&gt;
+    public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+    /// &lt;summary&gt;
+    /// Default init stage in silo lifecycle.
+    /// &lt;/summary&gt;
+    public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+    /// &lt;summary&gt;
+    /// The default ADO.NET invariant will be used for storage if none is given.
+    /// &lt;/summary&gt;
+    public const string DEFAULT_ADONET_INVARIANT = AdoNetInvariants.InvariantNameSqlServer;
+    /// &lt;summary&gt;
+    /// Define the invariant name for storage.
+    /// &lt;/summary&gt;
+    public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
+
+    /// &lt;summary&gt;
+    /// Determine whether the storage string payload should be formatted in JSON.
+    /// &lt;remarks&gt;If neither &lt;see cref=&quot;UseJsonFormat&quot;/&gt; nor &lt;see cref=&quot;UseXmlFormat&quot;/&gt; is set to true, then BinaryFormatSerializer will be configured to format the storage string payload.&lt;/remarks&gt;
+    /// &lt;/summary&gt;
+    public bool UseJsonFormat { get; set; }
+    public bool UseFullAssemblyNames { get; set; }
+    public bool IndentJson { get; set; }
+    public TypeNameHandling? TypeNameHandling { get; set; }
+
+    public Action&lt;JsonSerializerSettings&gt; ConfigureJsonSerializerSettings { get; set; }
+
+    /// &lt;summary&gt;
+    /// Determine whether storage string payload should be formatted in Xml.
+    /// &lt;remarks&gt;If neither &lt;see cref=&quot;UseJsonFormat&quot;/&gt; nor &lt;see cref=&quot;UseXmlFormat&quot;/&gt; is set to true, then BinaryFormatSerializer will be configured to format storage string payload.&lt;/remarks&gt;
+    /// &lt;/summary&gt;
+    public bool UseXmlFormat { get; set; }
+}
+</code></pre><p>The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently there is no method to expose it to application code.</p>
+<h2 id="adonet-persistence-rationale">ADO.NET Persistence Rationale</h2>
+<p>The principles for ADO.NET backed persistence storage are:</p>
+<ol>
+<li>Keep business-critical data safe and accessible while data, the format of data, and the code evolve.</li>
+<li>Take advantage of vendor- and storage-specific functionality.</li>
+</ol>
+<p>In practice, this means adhering to ADO.NET implementation goals, and some added implementation logic in ADO.NET-specific storage providers that allow evolving the shape of the data in the storage.</p>
+<p>In addition to the usual storage provider capabilities, the ADO.NET provider has built-in capability to:</p>
+<ol>
+<li>Change storage data from one format to another (e.g. from JSON to binary) when round-tripping state.</li>
+<li>Shape the type to be saved or read from the storage in arbitrary ways. This allows the version of the state to evolve.</li>
+<li>Stream data out of the database.</li>
+</ol>
+<p>Both <code>1.</code> and <code>2.</code> can be applied based on arbitrary decision parameters, such as <em>grain ID</em>, <em>grain type</em>, <em>payload data</em>.</p>
+<p>This is teh case so that you can choose a serialization format, e.g. <a href="https://github.com/real-logic/simple-binary-encoding">Simple Binary Encoding (SBE)</a> and implements
+<a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageDeserializer.cs">IStorageDeserializer</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageSerializer.cs">IStorageSerializer</a>.
+The built-in serializers have been built using this method. The <a href="https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider">OrleansStorageDefault(De)Serializer</a> can be used as examples of how to implement other formats.</p>
+<p>When the serializers have been implemented, they need to be added to the <code>StorageSerializationPicker</code> property in <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs">AdoNetGrainStorage</a>.
+Here is an implementation of <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageSerializationPicker.cs">IStorageSerializationPicker</a>. By default,
+<a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/StorageSerializationPicker.cs">StorageSerializationPicker</a> will be used. An example of changing the data storage format
+or using serializers can be seen at <a href="https://github.com/dotnet/orleans/blob/master/test/Extensions/TesterAdoNet/StorageTests/Relational/RelationalStorageTests.cs">RelationalStorageTests</a>.</p>
+<p>Currently, there is no method to expose the serialization picker to the Orleans application as there is no method to access the framework-created <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs">AdoNetGrainStorage</a>.</p>
+<h2 id="goals-of-the-design">Goals of the design</h2>
+<h3 id="1-allow-the-use-of-any-backend-that-has-an-adonet-provider">1. Allow the use of any backend that has an ADO.NET provider</h3>
+<p>This should cover the broadest possible set of backends available for .NET, which is a factor in on-premises installations. Some providers are listed at <a href="https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/ado-net-overview">ADO.NET Data Providers MSDN page</a>,
+but not all are listed, such as <a href="https://downloads.teradata.com/download/connectivity/net-data-provider-for-teradata">Teradata</a>.</p>
+<h3 id="2-maintain-the-potential-to-tune-queries-and-database-structure-as-appropriate-even-while-a-deployment-is-running">2. Maintain the potential to tune queries and database structure as appropriate, even while a deployment is running</h3>
+<p>In many cases, the servers and databases are hosted by a third party in contractual relation with the client. It is not an unusual
+situation to find a hosting environment which is virtualized, and where performance fluctuates due to unforeseen factors, such as noisy neighbors or faulty hardware. It may
+not be possible to alter and re-deploy either Orleans binaries (for contractual reasons) or even application binaries, but it is usually possible to tweak the
+database deployment parameters. Altering <em>standard components</em>, such as Orleans binaries, requires a lengthier procedure for optimizing in a given situation.</p>
+<h3 id="3-allow-you-to-make-use-of-vendor--and-version-specific-abilities">3. Allow you to make use of vendor- and version-specific abilities</h3>
+<p>Vendors have implemented different extensions and features within their products. It is sensible to make use of these features when they are available.
+These are features such as <a href="https://www.postgresql.org/about/news/1636/">native UPSERT</a> or <a href="https://www.pipelinedb.com/">PipelineDB</a> in PostgreSQL,
+<a href="https://docs.microsoft.com/en-us/sql/relational-databases/polybase/get-started-with-polybase">PolyBase</a> or <a href="https://docs.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/native-compilation-of-tables-and-stored-procedures">natively compiled tables and stored procedures</a> in SQL Server
+&ndash; and myriads of other features.</p>
+<h3 id="4-make-it-possible-to-optimize-hardware-resources">4. Make it possible to optimize hardware resources</h3>
+<p>When designing an application, it is often possible to anticipate which data needs to be inserted faster than other data, and
+which data could more likely be put into <em>cold storage</em>, which is cheaper (e.g. splitting data between SSD and HDD). Additional considerations include the physical location of the data (some data could be more expensive (e.g. SSD RAID viz HDD RAID), or more secured),
+or some other decision basis. Related to <em>point 3.</em>, some databases offer special partitioning schemes, such as SQL Server <a href="https://docs.microsoft.com/en-us/sql/relational-databases/partitions/partitioned-tables-and-indexes">Partitioned Tables and Indexes</a>.</p>
+<p>These principles apply throughout the application life-cycle. Considering that one of the principles of Orleans itself is high availability,
+it should be possible to adjust the storage system without interruption to the Orleans deployment, or it should be possible to adjust the queries according
+to data and other application parameters. An example of dynamic changes may be seen in Brian Harry&#39;s <a href="https://blogs.msdn.microsoft.com/bharry/2016/02/06/a-bit-more-on-the-feb-3-and-4-incidents/">blog post</a>:</p>
+<blockquote><p>When a table is small, it almost doesn’t matter what the query plan is. When it’s medium, an OK query plan is fine, but when it&#39;s huge (millions upon millions or billions of rows), even a slight variation in the query plan can kill you. For this reason, we hint our sensitive queries heavily.</p>
+</blockquote>
+<h3 id="5-no-assumptions-on-what-tools-libraries-or-deployment-processes-are-used-in-organizations">5. No assumptions on what tools, libraries, or deployment processes are used in organizations</h3>
+<p>Many organizations have familiarity with a certain set of database tools, examples being <a href="https://docs.microsoft.com/en-us/sql/relational-databases/data-tier-applications/data-tier-applications">Dacpac</a>
+or <a href="https://www.red-gate.com/">Red Gate</a>. It may be that deploying a database requires either a permission or a person, such as someone
+in a DBA role, to do it. Usually this means also having the target database layout and a rough sketch of the queries the application will
+produce for use in estimating the load. There might be processes, perhaps influenced by industry standards, which mandate script-based deployment.
+Having the queries and database structures in an external script makes this possible.</p>
+<h3 id="6-use-the-minimum-set-of-interface-functionality-needed-to-load-the-adonet-libraries-and-functionality">6. Use the minimum set of interface functionality needed to load the ADO.NET libraries and functionality</h3>
+<p>This is both fast, and has less surface exposed to the ADO.NET library implementation discrepancies.</p>
+<h3 id="7-make-the-design-shardable">7. Make the design shardable</h3>
+<p>When it makes sense, for instance in a relational storage provider, make the design readily shardable. For instance, this means using no database-dependent
+data (e.g. <code>IDENTITY</code>). Information that distinguishes row data should build on only data from the actual parameters.</p>
+<h3 id="8-make-the-design-easy-to-test">8. Make the design easy to test</h3>
+<p>Creating a new backend should ideally be as easy as translating one of the existing deployment scripts into the SQL dialect of the backend you are trying to target, adding a new connection string to the tests (assuming default
+parameters), checking to see if a given database is installed, and then runing the tests against it.</p>
+<h3 id="9-taking-into-account-the-previous-points-make-both-porting-scripts-for-new-backends-and-modifying-already-deployed-backend-scripts-as-transparent-as-possible">9. Taking into account the previous points, make both porting scripts for new backends and modifying already-deployed backend scripts as transparent as possible</h3>
+<h2 id="realization-of-the-goals">Realization of the goals</h2>
+<p>The Orleans framework does not have a knowledge of deployment-specific hardware (which hardware may change during active deployment), the change of data during the deployment life-cycle, or certain vendor-specific features which are only usable in certain situations. For this reason, the interface between the database and Orleans should adhere to the minimum set of abstractions and rules to meet these goals, make it robust against misuse, and make it easy to test if needed.
+Runtime Tables, Cluster Management and the concrete <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs">membership protocol implementation</a>. Also, the SQL Server implementation contains SQL Server edition-specific tuning.
+The interface contract between the database and Orleans is defined as follows:</p>
+<ol>
+<li>The general idea is that data is read and written through Orleans-specific queries.
+Orleans operates on column names and types when reading, and on parameter names and types when writing.</li>
+<li>The implementations <strong>must</strong> preserve input and output names and types. Orleans uses these parameters to read query results by name and type.
+Vendor- and deployment-specific tuning is allowed, and contributions are encouraged as long as the interface contract is maintained.  </li>
+<li>The implementation across vendor-specific scripts <strong>should</strong> preserve the constraint names.
+This simplifies troubleshooting, by virtue of uniform naming across concrete implementations.</li>
+<li><strong>Version</strong> &ndash; or <strong>ETag</strong> in application code &ndash; for Orleans, this represents a unique version.
+The type of its actual implementation is not important as long as it represents a unique version. In the implementation, Orleans code expects a signed 32-bit integer.</li>
+<li>For the sake of being explicit and removing ambiguity, Orleans expects some queries to return either <strong>TRUE as &gt; 0</strong> value
+or <strong>FALSE as = 0</strong> value. That is, the number of affected or returned rows does not matter. If an error is raised or an exception is thrown,
+the query <strong>must</strong> ensure the entire transaction is rolled back, and may either return FALSE or propagate the exception.</li>
+<li>Currently, all but one query are single-row inserts or updates (note, one could replace <code>UPDATE</code> queries with <code>INSERT</code>, provided the associated
+<code>SELECT</code> queries performed the last write).</li>
+</ol>
+<p>Database engines support in-database programming. This is similar to the idea of loading an executable script and invoking it to execute database operations. In pseudocode it could be depicted as:</p>
+<pre><code class="lang-csharp">const int Param1 = 1;
+const DateTime Param2 = DateTime.UtcNow;
+const string queryFromOrleansQueryTableWithSomeKey = &quot;SELECT column1, column2 FROM &lt;some Orleans table&gt; where column1 = @param1 AND column2 = @param2;&quot;;
+TExpected queryResult = SpecificQuery12InOrleans&lt;TExpected&gt;(query, Param1, Param2);
+</code></pre><p>These principles are also <a href="../../host/configuration_guide/adonet_configuration.html">included in the database scripts</a>.</p>
+<h2 id="some-ideas-on-applying-customized-scripts">Some ideas on applying customized scripts</h2>
+<ol>
+<li>Alter scripts in <code>OrleansQuery</code> for grain persistence with <code>IF ELSE</code>
+so that some state is saved using the default <code>INSERT</code>, while some grain states may use <a href="https://docs.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/memory-optimized-tables">memory optimized tables</a>.
+The <code>SELECT</code> queries need to be altered accordingly.</li>
+<li>The idea in <code>1.</code> can be used to take advantage of other deployment- or vendor-specific aspects, such as splitting data between <code>SSD</code> or <code>HDD</code>, putting some data in encrypted tables,
+or perhaps inserting statistics data via SQL-Server-to-Hadoop, or even <a href="https://docs.microsoft.com/en-us/sql/relational-databases/linked-servers/linked-servers-database-engine">linked servers</a>.</li>
+</ol>
+<p>The altered scripts can be tested by running the Orleans test suite, or straight in the database using, for instance, <a href="https://msdn.microsoft.com/en-us/library/jj851212.aspx">SQL Server Unit Test Project</a>.</p>
+<h2 id="guidelines-for-adding-new-adonet-providers">Guidelines for adding new ADO.NET providers</h2>
+<ol>
+<li>Add a new database setup script according to the <a href="#realization-of-the-goals">Realization of the goals</a> section above.</li>
+<li>Add the vendor ADO invariant name to <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Storage/AdoNetInvariants.cs#L34">AdoNetInvariants</a> and ADO.NET provider-specific data to <a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Storage/DbConstantsStore.cs">DbConstantsStore</a>. These are (potentially) used in some query operations. e.g. to select the correct statistics insert mode (i.e. the <code>UNION ALL</code> with or without <code>FROM DUAL</code>).</li>
+<li>Orleans has comprehensive tests for all system stores: membership, reminders and statistics. Adding tests for the new database script is done by copy-pasting existing test classes and changing the ADO invariant name. Also, derive from <a href="https://github.com/dotnet/orleans/blob/master/test/Extensions/TesterAdoNet/RelationalUtilities/RelationalStorageForTesting.cs">RelationalStorageForTesting</a> in order to define test functionality for the ADO invariant.</li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_persistence/relational_storage.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

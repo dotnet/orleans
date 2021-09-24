@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Architecture - Principles and Approach I | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Architecture - Principles and Approach I | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<p>Now that Orleans is (finally) available as open source, it&#39;s important to be clear about the goals and principles that has motivated the design decisions behind Orleans so that new changes either fit within that framework or explicitly and intentionally revise those goals and principles.</p>
+<p>About the time I joined the Orleans project, we agreed that the goal was to produce a framework that would allow mainstream developers to easily build scalable distributed (cloud) applications. To break this down a bit:</p>
+<ul>
+<li><p><strong>The target audience shouldn&#39;t exclude programmers who haven&#39;t done distributed systems development</strong>. We want to enable all developers, whether cloud experts or cloud beginners, to focus on their application logic and features -- which is to say, what actually provides business value -- rather than on generic distributed systems issues.</p>
+</li>
+<li><p><strong>The goal is to allow them to build cloud applications easily</strong>. Easily means that they shouldn&#39;t have to think about distribution any more than is absolutely required. Easily also means that Orleans should present as familiar a façade to the developer as possible; in a .NET context, that means C# objects and interfaces.</p>
+</li>
+<li><p><strong>Those applications should be <em>&quot;scalable by default&quot;</em></strong>. Since our target users aren&#39;t necessarily distributed systems experts, we want to provide them a framework that will lead them to build scalable applications without explicitly thinking about it. This means that the framework has to make a lot of decisions for them in order to guarantee an acceptable degree of scalability, even if that means that the scalability isn&#39;t optimal for every application.</p>
+</li>
+</ul>
+<p>We supplemented this goal with a set of architectural principles:</p>
+<ul>
+<li><p><strong>We&#39;re focused on the 80% case</strong>. There are certainly applications that Orleans isn&#39;t appropriate for; that&#39;s OK. There are applications that Orleans is a reasonable fit for, but where you can get somewhat better performance by a bunch of hand-tuning that Orleans doesn&#39;t allow; that&#39;s OK too. The 80% that Orleans fits well and performs well enough on covers a lot of interesting applications, and we&#39;d rather do a great job on 80% than a lousy job on 99%.</p>
+</li>
+<li><p><strong>Scalability is paramount</strong>. We&#39;ll trade off raw performance if that gets us better scaling.</p>
+</li>
+<li><p><strong>Availability is paramount</strong>. A cloud application should be like a utility: always there when you want it.</p>
+</li>
+<li><p><strong>Detect and fix problems</strong>, don&#39;t assume you can 100% prevent them. At cloud scale, bad things happen often, and even impossible bad things happen, just less often. This has led us to what is often termed &quot;recovery-oriented computing&quot;, rather than trying to be fault-tolerant; our experience has shown that fault tolerance is fragile and often illusory. Even mathematically proven protocols are no protection against random bit flips in memory or disk controllers that fail while reporting success -- both real examples I&#39;ve seen in production in my career.</p>
+</li>
+</ul>
+<p>The above has led us to certain practices:</p>
+<ul>
+<li><p><strong>API-first design</strong>: if we don&#39;t know how we&#39;re going to expose a feature to the developer, then we don&#39;t build it. Of course, the best way is for a feature have no developer exposure at all...</p>
+</li>
+<li><p><strong>Make it easy to do the right thing</strong>: keep things as simple as possible (but no simpler), don&#39;t provide a hammer if a screwdriver is the right tool. As one of our early adopters put it, we try to help our customers &quot;fall into the pit of success&quot;. If there is a standard pattern that will work well for 80% of the applications out there, then don&#39;t worry about enabling every possible alternative. Orleans&#39; embrace of asynchrony is a good example of this.</p>
+</li>
+<li><p><strong>Make it easy for developers to extend the framework without breaking it</strong>. Custom serialization and persistence providers are a couple of examples of this. Some sort of custom task scheduling extension would be an anti-example.</p>
+</li>
+<li><p><strong>Follow the principle of least surprise</strong>: as much as possible, things should be as familiar, but everything should behave the way it looks.</p>
+</li>
+</ul>
+<p>The next post will start applying these principles to the current Orleans design and walk through the motivations for some specific decisions we made.</p>
+<p>Thanks for reading!</p>
+<p>Alan Geller</p>
+<p><em>Alan Geller, <a href="http://research.microsoft.com/en-us/people/ageller/">http://research.microsoft.com/en-us/people/ageller/</a>, works on quantum computing at Microsoft Research. He was one of the primary architects of Orleans from 2008 until 2012. Earlier, he was the platform architect for Amazon Web Services from 2004 to 2008, and before that built a wide variety of large-scale production distributed systems in telecommunications and financial services.</em></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/orleans_architecture_principles_and_approach_I.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

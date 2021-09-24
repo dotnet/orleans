@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Placement | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Placement | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grain-placement">Grain Placement</h1>
+
+<p>Orleans ensures that when a grain call is made there is an instance of that grain available in memory on some server in the cluster to handle the request.
+If the grain is not currently active in the cluster, Orleans picks one of the servers to activate the grain on.
+This is called grain placement.
+Placement is also one way that load is balanced: even placement of busy grains helps to even the workload across the cluster.</p>
+<p>The placement process in Orleans is fully configurable: developers can choose from a set of out-of-the-box placement policies such as random, prefer-local, and load-based, or custom logic can be configured.
+This allows for full flexibility in deciding where grains are created.
+For example, grains can be placed on a server close to resources which they need to operate on or close to other grains which they communicate with.
+By default, Orleans will pick a random compatible server.</p>
+<p>The placement strategy which Orleans uses can be configured globally or per-grain-class.</p>
+<h2 id="in-built-placement-strategies">In-built placement strategies</h2>
+<h2 id="random-placement">Random placement</h2>
+<p>A server is randomly selected from the set of compatible servers.</p>
+<p>This placement strategy is configured by adding the <code>[RandomPlacement]</code> attribute to a grain.</p>
+<h2 id="local-placement">Local placement</h2>
+<p>If the local server is compatible, select the local server, otherwise select a random server.</p>
+<p>This placement strategy is configured by adding the <code>[PreferLocalPlacement]</code> attribute to a grain.</p>
+<h2 id="hash-based-placement">Hash-based placement</h2>
+<p>Hash the grain id to a non-negative integer and modulo it with the number of compatible servers.
+Select the corresponding server from list of compatible servers ordered by server address.
+Note that this is not guaranteed to remain stable as the cluster membership changes.
+Specifically, adding, removing, or restarting servers can alter the server selected for a given grain id.
+Because grains placed using this strategy are registered in the grain directory, this change in placement decision as membership changes typically does not have a noticeable effect.</p>
+<p>This placement strategy is configured by adding the <code>[HashBasedPlacement]</code> attribute to a grain.</p>
+<h2 id="activation-count-based-placement">Activation-count-based placement</h2>
+<p>The intention of this placement strategy is to place new grain activations on the least heavily loaded server based on the number of recently busy grains.
+It includes a mechanism in which all servers periodically publish their total activation count to all other servers.
+The placement director then selects a server which is predicted to have the fewest activations by examining the most recently reported activation count and a making prediction of the current activation count based upon the recent activation count made by the placement director on the current server.
+The director selects a number of servers at random when making this prediction, in an attempt to avoid multiple separate servers overloading the same server.
+By default, two servers are selected at random, but this value is configurable via <code>ActivationCountBasedPlacementOptions</code>.</p>
+<p>This algorithm is based on the thesis <a href="https://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf"><em>The Power of Two Choices in Randomized Load Balancing</em> by Michael David Mitzenmacher</a>, and is also used in NGINX for distributed load balancing, as described in the article <a href="https://www.nginx.com/blog/nginx-power-of-two-choices-load-balancing-algorithm/"><em>NGINX and the &quot;Power of Two Choices&quot; Load-Balancing Algorithm</em></a>.</p>
+<p>This placement strategy is configured by adding the <code>[ActivationCountBasedPlacement]</code> attribute to a grain.</p>
+<h2 id="stateless-worker-placement">Stateless worker placement</h2>
+<p>This is a special placement strategy used by <a href="stateless_worker_grains.html"><em>stateless worker</em> grains</a>.
+This operates almost identically to <code>PreferLocalPlacement</code> except that each server can have multiple activations of the same grain and the grain is not registered in the grain directory since there is no need.</p>
+<p>This placement strategy is configured by adding the <code>[StatelessWorker]</code> attribute to a grain.</p>
+<h2 id="configuring-the-default-placement-strategy">Configuring the default placement strategy</h2>
+<p>Orleans will use random placement unless the default is overridden.
+The default placement strategy can be overridden by registering an implementation of <code>PlacementStrategy</code> during configuration:</p>
+<pre><code class="lang-C#">siloBuilder.ConfigureServices(services =&gt;
+  services.AddSingleton&lt;PlacementStrategy, MyPlacementStrategy&gt;());
+</code></pre><h2 id="configuring-the-placement-strategy-for-a-grain">Configuring the placement strategy for a grain</h2>
+<p>The placment strategy for a grain type is configured by adding the appropriate attribute on the grain class.
+The relevant attributes are specified in the <a href="#in-built-placement-strategies">in-built placement strategies</a> section.</p>
+<h2 id="sample-custom-placement-strategy">Sample custom placement strategy</h2>
+<p>First define a class which implements <code>IPlacementDirector</code> interface, requiring a single method.
+In this example we assume you have a function <code>GetSiloNumber</code> defined which will return a silo number given the guid of the grain about to be created.</p>
+<pre><code class="lang-csharp">public class SamplePlacementStrategyFixedSiloDirector : IPlacementDirector
+{
+
+    public Task&lt;SiloAddress&gt; OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+    {
+        var silos = context.GetCompatibleSilos(target).OrderBy(s =&gt; s).ToArray();
+        int silo = GetSiloNumber(target.GrainIdentity.PrimaryKey, silos.Length);
+        return Task.FromResult(silos[silo]);
+    }
+}
+</code></pre><p>You then need to define two classes to allow grain classes to be assigned to the strategy:</p>
+<pre><code class="lang-csharp">[Serializable]
+public class SamplePlacementStrategy : PlacementStrategy
+{
+}
+
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+public sealed class SamplePlacementStrategyAttribute : PlacementAttribute
+{
+    public SamplePlacementStrategyAttribute() :
+        base(new SamplePlacementStrategy())
+        {
+        }
+}
+</code></pre><p>Then just tag any grain classes you want to use this strategy with the attribute:</p>
+<pre><code class="lang-csharp">[SamplePlacementStrategy]
+public class MyGrain : Grain, IMyGrain
+{
+    ...
+}
+</code></pre><p>And finally register the strategy when you build the SiloHost:</p>
+<pre><code class="lang-csharp">private static async Task&lt;ISiloHost&gt; StartSilo()
+{
+    ISiloHostBuilder builder = new SiloHostBuilder()
+        // normal configuration methods omitted for brevity
+        .ConfigureServices(ConfigureServices);
+
+    var host = builder.Build();
+    await host.StartAsync();
+    return host;
+}
+
+
+private static void ConfigureServices(IServiceCollection services)
+{
+    services.AddSingletonNamedService&lt;PlacementStrategy, SamplePlacementStrategy&gt;(nameof(SamplePlacementStrategy));
+    services.AddSingletonKeyedService&lt;Type, IPlacementDirector, SamplePlacementStrategyFixedSiloDirector&gt;(typeof(SamplePlacementStrategy));
+}
+</code></pre><p>For a second simple example showing further use of the placement context, refer to the <code>PreferLocalPlacementDirector</code> in the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Runtime/Placement/PreferLocalPlacementDirector.cs">Orleans source repo</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_placement.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

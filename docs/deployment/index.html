@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Running the Application | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Running the Application | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h3 id="orleans-application">Orleans Application</h3>
+
+<p>A typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes, usually web servers, that receive external requests, turn them into grain method calls, and return results back.
+Hence, the first thing one needs to do to run an Orleans application is to start a cluster of silos.
+For testing purposes, a cluster can consist of a single silo.
+For a reliable production deployment, we obviously want more than one silos in a cluster for fault tolerance and scale.</p>
+<p>Once the cluster is running, we can start one or more client processes that connect to the cluster and can send requests to the grains.
+Clients connect to a special TCP endpoint on silos - gateway.
+By default, every silo in a cluster has a client gateway enabled.
+So clients can connect to all silos in parallel for better performance and resilience.</p>
+<h3 id="configuring-and-starting-a-silo">Configuring and Starting a Silo</h3>
+<p>A silo is configured programmatically via a <code>ClusterConfiguration</code> object.
+It can be instantiated and populated directly, load settings from a file, or created with several available helper methods for different deployment environments.
+For local testing, the easiest way to go is to use <code>ClusterConfiguration.LocalhostPrimarySilo()</code> helper method.
+The configuration object is then passed to a new instance of <code>SiloHost</code> class, that can be initialized and started after that.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo.
+Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project.</p>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Server
+</code></pre><p>Here is an example of how a local silo can be started:</p>
+<pre><code class="lang-csharp">var siloConfig = ClusterConfiguration.LocalhostPrimarySilo(); 
+var silo = new SiloHost(&quot;Test Silo&quot;, siloConfig); 
+silo.InitializeOrleansSilo(); 
+silo.StartOrleansSilo();
+
+Console.WriteLine(&quot;Press Enter to close.&quot;); 
+// wait here
+Console.ReadLine(); 
+
+// shut the silo down after we are done.
+silo.ShutdownOrleansSilo();
+</code></pre><h3 id="configuring-and-connecting-a-client">Configuring and Connecting a Client</h3>
+<p>Client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a <code>ClientConfiguration</code> object and a <code>ClientBuilder</code>.
+<code>ClientConfiguration</code> object can be instantiated and populated directly, load settings from a file, or created with several available helper methods for different deployment environments.
+For local testing, the easiest way to go is to use <code>ClientConfiguration.LocalhostSilo()</code> helper method.
+The configuration object is then passed to a new instance of <code>ClientBuilder</code> class.</p>
+<p><code>ClientBuilder</code> exposes more methods for configuring additional client features.
+After that <code>Build</code> method of the <code>ClientBuilder</code> object is called to get an implementation of <code>IClusterClient</code> interface.
+Finally, we call <code>Connect()</code> method on the returned object to connect to the cluster.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.
+Add the <code>Microsoft.Orleans.Client</code> NuGet meta-package to the project.</p>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Client
+</code></pre><p>Here is an example of how a client can connect to a local silo:</p>
+<pre><code class="lang-csharp">var config = ClientConfiguration.LocalhostSilo();
+var builder = new ClientBuilder().UseConfiguration(config).
+var client = builder.Build();
+await client.Connect();
+</code></pre><h3 id="production-configurations">Production Configurations</h3>
+<p>The configuration examples we used here are for testing silos and clients running on the same machine as <code>localhost</code>.
+In production, silos and clients usually run on different servers and are configured with one of the reliable cluster configuration options.
+You can find more about that in the <a href="../host/configuration_guide/index.html">Configuration Guide</a> and in the description of <a href="../implementation/cluster_management.html">Cluster Management</a>.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/index.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

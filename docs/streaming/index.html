@@ -1,0 +1,179 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Streams | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Streams | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-streams">Orleans Streams</h1>
+
+<p>Orleans v.1.0.0 added support for streaming extensions to the programing model. Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way. The extensibility model of stream providers makes the programming model compatible with and portable across a wide range of existing queuing technologies, such as <a href="http://azure.microsoft.com/en-us/services/event-hubs/">Event Hubs</a>, <a href="http://azure.microsoft.com/en-us/services/service-bus/">ServiceBus</a>, <a href="http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-queues/">Azure Queues</a>, and <a href="http://kafka.apache.org/">Apache Kafka</a>. There is no need to write special code or run dedicated processes to interact with such queues.</p>
+<h2 id="why-should-i-care">Why should I care?</h2>
+<p>If you already know all about <a href="https://confluentinc.wordpress.com/2015/01/29/making-sense-of-stream-processing/">Stream Processing</a> and are familiar with technologies like <a href="http://azure.microsoft.com/en-us/services/event-hubs/">Event Hubs</a>, <a href="http://kafka.apache.org/">Kafka</a>, <a href="http://azure.microsoft.com/en-us/services/stream-analytics/">Azure Stream Analytics</a>, <a href="https://storm.apache.org/">Apache Storm</a>, <a href="https://spark.apache.org/streaming/">Apache Spark Streaming</a>, and <a href="https://msdn.microsoft.com/en-us/data/gg577609.aspx">Reactive Extensions (Rx) in .NET</a>, you may be asking why should you care. <strong>Why do we need yet another Stream Processing System and how Actors are related to Streams?</strong> <a href="streams_why.html">&quot;Why Orleans Streams?&quot;</a> is meant to answer that question.</p>
+<h2 id="programming-model">Programming Model</h2>
+<p>There are a number of principles behind Orleans Streams Programming Model:</p>
+<ol>
+<li>Orleans streams are <em>virtual</em>. That is, a stream always exists. It is not explicitly created or destroyed, and it can never fail.</li>
+<li>Streams are <em>identified by</em> stream IDs, which are just <em>logical names</em> comprised of GUIDs and strings.</li>
+<li>Orleans Streams allow you to <em>decouple generation of data from its processing, both in time and space</em>. That means that the stream producer and the stream consumer may be on different servers or in different time zones, and will withstand failures.</li>
+<li>Orleans streams are <em>lightweight and dynamic</em>. Orleans Streaming Runtime is designed to handle a large number of streams that come and go at a high rate.</li>
+<li>Orleans stream <em>bindings are dynamic</em>. Orleans Streaming Runtime is designed to handle cases where grains connect to and disconnect from streams at a high rate.</li>
+<li>Orleans Streaming Runtime <em>transparently manages the lifecycle of stream consumption</em>. After an application subscribes to a stream, it will then receive the stream&#39;s events, even in the presence of failures.</li>
+<li>Orleans streams <em>work uniformly across grains and Orleans clients</em>.</li>
+</ol>
+<h2 id="programming-apis">Programming APIs</h2>
+<p>Applications interact with streams via APIs that are very similar to the well-known <a href="https://msdn.microsoft.com/en-us/data/gg577609.aspx">Reactive Extensions (Rx) in .NET</a>, by using <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncStream.cs"><code>Orleans.Streams.IAsyncStream&lt;T&gt;</code></a> that implements<br><a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObserver.cs"><code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code></a> and
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObservable.cs"><code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code></a> interfaces.</p>
+<p>In a typical example below, a device generates some data, which is sent as an HTTP request to the service running in the Cloud. The Orleans client running in the front-end server receives this HTTP call and publishes the data into a matching device stream:</p>
+<pre><code class="lang-csharp">public async Task OnHttpCall(DeviceEvent deviceEvent)
+{
+     // Post data directly into the device&#39;s stream.
+     IStreamProvider streamProvider = GrainClient.GetStreamProvider(&quot;MyStreamProvider&quot;);
+     IAsyncStream&lt;DeviceEventData&gt; deviceStream = streamProvider.GetStream&lt;DeviceEventData&gt;(deviceEvent.DeviceId, &quot;MyNamespace&quot;);
+     await deviceStream.OnNextAsync(deviceEvent.Data);
+}
+</code></pre><p>In another example below, a chat user (implemented as Orleans Grain) joins a chat room, gets a handle to a stream of chat messages generated by all others users in this room, and subscribes to it. Notice that the chat user does not need to know about the chat room grain itself (there might not be such a grain in our system) or about other users in that group that produce messages. Needless to say, to publish to the chat stream, users don&#39;t need to know who is currently subscribed to the stream. This demonstrates how chat users can be completely decoupled in time and space.</p>
+<pre><code class="lang-csharp">public class ChatUser: Grain
+{
+    public async Task JoinChat(Guid chatGroupId)
+    {
+       IStreamProvider streamProvider = base.GetStreamProvider(&quot;MyStreamProvider&quot;);
+       IAsyncStream&lt;string&gt; chatStream = streamProvider.GetStream&lt;string&gt;(chatGroupId, &quot;MyNamespace&quot;);
+       await chatStream.SubscribeAsync(async (message, token) =&gt; Console.WriteLine(message))
+    }
+}
+</code></pre><hr>
+<h2 id="quick-start-sample">Quick Start Sample</h2>
+<p>The <a href="streams_quick_start.html">Quick Start Sample</a> is a good quick overview of the overall workflow of using streams in the application.
+After reading it, you should read the <a href="streams_programming_APIs.html">Streams Programming APIs</a> to get a deeper understanding of the concepts.</p>
+<h2 id="streams-programming-apis">Streams Programming APIs</h2>
+<p>A <a href="streams_programming_APIs.html">Streams Programming APIs</a> provides a detailed description of the programming APIs.</p>
+<h2 id="stream-providers">Stream Providers</h2>
+<p>Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of <strong>Stream Providers</strong>, which is an extensibility point in the system. Orleans currently has implementations of two stream providers: TCP based <strong>Simple Message Stream Provider</strong> and Azure Queue based <strong>Azure Queue Stream Provider</strong>.
+More details on Stream Providers can be found at <a href="stream_providers.html">Stream Providers</a>.</p>
+<h2 id="stream-semantics">Stream Semantics</h2>
+<p><strong>Stream Subscription Semantics</strong>:
+Orleans Streams guarantee Sequential Consistency for Stream Subscription operations. Specifically, when a consumer subscribes to a stream, once the <code>Task</code> representing the subscription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow you to subscribe from an arbitrary point in time in the past by using <code>StreamSequenceToken</code> (more details can be found <a href="stream_providers.html">here</a>).</p>
+<p><strong>Individual Stream Events Delivery Guarantees</strong>:
+Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams (SMS)), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don&#39;t have such a provider yet, but it is possible to build one).</p>
+<p><strong>Events Delivery Order</strong>:
+Event order also depends on a particular stream provider. In SMS streams, the producer explicitly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering by using <code>StreamSequenceToken</code>.</p>
+<h2 id="streams-implementation">Streams Implementation</h2>
+<p>The <a href="../implementation/streams_implementation/index.html">Orleans Streams Implementation</a> provides a high-level overview of the internal implementation.</p>
+<h2 id="code-samples">Code Samples</h2>
+<p>More examples of how to use streaming APIs within a grain can be found <a href="https://github.com/dotnet/orleans/blob/master/test/Grains/TestGrains/SampleStreamingGrain.cs">here</a>. We plan to create more samples in the future.</p>
+<h2 id="more-material">More Material</h2>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=eSepBlfY554">Orleans Virtual Meetup about Streams</a></li>
+<li><a href="../resources/presentations/Orleans%20Streaming%20-%20Virtual%20meetup%20-%205-22-2015.pptx">Orleans Streaming Presentation from Virtual Meetup</a></li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/streaming/index.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

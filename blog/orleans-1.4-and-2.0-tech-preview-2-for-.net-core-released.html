@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans 1.4 and 2.0 Tech Preview 2 for .NET Core released | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans 1.4 and 2.0 Tech Preview 2 for .NET Core released | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-14-and-20-tech-preview-2-for-net-core-released">Orleans 1.4 and 2.0 Tech Preview 2 for .NET Core released</h1>
+
+<p><a href="https://github.com/jdom">Julian Dominguez</a>
+3/2/2017 5:54:19 PM</p>
+<hr>
+<h1 id="orleans-140">Orleans 1.4.0</h1>
+<p>A few weeks ago we release Orleans 1.4.0 to NuGet.org, where the main new themes were:</p>
+<ul>
+<li>Revamped JournaledGrain for event sourcing with support for geo-distributed log-based consistency providers.</li>
+<li>Abstraction of Grain Services with fixed-placed per-silo application components with their workload partitioned via cluster consistency ring.</li>
+<li>Support for heterogeneous silos with non-uniform distribution of available grain classes.</li>
+<li>Cluster membership provider for Service Fabric.</li>
+</ul>
+<p>Of course, there&#39;s a lot of other improvement and bug fixes, that you can read about here: <a href="https://github.com/dotnet/orleans/releases/tag/v1.4.0">Orleans v1.4.0 release notes</a></p>
+<h1 id="orleans-20-tech-preview-2-for-net-core">Orleans 2.0 Tech Preview 2 for .NET Core</h1>
+<p>In addition to our standard releases, we have been working in a vNext feature that supports .NET Standard (and .NET Core hosts).
+Similar to TP1, this new preview is not at complete full parity with the Orleans 1.X releases, but it&#39;s getting pretty close.
+We have done a lot of bug fixes since the last preview, and also this one is up to date with the latest version in our master branch (a little bit ahead of 1.4.0).</p>
+<h3 id="differences-with-orleans-1x">Differences with Orleans 1.X</h3>
+<p>Some notable differences or pending things in this pre-release:</p>
+<ul>
+<li>Orleans code generation<ul>
+<li>Build time codegen (Microsoft.Orleans.OrleansCodeGenerator.Build nuget package) only works if building on Windows with either Visual Studio 2017 or the latest dotnet CLI.</li>
+<li>Nevertheless, runtime codegen is a viable alternative that works cross-platform (by referencing Microsoft.Orleans.OrleansCodeGenerator package in the Silo host and client projects).</li>
+</ul>
+</li>
+<li>BinaryFormatter (built-in .NET Serialization) is not yet available in .NET Standard, and it was being used as the default fallback serializer in Orleans (and typically used mostly when serializing exceptions). Now we have a custom IL based fallback serializer that should be fast and powerful, but might behave somewhat differently if you have existing code relying on <code>[Serializable]</code>.</li>
+<li>System.Diagnostic.Trace.CorrelationManager.ActivityId is not supported in .NET Standard. If you were relying on this to correlate grain calls, consider using Orleans.Runtime.RequestContext.ActivityId instead.</li>
+</ul>
+<h3 id="is-orleans-20-tp2-production-ready">Is Orleans 2.0 TP2 production ready?</h3>
+<p>Not yet.
+Big disclaimer: We do our CI testing in .NET (because our tests heavily rely on AppDomains to create an in-memory cluster of silos, and those are not supported in .NET Core, but we plan to tackle that soon).
+We have done some basic manual testing in .NET Core (both Windows and Linux), and we have some of our contributors using it to develop new services.
+Getting feedback (and PRs!) is one of the main goals of this release, and not to be used in production yet.
+Also, there is no guarantee that this technical preview is entirely backwards compatible with Orleans 1.4, even for the features that were fully ported.
+Once we are closer to a stable release, we’ll list all the breaking changes that we know of in case you are interested in upgrading your application from 1.X to 2.0.</p>
+<h3 id="where-to-get-it">Where to get it</h3>
+<p>Because this tech preview is not as full featured or stable as the 1.X releases is that we are only releasing in MyGet for now.
+You can get the NuGet packages by following the steps to configure the feed here: <a href="https://dotnet.myget.org/gallery/orleans-ci">https://dotnet.myget.org/gallery/orleans-ci</a></p>
+<h3 id="helloworld-sample">HelloWorld Sample</h3>
+<p>We now have a very simple sample in our repo that you can use to try Orleans in .NET Core (whether that&#39;s in Windows, Linux or MacOS).
+The sample is located at <a href="https://github.com/dotnet/orleans/tree/master/Samples/HelloWorld.NetCore">https://github.com/dotnet/orleans/tree/master/Samples/HelloWorld.NetCore</a>.</p>
+<p>Enjoy it, play with it, and lets us know what you think, either as GitHub issues, PRs or just come hang out in our Gitter channel.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/blog/orleans-1.4-and-2.0-tech-preview-2-for-.net-core-released.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

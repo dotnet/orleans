@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Configuring ADO.NET Providers | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Configuring ADO.NET Providers | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="configuring-adonet-providers">Configuring ADO.NET Providers</h1>
+
+<p>Any reliable deployment of Orleans requires using persistent storage to keep system state, specifically Orleans cluster membership table and reminders.
+One of the available options is using a SQL database via the ADO.NET providers.</p>
+<p>In order to use ADO.NET for persistence, clustering or reminders, one needs to configure the ADO.NET providers as part of the silo configuration, and, in case of clustering, also as part of the client configurations.</p>
+<p>The silo configuration code should look like this:</p>
+<pre><code class="lang-c#">var siloHostBuilder = new SiloHostBuilder();
+var invariant = &quot;System.Data.SqlClient&quot;; // for Microsoft SQL Server
+var connectionString = &quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+//use AdoNet for clustering 
+siloHostBuilder.UseAdoNetClustering(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+//use AdoNet for reminder service
+siloHostBuilder.UseAdoNetReminderService(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+//use AdoNet for Persistence
+siloHostBuilder.AddAdoNetGrainStorage(&quot;GrainStorageForTest&quot;, options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+</code></pre><p>The client configuration code should look like this:</p>
+<pre><code class="lang-c#">var siloHostBuilder = new SiloHostBuilder();
+var invariant = &quot;System.Data.SqlClient&quot;;
+var connectionString = &quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+//use AdoNet for clustering 
+siloHostBuilder.UseAdoNetClustering(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+</code></pre><p>Where the <code>ConnectionString</code> is set to a valid AdoNet Server connection string. </p>
+<p>In order to use ADO.NET providers for persistence, reminders or clustering, there are scripts for creating database artifacts, to which all servers that will be hosting Orleans silos need to have access.
+Lack of access to the target database is a typical mistake we see developers making.</p>
+<p>The scripts will be copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory, after you install or do a nuget restore on the AdoNet extension nugets. We split AdoNet nugets into per feature nugets:
+<code>Microsoft.Orleans.Clustering.AdoNet</code> for clustering, <code>Microsoft.Orleans.Persistence.AdoNet</code> for persistence and <code>Microsoft.Orleans.Reminders.AdoNet</code> for reminders.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/configuring_ADO.NET_providers.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

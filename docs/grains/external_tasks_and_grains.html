@@ -1,0 +1,292 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>External Tasks and Grains | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="External Tasks and Grains | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="external-tasks-and-grains">External Tasks and Grains</h1>
+
+<p>By design, any sub-Tasks spawned from grain code (for example, by using <code>await</code> or <code>ContinueWith</code> or <code>Task.Factory.StartNew</code>) will be dispatched on the same per-activation <a href="https://docs.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a> as the parent task and therefore inherit the same <em>single-threaded execution model</em> as the rest of grain code.
+This is the main point behind single threaded execution of grain turn based concurrency.</p>
+<p>In some cases grain code might need to “break out” of the Orleans task scheduling model and “do something special”, such as explicitly pointing a <code>Task</code> to a different task scheduler or the .NET <a href="https://docs.microsoft.com/dotnet/api/system.threading.threadpool"><code>ThreadPool</code></a>.
+An example of such cases is when grain code has to execute a synchronous remote blocking call (such as remote IO).
+Executing that blocking call in the grain context will block the grain and thus should never be made.
+Instead, the grain code can execute this piece of blocking code on the thread pool thread and join (<code>await</code>) the completion of that execution and proceed in the grain context.
+We expect that escaping from the Orleans scheduler will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns.</p>
+<h2 id="task-based-apis">Task-based APIs</h2>
+<ol>
+<li><p><code>await</code>, <code>Task.Factory.StartNew</code> (see below), <code>Task.ContinueWith</code>, <code>Task.WhenAny</code>, <code>Task.WhenAll</code>, <code>Task.Delay</code> all respect the current task scheduler.
+That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.</p>
+</li>
+<li><p>Both <code>Task.Run</code> and the <code>endMethod</code> delegate of <code>Task.Factory.FromAsync</code> do <em>not</em> respect the current task scheduler.
+They both use the <code>TaskScheduler.Default</code> scheduler, which is the .NET thread pool task scheduler.
+Therefore, the code inside <code>Task.Run</code> and the <code>endMethod</code> in <code>Task.Factory.FromAsync</code> will <em>always</em> run on the .NET thread pool outside of the single-threaded execution model for Orleans grains, <a href="http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx">as detailed here</a>.
+However, any code after the <code>await Task.Run</code> or <code>await Task.Factory.FromAsync</code> will run back under the scheduler at the point the task was created, which is the grain&#39;s scheduler.</p>
+</li>
+<li><p><code>ConfigureAwait(false)</code> is an explicit API to escape the current task Scheduler.
+It will cause the code after an awaited Task to be executed on the <code>TaskScheduler.Default</code> scheduler, which is the .NET thread pool, and will thus break the single-threaded execution of the grain.
+You should in general <strong>never use <code>ConfigureAwait(false)</code> directly in grain code.</strong></p>
+</li>
+<li><p>Methods with signature <code>async void</code> should not be used with grains.
+They are intended for graphical user interface event handlers.
+<code>async void</code> method can immediately crash the current process if they allow an exception to escape, with no way of handling the exception.
+This is also true for <code>List&lt;T&gt;.ForEach(async element =&gt; ...)</code> and any other method which accepts an <code>Action&lt;T&gt;</code>, since the asynchronous delegate will be coerced into an <code>async void</code> delegate.</p>
+</li>
+</ol>
+<h3 id="taskfactorystartnew-and-async-delegates">Task.Factory.StartNew and async delegates</h3>
+<p>The usual recommendation for scheduling tasks in any C# program is to use <code>Task.Run</code> in favor of <code>Task.Factory.StartNew</code>.
+In fact, a quick google search on the use of <code>Task.Factory.StartNew()</code> will suggest <a href="https://blog.stephencleary.com/2013/08/startnew-is-dangerous.html">that it is dangerous</a> and <a href="https://devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/">that one should always favor <code>Task.Run</code></a>.
+But if we want to stay in the grain&#39;s <em>single-threaded execution model</em> for our grain then we need to use it, so how do we do it correctly then?
+The danger when using <code>Task.Factory.StartNew()</code> is that it does not natively support async delegates.
+This means that this is likely a bug: <code>var notIntendedTask = Task.Factory.StartNew(SomeDelegateAsync)</code>.
+<code>notIntendedTask</code> is <em>not</em> a task that completes when <code>SomeDelegateAsync</code> does.
+Instead, one should <em>always</em> unwrap the returned task: <code>var task = Task.Factory.StartNew(SomeDelegateAsync).Unwrap()</code>.</p>
+<h4 id="example">Example</h4>
+<p>Below is sample code that demonstrates the usage of <code>TaskScheduler.Current</code>, <code>Task.Run</code> and a special custom scheduler to escape from Orleans grain context and how to get back to it.</p>
+<pre><code class="lang-csharp">   public async Task MyGrainMethod()
+   {
+        // Grab the grain&#39;s task scheduler
+        var scheduler = TaskScheduler.Current;
+        await TaskDelay(10000);
+
+        // Current task scheduler did not change, the code after await is still running
+        // in the same task scheduler.
+        Assert.AreEqual(scheduler, TaskScheduler.Current);
+
+        Task t1 = Task.Run( () =&gt;
+        {
+             // This code runs on the thread pool scheduler, not on Orleans task scheduler
+             Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+             Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current);
+        });
+
+        await t1;
+
+        // We are back to the Orleans task scheduler. 
+        // Since await was executed in Orleans task scheduler context, we are now back
+        // to that context.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
+
+        // Example of using Task.Factory.StartNew with a custom scheduler to escape from
+        // the Orleans scheduler
+        Task t2 = Task.Factory.StartNew(() =&gt;
+        {
+             // This code runs on the MyCustomSchedulerThatIWroteMyself scheduler, not on
+            // the Orleans task scheduler
+             Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+             Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current);
+        },
+        CancellationToken.None,
+        TaskCreationOptions.None,
+        scheduler: MyCustomSchedulerThatIWroteMyself);
+
+        await t2;
+
+        // We are back to Orleans task scheduler.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
+   }
+</code></pre><h4 id="example---making-a-grain-call-from-code-that-runs-on-a-thread-pool">Example - making a grain call from code that runs on a thread pool</h4>
+<p>Another scenario is a piece of grain code that needs to “break out” of the grain&#39;s task scheduling model and run on a thread pool (or some other, non-grain context), but still needs to call another grain.
+Grain calls can be made from non-grain contexts without extra ceremony.</p>
+<p>Below is code that demonstrates how a grain call can be made from a piece of code that runs inside a grain but not in the grain context.</p>
+<pre><code class="lang-csharp">   public async Task MyGrainMethod()
+   {
+        // Grab the Orleans task scheduler
+        var scheduler = TaskScheduler.Current;
+        var fooGrain = this.GrainFactory.GetGrain&lt;IFooGrain&gt;(0);
+        Task&lt;int&gt; t1 = Task.Run(async () =&gt;
+        {
+            // This code runs on the thread pool scheduler,
+            // not on Orleans task scheduler
+            Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+            int res = await fooGrain.MakeGrainCall();
+
+            // This code continues on the thread pool scheduler,
+            // not on the Orleans task scheduler
+            Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+            return res;
+        });
+
+        int result = await t1;
+
+        // We are back to the Orleans task scheduler.
+        // Since await was executed in the Orleans task scheduler context,
+        // we are now back to that context.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
+   }
+</code></pre><h2 id="working-with-libraries">Working with libraries</h2>
+<p>Some external libraries that your code is using might be using <code>ConfigureAwait(false)</code> internally.
+In fact, it is a good and correct practice in .NET to use <code>ConfigureAwait(false)</code> <a href="https://msdn.microsoft.com/magazine/jj991977.aspx">when implementing general purpose libraries</a>.
+This is not a problem in Orleans.
+As long as the code in the grain that invokes the library method is awaiting the library call with a regular <code>await</code>, the grain code is correct.
+The result will be exactly as desired – the library code will run continuations on the default scheduler (the value returned by <code>TaskScheduler.Default</code>, which does not guarantee that the continuations will definitely run on a <code>ThreadPool</code> thread as continuations are often inlined in the previous thread), while the grain code will run on the grain&#39;s scheduler.</p>
+<p>Another frequently-asked question is whether there is a need to execute library calls with <code>Task.Run</code> – that is, whether there is a need to explicitly offload the library code to <code>ThreadPool</code> (for grain code to do <code>Task.Run(() =&gt; myLibrary.FooAsync())</code>).
+The answer is no.
+There is no need to offload any code to <code>ThreadPool</code> except for the case of library code that is making a blocking synchronous calls.
+Usually, any well-written and correct .NET async library (methods that return <code>Task</code> and are named with an <code>Async</code> suffix) do not make blocking calls.
+Thus there is no need to offload anything to <code>ThreadPool</code> unless you suspect the async library is buggy or if you are deliberately using a synchronous blocking library.</p>
+<h2 id="deadlocks">Deadlocks</h2>
+<p>Since grains execute in a <em>single threaded</em> fashion, it is possible to deadlock a grain by synchronously blocking in a way that would require multiple threads to unblock.
+This means that code which calls any of the following methods and properties can deadlock a grain if the provided tasks have not yet completed by the time the method or property is invoked:</p>
+<ul>
+<li><code>Task.Wait()</code></li>
+<li><code>Task.Result</code></li>
+<li><code>Task.WaitAny(...)</code></li>
+<li><code>Task.WaitAll(...)</code></li>
+<li><code>task.GetAwaiter().GetResult()</code></li>
+</ul>
+<p>These methods should be avoided in any high-concurrency service because they can lead to poor performance and instability by starving the .NET <code>ThreadPool</code> by blocking threads which could be performing useful work and requiring the .NET <code>ThreadPool</code> to inject additional threads so that they can be completed.
+When executing grain code, these methods, as mentioned above, can cause the grain to deadlock and therefore they should also be avoided in grain code.</p>
+<p>If there is some <em>sync-over-async</em> work which cannot be avoided, it is best to move that work to a separate scheduler.
+The simplest way to do this is to use <code>await Task.Run(() =&gt; task.Wait())</code> for example.
+Please note that it is strongly recommended to avoid <em>sync-over-async</em> work since, as mentioned above, it will cause your application&#39;s scalability and performance to suffer.</p>
+<h2 id="summary-working-with-tasks-in-orleans">Summary: working with Tasks in Orleans</h2>
+<table>
+<thead>
+<tr>
+<th>What are you trying to do?</th>
+<th>How to do it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run background work on .NET thread-pool threads. No grain code or grain calls allowed.</td>
+<td><code>Task.Run</code></td>
+</tr>
+<tr>
+<td>Run asynchronous worker task from grain code with Orleans turn-based concurrency guarantees (<a href="#taskfactorystartnew-and-async-delegates">see above</a>).</td>
+<td><code>Task.Factory.StartNew(WorkerAsync).Unwrap()</code></td>
+</tr>
+<tr>
+<td>Run synchronous worker task from grain code with Orleans turn-based concurrency guarantees.</td>
+<td><code>Task.Factory.StartNew(WorkerSync)</code></td>
+</tr>
+<tr>
+<td>Timeouts for executing work items</td>
+<td><code>Task.Delay</code> + <code>Task.WhenAny</code></td>
+</tr>
+<tr>
+<td>Call an asynchronous library method</td>
+<td><code>await</code> the library call</td>
+</tr>
+<tr>
+<td>Use <code>async</code>/<code>await</code></td>
+<td>The normal .NET Task-Async programming model. Supported &amp; recommended</td>
+</tr>
+<tr>
+<td><code>ConfigureAwait(false)</code></td>
+<td>Do not use inside grain code. Allowed only inside libraries.</td>
+</tr>
+</tbody>
+</table>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/external_tasks_and_grains.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

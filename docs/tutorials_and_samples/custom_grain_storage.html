@@ -1,0 +1,322 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Custom Grain Storage | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Custom Grain Storage | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="custom-grain-storage">Custom Grain Storage</h1>
+
+<h2 id="writing-a-custom-grain-storage">Writing a Custom Grain Storage</h2>
+<p>In the tutorial on declarative actor storage, we looked at allowing grains to store their state in an Azure table using one of the built-in storage providers.
+While Azure is a great place to squirrel away your data, there are many alternatives.
+In fact, there are so many that there was no way to support them all.
+Instead, Orleans is designed to let you easily add support for your own form of storage by writing a grain storage.</p>
+<p>In this tutorial, we&#39;ll walk through how to write a simple file-based grain storage.
+A file system is not the best place to store grains states as it is local, there can be issues with file locks and the last update date is not sufficient to prevent inconsistency. But it&#39;s an easy example to help us illustrate the implementation of a <code>Grain Storage</code>.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>An Orleans grain storage is a class that implements <code>IGrainStorage</code> which is included in <a href="https://www.nuget.org/packages/Microsoft.Orleans.Core/">Microsoft.Orleans.Core NuGet package</a>.</p>
+<p>We also inherit from <code>ILifecycleParticipant&lt;ISiloLifecycle&gt;</code> which will allow us to subscribe to a particular event in the lifecycle of the silo.</p>
+<p>We start by creating a class named <code>FileGrainStorage</code>.</p>
+<pre><code class="lang-csharp">using Orleans;
+using System;
+using Orleans.Storage;
+using Orleans.Runtime;
+using System.Threading.Tasks;
+
+namespace GrainStorage
+{
+    public class FileGrainStorage : IGrainStorage, ILifecycleParticipant&lt;ISiloLifecycle&gt;
+    {
+        private readonly string _storageName;
+        private readonly FileGrainStorageOptions _options;
+        private readonly ClusterOptions _clusterOptions;
+        private readonly IGrainFactory _grainFactory;
+        private readonly ITypeResolver _typeResolver;
+        private JsonSerializerSettings _jsonSettings;
+
+        public FileGrainStorage(string storageName, FileGrainStorageOptions options, IOptions&lt;ClusterOptions&gt; clusterOptions, IGrainFactory grainFactory, ITypeResolver typeResolver)
+        {
+            _storageName = storageName;
+            _options = options;
+            _clusterOptions = clusterOptions.Value;
+            _grainFactory = grainFactory;
+            _typeResolver = typeResolver;
+        }
+
+        public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+</code></pre><p>Prior starting the implementation, we create an option class containing the root directory where the grains states files will be stored under. For that we will create an options file <code>FileGrainStorageOptions</code>:</p>
+<pre><code class="lang-csharp">public class FileGrainStorageOptions
+{
+    public string RootDirectory { get; set; }
+}
+</code></pre><p>The  create a constructor containing two fields, <code>storageName</code> to specify which grains should write using this storage <code>[StorageProvider(ProviderName = &quot;File&quot;)]</code> and <code>directory</code> which would be the directory where the grain states will be saved.</p>
+<p><code>IGrainFactory</code>, <code>ITypeResolver</code> will be used in the next section where we will initilize the storage.</p>
+<p>We also take two options as argument, our own <code>FileGrainStorageOptions</code> and the <code>ClusterOptions</code>. Those will be needed for the implementation of the storage functionalities.</p>
+<p>We also need <code>JsonSerializerSettings</code> as we are serializing and deserializing in Json format.</p>
+<p><em>Json is an implementation detail, it is up to the developer to decide what serialization/deserialization protocol would fit the application. Another common format is binary format.</em></p>
+<h2 id="initializing-the-storage">Initializing the storage</h2>
+<p>To initialize the storage, we register an <code>Init</code> function on the <code>ApplicationServices</code> lifecycle.</p>
+<pre><code class="lang-csharp">public void Participate(ISiloLifecycle lifecycle)
+{
+    lifecycle.Subscribe(OptionFormattingUtilities.Name&lt;FileGrainStorage&gt;(_storageName), ServiceLifecycleStage.ApplicationServices, Init);
+}
+</code></pre><p>The <code>Init</code> function is used to set the <code>_jsonSettings</code> which will be used to configure the <code>Json</code> serializer. At the same time we create the folder to store the grains states if it does not exist yet.</p>
+<pre><code class="lang-csharp">private Task Init(CancellationToken ct)
+{
+    // Settings could be made configurable from Options.
+    _jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(_typeResolver, _grainFactory), false, false, null);
+
+    var directory = new System.IO.DirectoryInfo(_rootDirectory);
+    if (!directory.Exists)
+        directory.Create();
+
+    return Task.CompletedTask;
+}
+</code></pre><p>We also provide a common function to construct the filename ensuring uniqueness per service, grain Id and grain type.</p>
+<pre><code class="lang-csharp">private string GetKeyString(string grainType, GrainReference grainReference)
+{
+    return $&quot;{_clusterOptions.ServiceId}.{grainReference.ToKeyString()}.{grainType}&quot;;
+}
+</code></pre><h2 id="reading-state">Reading State</h2>
+<p>To read a grain state, we get the filename using the function we previously defined and combine it to the root directory coming from the options.</p>
+<pre><code class="lang-csharp">public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+{
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
+
+    var fileInfo = new FileInfo(path);
+    if (!fileInfo.Exists)
+    {
+        grainState.State = Activator.CreateInstance(grainState.State.GetType());
+        return;
+    }
+
+    using (var stream = fileInfo.OpenText())
+    {
+        var storedData = await stream.ReadToEndAsync();
+        grainState.State = JsonConvert.DeserializeObject(storedData, _jsonSettings);
+    }
+
+    grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
+}
+</code></pre><p>We use the <code>fileInfo.LastWriteTimeUtc</code> as a ETag which will be used by other functions for inconsistency checks to prevent data loss.</p>
+<p>Note that for the deserialization, we use the <code>_jsonSettings</code> which was set on the <code>Init</code> function. This is important to be able to serialize/deserialize properly the state.</p>
+<h2 id="writing-state">Writing State</h2>
+<p>Writing the state is similar to reading the state.</p>
+<pre><code class="lang-csharp">public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+{
+    var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
+
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
+
+    var fileInfo = new FileInfo(path);
+
+    if (fileInfo.Exists &amp;&amp; fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+    {
+        throw new InconsistentStateException($&quot;Version conflict (WriteState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.&quot;);
+    }
+
+    using (var stream = new StreamWriter(fileInfo.Open(FileMode.Create, FileAccess.Write)))
+    {
+        await stream.WriteAsync(storedData);
+    }
+
+    fileInfo.Refresh();
+    grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
+}
+</code></pre><p>Similarly as reading, we use <code>_jsonSettings</code> to write the state.
+The current ETag is used to check against the last updated time in UTC of the file. If the date is different, it means that another activation of the same grain changed the state concurrently. In this situation, we throw an <code>InconsistentStateException</code> which will result in the current activation being killed to prevent overwritting the state previously saved by the other activated grain.</p>
+<h2 id="clearing-state">Clearing State</h2>
+<p>Clearing the state would be deleting the file if the file exists.</p>
+<pre><code class="lang-csharp">public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+{
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
+
+    var fileInfo = new FileInfo(path);
+    if (fileInfo.Exists)
+    {
+        if (fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+        {
+            throw new InconsistentStateException($&quot;Version conflict (ClearState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.&quot;);
+        }
+
+        grainState.ETag = null;
+        grainState.State = Activator.CreateInstance(grainState.State.GetType());
+        fileInfo.Delete();
+    }
+
+    return Task.CompletedTask;
+}
+</code></pre><p>For the same reason as <code>WriteState</code>, we check for inconsistency before proceeding to delete the file and reset the ETag, we check if the current ETag is the same as the last write time UTC.</p>
+<h2 id="putting-it-together">Putting it Together</h2>
+<p>After that we will create a factory which will allow us to scope the options setting to the provider name and at the same time create an instance of the <code>FileGrainStorage</code> to ease the registration to the service collection.</p>
+<pre><code class="lang-csharp">public static class FileGrainStorageFactory
+{
+    internal static IGrainStorage Create(IServiceProvider services, string name)
+    {
+        IOptionsSnapshot&lt;FileGrainStorageOptions&gt; optionsSnapshot = services.GetRequiredService&lt;IOptionsSnapshot&lt;FileGrainStorageOptions&gt;&gt;();
+        return ActivatorUtilities.CreateInstance&lt;FileGrainStorage&gt;(services, name, optionsSnapshot.Get(name), services.GetProviderClusterOptions(name));
+    }
+}
+</code></pre><p>Lastly to register the grain storage, we create an extension on the <code>ISiloHostBuilder</code> which internally register the grain storage as a named service using <code>.AddSingletonNamedService(...)</code>, an extension provided by <code>Orleans.Core</code>.</p>
+<pre><code class="lang-csharp">public static class FileSiloBuilderExtensions
+{
+    public static ISiloHostBuilder AddFileGrainStorage(this ISiloHostBuilder builder, string providerName, Action&lt;FileGrainStorageOptions&gt; options)
+    {
+        return builder.ConfigureServices(services =&gt; services.AddFileGrainStorage(providerName, options));
+    }
+
+    public static IServiceCollection AddFileGrainStorage(this IServiceCollection services, string providerName, Action&lt;FileGrainStorageOptions&gt; options)
+    {
+        services.AddOptions&lt;FileGrainStorageOptions&gt;(providerName).Configure(options);
+        return services
+            .AddSingletonNamedService(providerName, FileGrainStorageFactory.Create)
+            .AddSingletonNamedService(providerName, (s, n) =&gt; (ILifecycleParticipant&lt;ISiloLifecycle&gt;)s.GetRequiredServiceByName&lt;IGrainStorage&gt;(n));
+    }
+}
+</code></pre><p>Our <code>FileGrainStorage</code> implements two interfaces, <code>IGrainStorage</code> and <code>ILifecycleParticipant&lt;ISiloLifecycle&gt;</code> therefore we need to register two named services for each interfaces:</p>
+<pre><code class="lang-csharp">return services
+    .AddSingletonNamedService(providerName, FileGrainStorageFactory.Create)
+    .AddSingletonNamedService(providerName, (s, n) =&gt; (ILifecycleParticipant&lt;ISiloLifecycle&gt;)s.GetRequiredServiceByName&lt;IGrainStorage&gt;(n));
+</code></pre><p>This enables us to add the file storage using the extension on the <code>ISiloHostBuilder</code>:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+    .UseLocalhostClustering()
+    .AddFileGrainStorage(&quot;File&quot;, opts =&gt;
+    {
+        opts.RootDirectory = &quot;C:/TestFiles&quot;;
+    })
+    .Build();
+</code></pre><p>Now we will be able to decorate our grains with the provider <code>[StorageProvider(ProviderName = &quot;File&quot;)]</code> and it will store in the grain state in the root directory set in the options.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/custom_grain_storage.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

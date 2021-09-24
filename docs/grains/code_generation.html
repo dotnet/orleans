@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Code Generation | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Code Generation | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="code-generation">Code Generation</h1>
+
+<p>The Orleans runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate, which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.</p>
+<h2 id="enabling-code-generation">Enabling Code Generation</h2>
+<p>Code generation can be performed either when your projects are being built or when your application initializes.</p>
+<h3 id="during-build">During Build</h3>
+<p>The preferred method for performing code generation is at build time. Build time code generation could be enabled by using one of the following packages:</p>
+<ul>
+<li><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/">Microsoft.Orleans.OrleansCodeGenerator.Build</a>. A package that uses Roslyn for code generation and uses .NET Reflection for analysis.</li>
+<li><p><a href="https://www.nuget.org/packages/Microsoft.Orleans.CodeGenerator.MSBuild/">Microsoft.Orleans.CodeGenerator.MSBuild</a>. A new code generation package that leverages Roslyn both for code generation and code analysis. It does not load application binaries, and as a result avoids issues caused by clashing dependency versions and differing target frameworks. The new code generator also improves support for incremental builds, which should result in shorter build times.</p>
+<p>One of these packages should be installed into all projects which contain grains, grain interfaces, custom serializers, or types which are sent between grains. Installing a package injects a target into the project which will generate code at build time.</p>
+</li>
+</ul>
+<p>Both packages (<code>Microsoft.Orleans.CodeGenerator.MSBuild</code> and <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>) only support C# projects. Other languages are supported either using the <code>Microsoft.Orleans.OrleansCodeGenerator</code> package described below, or by creating a C# project which can act as the target for code generated from assemblies written in other languages.</p>
+<p>Additional diagnostics can be emitted at build time by specifying a value for <code>OrleansCodeGenLogLevel</code> in the target project&#39;s <em>csproj</em> file. For example, <code>&lt;OrleansCodeGenLogLevel&gt;Trace&lt;/OrleansCodeGenLogLevel&gt;</code>.</p>
+<h3 id="during-initialization">During Initialization</h3>
+<p>Code generation can be performed during initialization on the client and silo by installing the <code>Microsoft.Orleans.OrleansCodeGenerator</code> package and using the <code>IApplicationPartManager.WithCodeGeneration</code> extension method:</p>
+<pre><code class="lang-csharp">builder.ConfigureApplicationParts(
+    parts =&gt; parts
+        .AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly)
+        .WithCodeGeneration());
+</code></pre><p>In the foregoing example, <code>builder</code> may be an instance of either <code>ISiloHostBuilder</code> or <code>IClientBuilder</code>.
+An optional <a href="https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.logging.iloggerfactory"><code>ILoggerFactory</code></a> instance can be passed to <code>WithCodeGeneration</code> to enable logging during code generation, for example:</p>
+<pre><code class="lang-csharp">ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
+codeGenLoggerFactory.AddProvider(new ConsoleLoggerProvider());
+builder.ConfigureApplicationParts(
+    parts =&gt; parts
+        .AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly)
+        .WithCodeGeneration(codeGenLoggerFactory));
+</code></pre><h2 id="influencing-code-generation">Influencing Code Generation</h2>
+<h3 id="generate-code-for-a-specific-type">Generate code for a specific type</h3>
+<p>Code is automatically generated for grain interfaces, grain classes, grain state, and types passed as arguments in grain methods. If a type does not fit this criteria, the following methods can be used to further guide code generation.</p>
+<p>Adding <code>[Serializable]</code> to a type instructs the code generator to generate a serializer for that type.</p>
+<p>Adding <code>[assembly: GenerateSerializer(Type)]</code> to a project instructs the code generator to treat that type as serializable, and will cause an error if a serializer could not be generated for that type, for example because the type is not accessible. This error will halt a build if code generation is enabled. This attribute also allows generating code for specific types from another assembly.</p>
+<p><code>[assembly: KnownType(Type)]</code> also instructs the code generator to include a specific type (which may be from a referenced assembly), but does not cause an exception if the type is inaccessible.</p>
+<h3 id="generate-serializers-for-all-subtypes">Generate serializers for all subtypes</h3>
+<p>Adding <code>[KnownBaseType]</code> to an interface or class instructs the code generator to generate serialization code for all types which inherit/implement that type.</p>
+<h3 id="generate-code-for-all-types-in-another-assembly">Generate code for all types in another assembly</h3>
+<p>There are cases where generated code cannot be included in a particular assembly at build time. For example, this can include shared libraries which do not reference Orleans, assemblies written in languages other than C#, and assemblies which the developer does not have the source code for. In these cases, generated code for those assemblies can be placed into a separate assembly which is referenced during initialization.</p>
+<p>In order to enable this for an assembly:</p>
+<ol>
+<li>Create a C# project.</li>
+<li>Install the <code>Microsoft.Orleans.CodeGenerator.MSBuild</code> or the <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package.</li>
+<li>Add a reference to the target assembly.</li>
+<li>Add <code>[assembly: KnownAssembly(&quot;OtherAssembly&quot;)]</code> at the top level of a C# file.</li>
+</ol>
+<p>The <code>KnownAssembly</code> attribute instructs the code generator to inspect the specified assembly and generate code for the types within it. The attribute can be used multiple times within a project.</p>
+<p>The generated assembly must then be added to the client/silo during initialization:</p>
+<pre><code class="lang-csharp">builder.ConfigureApplicationParts(
+    parts =&gt; parts.AddApplicationPart(&quot;CodeGenAssembly&quot;));
+</code></pre><p>In the foregoing example, <code>builder</code> may be an instance of either <code>ISiloHostBuilder</code> or <code>IClientBuilder</code>.</p>
+<p><code>KnownAssemblyAttribute</code> has an optional property, <code>TreatTypesAsSerializable</code>, which can be set to <code>true</code> to instruct the code generator to act as though all types within that assembly are marked as serializable.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/code_generation.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

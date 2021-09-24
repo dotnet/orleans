@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>GrainServices | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="GrainServices | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grainservices">GrainServices</h1>
+
+<p>A GrainService is a special grain; one that has no identity, and runs in every silo from startup to shutdown.</p>
+<h2 id="creating-a-grainservice">Creating a GrainService</h2>
+<p><strong>Step 1.</strong> Create the interface.
+The interface of a GrainService is built using exactly the same principles you would use for building the interface of any other grain.</p>
+<pre><code class="lang-csharp">public interface IDataService : IGrainService {
+    Task MyMethod();
+}
+</code></pre><p><strong>Step 2.</strong> Create the DataService grain itself.
+If possible, make the GrainService reentrant for better performance.
+Note the necessary base constructor call.
+It’s good to know that you can also inject an <code>IGrainFactory</code> so you can make grain calls from your GrainService.</p>
+<p>A note about streams: a GrainService cannot write to Orleans streams because it doesn’t work within a grain task scheduler.
+If you need the GrainService to write to streams for you, then you will have to send the object to another kind of grain for writing to the stream.</p>
+<pre><code class="lang-csharp">[Reentrant]
+
+public class DataService : GrainService, IDataService {
+
+    readonly IGrainFactory GrainFactory;
+
+    public DataService(IServiceProvider services, IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory, IGrainFactory grainFactory) : base(id, silo, loggerFactory) {
+        GrainFactory = grainFactory;
+    }
+
+    public override Task Init(IServiceProvider serviceProvider) {
+        return base.Init(serviceProvider);
+    }
+
+    public override async Task Start() {
+        await base.Start();
+    }
+
+    public override Task Stop() {
+        return base.Stop();
+    }
+
+    public Task MyMethod() {
+ }
+}
+</code></pre><p><strong>Step 3.</strong> Create an interface for the GrainServiceClient to be used by other grains to connect to the GrainService.</p>
+<pre><code class="lang-csharp">public interface IDataServiceClient : IGrainServiceClient&lt;IDataService&gt;, IDataService {
+}
+</code></pre><p><strong>Step 4.</strong> Create the actual grain service client.
+It pretty much just acts as a proxy for the data service.
+Unfortunately, you have to manually type in all the method mappings, which are just simple one-liners.</p>
+<pre><code class="lang-csharp">public class DataServiceClient : GrainServiceClient&lt;IDataService&gt;, IDataServiceClient {
+
+    public DataServiceClient(IServiceProvider serviceProvider) : base(serviceProvider) {
+    }
+
+    public Task MyMethod()  =&gt; GrainService.MyMethod();
+}
+</code></pre><p><strong>Step 5.</strong> Inject the grain service client into the other grains that need it.
+Note that the GrainServiceClient does not guarantee accessing the GrainService on the local silo.
+Your command could potentially be sent to the GrainService on any silo in the cluster.</p>
+<pre><code class="lang-csharp">public class MyNormalGrain: Grain&lt;NormalGrainState&gt;, INormalGrain {
+
+    readonly IDataServiceClient DataServiceClient;
+
+    public MyNormalGrain(IGrainActivationContext grainActivationContext, IDataServiceClient dataServiceClient) {
+                DataServiceClient = dataServiceClient;
+    }
+}
+</code></pre><p><strong>Step 6.</strong> Inject the grain service into the silo itself.
+You need to do this so that the silo will start the GrainService.</p>
+<pre><code class="lang-csharp">(ISiloHostBuilder builder) =&gt; builder .ConfigureServices(services =&gt; { services.AddSingleton&lt;IDataService, DataService&gt;(); });
+</code></pre><h2 id="additional-notes">Additional Notes</h2>
+<h3 id="note-1">Note 1</h3>
+<p>There&#39;s an extension method on <code>ISiloHostBuilder: AddGrainService&lt;SomeGrainService&gt;()</code>.
+Type constraint is: <code>where T : GrainService</code>.
+It ends up calling this bit: <strong>orleans/src/Orleans.Runtime/Services/GrainServicesSiloBuilderExtensions.cs</strong></p>
+<p> <code>return services.AddSingleton&lt;IGrainService&gt;(sp =&gt; GrainServiceFactory(grainServiceType, sp));</code></p>
+<p>Basically, the silo fetches <code>IGrainService</code> types from the service provider when starting: <strong>orleans/src/Orleans.Runtime/Silo/Silo.cs</strong>
+ <code>var grainServices = this.Services.GetServices&lt;IGrainService&gt;();</code></p>
+<p>The <code>Microsoft.Orleans.OrleansRuntime</code> Nuget package should be referenced by the Grainservice project.</p>
+<h3 id="note-2">Note 2</h3>
+<p>In order for this to work you have to register both the Service and its Client.
+The code looks something like this:</p>
+<pre><code class="lang-csharp">  var builder = new SiloHostBuilder()
+      .AddGrainService&lt;DataService&gt;()  // Register GrainService
+      .ConfigureServices(s =&gt;
+       {
+          // Register Client of GrainService
+          s.AddSingleton&lt;IDataServiceClient, DataServiceClient&gt;(); 
+      })
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grainservices.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

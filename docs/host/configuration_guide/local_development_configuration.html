@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Local development configuration | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Local development configuration | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="local-development-configuration">Local development configuration</h1>
+
+<p>For a working sample application that targets Orleans 3.0 see: <a href="https://github.com/dotnet/orleans/tree/master/Samples/3.0/HelloWorld">https://github.com/dotnet/orleans/tree/master/Samples/3.0/HelloWorld</a>. The sample hosts the client and the silo in .NET Core console applications that work in different platforms, while the grains and interfaces target .NET Standard 2.0.</p>
+<p>For older versions of Orleans please see their respective Sample projects: <a href="https://github.com/dotnet/orleans/tree/master/Samples/">https://github.com/dotnet/orleans/tree/master/Samples/</a>.</p>
+<h2 id="silo-configuration">Silo configuration</h2>
+<p>For local development, please refer to the below example of how to configure a silo for that case.
+It configures and starts a silo listening on <code>loopback</code> address and 11111 and 30000 as silo and gateway ports respectively.</p>
+<p>Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project. After you get comfortable with the API, you can pick and choose which exact packages included in <code>Microsoft.Orleans.Server</code> you actually need, and reference them instead.</p>
+<pre><code class="lang-PowerShell">PM&gt; Install-Package Microsoft.Orleans.Server
+</code></pre><p>You need to configure <code>ClusterOptions</code> via <code>ISiloBuilder.Configure</code> method, specify that you want <code>DevelopmentClustering</code> as your clustering choice with this silo being the primary, and then configure silo endpoints.</p>
+<p><code>ConfigureApplicationParts</code> call explicitly adds the assembly with grain classes to the application setup. It also adds any referenced assembly due to the <code>WithReferences</code> extension. After these steps are completed, the silo host gets built and the silo gets started.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo, as well as a .NET Core console application.</p>
+<p>Here is an example of how a local silo can be started:</p>
+<pre><code class="lang-csharp">public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        try
+        {
+            var host = await StartSilo();
+            Console.WriteLine(&quot;Press Enter to terminate...&quot;);
+            Console.ReadLine();
+
+            await host.StopAsync();
+
+            return;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return;
+        }
+    }
+
+   private static async Task&lt;ISiloHost&gt; StartSilo()
+    {
+        var builder = new SiloHostBuilder()
+        // Use localhost clustering for a single local silo
+            .UseLocalhostClustering()
+            // Configure ClusterId and ServiceId
+            .Configure&lt;ClusterOptions&gt;(options =&gt;
+            {
+                options.ClusterId = &quot;dev&quot;;
+                options.ServiceId = &quot;MyAwesomeService&quot;;
+            })
+            // Configure connectivity
+        .Configure&lt;EndpointOptions&gt;(options =&gt; options.AdvertisedIPAddress = IPAddress.Loopback)
+            // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
+            // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
+            .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+        var host = builder.Build();
+        await host.StartAsync();
+        return host;
+    }
+}
+</code></pre><h2 id="client-configuration">Client configuration</h2>
+<p>For local development, please refer to the below example of how to configure a client for that case.
+It configures a client that would connect to a <code>loopback</code> silo.</p>
+<p>Add the <code>Microsoft.Orleans.Client</code> NuGet meta-package to the project.
+After you get comfortable with the API, you can pick and choose which exact packages included in <code>Microsoft.Orleans.Client</code> you actually need, and reference them instead.</p>
+<pre><code class="lang-PowerShell">PM&gt; Install-Package Microsoft.Orleans.Client
+</code></pre><p>You need to configure <code>ClientBuilder</code> with a cluster ID that matches the one you specified for local silo and specify static clustering as your clustering choice pointing it to the gateway port of the silo</p>
+<p><code>ConfigureApplicationParts</code> call explicitly adds the assembly with grain interfaces to the application setup.</p>
+<p>After these steps are completed, we can build the client and <code>Connect()</code> method on it to connect to the cluster.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.</p>
+<p>Here is an example of how a client can connect to a local silo:</p>
+<pre><code class="lang-csharp">client = new ClientBuilder()
+    // Use localhost clustering for a single local silo
+    .UseLocalhostClustering()
+    // Configure ClusterId and ServiceId
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
+    {
+        options.ClusterId = &quot;dev&quot;;
+        options.ServiceId = &quot;MyAwesomeService&quot;;
+    })
+    .ConfigureLogging(logging =&gt; logging.AddConsole())
+var client = builder.Build();
+await client.Connect();
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/local_development_configuration.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

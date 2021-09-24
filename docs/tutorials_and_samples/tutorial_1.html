@@ -1,0 +1,381 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Tutorial One | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Tutorial One | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tutorial-one---creating-a-minimal-orleans-application">Tutorial One - Creating a Minimal Orleans Application</h1>
+
+<p>This tutorial provides step by step instructions for creating a basic functioning Orleans application.
+It is designed to be self-contained and minimalistic, with the following traits:</p>
+<ul>
+<li>It relies only on NuGet packages</li>
+<li>It has been tested in Visual Studio 2017 using Orleans 2.2.0</li>
+<li>It has no reliance on external storage</li>
+</ul>
+<p>Keep in mind that this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment.
+However, it should help the readers get a real hands-on with regards to the structure of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
+<h2 id="project-setup">Project Setup</h2>
+<p>For this tutorial we’re going to create 4 projects:</p>
+<ul>
+<li>a library to contain the grain interfaces</li>
+<li>a library to contain the grain classes</li>
+<li>a console application to host our Silo</li>
+<li>a console application to host our Client</li>
+</ul>
+<p>After following this tutorial, the complete Solution should look like this:</p>
+<p><img src="../../images/orleansbasics_complete_app.png" alt=""></p>
+<h3 id="create-the-structure-in-visual-studio">Create the structure in Visual Studio</h3>
+<p>Note: You can use the default project types in c# for each of these projects.
+You will replace the default code with the code given for each project, below.
+You will also probably need to add <code>using</code> statements.</p>
+<ol>
+<li>Start by creating a Console App (.NET Core) project in a new solution. Call the project part <code>Silo</code> and name the solution <code>OrleansHelloWorld</code>.</li>
+<li>Add another Console App (.NET Core) project and name it <code>Client</code>.</li>
+<li>Add a Class Library (.NET Standard) and name it <code>GrainInterfaces</code>. </li>
+<li>Add another Class Library (.NET Standard) and name it <code>Grains</code>.</li>
+</ol>
+<h4 id="delete-default-source-files">Delete default source files</h4>
+<ol>
+<li>Delete Class1.cs from Grains</li>
+<li>Delete Class1.cs from GrainInterfaces</li>
+</ol>
+<h3 id="add-references">Add References</h3>
+<ol>
+<li><code>Grains</code> references <code>GrainInterfaces</code>.</li>
+<li><code>Silo</code> references <code>GrainInterfaces</code> and <code>Grains</code>.</li>
+<li><code>Client</code> references <code>GrainInterfaces</code>.</li>
+</ol>
+<h2 id="add-orleans-nuget-packages">Add Orleans NuGet Packages</h2>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Nuget Package</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Silo</td>
+<td><code>Microsoft.Orleans.Server</code></td>
+</tr>
+<tr>
+<td>Silo</td>
+<td><code>Microsoft.Extensions.Logging.Console</code></td>
+</tr>
+<tr>
+<td>Client</td>
+<td><code>Microsoft.Extensions.Logging.Console</code></td>
+</tr>
+<tr>
+<td>Client</td>
+<td><code>Microsoft.Orleans.Client</code></td>
+</tr>
+<tr>
+<td>Grain Interfaces</td>
+<td><code>Microsoft.Orleans.Core.Abstractions</code></td>
+</tr>
+<tr>
+<td>Grain Interfaces</td>
+<td><code>Microsoft.Orleans.CodeGenerator.MSBuild</code></td>
+</tr>
+<tr>
+<td>Grains</td>
+<td><code>Microsoft.Orleans.CodeGenerator.MSBuild</code></td>
+</tr>
+<tr>
+<td>Grains</td>
+<td><code>Microsoft.Orleans.Core.Abstractions</code></td>
+</tr>
+<tr>
+<td>Grains</td>
+<td><code>Microsoft.Extensions.Logging.Abstractions</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>Microsoft.Orleans.Server</code> and <code>Microsoft.Orleans.Client</code> are meta-packages that bring dependency that you will most likely need on the Silo and Client side.</p>
+<p><code>Microsoft.Orleans.Core.Abstractions</code> is needed everywhere. It included in both <code>Microsoft.Orleans.Server</code> and <code>Microsoft.Orleans.Client</code>.</p>
+<p><code>Microsoft.Orleans.CodeGenerator.MSBuild</code> automatically generates code that is needed to make calls to grains across machine boundaries. So it is needed in both <code>GrainInterfaces</code> and <code>Grains</code> projects.</p>
+<h2 id="define-a-grain-interface">Define a Grain Interface</h2>
+<p>In the GrainInterfaces project, add a <code>IHello.cs</code> code file and define the following IHello interface in it:</p>
+<pre><code class="lang-csharp">using System.Threading.Tasks;
+
+namespace OrleansBasics
+{
+    public interface IHello : Orleans.IGrainWithIntegerKey
+    {
+        Task&lt;string&gt; SayHello(string greeting);
+    }
+}
+</code></pre><h2 id="define-a-grain-class">Define a Grain Class</h2>
+<p>In the Grains project, add a <code>HelloGrain.cs</code> code file and define the following class in it:</p>
+<pre><code class="lang-csharp">using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+
+namespace OrleansBasics
+{
+    public class HelloGrain : Orleans.Grain, IHello
+    {
+        private readonly ILogger logger;
+
+        public HelloGrain(ILogger&lt;HelloGrain&gt; logger)
+        {
+            this.logger = logger;
+        }
+
+        Task&lt;string&gt; IHello.SayHello(string greeting)
+        {
+            logger.LogInformation($&quot;\n SayHello message received: greeting = &#39;{greeting}&#39;&quot;);
+            return Task.FromResult($&quot;\n Client said: &#39;{greeting}&#39;, so HelloGrain says: Hello!&quot;);
+        }
+    }
+}
+</code></pre><h3 id="create-the-silo--programcs">Create the Silo – Program.cs</h3>
+<p>At this step, we add code to initialize a server that will host and run our grains - a silo.
+We will use the development clustering provider here, so that we can run everything locally, without a dependency on external storage systems. You can find more information about that in the <a href="../host/configuration_guide/local_development_configuration.html">Local Development Configuration</a> page of the Orleans documentation.
+We will run a cluster with a single silo in it.</p>
+<p>Add the following code to Program.cs of the Silo project:</p>
+<pre><code class="lang-csharp">using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
+
+namespace OrleansBasics
+{
+    public class Program
+    {
+        public static int Main(string[] args)
+        {
+            return RunMainAsync().Result;
+        }
+
+        private static async Task&lt;int&gt; RunMainAsync()
+        {
+            try
+            {
+                var host = await StartSilo();
+                Console.WriteLine(&quot;\n\n Press Enter to terminate...\n\n&quot;);
+                Console.ReadLine();
+
+                await host.StopAsync();
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return 1;
+            }
+        }
+
+        private static async Task&lt;ISiloHost&gt; StartSilo()
+        {
+            // define the cluster configuration
+            var builder = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .Configure&lt;ClusterOptions&gt;(options =&gt;
+                {
+                    options.ClusterId = &quot;dev&quot;;
+                    options.ServiceId = &quot;OrleansBasics&quot;;
+                })
+                .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
+                .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+            var host = builder.Build();
+            await host.StartAsync();
+            return host;
+        }
+    }
+}
+</code></pre><h3 id="create-the-client--programcs">Create the Client – Program.cs</h3>
+<p>Finally, we need to configure a client for communicating with our grains, connect it to the the cluster (with a single silo in it), and invoke the grain.
+Note that the clustering configuration must match the one we used for the silo.
+There is more information about the client in the <a href="../host/client.html">Clusters and Clients</a> section of the Orleans documentation.</p>
+<pre><code class="lang-csharp">using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Configuration;
+using System;
+using System.Threading.Tasks;
+
+namespace OrleansBasics
+{
+    public class Program
+    {
+        static int Main(string[] args)
+        {
+            return RunMainAsync().Result;
+        }
+
+        private static async Task&lt;int&gt; RunMainAsync()
+        {
+            try
+            {
+                using (var client = await ConnectClient())
+                {
+                    await DoClientWork(client);
+                    Console.ReadKey();
+                }
+
+                return 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($&quot;\nException while trying to run client: {e.Message}&quot;);
+                Console.WriteLine(&quot;Make sure the silo the client is trying to connect to is running.&quot;);
+                Console.WriteLine(&quot;\nPress any key to exit.&quot;);
+                Console.ReadKey();
+                return 1;
+            }
+        }
+
+        private static async Task&lt;IClusterClient&gt; ConnectClient()
+        {
+            IClusterClient client;
+            client = new ClientBuilder()
+                .UseLocalhostClustering()
+                .Configure&lt;ClusterOptions&gt;(options =&gt;
+                {
+                    options.ClusterId = &quot;dev&quot;;
+                    options.ServiceId = &quot;OrleansBasics&quot;;
+                })
+                .ConfigureLogging(logging =&gt; logging.AddConsole())
+                .Build();
+
+            await client.Connect();
+            Console.WriteLine(&quot;Client successfully connected to silo host \n&quot;);
+            return client;
+        }
+
+        private static async Task DoClientWork(IClusterClient client)
+        {
+            // example of calling grains from the initialized client
+            var friend = client.GetGrain&lt;IHello&gt;(0);
+            var response = await friend.SayHello(&quot;Good morning, HelloGrain!&quot;);
+            Console.WriteLine($&quot;\n\n{response}\n\n&quot;);
+        }
+    }
+}
+</code></pre><h2 id="run-the-application">Run the application</h2>
+<p>Build the solution and run the Silo.
+After you get the confirmation message that the Silo is running (&quot;Press enter to terminate...&quot;), run the Client.
+Success looks like this:</p>
+<p><img src="../../images/orleansbasics_success.png" alt=""></p>
+<h2 id="further-reading">Further Reading</h2>
+<ul>
+<li><a href="../resources/nuget_packages.html">List of Orleans Packages</a></li>
+<li><a href="../host/configuration_guide/index.html">Orleans Configuration Guide</a></li>
+<li><a href="https://www.microsoft.com/en-us/research/publication/orleans-best-practices">Orleans Best Practices</a></li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/tutorial_1.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Heterogeneous silos | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Heterogeneous silos | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="heterogeneous-silos">Heterogeneous silos</h1>
+
+<h2 id="overview">Overview</h2>
+<p>On a given cluster, silos can support a different set of grain types:
+<img src="../../images/heterogeneous.png" alt=""></p>
+<p>In this example the cluster supports grains of type <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code>, <code>E</code>:</p>
+<ul>
+<li>Grain types<code>A</code>and<code>B</code>can be placed on Silo 1 and 2. </li>
+<li>Grain type<code>C</code>can be placed on Silo 1, 2 or 3. </li>
+<li>Grain type<code>D</code>can be only placed on Silo 3</li>
+<li>Grain Type<code>E</code>can be only placed on Silo 4.</li>
+</ul>
+<p>All silos should reference interfaces of all grain types of the cluster, but grain classes should only be referenced by the silos that will host them.</p>
+<p>The client does not know which silo supports a given Grain Type.</p>
+<p><strong>A given Grain Type implementation must be the same on each silo that supports it. The following scenario is NOT valid:</strong></p>
+<p>On Silo 1 and 2:</p>
+<pre><code class="lang-csharp">public class C: Grain, IMyGrainInterface
+{
+   public Task SomeMethod() { … }
+}
+</code></pre><p>On Silo 3</p>
+<pre><code class="lang-csharp">public class C: Grain, IMyGrainInterface, IMyOtherGrainInterface
+{
+   public Task SomeMethod() { … }
+   public Task SomeOtherMethod() { … }
+}
+</code></pre><h2 id="configuration">Configuration</h2>
+<p>No configuration is needed, you can deploy different binaries on each silo in your cluster.
+However, if necessary, you can change the interval that silos and clients check for changes in types supported with the property <code>TypeMapRefreshInterval</code> from <code>TypeManagementOptions</code></p>
+<p>For testing purposes, you can use the property <code>ExcludedGrainTypes</code> in <code>GrainClassOptions</code>, which is a list names of the types you want to exclude on the silos.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Connected clients will not be notified if the set of supported Grain Types changed. In the previous example:<ul>
+<li>If Silo 4 leaves the cluster, the client will still try to make calls to grain of type <code>E</code>. It will fail at runtime with an <code>OrleansException</code>.</li>
+<li>If the client was connected to the cluster before Silo 4 joined it, the client will not be able to make calls to grain of type <code>E</code>. It will fail with an <code>ArgumentException</code></li>
+</ul>
+</li>
+<li>Stateless grains are not supported: all silos in the cluster must support the same set of stateless grains.</li>
+<li><code>ImplicitStreamSubscription</code> are not supported and thus only <a href="../streaming/streams_programming_APIs.html">&quot;Explicit Subscriptions&quot;</a> can be used in Orleans Streams.</li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/heterogeneous_silos.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

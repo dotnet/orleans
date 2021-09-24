@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Migration from Orleans 1.5 to 2.0 | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Migration from Orleans 1.5 to 2.0 | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="migration-from-orleans-15-to-20">Migration from Orleans 1.5 to 2.0</h1>
+
+<p>The bulk of the Orleans APIs stayed unchanged in 2.0 or implementation of those APIs were left in legacy classes for backward compatibility. At the same time, the newly introduced APIs provide some new capabilities or better ways of accomplishing those tasks. There are also more subtle differences when it comes to .NET SDK tooling and Visual Studio support that helps to be aware of. This document provides guidance for migrating application code from to Orleans 2.0.</p>
+<h2 id="visual-studio-and-tooling-requirements">Visual Studio and Tooling requirements</h2>
+<p>Orleans 2.0.0 is built on top of .NET Standard 2.0. Because of that, you need to upgrade development tools to ensure yourself a pleasant developing experience. We recommend to use Visual Studio 2017 or above to develop Orleans 2.0.0 applications. Based on our experience, version 15.5.2 and above works best. 
+.NET Standard 2.0.0 is compatible with .NET 4.6.1 and above, .NET Core 2.0, and a list of other frameworks. Orleans 2.0.0 inherited that compatibility. For more information on .NET Standard compatibility with other framework, please refer to <a href="https://docs.microsoft.com/en-us/dotnet/standard/net-standard">.NET Standard documentation</a> : 
+If you are developing a .NET Core or .NET application using Orleans, you will need to follow certain steps to set up your environment, such as installing .NET Core SDK. For more information, please refer to their <a href="https://dotnet.github.io/">documentation</a>.</p>
+<h2 id="available-options-for-configuration-code">Available options for configuration code</h2>
+<h2 id="hosting">Hosting</h2>
+<h3 id="configuring-and-starting-a-silo-using-the-new-silobuilder-api-and-legacy-clusterconfiguration-object">Configuring and Starting a Silo (using the new SiloBuilder API and legacy ClusterConfiguration object)</h3>
+<p>There&#39;s a number of new option classes in Orleans 2.0 that provide a new way for configuring a silo.
+To ease migration to the new API, there is a optional backward compatibility package, <code>Microsoft.Orleans.Runtime.Legacy</code>, that provides a bridge from the old 1.x configuration API to the new one. </p>
+<p>If you add <code>Microsoft.Orleans.Runtime.Legacy</code> package, a silo can still be configured programmatically via the legacy <code>ClusterConfiguration</code> object that can then be passed to <code>SiloHostBuilder</code> to build and start a silo.</p>
+<p>You still need to specify grain class assemblies via the <code>ConfigureApplicationParts</code> call.</p>
+<p>Here is an example of how a local silo can be configured in the legacy way: </p>
+<pre><code class="lang-csharp">public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        try
+        {
+            var host = await StartSilo();
+            Console.WriteLine(&quot;Press Enter to terminate...&quot;);
+            Console.ReadLine();
+
+            await host.StopAsync();
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return 1;
+        }
+    }
+
+    private static async Task&lt;ISiloHost&gt; StartSilo()
+    {
+        // define the cluster configuration (temporarily required in the beta version,
+        // will not be required by the final release)
+        var config = ClusterConfiguration.LocalhostPrimarySilo();
+        // add providers to the legacy configuration object.
+        config.AddMemoryStorageProvider();
+
+        var builder = new SiloHostBuilder()
+            .UseConfiguration(config)
+            // Add assemblies to scan for grains and serializers.
+            // For more info read the Application Parts section
+            .ConfigureApplicationParts(parts =&gt;
+                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
+                     .WithReferences())
+            // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
+            // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
+            .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+        var host = builder.Build();
+        await host.StartAsync();
+        return host;
+    }
+}
+</code></pre><h3 id="configuring-and-connecting-a-client-using-the-new-clientbuilder-api-and-legacy-clientconfiguration-object">Configuring and Connecting a Client (using the new ClientBuilder API and legacy ClientConfiguration object)</h3>
+<p>There&#39;s a number of new option classes in Orleans 2.0 that provide a new way for configuring a client.
+To ease migration to the new API, there is a optional backward compatibility package, <code>Microsoft.Orleans.Core.Legacy</code>, that provides a bridge from the old 1.x configuration API to the new one. </p>
+<p>If you added <code>Microsoft.Orleans.Core.Legacy</code> package, a client can still be configured programmatically via the legacy <code>ClientConfiguration</code> object that can then be passed to <code>ClientBuilder</code> to build and connect the client.</p>
+<p>You still need to specify grain interface assemblies via the <code>ConfigureApplicationParts</code> call.</p>
+<p>Here is an example of how a client can connect to a local silo, using legacy configuration:</p>
+<pre><code class="lang-csharp">// define the client configuration (temporarily required in the beta version,
+// will not be required by the final release)
+var config = ClientConfiguration.LocalhostSilo();
+var builder = new ClientBuilder()
+    .UseConfiguration(config)
+    // Add assemblies to scan for grains interfaces and serializers.
+    // For more info read the Application Parts section
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IHello).Assembly))
+    .ConfigureLogging(logging =&gt; logging.AddConsole())
+var client = builder.Build();
+await client.Connect();
+</code></pre><h2 id="logging">Logging</h2>
+<p>Orleans 2.0 uses the same logging abstractions as ASP.NET Core 2.0. You can find replacement for most Orleans logging feature in ASP.NET Core logging. Orleans specific logging feature, such as <code>ILogConsumer</code> and message bulking, is still maintained in <code>Microsoft.Orleans.Logging.Legacy</code> package, so that you still have the option to use them. But how to configure your logging with Orleans changed in 2.0. Let me walk you through the process of migration.</p>
+<p>In 1.5, logging configuration is done through <code>ClientConfiguration</code> and <code>NodeConfiguration</code>. You can configure <code>DefaultTraceLevel</code>, <code>TraceFileName</code>, <code>TraceFilePattern</code>, <code>TraceLevelOverrides</code>, <code>TraceToConsole</code>, <code>BulkMessageLimit</code>, <code>LogConsumers</code>, etc through it. In 2.0, logging configuration is consistent with ASP.NET Core 2.0 logging, which means most of the configuration is done through <code>Microsoft.Extensions.Logging.ILoggingBuilder</code>. </p>
+<p>To configure <code>DefaultTraceLevel</code> and <code>TraceLevelOverrides</code>, you need to apply <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging">log filtering</a> to <code>ILoggingBuilder</code>. For example, to set trace level to &#39;Debug&#39; on orleans runtime, you can use sample below, </p>
+<pre><code>siloBuilder.AddLogging(builder=&gt;builder.AddFilter(&quot;Orleans&quot;, LogLevel.Debug));
+</code></pre><p>You can configure log level for you application code in the same way. If you want to set a default minimum trace level to be Debug, use sample below</p>
+<pre><code>siloBuilder.AddLogging(builder=&gt;builder.SetMinimumLevel(LogLevel.Debug);
+</code></pre><p>For more information on log filtering, please see their docs on <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging">https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging</a>;</p>
+<p>To configure TraceToConsole to be <code>true</code>, you need to reference <code>Microsoft.Extensions.Logging.Console</code> package and then use <code>AddConsole()</code> extension method on <code>ILoggingBuilder</code>. The same with <code>TraceFileName</code> and <code>TraceFilePattern</code>, if you want to log messages to a file, you need to use <code>AddFile(&quot;file name&quot;)</code> method on <code>ILoggingBuilder</code>.</p>
+<p>If you still want to use Message Bulking feature, You need to configure it through <code>ILoggingBuilder</code> as well. Message bulking feature lives in <code>Microsoft.Orleans.Logging.Legacy</code> package. So you need to add dependency on that package first. And then configure it through <code>ILoggingBuilder</code>. Below is an example on how to configure it with <code>ISiloHostBuilder</code></p>
+<pre><code>       siloBuiler.AddLogging(builder =&gt; builder.AddMessageBulkingLoggerProvider(new FileLoggerProvider(&quot;mylog.log&quot;)));
+</code></pre><p>This method would apply message bulking feature to the <code>FileLoggerProvider</code>, with default bulking config.</p>
+<p>Since we are going to eventually deprecate and remove LogConsumer feature support in the future, we highly encourage you to migrate off this feature as soon as possible. There&#39;s couple approaches you can take to migrate off. One option is to maintain your own <code>ILoggerProvider</code>, which creates <code>ILogger</code> who logs to all your existing log consumers. This is very similar to what we are doing in <code>Microsoft.Orleans.Logging.Legacy</code> package. You can take a look at <code>LegacyOrleansLoggerProvider</code> and borrow logic from it. Another option is replace your <code>ILogConsumer</code> with existing implementation 
+ of <code>ILoggerProvider</code> on nuget which provides identical or similar functionality, or implement your own <code>ILoggerProvider</code> which fits your specfic logging requirement. And configure those <code>ILoggerProvider</code>s with <code>ILoggingBuilder</code>.</p>
+<p>But if you cannot migrate off log consumer in the short term, you can still use it. The support for <code>ILogConsumer</code> lives in <code>Microsoft.Orleans.Logging.Legacy</code> package. So you need to add dependency on that package first, and then configure Log consumers through extension method <code>AddLegacyOrleansLogging</code> on <code>ILoggingBuilder</code>.
+There&#39;s native <code>AddLogging</code> method on <code>IServiceCollection</code> provided by ASP.NET for you to configure <a href="https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.dependencyinjection.loggingservicecollectionextensions.addlogging?view=aspnetcore-2.0#Microsoft_Extensions_DependencyInjection_LoggingServiceCollectionExtensions_AddLogging_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_Action_Microsoft_Extensions_Logging_ILoggingBuilder"><code>ILoggingBuilder</code></a>. We also wrap that method under extension method on <code>ISiloHostBuilder</code> and <code>IClientBuilder</code>. So you can call <code>AddLogging</code> method on silo builder and client builder as well to configure <code>ILoggingBuilder</code>. 
+below is an example:</p>
+<pre><code>            var severityOverrides = new OrleansLoggerSeverityOverrides();
+            severityOverrides.LoggerSeverityOverrides.Add(typeof(MyType).FullName, Severity.Warning);
+            siloBuilder.AddLogging(builder =&gt; builder.AddLegacyOrleansLogging(new List&lt;ILogConsumer&gt;()
+            {
+                new LegacyFileLogConsumer($&quot;{this.GetType().Name}.log&quot;)
+            }, severityOverrides));
+</code></pre><p>You can use this feature if you invested in custom implementation of <code>ILogConsumer</code> and cannot convert them to implementation of <code>ILoggerProvider</code> in the short term. </p>
+<p><code>Logger GetLogger(string loggerName)</code> method on <code>Grain</code> base class and <code>IProviderRuntime</code>, and <code>Logger Log { get; }</code> method on IStorageProvider are still maintained as a deprecated feature in 2.0. You can still use it in your process of migrating off orleans legacy logging. But we recommend you to migrate off them as soon as possible.</p>
+<h2 id="provider-configuration">Provider Configuration</h2>
+<p>In Orleans 2.0, configuration of the included providers has been standardized to obtain Service ID and Cluster ID from the <code>ClusterOptions</code> configured for the silo or client.</p>
+<p>Service ID is a stable identifier of the service or application that the cluster represents.
+Service ID does not change between deployments and upgrades of clusters that implement the service over time.</p>
+<p>Unlike Service ID, Cluster ID stays the same only through the lifecycle of a cluster of silos.
+If a running cluster gets shut down, and a new cluster for the same service gets deployed, the new cluster will have a new and unique Cluster ID, but will maintain the Service ID of the old cluster.</p>
+<p>Service ID is often used as part of a key for persisting data that needs to have continuity throughout the life of the service.
+Examples are grain state, reminders, and queues of persistent streams.
+On the other hand, data within a cluster membership table only makes sense within the scope of its cluster, and hence is normally keyed off Cluster ID.</p>
+<p>Prior to 2.0, behavior of Orleans providers was sometimes inconsistent with regards to using Service ID and Cluster ID (that was also previously called Deployment ID).
+Because of this unifications and the overall change of provider configuration API, data written to storage by some providers may change location or key.
+An example of a provider that is sensitive to this change is Azure Queue stream provider.</p>
+<p>If you are migrating an existing service from 1.x to 2.0, and need to maintain backward compatibility with regards to location or keys of data persisted by the providers you are using in the service, please verify that the data will be where your service or provider expects it to be.
+If your service happen to depend on the incorrect usage of Service ID and Cluster ID by a 1.x provider, you can override <code>ClusterOptions</code> for that specific provider by calling <code>ISiloHostBuilder.AddProviderClusterOptions()</code> or <code>IClientBuilder.AddProviderClusterOptions()</code> and force it to read/write data from/to the 1.x location in storage</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/migration/migration-1.5.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

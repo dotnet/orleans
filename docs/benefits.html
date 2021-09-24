@@ -1,0 +1,195 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Main Benefits | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Main Benefits | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="benefits">Benefits</h1>
+
+<p>The main benefits of Orleans are: <strong>developer productivity</strong>, even for non-expert programmers, and <strong>transparent scalability by default</strong> with no special effort from the programmer.
+We expand on both of these benefits below.</p>
+<h2 id="developer-productivity">Developer Productivity</h2>
+<p>The Orleans programming model raises productivity of both expert and non-expert programmers by providing the following key abstractions, guarantees, and system services.</p>
+<ul>
+<li><strong>Familiar object-oriented programming (OOP) paradigm</strong>.</li>
+</ul>
+<p>Grains are .NET classes that implement declared .NET grain interfaces with asynchronous methods.
+Thus, grains appear to the programmer as remote objects whose methods can be directly invoked.
+This provides the programmer the familiar OOP paradigm by turning method calls into messages, routing them to the right endpoints, invoking the target grain&#39;s methods, and dealing with failures and corner cases in a completely transparent way.</p>
+<ul>
+<li><strong>Single-threaded execution of grains</strong>.</li>
+</ul>
+<p>The runtime guarantees that a grain never executes on more than one thread at a time. Combined with the isolation from other grains, the programmer never faces concurrency at the grain level, and never needs to use locks or other synchronization mechanisms to control access to shared data.
+This feature alone makes development of distributed applications tractable for non-expert programmers.</p>
+<ul>
+<li><strong>Transparent activation</strong>.</li>
+</ul>
+<p>The runtime activates a grain only when there is a message for it to process.
+This cleanly separates the notion of creating a reference to a grain, which is visible to and controlled by application code, and physical activation of the grain in memory, which is transparent to the application.
+In many ways, this is similar to virtual memory in that it decides when to “page out” (deactivate) or “page in” (activate) a grain; the application has uninterrupted access to the full “memory space” of logically created grains, whether or not they are in the physical memory at any particular point in time.
+Transparent activation enables dynamic, adaptive load balancing via placement and migration of grains across the pool of hardware resources.
+This features is a significant improvement on the traditional actor model, in which actor lifetime is application-managed.</p>
+<ul>
+<li><strong>Location transparency</strong>.</li>
+</ul>
+<p>A grain reference (proxy object) that the programmer uses to invoke the grain&#39;s methods or pass to other components contains only the logical identity of the grain.
+The translation of the grain&#39;s logical identity to its physical location and the corresponding routing of messages are done transparently by the Orleans runtime.
+Application code communicates with grains while remaining oblivious to their physical location, which may change over time due to failures or resource management or because a grain is deactivated at the time it is called.</p>
+<ul>
+<li><strong>Transparent integration with persistent store</strong>.</li>
+</ul>
+<p>Orleans allows for declarative mapping of a grain&#39;s in-memory state to a persistent store.
+It synchronizes updates, transparently guaranteeing that callers receive results only after the persistent state has been successfully updated.
+Extending and/or customizing the set of existing persistent storage providers available is straight-forward.</p>
+<ul>
+<li><strong>Automatic propagation of errors</strong>.</li>
+</ul>
+<p>The runtime automatically propagates unhandled errors up the call chain with the semantics of asynchronous and distributed try/catch.
+As a result, errors do not get lost within an application.</p>
+<p>This allows the programmer to put error handling logic at the appropriate places, without the tedious work of manually propagating errors at each level.</p>
+<h3 id="transparent-scalability-by-default">Transparent Scalability by Default</h3>
+<p>The Orleans programming model is designed to guide the programmer down a path of likely success in scaling an application or service through several orders of magnitude.
+This is done by incorporating proven best practices and patterns and by providing an efficient implementation of the lower level system functionality.
+Here are some key factors that enable scalability and performance:</p>
+<ul>
+<li><strong>Implicit fine grain partitioning of application state</strong>.</li>
+</ul>
+<p>By using grains as directly addressable entities, the programmer implicitly breaks down the overall state of their application.
+While the Orleans programming model does not prescribe how big or small a grain should be, in most cases it makes sense to have a relatively large number of grains – millions or more – with each representing a natural entity of the application, such as a user account or a purchase order.
+With grains being individually addressable and their physical location abstracted away by the runtime, Orleans has enormous flexibility in balancing load and dealing with hot spots in a transparent and generic way without any thought from the application developer.</p>
+<ul>
+<li><strong>Adaptive resource management</strong>.</li>
+</ul>
+<p>Grains make no assumption about the locality of other grains as they interact with them.
+Because of this location transparency, the runtime can manage and adjust allocation of available hardware resources in a dynamic way.
+The runtime does this by making fine-grained decisions on placement and migration of grains across the compute cluster in reaction to load and communication patterns - without failing incoming requests.
+By creating multiple replicas of a particular grain, the runtime can increase throughput of the grain without making any changes to the application code.</p>
+<ul>
+<li><strong>Multiplexed communication</strong>.</li>
+</ul>
+<p>Grains in Orleans have logical endpoints, and messaging among them is multiplexed across a fixed set of all-to-all physical connections (TCP sockets).
+This allows the runtime to host millions of addressable entities with low OS overhead per grain.
+In addition, activation and deactivation of a grain does not incur the cost of registering/unregistering of a physical endpoint, such as a TCP port or HTTP URL, or even closing a TCP connection.</p>
+<ul>
+<li><strong>Efficient scheduling</strong>.</li>
+</ul>
+<p>The runtime schedules execution of a large number of single-threaded grains across a custom thread pool with a thread per physical processor core.
+With grain code written in the non-blocking, continuation-based style (a requirement of the Orleans programming model), application code runs in a very efficient “cooperative” multi-threaded manner with no contention.
+This allows the system to reach high throughput and run at very high CPU utilization (up to 90%+) with great stability.
+The fact that a growth in the number of grains in the system and an increase in the load does not lead to additional threads or other OS primitives helps scalability of individual nodes and the whole system.</p>
+<ul>
+<li><strong>Explicit asynchrony</strong>.</li>
+</ul>
+<p>The Orleans programming model makes the asynchronous nature of a distributed application explicit and guides programmers to write non-blocking asynchronous code.
+Combined with asynchronous messaging and efficient scheduling, this enables a large degree of distributed parallelism and overall throughput without the explicit use of multi-threading.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/benefits.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

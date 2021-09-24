@@ -1,0 +1,140 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Global-Single-Instance Grains | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Global-Single-Instance Grains | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h3 id="grain-coordination-attributes">Grain Coordination Attributes</h3>
+
+<p>Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  <code>[GlobalSingleInstance]</code> attribute means we want the same behavior as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the <code>[OneInstancePerCluster]</code> attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.</p>
+<p>The attributes are placed on grain implementations. For example: </p>
+<pre><code class="lang-csharp">using Orleans.MultiCluster;
+
+[GlobalSingleInstance]
+public class MyGlobalGrain : Orleans.Grain, IMyGrain {
+   ...
+}
+
+[OneInstancePerCluster]
+public class MyLocalGrain : Orleans.Grain, IMyGrain {
+   ...
+}
+</code></pre><p>If a grain class does not specify either one of those attributes, it defaults to <code>[OneInstancePerCluster]</code>, or <code>[GlobalSingleInstance]</code> if the  configuration parameter <code>UseGlobalSingleInstanceByDefault</code> is set to true.</p>
+<h4 id="protocol-for-global-single-instance-grains">Protocol for Global-Single-Instance Grains</h4>
+<p>When a global-single-instance (GSI) grain is accessed, and no activation is known to exist, a special GSI activation protocol is executed before activating a new instance. Specifically, a request is sent to all other clusters in the current <a href="MultiClusterConfiguration.html">multi-cluster configuration</a> to check if they already have an activation for this grain. If all responses are negative, a new activation is created in this cluster. Otherwise, the remote activation is used (and a reference to it is cached in the local directory).</p>
+<h4 id="protocol-for-one-instance-per-cluster-grains">Protocol for One-Instance-Per-Cluster Grains</h4>
+<p>There is no inter-cluster communication for One-Instance-Per-Cluster grains. They simply use the standard Orleans mechanism independently within each cluster. Inside the Orleans framework itself, the following grain classes are marked with the <code>[OneInstancePerCluster]</code> attribute: <code>ManagementGrain</code>, <code>GrainBasedMembershipTable</code>,  and <code>GrainBasedReminderTable</code>. </p>
+<h4 id="doubtful-activations">Doubtful Activations</h4>
+<p>If the GSI protocol does not receive conclusive responses from all clusters after 3 retries (or whatever number is specified by the configuration parameter <code>GlobalSingleInstanceNumberRetries</code>), it creates a new local &quot;doubtful&quot; activation optimistically, favoring availability over consistency.</p>
+<p>Doubtful activations may be duplicates (because some remote cluster that did not respond during the GSI protocol activation may nevertheless have  an activation of this grain). Therefore, periodically every 30 seconds (or whatever interval is specified by the configuration parameter <code>GlobalSingleInstanceRetryInterval</code>) the GSI protocol is run again for all doubtful activations. This ensures that once communication between clusters is restored, duplicate activations can be detected and removed. </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/multi-cluster_support/GlobalSingleInstance.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

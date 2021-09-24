@@ -1,0 +1,410 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>What's new in Orleans | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="What's new in Orleans | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="whats-new-in-orleans">What&#39;s new in Orleans?</h1>
+
+<h2 id="v232httpsgithubcomdotnetorleansreleasestagv232-may-9th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v2.3.2">v2.3.2</a> May 9th 2019</h2>
+<p>Three bug fixes.</p>
+<h2 id="v231httpsgithubcomdotnetorleansreleasestagv231-april-26th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v2.3.1">v2.3.1</a> April 26th 2019</h2>
+<p>A few improvements, a bug fix, and batch stream API added back.</p>
+<h2 id="v230httpsgithubcomdotnetorleansreleasestagv230-march-20th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v2.3.0">v2.3.0</a> March 20th 2019</h2>
+<ul>
+<li>Major improvements<ul>
+<li>Support for the ASP.NET Core hosting API (Microsoft.Extensions.Hosting). Thanks to @galvesribeiro!</li>
+<li>Replacement of the custom implementation of named options with Microsoft.Extensions.Options.</li>
+<li>EventHub stream provider got upgrade to EvenHub 2.2.1 and is also compatible with 3.0.0.</li>
+<li>Old dead entries in the cluster membership table now get automatically cleaned up, which is helpful for hosting environments that use new IP endpoints for restarted silos.</li>
+<li>Hosted client that enables efficient hosting of frontend code within the silo process is now enabled by default.</li>
+<li>Support for <code>IHostEnvironmentStatistics</code> on Linux, which enables CPU and memory metrics as well as load shedding. Thanks to @martinothamar!</li>
+</ul>
+</li>
+</ul>
+<h2 id="v230-rc2httpsgithubcomdotnetorleansreleasestagv230-rc2-march-13th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v2.3.0-rc2">v2.3.0-rc2</a> March 13th 2019</h2>
+<p><code>Refactored stream batch behaviors to support batch consumption.</code> (#5425) is the only change. While technically it is breaking due to the changes to the batch streaming API, it shouldn&#39;t break any working application code because the batching functionality wasn&#39;t fully wired previously. No breaking change in the wire protocol or persistence. This release is backward-compatible with 2.x releases.</p>
+<h2 id="v230-rc1httpsgithubcomdotnetorleansreleasestagv230-rc1-march-5th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v2.3.0-rc1">v2.3.0-rc1</a> March 5th 2019</h2>
+<ul>
+<li>Major improvements<ul>
+<li>Support for the ASP.NET Core hosting API (Microsoft.Extensions.Hosting).</li>
+<li>Replacement of the custom implementation of named options with Microsoft.Extensions.Options.</li>
+<li>EventHub stream provider got upgrade to EvenHub 2.2.1 and is also compatible with 3.0.0.</li>
+<li>Old dead entries in the cluster membership table now get automatically cleaned up, which is helpful for hosting environments that use new IP endpoints for restarted silos.</li>
+<li>Hosted client that enables efficient hosting of frontend code within the silo process is now enabled by default.</li>
+</ul>
+</li>
+</ul>
+<h2 id="v157httpsgithubcomdotnetorleansreleasestagv157-february-28th-2019"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.7">v1.5.7</a> February 28th 2019</h2>
+<p>Two fixes backported from v2.x</p>
+<ul>
+<li>Non-breaking bug fixes<ul>
+<li>Fixes for Multi-Cluster Support (#3974)</li>
+<li>Add GSI cache maintenance and tests (#5184)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v220httpsgithubcomdotnetorleansreleasestagv220-december-13th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.2.0">v2.2.0</a> December 13th 2018</h2>
+<p>This release is primarily about bringing support for ACID cross-grain transactions to production-ready quality.</p>
+<p>This release includes no breaking changes and is backward compatible with 2.0.* releases, which allows for in-place upgrade of a running cluster.</p>
+<h2 id="v210httpsgithubcomdotnetorleansreleasestagv210-september-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0">v2.1.0</a> September 28th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New scheduler (<a href="https://github.com/dotnet/orleans/pull/3792">#3792</a>)</li>
+<li>Hosted Client (<a href="https://github.com/dotnet/orleans/pull/3362">#3362</a>)</li>
+<li>Distributed Transaction Manager (<a href="https://github.com/dotnet/orleans/pull/3820">#3820</a>, <a href="https://github.com/dotnet/orleans/pull/4502">#4502</a>, <a href="https://github.com/dotnet/orleans/pull/4538">#4538</a>, <a href="https://github.com/dotnet/orleans/pull/4566">#4566</a>, <a href="https://github.com/dotnet/orleans/pull/4568">#4568</a>, <a href="https://github.com/dotnet/orleans/pull/4591">#4591</a>, <a href="https://github.com/dotnet/orleans/pull/4599">#4599</a>, <a href="https://github.com/dotnet/orleans/pull/4613">#4613</a>, <a href="https://github.com/dotnet/orleans/pull/4609">#4609</a>, <a href="https://github.com/dotnet/orleans/pull/4616">#4616</a>, <a href="https://github.com/dotnet/orleans/pull/4608">#4608</a>, <a href="https://github.com/dotnet/orleans/pull/4628">#4628</a>, <a href="https://github.com/dotnet/orleans/pull/4638">#4638</a>, <a href="https://github.com/dotnet/orleans/pull/4685">#4685</a>, <a href="https://github.com/dotnet/orleans/pull/4714">#4714</a>, <a href="https://github.com/dotnet/orleans/pull/4739">#4739</a>, <a href="https://github.com/dotnet/orleans/pull/4768">#4768</a>, <a href="https://github.com/dotnet/orleans/pull/4799">#4799</a>, <a href="https://github.com/dotnet/orleans/pull/4781">#4781</a>, <a href="https://github.com/dotnet/orleans/pull/4810">#4810</a>, <a href="https://github.com/dotnet/orleans/pull/4820">#4820</a>, <a href="https://github.com/dotnet/orleans/pull/4838">#4838</a>, <a href="https://github.com/dotnet/orleans/pull/4831">#4831</a>, <a href="https://github.com/dotnet/orleans/pull/4871">#4871</a>, <a href="https://github.com/dotnet/orleans/pull/4887">#4887</a>)</li>
+<li>New Code Generator (<a href="https://github.com/dotnet/orleans/pull/4934">#4934</a>, <a href="https://github.com/dotnet/orleans/pull/5010">#5010</a>, <a href="https://github.com/dotnet/orleans/pull/5011">#5011</a>)</li>
+<li>Support for Transfer of Coordination in transactions (<a href="https://github.com/dotnet/orleans/pull/4860">#4860</a>, <a href="https://github.com/dotnet/orleans/pull/4894">#4894</a>, <a href="https://github.com/dotnet/orleans/pull/4949">#4949</a>, <a href="https://github.com/dotnet/orleans/pull/5026">#5026</a>, <a href="https://github.com/dotnet/orleans/pull/5024">#5024</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v156httpsgithubcomdotnetorleansreleasestagv156-september-27th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.6">v1.5.6</a> September 27th 2018</h2>
+<p>Improvements and bug fixes since 1.5.5.</p>
+<ul>
+<li>Non-breaking improvements<ul>
+<li>Make MaxSockets in SocketManager configurable <a href="https://github.com/dotnet/orleans/pull/5033">#5033</a>.</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210-rc2httpsgithubcomdotnetorleansreleasestagv210-rc2-september-21st-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0-rc2">v2.1.0-rc2</a> September 21st 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New Code Generator (<a href="https://github.com/dotnet/orleans/pull/4934">#4934</a>, <a href="https://github.com/dotnet/orleans/pull/5010">#5010</a>, <a href="https://github.com/dotnet/orleans/pull/5011">#5011</a>).</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210-rc1httpsgithubcomdotnetorleansreleasestagv210-rc1-september-14th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0-rc1">v2.1.0-rc1</a> September 14th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>Transactions (beta2) (<a href="https://github.com/dotnet/orleans/pull/4851">#4851</a>, <a href="https://github.com/dotnet/orleans/pull/4923">#4923</a>, <a href="https://github.com/dotnet/orleans/pull/4951">#4951</a>, <a href="https://github.com/dotnet/orleans/pull/4950">#4950</a>, <a href="https://github.com/dotnet/orleans/pull/4953">#4953</a>)</li>
+<li>Support for Transfer of Coordination in transaction (<a href="https://github.com/dotnet/orleans/pull/4860">#4860</a>, <a href="https://github.com/dotnet/orleans/pull/4894">#4894</a>, <a href="https://github.com/dotnet/orleans/pull/4949">#4949</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v155httpsgithubcomdotnetorleansreleasestagv155-september-7th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.5">v1.5.5</a> September 7th 2018</h2>
+<p>Improvements and bug fixes since 1.5.4.</p>
+<ul>
+<li><p>Non-breaking bug fixes</p>
+<ul>
+<li>Fix programmatic subscribe bugs (<a href="https://github.com/dotnet/orleans/pull/4943">#4943</a> - <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>)</li>
+<li>Propagate message serialization errors to callers (<a href="https://github.com/dotnet/orleans/pull/4944">#4944</a> - <a href="https://github.com/dotnet/orleans/pull/4907">#4907</a>)</li>
+</ul>
+</li>
+<li><p>Breaking bug fixes</p>
+<ul>
+<li>Add StreamSubscriptionHandleFactory to subscribe on behalf feature (<a href="https://github.com/dotnet/orleans/pull/4943">#4943</a> - <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>). While technically a breaking change, it only impacts users of the programmatic subscriptions feature that tried to use it with SMS stream by fixing that scenario (along with <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>).</li>
+</ul>
+</li>
+</ul>
+<h2 id="v204httpsgithubcomdotnetorleansreleasestagv204-august-7th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.4">v2.0.4</a> August 7th 2018</h2>
+<ul>
+<li>Non-breaking bug fixes<ul>
+<li>Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (<a href="https://github.com/dotnet/orleans/pull/4895">#4895</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210httpsgithubcomdotnetorleansreleasestagv210-august-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0">v2.1.0</a> August 28th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New scheduler (<a href="https://github.com/dotnet/orleans/pull/3792">#3792</a>)</li>
+<li>Hosted Client (<a href="https://github.com/dotnet/orleans/pull/3362">#3362</a>)</li>
+<li>Distributed Transaction Manager (beta)(<a href="https://github.com/dotnet/orleans/pull/3820">#3820</a>, <a href="https://github.com/dotnet/orleans/pull/4502">#4502</a>, <a href="https://github.com/dotnet/orleans/pull/4538">#4538</a>, <a href="https://github.com/dotnet/orleans/pull/4566">#4566</a>, <a href="https://github.com/dotnet/orleans/pull/4568">#4568</a>, <a href="https://github.com/dotnet/orleans/pull/4591">#4591</a>, <a href="https://github.com/dotnet/orleans/pull/4599">#4599</a>, <a href="https://github.com/dotnet/orleans/pull/4613">#4613</a>, <a href="https://github.com/dotnet/orleans/pull/4609">#4609</a>, <a href="https://github.com/dotnet/orleans/pull/4616">#4616</a>, <a href="https://github.com/dotnet/orleans/pull/4608">#4608</a>, <a href="https://github.com/dotnet/orleans/pull/4628">#4628</a>, <a href="https://github.com/dotnet/orleans/pull/4638">#4638</a>, <a href="https://github.com/dotnet/orleans/pull/4685">#4685</a>, <a href="https://github.com/dotnet/orleans/pull/4714">#4714</a>, <a href="https://github.com/dotnet/orleans/pull/4739">#4739</a>, <a href="https://github.com/dotnet/orleans/pull/4768">#4768</a>, <a href="https://github.com/dotnet/orleans/pull/4799">#4799</a>, <a href="https://github.com/dotnet/orleans/pull/4781">#4781</a>, <a href="https://github.com/dotnet/orleans/pull/4810">#4810</a>, <a href="https://github.com/dotnet/orleans/pull/4820">#4820</a>, <a href="https://github.com/dotnet/orleans/pull/4838">#4838</a>, <a href="https://github.com/dotnet/orleans/pull/4831">#4831</a>, <a href="https://github.com/dotnet/orleans/pull/4871">#4871</a>, 
+<a href="https://github.com/dotnet/orleans/pull/4887">#4887</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v204httpsgithubcomdotnetorleansreleasestagv204-august-7th-2018-1"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.4">v2.0.4</a> August 7th 2018</h2>
+<p>Improvements and bug fixes since 2.0.3.</p>
+<ul>
+<li>Non-breaking bug fixes<ul>
+<li>Workaround for CoreFx/#30781 when running on .NET Core (<a href="https://github.com/dotnet/orleans/pull/4736">#4736</a>)</li>
+<li>Fix for .NET Core 2.1 build-time code generation (<a href="https://github.com/dotnet/orleans/pull/4673">#4673</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v154httpsgithubcomdotnetorleansreleasestagv154-june-13th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.4">v1.5.4</a> June 13th 2018</h2>
+<h2 id="v203httpsgithubcomdotnetorleansreleasestagv203-may-14th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.3">v2.0.3</a> May 14th 2018</h2>
+<ul>
+<li>This is a first patch release with a partial build -- only 9 NuGet packages got updated:<ul>
+<li>Microsoft.Orleans.OrleansRuntime</li>
+<li>Microsoft.Orleans.OrleansServiceBus</li>
+<li>Microsoft.Orleans.Runtime.Legacy</li>
+<li>Microsoft.Orleans.OrleansCodeGenerator.Build</li>
+<li>Microsoft.Orleans.Core.Legacy</li>
+<li>Microsoft.Orleans.Transactions</li>
+<li>Microsoft.Orleans.OrleansCodeGenerator</li>
+<li>Microsoft.Orleans.Core</li>
+<li>Microsoft.Orleans.TestingHost</li>
+</ul>
+</li>
+</ul>
+<p>The rest of the packages stayed unchanged at 2.0.0, except for the <code>Microsoft.Orleans.ServiceFabric</code> meta-package which is at 2.0.2.</p>
+<h2 id="v200httpsgithubcomdotnetorleansreleasestagv200-march-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0">v2.0.0</a> March 28th 2018</h2>
+<ul>
+<li>Major changes (since 2.0.0-rc2)<ul>
+<li>All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, 4290)</li>
+<li>Use string for ServiceId instead of Guid (#4262)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v200-rc2httpsgithubcomdotnetorleansreleasestagv200-rc2-march-12th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc2">v2.0.0-rc2</a> March 12th 2018</h2>
+<ul>
+<li>Major changes (since 2.0.0-rc1)<ul>
+<li>A new &quot;facade&quot; API for easier configuration of various aspects of stream providers: Persistent stream configurators</li>
+</ul>
+</li>
+</ul>
+<h2 id="v200-rc1httpsgithubcomdotnetorleansreleasestagv200-rc1-february-27th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc1">v2.0.0-rc1</a> February 27th 2018</h2>
+<ul>
+<li>Major changes (since 2.0.0-beta3)<ul>
+<li>New provider lifecycle model to replace the old one</li>
+<li>Builder pattern and options-based configuration of components and extension</li>
+</ul>
+</li>
+</ul>
+<h2 id="v200-beta3httpsgithubcomdotnetorleansreleasestagv200-beta3-december-21st-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta3">v2.0.0-beta3</a> December 21st 2017</h2>
+<h2 id="community-virtual-meetup-15">Community Virtual Meetup #15</h2>
+<p><a href="https://youtu.be/d3ufDsZcW4k">Orleans 2.0 with the core team</a> 
+December 13th 2017
+<a href="https://github.com/dotnet/orleans/blob/gh-pages/Presentations/VM-15%20-%20Orleans%202.0.pdf">Presentation</a></p>
+<h2 id="v200-beta2httpsgithubcomdotnetorleansreleasestagv200-beta2-december-12th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta2">v2.0.0-beta2</a> December 12th 2017</h2>
+<h2 id="v153httpsgithubcomdotnetorleansreleasestagv153-december-8th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.3">v1.5.3</a> December 8th 2017</h2>
+<h2 id="v200-beta1httpsgithubcomdotnetorleansreleasestagv200-beta1-october-26th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta1">v2.0.0-beta1</a> October 26th 2017</h2>
+<ul>
+<li>Major new features<ul>
+<li>Most packages are now targeting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0) and on non-Windows platforms.</li>
+</ul>
+</li>
+</ul>
+<h2 id="v152httpsgithubcomdotnetorleansreleasestagv152-october-17th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.2">v1.5.2</a> October 17th 2017</h2>
+<h2 id="v151httpsgithubcomdotnetorleansreleasestagv151-august-28th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.1">v1.5.1</a> August 28th 2017</h2>
+<h2 id="v150httpsgithubcomdotnetorleansreleasestagv150-july-6th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.0">v1.5.0</a> July 6th 2017</h2>
+<ul>
+<li>Major new features<ul>
+<li>Non-static grain client via ClientBuilder enables connecting to multiple Orleans cluster from the same app domain and connecting to other clusters from within a silo.</li>
+<li>Support for versioning of grain interfaces for non-downtime upgrades.</li>
+<li>Support for custom grain placement strategies and directors.</li>
+<li>Support for hash-based grain placement.</li>
+</ul>
+</li>
+</ul>
+<h2 id="v142httpsgithubcomdotnetorleansreleasestagv142-june-9th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.4.2">v1.4.2</a> June 9th 2017</h2>
+<h2 id="v141httpsgithubcomdotnetorleansreleasestagv141-march-27th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.4.1">v1.4.1</a> March 27th 2017</h2>
+<h2 id="community-virtual-meetup-14">Community Virtual Meetup #14</h2>
+<p><a href="https://youtu.be/XmsVYLfNHjI">Orleans FSM</a> with <a href="https://github.com/johnazariah">John Azariah</a>
+March 22nd 2017</p>
+<h2 id="v140httpsgithubcomdotnetorleansreleasestagv140-february-21st-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.4.0">v1.4.0</a> February 21st 2017</h2>
+<ul>
+<li>Major new features<ul>
+<li>Revamped JournaledGrain for event sourcing with support for geo-distributed log-based consistency providers.</li>
+<li>Abstraction of Grain Services with fixed-placed per-silo application components with their workload partitioned via cluster consistency ring.</li>
+<li>Support for heterogeneous silos with non-uniform distribution of available grain classes.</li>
+<li>Cluster membership provider for Service Fabric.</li>
+</ul>
+</li>
+</ul>
+<h2 id="community-virtual-meetup-13">Community Virtual Meetup #13</h2>
+<p><a href="https://youtu.be/_5hWNVccKeQ">Upgrading Orleans Applications</a> with <a href="https://github.com/sergeybykov">Sergey Bykov</a> and team
+February 8th 2017
+<a href="https://github.com/dotnet/orleans/raw/gh-pages/Presentations/VM-13%20-%20Orleans%20%26%20versioning.pptx">Presentation</a></p>
+<h2 id="v140-betahttpsgithubcomdotnetorleansreleasestagv140-beta-february-1st-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v1.4.0-beta">v1.4.0-beta</a> February 1st 2017</h2>
+<ul>
+<li>Major new features<ul>
+<li>Revamped JournaledGrain for event sourcing with support for geo-distributed log-based consistency providers.</li>
+<li>Abstraction of Grain Services with fixed-placed per-silo application components with their workload partitioned via cluster consistency ring.</li>
+<li>Support for heterogeneous silos with non-uniform distribution of available grain classes.</li>
+<li>Cluster membership provider for Service Fabric.</li>
+</ul>
+</li>
+</ul>
+<h2 id="community-virtual-meetup-12">Community Virtual Meetup #12</h2>
+<p><a href="https://youtu.be/JrmHfbZH11M">Deploying Orleans</a> with <a href="https://github.com/jkonecki">Jakub Konecki</a>
+December 8th 2016
+<a href="https://github.com/dotnet/orleans/raw/gh-pages/Presentations/VM-12%20Orleans-YAMS.pdf">Presentation</a></p>
+<h2 id="v131httpsgithubcomdotnetorleansreleasestagv131-november-15th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.3.1">v1.3.1</a> November 15th 2016</h2>
+<h2 id="community-virtual-meetup-11">Community Virtual Meetup #11</h2>
+<p><a href="https://youtu.be/WiAX_eGEuyo">A monitoring and visualisation show</a> with <a href="https://github.com/richorama">Richard Astbury</a>, <a href="https://github.com/danvanderboom">Dan Vanderboom</a> and <a href="https://github.com/creyke">Roger Creyke</a>
+October 13th 2016</p>
+<h2 id="v130httpsgithubcomdotnetorleansreleasestagv130-october-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.3.0">v1.3.0</a> October 11th 2016</h2>
+<h2 id="v124httpsgithubcomdotnetorleansreleasestagv124-october-5th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.4">v1.2.4</a> October 5th 2016</h2>
+<h2 id="v130-beta2httpsgithubcomdotnetorleansreleasestagv130-beta2-september-27th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.3.0-beta2">v1.3.0-beta2</a> September 27th 2016</h2>
+<ul>
+<li>Notable new features<ul>
+<li>Support for geo-distributed multi-cluster deployments <a href="https://github.com/dotnet/orleans/pull/1108/">#1108</a> <a href="https://github.com/dotnet/orleans/pull/1109/">#1109</a> <a href="https://github.com/dotnet/orleans/pull/1800/">#1800</a></li>
+<li>Added new Amazon AWS basic Orleans providers <a href="https://github.com/dotnet/orleans/issues/2006">#2006</a></li>
+<li>Support distributed cancellation tokens in grain methods <a href="https://github.com/dotnet/orleans/pull/1599/">#1599</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="community-virtual-meetup-10">Community Virtual Meetup #10</h2>
+<p><a href="https://youtu.be/_SbIbYkY88o">The roadmap to Orleans 2.0 with the core team</a>
+August 25th 2016</p>
+<h2 id="v123httpsgithubcomdotnetorleansreleasestagv123-july-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.3">v1.2.3</a> July 11th 2016</h2>
+<h2 id="v122httpsgithubcomdotnetorleansreleasestagv122-june-15th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.2">v1.2.2</a> June 15th 2016</h2>
+<h2 id="v121httpsgithubcomdotnetorleansreleasestagv121-may-19th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.1">v1.2.1</a> May 19th 2016</h2>
+<h2 id="v120httpsgithubcomdotnetorleansreleasestagv120-may-4th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0">v1.2.0</a> May 4th 2016</h2>
+<h2 id="v120-betahttpsgithubcomdotnetorleansreleasestagv120-beta-april-18th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0-beta">v1.2.0-beta</a> April 18th 2016</h2>
+<ul>
+<li>Major improvements<ul>
+<li>Added an EventHub stream provider based on the same code that is used in Halo 5.</li>
+<li><a href="https://github.com/dotnet/orleans/pull/1586">Increased throughput by between 5% and 26% depending on the scenario.</a></li>
+<li>Migrated all but 30 functional tests to GitHub.</li>
+<li>Grain state doesn&#39;t have to extend <code>GrainState</code> anymore (marked as <code>[Obsolete]</code>) and can be a simple POCO class.</li>
+<li><a href="https://github.com/dotnet/orleans/pull/963">Added support for per-grain-class</a> and <a href="https://github.com/dotnet/orleans/pull/965">global server-side interceptors.</a></li>
+<li><a href="https://github.com/dotnet/orleans/pull/1267">Added support for using Consul 0.6.0 as a Membership Provider.</a></li>
+<li><a href="https://github.com/dotnet/orleans/pull/1479">Support C# 6.</a></li>
+<li><a href="https://github.com/dotnet/orleans/pull/1455">Switched to xUnit for testing as a step towards CoreCLR compatibility.</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="v113httpsgithubcomdotnetorleansreleasestagv113-march-9th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.3">v1.1.3</a> March 9th 2016</h2>
+<h2 id="community-virtual-meetup-9">Community Virtual Meetup #9</h2>
+<p><a href="https://github.com/nehmebilal">Nehme Bilal</a> and <a href="https://github.com/ReubenBond">Reuben Bond</a> <a href="https://youtu.be/w__D7gnqeZ0">talk about deploying Orleans</a> with <a href="https://github.com/Microsoft/Yams">YAMS</a> and <a href="https://azure.microsoft.com/en-gb/documentation/articles/service-fabric-overview/">Service Fabric</a>
+Fabruary 26st 2016</p>
+<h2 id="community-virtual-meetup-85">Community Virtual Meetup #8.5</h2>
+<p><a href="https://youtu.be/F1Yoe88HEvg">Networking discussion</a> hosted by <a href="https://github.com/jason-bragg">Jason Bragg</a>
+February 11th 2016</p>
+<h2 id="community-virtual-meetup-8">Community Virtual Meetup #8</h2>
+<p><a href="https://www.youtube.com/watch?v=4BiCyhvSOs4">Orleans core team present the roadmap</a>
+January 21st 2016</p>
+<h2 id="v112httpsgithubcomdotnetorleansreleasestagv112-january-20th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.2">v1.1.2</a> January 20th 2016</h2>
+<h2 id="v111httpsgithubcomdotnetorleansreleasestagv111-january-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.1">v1.1.1</a> January 11th 2016</h2>
+<h2 id="community-virtual-meetup-7httpswwwyoutubecomwatchvfkl-ps8q9ac"><a href="https://www.youtube.com/watch?v=FKL-PS8Q9ac">Community Virtual Meetup #7</a></h2>
+<p>Christmas Special - <a href="https://github.com/yevhen">Yevhen Bobrov</a> on <a href="https://github.com/yevhen/Orleankka">Orleankka</a>
+December 17th 2015</p>
+<h2 id="v110httpsgithubcomdotnetorleansreleasestagv110-december-14nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.0">v1.1.0</a> December 14nd 2015</h2>
+<h2 id="community-virtual-meetup-6">Community Virtual Meetup #6</h2>
+<p><a href="https://www.youtube.com/watch?v=fOl8ophHtug">MSR PhDs on Geo Distributed Orleansp</a>
+October 23rd 2015</p>
+<h2 id="v1010httpsgithubcomdotnetorleansreleasestagv1010-september-22nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.10">v1.0.10</a> September 22nd 2015</h2>
+<h2 id="v109httpsgithubcomdotnetorleansreleasestagv109-july-15th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.9">v1.0.9</a> July 15th  2015</h2>
+<h2 id="v108httpsgithubcomdotnetorleansreleasestagv108-may-26th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.8">v1.0.8</a> May 26th  2015</h2>
+<h2 id="community-virtual-meetup-5httpswwwyoutubecomwatchvesepblfy554"><a href="https://www.youtube.com/watch?v=eSepBlfY554">Community Virtual Meetup #5</a></h2>
+<p><a href="https://github.com/gabikliot">Gabriel Kliot</a> on the new Orleans Streaming API
+May 22nd 2015</p>
+<h2 id="v107httpsgithubcomdotnetorleansreleasestagv107-may-15th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.7">v1.0.7</a> May 15th  2015</h2>
+<h2 id="community-virtual-meetup-4httpswwwyoutubecomwatchv56xz68ltb9c"><a href="https://www.youtube.com/watch?v=56Xz68lTB9c">Community Virtual Meetup #4</a></h2>
+<p><a href="https://github.com/ReubenBond">Reuben Bond</a> on using Orleans at FreeBay
+April 15th 2015</p>
+<h2 id="v105httpsgithubcomdotnetorleansreleasestagv105-march-30th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.5">v1.0.5</a> March 30th  2015</h2>
+<h2 id="community-virtual-meetup-3httpswwwyoutubecomwatchv07up88bpl20"><a href="https://www.youtube.com/watch?v=07Up88bpl20">Community Virtual Meetup #3</a></h2>
+<p><a href="https://github.com/yevhen">Yevhen Bobrov</a> on a Uniform API for Orleans
+March 6th 2015</p>
+<h2 id="community-virtual-meetup-2httpswwwyoutubecomwatchvd4kjksffnji"><a href="https://www.youtube.com/watch?v=D4kJKSFfNjI">Community Virtual Meetup #2</a></h2>
+<p>Orleans team live Q&amp;A and roadmap
+January 12th 2015</p>
+<h2 id="orleans-open-source-v10-update-january-2015">Orleans Open Source v1.0 Update (January 2015)</h2>
+<h2 id="community-virtual-meetup-1httpwwwyoutubecomwatchv6coq8xzlopg"><a href="http://www.youtube.com/watch?v=6COQ8XzloPg">Community Virtual Meetup #1</a></h2>
+<p><a href="https://github.com/jkonecki">Jakub Konecki</a> on Event Sourced Grains
+December 18th 2014</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/whats_new_in_orleans.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

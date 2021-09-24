@@ -1,0 +1,435 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Serialization and Writing Custom Serializers | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Serialization and Writing Custom Serializers | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="serialization">
+<h1 id="serialization-and-writing-custom-serializers">Serialization and Writing Custom Serializers</h1>
+
+<p>Orleans has an advanced and extensible serialization framework. Orleans serializes data types passed in grain request and response messages as well as grain persistent state objects. As part of this framework, Orleans automatically generates serialization code for those data types. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable, Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. The framework also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, strings, primitives, arrays, etc.</p>
+<p>There are 2 important features of Orleans&#39;s serializer that set it apart from a lot of other third party serialization frameworks: dynamic types/arbitrary polymorphism and object identity.</p>
+<ol>
+<li><p><strong>Dynamic types and arbitrary polymorphism</strong> - Orleans does not put any restrictions on the types that can be passed in grain calls and maintains the dynamic nature of the actual data type. That means, for example, that if the method in the grain interfaces is declared to accept <code>IDictionary</code> but at runtime the sender passes <code>SortedDictionary</code>, the receiver will indeed get <code>SortedDictionary</code> (although the &quot;static contract&quot;/grain interface did not specify this behaviour).</p>
+</li>
+<li><p><strong>Maintaining Object identity</strong> - if the same object is passed multiple types in the arguments of a grain call or is indirectly pointed more than once from the arguments, Orleans will serialize it only once. At the receiver side Orleans will restore all references correctly, so that two pointers to the same object still point to the same object after deserialization as well. Object identity is important to preserve in scenarios like the following. Imagine actor A is sending a dictionary with 100 entries to actor B, and 10 of the keys in the dictionary point to the same object, obj, on A&#39;s side. Without preserving object identity, B would receive a dictionary of 100 entries with those 10 keys pointing to 10 different clones of obj. With object identity preserved, the dictionary on B&#39;s side looks exactly like on A&#39;s side with those 10 keys pointing to a single object obj.</p>
+</li>
+</ol>
+<p>The above two behaviours are provided by the standard .NET binary serializer and it was therefore important for us to support this standard and familiar behaviour in Orleans as well.</p>
+<h1 id="generated-serializers">Generated Serializers</h1>
+<p>Orleans uses the following rules to decide which serializers to generate.
+The rules are:</p>
+<p>1) Scan all types in all assemblies which reference the core Orleans library.</p>
+<p>2) Out of those assemblies: generate serializers for types that are directly referenced in grain interfaces method signatures or state class signature or for any type that is marked with  <code>[Serializable]</code> attribute.</p>
+<p>3) In addition, a grain interface or implementation project can point to arbitrary types for serialization generation by adding a <code>[KnownType]</code> or <code>[KnownAssembly]</code> assembly level attributes to tell code generator to generate serializers for a specific types or all eligible types within an assembly.</p>
+<h1 id="serialization-providers">Serialization Providers</h1>
+<p>Orleans supports integration with third-party serializers using a provider model. This requires an implementation of the <code>IExternalSerializer</code> type described in the custom serialization section of this document. Integrations for some common serializers are maintained alongside Orleans, for example:</p>
+<ul>
+<li><a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a>: <code>Orleans.Serialization.ProtobufSerializer</code> from the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/">Microsoft.Orleans.OrleansGoogleUtils</a> NuGet package.</li>
+<li><a href="https://github.com/microsoft/bond/">Bond</a>: <code>Orleans.Serialization.BondSerializer</code> from the <a href="https://www.nuget.org/packages/Microsoft.Orleans.Serialization.Bond/">Microsoft.Orleans.Serialization.Bond</a> NuGet package.</li>
+<li><a href="http://www.newtonsoft.com/json">Newtonsoft.Json AKA Json.NET</a>: <code>Orleans.Serialization.OrleansJsonSerializer</code> from the core Orleans library.</li>
+</ul>
+<p>Custom implementation of <code>IExternalSerializer</code> is described in the Writing Custom Serializers section below.</p>
+<h3 id="configuration">Configuration</h3>
+<p>It is important to ensure that serialization configuration is identical on all clients and silos. If configurations are not consistent, serialization errors may occur.</p>
+<p>Serialization providers, which implement <code>IExternalSerializer</code>, can be specified using the <code>SerializationProviders</code> property of <code>ClientConfiguration</code> and <code>GlobalConfiguration</code> in code:</p>
+<pre><code class="lang-csharp">var cfg = new ClientConfiguration();
+cfg.SerializationProviders.Add(typeof(FantasticSerializer).GetTypeInfo());
+</code></pre><pre><code class="lang-csharp">var cfg = new GlobalConfiguration();
+cfg.SerializationProviders.Add(typeof(FantasticSerializer).GetTypeInfo());
+</code></pre><p>Alternatively, they can be specified in XML configuration under the <code>&lt;SerializationProviders /&gt;</code> property of <code>&lt;Messaging&gt;</code>:</p>
+<pre><code class="lang-xml">&lt;Messaging&gt;
+  &lt;SerializationProviders&gt;
+    &lt;Provider type=&quot;GreatCompany.FantasticSerializer, GreatCompany.SerializerAssembly&quot;/&gt;
+  &lt;/SerializationProviders&gt;
+&lt;/Messaging&gt;
+</code></pre><p>In both cases, multiple providers can be configured. The collection is ordered, meaning that if a provider which can serialize types <code>A</code> and <code>B</code> is specified before a provider which can only serialize type <code>B</code>, then the latter provider will not be used.</p>
+<h1 id="writing-custom-serializers">Writing Custom Serializers</h1>
+<p>In addition to automatic serialization generation, application code can provide custom serialization for types it chooses. Orleans recommends using the automatic serialization generation for the majority of your application types and only write custom serializers in rare cases when you believe it is possible to get improved performance by hand-coding serializers. This note describes how to do so, and identifies some specific cases when it might be helpful.</p>
+<p>There are 3 ways in which applications can customize serialization:</p>
+<ol>
+<li><p>Add serialization methods to your type and mark them with appropriate attributes (<code>CopierMethod</code>, <code>SerializerMethod</code>, <code>DeserializerMethod</code>). This method is preferable for types that your application owns, that is, the types that you can add new methods to.</p>
+</li>
+<li><p>Implement <code>IExternalSerializer</code> and register it during configuration time. This method is useful for integrating an external serialization library.</p>
+</li>
+<li><p>Write a separate static class annotated with an <code>[Serializer(typeof(YourType))]</code> with the 3 serialization methods in it and the same attributes as above. This method is useful for types that the application does not own, for example, types defined in other libraries your application has no control over.</p>
+</li>
+</ol>
+<p>Each of these methods are detailed in the sections below.</p>
+<h2 id="introduction">Introduction</h2>
+<p>Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.</p>
+<p>The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.</p>
+<p>Serializers are registered for each supported data type at silo start-up and whenever an assembly is loaded. Registration is necessary for custom serializer routines for a type to be used. Serializer selection is based on the dynamic type of the object to be copied or serialized. For this reason, there is no need to create serializers for abstract classes or interfaces, because they will never be used.</p>
+<h2 id="when-to-consider-writing-a-custom-serializer">When to Consider Writing a Custom Serializer</h2>
+<p>It is rare that a hand-crafted serializer routine will perform meaningfully better than the generated versions. If you are tempted to do so, you should first consider the following options:</p>
+<p> If there are fields or properties within your data types that don&#39;t have to be serialized or copied, you can mark them with the <code>NonSerialized</code> attribute. This will cause the generated code to skip these fields when copying and serializing.
+ Use <code>Immutable&lt;T&gt;</code> &amp; <code>[Immutable]</code> where possible to avoid copying immutable data. The section on <em>Optimizing Copying</em> below for details. If you&#39;re avoiding using the standard generic collection types, don&#39;t. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special &quot;abbreviated&quot; representations in the serialized byte stream, resulting in even more performance advantages. For instance, a <code>Dictionary&lt;string, string&gt;</code> will be faster than a <code>List&lt;Tuple&lt;string, string&gt;&gt;</code>.</p>
+<p> The most common case where a custom serializer can provide a noticeable performance gain is when there is significant semantic information encoded in the data type that is not available by simply copying field values. For instance, arrays that are sparsely populated may often be more efficiently serialized by treating the array as a collection of index/value pairs, even if the application keeps the data as a fully realized array for speed of operation.</p>
+<p> A key thing to do before writing a custom serializer is to make sure that the generated serializer is really hurting your performance. Profiling will help a bit here, but even more valuable is running end-to-end stress tests of your application with varying serialization loads to gauge the system-level impact, rather than the micro-impact of serialization. For instance, building a test version that passes no parameters to or results from grain methods, simply using canned values at either end, will zoom in on the impact of serialization and copying on system performance.</p>
+<h2 id="method-1-adding-serialization-methods-to-the-type">Method 1: Adding Serialization Methods to the Type</h2>
+<p>All serializer routines should be implemented as static members of the class or struct they operate on. The names shown here are not required; registration is based on the presence of the respective attributes, not on method names. Note that serializer methods need not be public.</p>
+<p>Unless you implement all three serialization routines, you should mark your type with the <code>Serializable</code> attribute so that the missing methods will be generated for you.</p>
+<h3 id="copier">Copier</h3>
+<p>Copier methods are flagged with the <code>Orleans.CopierMethod</code> attribute:</p>
+<pre><code class="lang-csharp">[CopierMethod]
+static private object Copy(object input, ICopyContext context)
+{
+    ...
+}
+</code></pre><p>Copiers are usually the simplest serializer routines to write. They take an object, guaranteed to be of the same type as the type the copier is defined in, and must return a semantically-equivalent copy of the object.</p>
+<p>If, as part of copying the object, a sub-object needs to be copied, the best way to do so is to use the SerializationManager&#39;s DeepCopyInner routine:</p>
+<pre><code class="lang-csharp">var fooCopy = SerializationManager.DeepCopyInner(foo, context);
+</code></pre><p>It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.</p>
+<h4 id="maintaining-object-identity">Maintaining Object Identity</h4>
+<p>An important responsibility of a copy routine is to maintain object identity. The Orleans runtime provides a helper class for this. Before copying a sub-object &quot;by hand&quot; (i.e., not by calling DeepCopyInner), check to see if it has already been referenced as follows:</p>
+<pre><code class="lang-csharp">var fooCopy = context.CheckObjectWhileCopying(foo);
+
+if (fooCopy == null)
+{
+    // Actually make a copy of foo
+    context.RecordObject(foo, fooCopy);
+}
+</code></pre><p>The last line, the call to <code>RecordObject</code>, is required so that possible future references to the same object as foo references will get found properly by <code>CheckObjectWhileCopying</code>.</p>
+<p>Note that this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums).</p>
+<p>If you use <code>DeepCopyInner</code> to copy sub-objects, then object identity is handled for you.</p>
+<h3 id="serializer">Serializer</h3>
+<p>Serialization methods are flagged with the <code>SerializerMethod</code> attribute:</p>
+<pre><code class="lang-csharp">[SerializerMethod]
+static private void Serialize(object input, ISerializationContext context, Type expected)
+{
+    ...
+}
+</code></pre><p>As with copiers, the &quot;input&quot; object passed to a serializer is guaranteed to be an instance of the defining type. The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream.</p>
+<p>To serialize sub-objects, use the <code>SerializationManager</code>&#39;s <code>SerializeInner</code> routine:</p>
+<pre><code class="lang-csharp">SerializationManager.SerializeInner(foo, context, typeof(FooType));
+</code></pre><p>If there is no particular expected type for foo, then you can pass null for the expected type.</p>
+<p>The <code>BinaryTokenStreamWriter</code> class provides a wide variety of methods for writing data to the byte stream. An instance of the class can be obtained via the <code>context.StreamWriter</code> property. See the class for documentation.</p>
+<h3 id="deserializer">Deserializer</h3>
+<p>Deserialization methods are flagged with the <code>DeserializerMethod</code> attribute:</p>
+<pre><code class="lang-csharp">[DeserializerMethod]
+static private object Deserialize(Type expected, IDeserializationContext context)
+{
+    ...
+}
+</code></pre><p>The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream. The actual type of the object to be created will always be the type of the class in which the deserializer is defined.</p>
+<p>To deserialize sub-objects, use the <code>SerializationManager</code>&#39;s <code>DeserializeInner</code> routine:</p>
+<pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner(typeof(FooType), context);
+</code></pre><p>Or, alternatively:</p>
+<pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner&lt;FooType&gt;(context);
+</code></pre><p>If there is no particular expected type for foo, use the non-generic <code>DeserializeInner</code> variant and pass <code>null</code> for the expected type.</p>
+<p>The <code>BinaryTokenStreamReader</code> class provides a wide variety of methods for reading data from the byte stream. An instance of the class can be obtained via the <code>context.StreamReader</code> property. See the class for documentation.</p>
+<h2 id="method-2-writing-a-serializer-provider">Method 2: Writing a Serializer Provider</h2>
+<p>In this method, you implement <code>Orleans.Serialization.IExternalSerializer</code> and add it to the <code>SerializationProviders</code> property on both <code>ClientConfiguration</code> on the client and <code>GlobalConfiguration</code> on the silos. Configuration is detailed in the Serialization Providers section above.</p>
+<p>Implementation of <code>IExternalSerializer</code> follows the pattern described for serialization methods from <code>Method 1</code> above with the addition of an <code>Initialize</code> method and an <code>IsSupportedType</code> method which Orleans uses to determine if the serializer supports a given type. This is the interface definition:</p>
+<pre><code class="lang-csharp">public interface IExternalSerializer
+{
+    /// &lt;summary&gt;
+    /// Initializes the external serializer. Called once when the serialization manager creates 
+    /// an instance of this type
+    /// &lt;/summary&gt;
+    void Initialize(Logger logger);
+
+    /// &lt;summary&gt;
+    /// Informs the serialization manager whether this serializer supports the type for serialization.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;itemType&quot;&gt;The type of the item to be serialized&lt;/param&gt;
+    /// &lt;returns&gt;A value indicating whether the item can be serialized.&lt;/returns&gt;
+    bool IsSupportedType(Type itemType);
+
+    /// &lt;summary&gt;
+    /// Tries to create a copy of source.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;source&quot;&gt;The item to create a copy of&lt;/param&gt;
+    /// &lt;param name=&quot;context&quot;&gt;The context in which the object is being copied.&lt;/param&gt;
+    /// &lt;returns&gt;The copy&lt;/returns&gt;
+    object DeepCopy(object source, ICopyContext context);
+
+    /// &lt;summary&gt;
+    /// Tries to serialize an item.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;item&quot;&gt;The instance of the object being serialized&lt;/param&gt;
+    /// &lt;param name=&quot;context&quot;&gt;The context in which the object is being serialized.&lt;/param&gt;
+    /// &lt;param name=&quot;expectedType&quot;&gt;The type that the deserializer will expect&lt;/param&gt;
+    void Serialize(object item, ISerializationContext context, Type expectedType);
+
+    /// &lt;summary&gt;
+    /// Tries to deserialize an item.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;context&quot;&gt;The context in which the object is being deserialized.&lt;/param&gt;
+    /// &lt;param name=&quot;expectedType&quot;&gt;The type that should be deserialized&lt;/param&gt;
+    /// &lt;returns&gt;The deserialized object&lt;/returns&gt;
+    object Deserialize(Type expectedType, IDeserializationContext context);
+}
+</code></pre><h2 id="method-3-writing-a-serializer-for-individual-types">Method 3: Writing a Serializer for Individual Types</h2>
+<p>In this method you write a new class annotated with an attribute <code>[SerializerAttribute(typeof(TargetType))]</code>, where <code>TargetType</code> is the type which is being serialized, and implement the 3 serialization routines. The rules for how to write those routines are identical to method 1. Orleans uses the <code>[SerializerAttribute(typeof(TargetType))]</code> to determine that this class is a serializer for <code>TargetType</code> and this attribute can be specified multiple times on the same class if it&#39;s able to serialize multiple types. Below is an example for such a class:</p>
+<pre><code class="lang-csharp">public class User
+{
+    public User BestFriend { get; set; }
+    public string NickName { get; set; }
+    public int FavoriteNumber { get; set; }
+    public DateTimeOffset BirthDate { get; set; }
+}
+
+[Orleans.CodeGeneration.SerializerAttribute(typeof(User))]
+internal class UserSerializer
+{
+    [CopierMethod]
+    public static object DeepCopier(object original, ICopyContext context)
+    {
+        var input = (User) original;
+        var result = new User();
+
+        // Record &#39;result&#39; as a copy of &#39;input&#39;. Doing this immediately after construction allows for
+        // data structures which have cyclic references or duplicate references.
+        // For example, imagine that &#39;input.BestFriend&#39; is set to &#39;input&#39;. In that case, failing to record
+        // the copy before trying to copy the &#39;BestFriend&#39; field would result in infinite recursion.
+        context.RecordCopy(original, result);
+
+        // Deep-copy each of the fields.
+        result.BestFriend = (User)context.SerializationManager.DeepCopy(input.BestFriend);
+        result.NickName = input.NickName; // strings in .NET are immutable, so they can be shallow-copied.
+        result.FavoriteNumber = input.FavoriteNumber; // ints are primitive value types, so they can be shallow-copied.
+        result.BirthDate = (DateTimeOffset)context.SerializationManager.DeepCopy(input.BirthDate);
+
+        return result;
+    }
+
+    [SerializerMethod]
+    public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
+    {
+        var input = (User) untypedInput;
+
+        // Serialize each field.
+        SerializationManager.SerializeInner(input.BestFriend, context);
+        SerializationManager.SerializeInner(input.NickName, context);
+        SerializationManager.SerializeInner(input.FavoriteNumber, context);
+        SerializationManager.SerializeInner(input.BirthDate, context);
+    }
+
+    [DeserializerMethod]
+    public static object Deserializer(Type expected, IDeserializationContext context)
+    {
+        var result = new User();
+
+        // Record &#39;result&#39; immediately after constructing it. As with the deep copier, this
+        // allows for cyclic references and de-duplication.
+        context.RecordObject(result);
+
+        // Deserialize each field in the order that they were serialized.
+        result.BestFriend = SerializationManager.DeserializeInner&lt;User&gt;(context);
+        result.NickName = SerializationManager.DeserializeInner&lt;string&gt;(context);
+        result.FavoriteNumber = SerializationManager.DeserializeInner&lt;int&gt;(context);
+        result.BirthDate = SerializationManager.DeserializeInner&lt;DateTimeOffset&gt;(context);
+
+        return result;
+    }
+}
+</code></pre><h3 id="serializing-generic-types">Serializing Generic Types</h3>
+<p>The <code>TargetType</code> parameter of <code>[Serializer(typeof(TargetType))]</code> can be an open-generic type, for example, <code>MyGenericType&lt;&gt;</code>. In that case, the serializer class must have the same generic parameters as the target type. Orleans will create a concrete version of the serializer at runtime for every concrete <code>MyGenericType&lt;T&gt;</code> type which is serialized, for example, one for each of <code>MyGenericType&lt;int&gt;</code> and <code>MyGenericType&lt;string&gt;</code>.</p>
+<h2 id="hints-for-writing-serializers-and-deserializers">Hints for Writing Serializers and Deserializers</h2>
+<p>Often the simplest way to write a serializer/deserializer pair is to serialize by constructing a byte array and writing the array length to the stream, followed by the array itself, and then deserialize by reversing the process. If the array is fixed-length, you can omit it from the stream. This works well when you have a data type that you can represent compactly and that doesn&#39;t have sub-objects that might be duplicated (so you don&#39;t have to worry about object identity).</p>
+<p>Another approach, which is the approach the Orleans runtime takes for collections such as dictionaries, works well for classes with significant and complex internal structure: use instance methods to access the semantic content of the object, serialize that content, and deserialize by setting the semantic contents rather than the complex internal state. In this approach, inner objects are written using SerializeInner and read using DeserializeInner. In this case, it is common to write a custom copier, as well.</p>
+<p>If you write a custom serializer, and it winds up looking like a sequence of calls to SerializeInner for each field in the class, you don&#39;t need a custom serializer for that class.</p>
+<h1 id="fallback-serialization">Fallback Serialization</h1>
+<p>Orleans supports transmission of arbitrary types at runtime and therefore the in-built code generator cannot determine the entire set of types which will be transmitted ahead of time. Additionally, certain types cannot have serializers generated for them because they are inaccessible (for example, <code>private</code>) or have fields which are inaccessible (for example, <code>readonly</code>). Therefore, there is a need for just-in-time serialization of types which were unexpected or could not have serializers generated ahead-of-time. The serializer responsible for these types is called the <em>fallback serializer</em>. Orleans ships with two fallback serializers:</p>
+<ul>
+<li><code>Orleans.Serialization.BinaryFormatterSerializer</code> which uses .NET&#39;s <a href="https://msdn.microsoft.com/en-us/library/system.runtime.serialization.formatters.binary.binaryformatter">BinaryFormatter</a>; and</li>
+<li><code>Orleans.Serialization.ILBasedSerializer</code> which emits <a href="https://en.wikipedia.org/wiki/Common_Intermediate_Language">CIL</a> instructions at runtime to create serializers which leverage Orleans&#39; serialization framework to serialize each field. This means that if an inaccessible type <code>MyPrivateType</code> contains a field <code>MyType</code> which has a custom serializer, that custom serializer will be used to serialize it.</li>
+</ul>
+<p>The fallback serializer can be configured using the <code>FallbackSerializationProvider</code> property on both <code>ClientConfiguration</code> on the client and <code>GlobalConfiguration</code> on the silos.</p>
+<pre><code class="lang-csharp">var cfg = new ClientConfiguration();
+cfg.FallbackSerializationProvider = typeof(FantasticSerializer).GetTypeInfo();
+</code></pre><pre><code class="lang-csharp">var cfg = new GlobalConfiguration();
+cfg.FallbackSerializationProvider = typeof(FantasticSerializer).GetTypeInfo();
+</code></pre><p>Alternatively, the fallback serialization provider can be specified in XML configuration:</p>
+<pre><code class="lang-xml">&lt;Messaging&gt;
+  &lt;FallbackSerializationProvider type=&quot;GreatCompany.FantasticFallbackSerializer, GreatCompany.SerializerAssembly&quot;/&gt;
+&lt;/Messaging&gt;
+</code></pre><p><code>BinaryFormatterSerializer</code> is the default fallback serializer.</p>
+<h1 id="exception-serialization">Exception Serialization</h1>
+<p>Exceptions are serialized using the <a href="serialization.html#fallback-serialization">fallback serializer</a>. Using the default configuration, <code>BinaryFormatterSerializer</code> is the fallback serializer and so the <a href="https://docs.microsoft.com/en-us/dotnet/standard/serialization/custom-serialization">ISerializable pattern</a> must be followed in order to ensure correct serialization of all properties in an exception type.</p>
+<p>Here is an example of an exception type with correctly implemented serialization:</p>
+<pre><code class="lang-csharp">[Serializable]
+public class MyCustomException : Exception
+{
+    public string MyProperty { get; }
+
+    public MyCustomException(string myProperty, string message)
+        : base(message)
+    {
+        this.MyProperty = myProperty;
+    }
+
+    public MyCustomException(string transactionId, string message, Exception innerException)
+        : base(message, innerException)
+    {
+        this.MyProperty = transactionId;
+    }
+
+    // Note: This is the constructor called by BinaryFormatter during deserialization
+    public MyCustomException(SerializationInfo info, StreamingContext context)
+        : base(info, context)
+    {
+        this.MyProperty = info.GetString(nameof(this.MyProperty));
+    }
+
+    // Note: This method is called by BinaryFormatter during serialization
+    public override void GetObjectData(SerializationInfo info, StreamingContext context)
+    {
+        base.GetObjectData(info, context);
+        info.AddValue(nameof(this.MyProperty), this.MyProperty);
+    }
+}
+</code></pre><h1 id="optimize-copying-using-immutable-types">Optimize Copying Using Immutable Types</h1>
+<p>Orleans has a feature that can be used to avoid some of the overhead associated with serializing messages containing immutable types. This section describes the feature and its application, starting with context on where it is relevant.</p>
+<h2 id="serialization-in-orleans">Serialization in Orleans</h2>
+<p>When a grain method is invoked, the Orleans runtime makes a deep copy of the method arguments and forms the request out of the copies. This protects against the calling code modifying the argument objects before the data is passed to the called grain.</p>
+<p>If the called grain is on a different silo, then the copies are eventually serialized into a byte stream and sent over the network to the target silo, where they are deserialized back into objects. If the called grain is on the same silo, then the copies are handed directly to the called method.</p>
+<p>Return values are handled the same way: first copied, then possibly serialized and deserialized.</p>
+<p>Note that all 3 processes, copying, serializing, and deserializing, respect object identity. In other words, if you pass a list that has the same object in it twice, on the receiving side you&#39;ll get a list with the same object in it twice, rather than with two objects with the same values in them.</p>
+<h2 id="optimizing-copying">Optimizing Copying</h2>
+<p>In many cases, the deep copying is unnecessary. For instance, a possible scenario is a web front-end that receives a byte array from its client and passes that request, including the byte array, on to a grain for processing. The front-end process doesn&#39;t do anything with the array once it has passed it on to the grain; in particular, it doesn&#39;t reuse the array to receive a future request. Inside the grain, the byte array is parsed to fetch the input data, but not modified. The grain returns another byte array that it has created to get passed back to the web client; it discards the array as soon as it returns it. The web front-end passes the result byte array back to its client, without modification.</p>
+<p>In such a scenario, there is no need to copy either the request or response byte arrays. Unfortunately, the Orleans runtime can&#39;t figure this out by itself, since it can&#39;t tell whether or not the arrays are modified later on by the web front-end or by the grain. In the best of all possible worlds, we&#39;d have some sort of .NET mechanism for indicating that a value is no longer modified; lacking that, we&#39;ve added Orleans-specific mechanisms for this: the <code>Immutable&lt;T&gt;</code> wrapper class and the <code>[Immutable]</code> attribute.</p>
+<h3 id="using-immutablet">Using <code>Immutable&lt;T&gt;</code></h3>
+<p>The <code>Orleans.Concurrency.Immutable&lt;T&gt;</code> wrapper class is used to indicate that a value may be considered immutable; that is, the underlying value will not be modified, so no copying is required for safe sharing. Note that using <code>Immutable&lt;T&gt;</code> implies that neither the provider of the value nor the recipient of the value will modify it in the future; it is not a one-sided commitment, but rather a mutual dual-side commitment.</p>
+<p>Using <code>Immutable&lt;T&gt;</code> is simple: in your grain interface, instead of passing <code>T</code>, pass <code>Immutable&lt;T&gt;</code>. For instance, in the above described scenario, the grain method that was:</p>
+<pre><code class="lang-csharp">Task&lt;byte[]&gt; ProcessRequest(byte[] request);
+</code></pre><p>Becomes:</p>
+<pre><code class="lang-csharp">Task&lt;Immutable&lt;byte[]&gt;&gt; ProcessRequest(Immutable&lt;byte[]&gt; request);
+</code></pre><p>To create an <code>Immutable&lt;T&gt;</code>, simply use the constructor:</p>
+<pre><code class="lang-csharp">Immutable&lt;byte[]&gt; immutable = new Immutable&lt;byte[]&gt;(buffer);
+</code></pre><p>To get the value inside the immutable, use the <code>.Value</code> property:</p>
+<pre><code class="lang-csharp">byte[] buffer = immutable.Value;
+</code></pre><h3 id="using-immutable">Using <code>[Immutable]</code></h3>
+<p>For user-defined types, the <code>[Orleans.Concurrency.Immutable]</code> attribute can be added to the type. This instructs Orleans&#39; serializer to avoid copying instances of this type.
+The following code snippet demonstrates using <code>[Immutable]</code> to denote an immutable type. This type will not be copied during transmission.</p>
+<pre><code class="lang-csharp">[Immutable]
+public class MyImmutableType
+{
+    public MyImmutableType(int value)
+    {
+        this.MyValue = value;
+    }
+
+    public int MyValue { get; }
+}
+</code></pre><h2 id="immutability-in-orleans">Immutability in Orleans</h2>
+<p>For Orleans&#39; purposes, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item&#39;s semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability.</p>
+<p>In some cases it is safe to relax this to logical immutability, but care must be taken to ensure that the mutating code is properly thread-safe; because dealing with multithreading is complex, and uncommon in an Orleans context, we strongly recommend against this approach and recommend sticking to bitwise immutability.</p>
+<h1 id="serialization-best-practices">Serialization Best Practices</h1>
+<p>Serialization serves two primary purposes in Orleans:</p>
+<ol>
+<li>As a wire format for transmitting data between grains and clients at runtime.</li>
+<li>As a storage format for persisting long-lived data for later retrieval.</li>
+</ol>
+<p>The serializers generated by Orleans are suitable for the first purpose due to their flexibility, performance, and versatility. They are not as suitable for the second purpose, since they are not explicitly version-tolerant. It is recommended that users configure a version-tolerant serializer such as <a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a> for persistent data. Protocol Buffers is supported via <code>Orleans.Serialization.ProtobufSerializer</code> from the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/">Microsoft.Orleans.OrleansGoogleUtils</a> NuGet package. The best-practices for the particular serializer of choice should be used in order to ensure version-tolerance. Third-party serializers can be configured using the <code>SerializationProviders</code> configuration property as described above.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/serialization.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,273 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans NuGet Packages | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans NuGet Packages | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-nuget-packages">Orleans NuGet packages</h1>
+
+<h2 id="key-packages">Key Packages</h2>
+<p>There are 5 key NuGet packages you will need to use in most scenarios:</p>
+<h3 id="microsoft-orleans-core-abstractionshttpswwwnugetorgpackagesmicrosoftorleanscoreabstractions"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Core.Abstractions/">Microsoft Orleans Core Abstractions</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Core.Abstractions
+</code></pre><p>Contains Orleans.Core.Abstractions.dll, which defines Orleans public types that are needed for developing application code (grain interfaces and classes).
+This package is needs to be directly or indirectly referenced by any Orleans project.
+Add it to your projects that define grain interfaces and classes.</p>
+<h3 id="microsoft-orleans-build-time-code-generation">Microsoft Orleans Build-time Code Generation</h3>
+<ul>
+<li><p><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/">Microsoft.Orleans.OrleansCodeGenerator.Build</a>.</p>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
+</code></pre><p>  Appeared in Orleans 1.2.0. Build time support for grain interfaces and implementation projects.
+  Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers.</p>
+</li>
+<li><p><a href="https://www.nuget.org/packages/Microsoft.Orleans.CodeGenerator.MSBuild/">Microsoft.Orleans.CodeGenerator.MSBuild</a>.</p>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.CodeGenerator.MSBuild
+</code></pre><p>  Appeared as part of <a href="https://blogs.msdn.microsoft.com/orleans/2018/10/01/announcing-orleans-2-1/">Orleans 2.1.0</a>. An alternative to the <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package. Leverages Roslyn for code analysis to avoid loading application binaries and improves support for incremental builds, which should result in shorter build times.</p>
+</li>
+</ul>
+<h3 id="microsoft-orleans-server-librarieshttpswwwnugetorgpackagesmicrosoftorleansserver"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Server/">Microsoft Orleans Server Libraries</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Server
+</code></pre><p>A meta-package for easily building and starting a silo. Includes the following packages:</p>
+<ul>
+<li>Microsoft.Orleans.Core.Abstractions</li>
+<li>Microsoft.Orleans.Core</li>
+<li>Microsoft.Orleans.OrleansRuntime</li>
+<li>Microsoft.Orleans.OrleansProviders</li>
+</ul>
+<h3 id="microsoft-orleans-client-librarieshttpswwwnugetorgpackagesmicrosoftorleansclient"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Client/">Microsoft Orleans Client Libraries</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Client
+</code></pre><p>A meta-package for easily building and starting an Orleans client (frontend). Includes the following packages:</p>
+<ul>
+<li>Microsoft.Orleans.Core.Abstractions</li>
+<li>Microsoft.Orleans.Core</li>
+<li>Microsoft.Orleans.OrleansProviders</li>
+</ul>
+<h3 id="microsoft-orleans-core-libraryhttpswwwnugetorgpackagesmicrosoftorleanscore"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Core/">Microsoft Orleans Core Library</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Core
+</code></pre><p>Contains implementation for most Orleans public types used by application code and Orleans clients (frontends).
+Reference it for building libraries and client applications that use Orleans types but don&#39;t deal with hosting or silos.
+Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server meta-packages, and is referenced, directly or indirectly, by most other packages. </p>
+<h2 id="hosting">Hosting</h2>
+<h3 id="microsoft-orleans-runtimehttpswwwnugetorgpackagesmicrosoftorleansorleansruntime"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/">Microsoft Orleans Runtime</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansRuntime 
+</code></pre><p>Library for configuring and starting a silo. Reference it in your silo host project. Included in Microsoft.Orleans.Server meta-package.</p>
+<h3 id="microsoft-orleans-runtime-abstractionshttpswwwnugetorgpackagesmicrosoftorleansruntimeabstractions"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Runtime.Abstractions/">Microsoft Orleans Runtime Abstractions</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Runtime.Abstractions 
+</code></pre><p>Contains interfaces and abstractions for types implemented in Microsoft.Orleans.OrleansRuntime.</p>
+<h3 id="microsoft-orleans-hosting-on-azure-cloud-serviceshttpswwwnugetorgpackagesmicrosoftorleanshostingazurecloudservices"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Hosting.AzureCloudServices/">Microsoft Orleans Hosting on Azure Cloud Services</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Hosting.AzureCloudServices
+</code></pre><p>Contains helper classes for hosting silos and Orleans clients as Azure Cloud Services (Worker Roles and Web Roles).</p>
+<h3 id="microsoft-orleans-service-fabric-hosting-supporthttpswwwnugetorgpackagesmicrosoftorleanshostingservicefabric"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Hosting.ServiceFabric/">Microsoft Orleans Service Fabric Hosting Support</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Hosting.ServiceFabric 
+</code></pre><p>Contains helper classes for hosting silos as a stateless Service Fabric service.</p>
+<h2 id="clustering-providers">Clustering Providers</h2>
+<p>The below packages include plugins for persisting cluster membership data in various storage technologies.</p>
+<h3 id="microsoft-orleans-clustering-provider-for-azure-table-storageshttpswwwnugetorgpackagesmicrosoftorleansclusteringazurestorage"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AzureStorage/">Microsoft Orleans clustering provider for Azure Table Storages</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Clustering.AzureStorage
+</code></pre><p>Includes the plugin for using Azure Tables for storing cluster membership data.</p>
+<h3 id="microsoft-orleans-clustering-provider-for-adonet-providershttpswwwnugetorgpackagesmicrosoftorleansclusteringadonet"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AdoNet/">Microsoft Orleans clustering provider for ADO.NET Providers</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Clustering.AdoNet
+</code></pre><p>Includes the plugin for using ADO.NET for storing cluster membership data in one of the supported databases.</p>
+<h3 id="microsoft-orleans-consul-utilitieshttpswwwnugetorgpackagesmicrosoftorleansorleansconsulutils"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansConsulUtils/">Microsoft Orleans Consul Utilities</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansConsulUtils
+</code></pre><p>Includes the plugin for using Consul for storing cluster membership data.</p>
+<h3 id="microsoft-orleans-zookeeper-utilitieshttpswwwnugetorgpackagesmicrosoftorleansorleanszookeeperutils"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansZooKeeperUtils/">Microsoft Orleans ZooKeeper Utilities</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansZooKeeperUtils
+</code></pre><p>Includes the plugin for using ZooKeeper for storing cluster membership data.</p>
+<h3 id="microsoft-orleans-clustering-provider-for-aws-dynamodbhttpswwwnugetorgpackagesmicrosoftorleansclusteringdynamodb"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Clustering.DynamoDB/">Microsoft Orleans clustering provider for AWS DynamoDB</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Clustering.DynamoDB
+</code></pre><p>Includes the plugin for using AWS DynamoDB for storing cluster membership data.</p>
+<h2 id="reminder-providers">Reminder Providers</h2>
+<p>The below packages include plugins for persisting reminders in various storage technologies.</p>
+<h3 id="microsoft-orleans-reminders-azure-table-storagehttpswwwnugetorgpackagesmicrosoftorleansremindersazurestorage"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AzureStorage/">Microsoft Orleans Reminders Azure Table Storage</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Reminders.AzureStorage
+</code></pre><p>Includes the plugin for using Azure Tables for storing reminders.</p>
+<h3 id="microsoft-orleans-reminders-adonet-providershttpswwwnugetorgpackagesmicrosoftorleansremindersadonet"><a href="https://www.nuget.org/packages/Microsoft.Orleans.reminders.AdoNet/">Microsoft Orleans Reminders ADO.NET Providers</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Reminders.AdoNet
+</code></pre><p>Includes the plugin for using ADO.NET for storing reminders in one of the supported databases.</p>
+<h3 id="microsoft-orleans-reminders-provider-for-aws-dynamodbhttpswwwnugetorgpackagesmicrosoftorleansremindersdynamodb"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Reminders.DynamoDB/">Microsoft Orleans reminders provider for AWS DynamoDB</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Reminders.DynamoDB
+</code></pre><p>Includes the plugin for using AWS DynamoDB for storing reminders.</p>
+<h2 id="grain-storage-providers">Grain Storage Providers</h2>
+<p>The below packages include plugins for persisting grain state in various storage technologies.</p>
+<h3 id="microsoft-orleans-persistence-azure-storagehttpswwwnugetorgpackagesmicrosoftorleanspersistenceazurestorage"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage/">Microsoft Orleans Persistence Azure Storage</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Persistence.AzureStorage
+</code></pre><p>Includes the plugins for using Azure Tables or Azure Blobs for storing grain state.</p>
+<h3 id="microsoft-orleans-persistence-adonet-providershttpswwwnugetorgpackagesmicrosoftorleanspersistenceadonet"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet/">Microsoft Orleans Persistence ADO.NET Providers</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Persistence.AdoNet
+</code></pre><p>Includes the plugin for using ADO.NET for storing grain state in one of the supported databases.</p>
+<h3 id="microsoft-orleans-persistence-dynamodbhttpswwwnugetorgpackagesmicrosoftorleanspersistencedynamodb"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB/">Microsoft Orleans Persistence DynamoDB</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Persistence.DynamoDB
+</code></pre><p>Includes the plugin for using AWS DynamoDB for storing grain state.</p>
+<h2 id="stream-providers">Stream Providers</h2>
+<p>The below packages include plugins for delivering streaming events.</p>
+<h3 id="microsoft-orleans-servicebus-utilitieshttpswwwnugetorgpackagesmicrosoftorleansorleansservicebus"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansServiceBus/">Microsoft Orleans ServiceBus Utilities</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansServiceBus
+</code></pre><p>Includes the stream provider for Azure Event Hubs.</p>
+<h3 id="microsoft-orleans-streaming-azure-storagehttpswwwnugetorgpackagesmicrosoftorleansstreamingazurestorage"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage/">Microsoft Orleans Streaming Azure Storage</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Streaming.AzureStorage
+</code></pre><p>Includes the stream provider for Azure Queues.</p>
+<h3 id="microsoft-orleans-streaming-aws-sqshttpswwwnugetorgpackagesmicrosoftorleansstreamingsqs"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS/">Microsoft Orleans Streaming AWS SQS</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Streaming.SQS
+</code></pre><p>Includes the stream provider for AWS SQS service.</p>
+<h3 id="microsoft-orleans-google-cloud-platform-utilitieshttpswwwnugetorgpackagesmicrosoftorleansorleansgcputils"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansGCPUtils/">Microsoft Orleans Google Cloud Platform Utilities</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansGCPUtils
+</code></pre><p>Includes the stream provider for GCP PubSub service.</p>
+<h2 id="additional-packages">Additional Packages</h2>
+<h3 id="microsoft-orleans-code-generationhttpswwwnugetorgpackagesmicrosoftorleansorleanscodegenerator"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator/">Microsoft Orleans Code Generation</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansCodeGenerator
+</code></pre><p>Includes the run time code generator.</p>
+<h3 id="microsoft-orleans-event-sourcinghttpswwwnugetorgpackagesmicrosoftorleanseventsourcing"><a href="https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing/">Microsoft Orleans Event-Sourcing</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.EventSourcing 
+</code></pre><p>Contains a set of base types for creating grain classes with event-sourced state.</p>
+<h2 id="development-and-testing">Development and Testing</h2>
+<h3 id="microsoft-orleans-providershttpswwwnugetorgpackagesmicrosoftorleansorleansproviders"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/">Microsoft Orleans Providers</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansProviders
+</code></pre><p>Contains a set of persistence and stream providers that keep data in memory.
+Intended for testing.
+In general, not recommended for production use, unless data loss is care of a silo failure is acceptable.</p>
+<h3 id="microsoft-orleans-testing-host-libraryhttpswwwnugetorgpackagesmicrosoftorleanstestinghost"><a href="https://www.nuget.org/packages/Microsoft.Orleans.TestingHost/">Microsoft Orleans Testing Host Library</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.TestingHost
+</code></pre><p>Includes the library for hosting silos and clients in a testing project.</p>
+<h2 id="serializers">Serializers</h2>
+<h3 id="microsoft-orleans-bond-serializerhttpswwwnugetorgpackagesmicrosoftorleansserializationbond"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Serialization.Bond/">Microsoft Orleans Bond Serializer</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Serialization.Bond
+</code></pre><p>Includes support for <a href="https://github.com/microsoft/bond">Bond serializer</a>.</p>
+<h3 id="microsoft-orleans-google-utilitieshttpswwwnugetorgpackagesmicrosoftorleansorleansgoogleutils"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/">Microsoft Orleans Google Utilities</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansGoogleUtils
+</code></pre><p>Includes Google Protocol Buffers serializer.</p>
+<h3 id="microsoft-orleans-protobuf-net-serializerhttpswwwnugetorgpackagesmicrosoftorleansprotobufnet"><a href="https://www.nuget.org/packages/Microsoft.Orleans.ProtobufNet/">Microsoft Orleans protobuf-net Serializer</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.ProtobufNet
+</code></pre><p>Includes protobuf-net version of Protocol Buffers serializer.</p>
+<h2 id="telemetry">Telemetry</h2>
+<h3 id="microsoft-orleans-telemetry-consumer---performance-countershttpswwwnugetorgpackagesmicrosoftorleansorleanstelemetryconsumerscounters"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.Counters/">Microsoft Orleans Telemetry Consumer - Performance Counters</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.Counters
+</code></pre><p>Windows Performance Counters implementation of Orleans Telemetry API.</p>
+<h3 id="microsoft-orleans-telemetry-consumer---azure-application-insightshttpswwwnugetorgpackagesmicrosoftorleansorleanstelemetryconsumersai"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.AI/">Microsoft Orleans Telemetry Consumer - Azure Application Insights</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.AI
+</code></pre><p>Includes the telemetry consumer for Azure Application Insights.</p>
+<h3 id="microsoft-orleans-telemetry-consumer---newrelichttpswwwnugetorgpackagesmicrosoftorleansorleanstelemetryconsumersnewrelic"><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic/">Microsoft Orleans Telemetry Consumer - NewRelic</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic
+</code></pre><p>Includes the telemetry consumer for NewRelic.</p>
+<h2 id="tools">Tools</h2>
+<h3 id="microsoft-orleans-performance-counter-toolhttpswwwnugetorgpackagesmicrosoftorleanscountercontrol"><a href="https://www.nuget.org/packages/Microsoft.Orleans.CounterControl/">Microsoft Orleans Performance Counter Tool</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.CounterControl
+</code></pre><p>Includes OrleansCounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task.</p>
+<h2 id="transactions">Transactions</h2>
+<h3 id="microsoft-orleans-transactions-supporthttpswwwnugetorgpackagesmicrosoftorleanstransactions"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Transactions/">Microsoft Orleans Transactions support</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Transactions
+</code></pre><p>Includes support for cross-grain transactions (beta).</p>
+<h3 id="microsoft-orleans-transactions-on-azurehttpswwwnugetorgpackagesmicrosoftorleanstransactionsazurestorage"><a href="https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage/">Microsoft Orleans Transactions on Azure</a></h3>
+<pre><code class="lang-powershell">PM&gt; Install-Package Microsoft.Orleans.Transactions.AzureStorage
+</code></pre><p>Includes a plugin for persisting transaction log in Azure Table (beta).</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/resources/nuget_packages.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

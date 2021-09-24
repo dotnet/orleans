@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Why Orleans Streams? | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Why Orleans Streams? | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="why-orleans-streams">Why Orleans Streams?</h1>
+
+<p>There are already a wide range of technologies that allow you to build stream processing systems.
+Those include systems to <strong>durably store stream data</strong> (e.g., <a href="http://azure.microsoft.com/en-us/services/event-hubs/">Event Hubs</a> and <a href="http://kafka.apache.org/">Kafka</a>) and systems to express <strong>compute operations</strong> over stream data (e.g., <a href="http://azure.microsoft.com/en-us/services/stream-analytics/">Azure Stream Analytics</a>, <a href="https://storm.apache.org/">Apache Storm</a>, and <a href="https://spark.apache.org/streaming/">Apache Spark Streaming</a>). Those are great systems that allow you to build efficient data stream processing pipelines.</p>
+<h3 id="limitations-of-existing-systems">Limitations of Existing Systems</h3>
+<p>However, those systems are not suitable for <strong>fine-grained free-form compute over stream data</strong>. The Streaming Compute systems mentioned above all allow you to specify a <strong>unified data-flow graph of operations that are applied in the same way to all stream items</strong>. This is a powerful model when data is uniform and you want to express the same set of transformation, filtering, or aggregation operations over this data.
+But there are other use cases where you need to express fundamentally different operations over different data items. And in some of them as part of this processing you occasionally need to make an external call, such as invoke some arbitrary REST API. The unified data-flow stream processing engines either do not support those scenarios, support them in a limited and constrained way, or are inefficient in supporting them. This is because they are inherently optimized for a <strong>large volume of similar items, and usually limited in terms of expressiveness, processing</strong>. Orleans Streams target those other scenarios.</p>
+<h3 id="motivation">Motivation</h3>
+<p>It all started with requests from Orleans users to support returning a sequence of items from a grain method call. As you can imagine, that was only the tip of the iceberg. They actually needed much more than that.</p>
+<p>A typical scenario for Orleans Streams is when you have per user streams and you want to perform <strong>different processing for each user</strong>, within the context of an individual user. We may have millions of users but some of them are interested in weather and can subscribe to weather alerts for a particular location, while some are interested in sports events; somebody else is tracking status of a particular flight. Processing those events requires different logic, but you don&#39;t want to run two independent instances of stream processing. Some users are interested in only a particular stock and only if a certain external condition applies, a condition that may not necessarily be part of the stream data (and thus needs to be checked dynamically at runtime as part of processing).</p>
+<p>Users change their interests all the time, hence their subscriptions to specific streams of events come and go dynamically, thus <strong>the streaming topology changes dynamically and rapidly</strong>. On top of that, <strong>the processing logic per user evolves and changes dynamically as well, based on user state and external events</strong>. External events may modify the  processing logic for a particular user. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updated with the new rule to detect this new violation. This needs to be done of course <strong>without disrupting the ongoing processing pipeline</strong>. Bulk data-flow stream processing engines were not built to support such scenarios.</p>
+<p>It goes almost without saying that such a system has to run on a number of network-connected machines, not on a single node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.</p>
+<h3 id="new-requirements">New Requirements</h3>
+<p>We identified 4 basic requirements for our Stream Processing system that will allow it to target the above scenarios.</p>
+<ol>
+<li>Flexible stream processing logic</li>
+<li>Support for highly dynamic topologies</li>
+<li>Fine-grained stream granularity</li>
+<li>Distribution</li>
+</ol>
+<h4 id="flexible-stream-processing-logic">Flexible stream processing logic</h4>
+<p>We want the system to support different ways of expressing the stream processing logic. The existing systems we mentioned above require the developer to write a declarative data-flow computation graph, usually by following a functional programming style. This limits the expressiveness and flexibility of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using <a href="https://msdn.microsoft.com/en-us/data/gg577609.aspx">Reactive Extensions (Rx) in .NET</a>); as a functional program; as a declarative query; or in a general imperative logic. The logic can be stateful or stateless, may or may not have side effects, and can trigger external actions. All power goes to the developer.</p>
+<h4 id="support-for-dynamic-topologies">Support for dynamic topologies</h4>
+<p>We want the system to allow for dynamically evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. In the following example of a dataflow expression everything is nice and simple until you need to change it.</p>
+<p><code>Stream.GroupBy(x=&gt; x.key).Extract(x=&gt;x.field).Select(x=&gt;x+2).AverageWindow(x, 5sec).Where(x=&gt;x &gt; 0.8) *</code></p>
+<p>Change the threshold condition in the <code>Where</code> filter, add an additional <code>Select</code> statement or add another branch in the data-flow graph and produce a new output stream. In existing systems this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those systems will checkpoint the existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to an online service that produces results in real time. Such a restart becomes especially impractical when we are talking about a large number of such expressions being executed with similar but different (per-user, per-device, etc.) parameters and that continually change.</p>
+<p>We want the system to allow for evolving the stream processing graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.</p>
+<h4 id="fine-grained-stream-granularity">Fine grained stream granularity</h4>
+<p>In the existing systems, the smallest unit of abstraction is usually the whole flow (topology). However, many of our target scenarios require an individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising multiple links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in existing systems.</p>
+<p>The unit of abstraction and flexibility argument is similar to a comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each actor is essentially an independently managed &#39;&#39;tiny service&#39;&#39;. Similarly, we want the stream system to allow for such fine grained control.</p>
+<h4 id="distribution">Distribution</h4>
+<p>And of course, our system should have all the properties of a <strong>&quot;good distributed system&quot;</strong>. That includes:</p>
+<ol>
+<li><em>Scalability</em> - supports large number of streams and compute elements.</li>
+<li><em>Elasticity</em> - allows to add/remove resources to grow/shrink based on load.</li>
+<li><em>Reliability</em> - be resilient to failures</li>
+<li><em>Efficiency</em> - use the underlying resources efficiently</li>
+<li><em>Responsiveness</em> - enable near real time scenarios.</li>
+</ol>
+<p>These were the requirements we had in mind for building <a href="index.html"><strong>Orleans Streaming</strong></a>.</p>
+<hr>
+<p><em>Clarificaton</em>: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described <a href="streams_programming_APIs.html">here</a>. Providing declarative dataflow expressions is our future goal.</p>
+<h2 id="next">Next</h2>
+<p><a href="streams_programming_APIs.html">Orleans Streams Programming APIs</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/streaming/streams_why.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,347 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Persistence | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Persistence | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="persistence">Persistence</h1>
+
+<p>Grains can have multiple named persistent data objects associated with them. These state objects are loaded from storage during grain activation so that they are available during requests. Grain persistence uses an extensible plugin model so that storage providers for any database can be used. This persistence model is designed for simplicity, and is not intended to cover all data access patterns. Grains can also access databases directly, without using the grain persistence model.</p>
+<p><img src="../../../images/grain_state_1.png" alt="A grain can have multiple persisted data objects each stored in a different storage system"></p>
+<p>In the above diagram, UserGrain has a <em>Profile</em> state and a <em>Cart</em> state, each of which is stored in a separate storage system.</p>
+<h2 id="goals">Goals</h2>
+<ol>
+<li>Multiple named persistent data objects per grain.</li>
+<li>Multiple configured storage providers, each of which can have different configuration and be backed by a different storage system.</li>
+<li>Storage providers can be developed and published by the community.</li>
+<li>Storage providers have complete control over how they store grain state data in persistent backing store. Corollary: Orleans is not providing a comprehensive ORM storage solution, but instead allows custom storage providers to support specific ORM requirements as and when required.</li>
+</ol>
+<h2 id="packages">Packages</h2>
+<p>Orleans grain storage providers can be found on <a href="https://www.nuget.org/packages?q=Orleans+Persistence">NuGet</a>. Officially maintained packages include:</p>
+<ul>
+<li><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet">Microsoft.Orleans.Persistence.AdoNet</a> is for SQL databases and other storage systems supported by ADO.NET. For more information, see <a href="relational_storage.html">ADO.NET Grain Persistence</a>.</li>
+<li><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage">Microsoft.Orleans.Persistence.AzureStorage</a> is for Azure Storage, including Azure Blob Storage, Azure Table Storage, and Azure CosmosDB, via the Azure Table Storage API. For more information, see <a href="azure_storage.html">Azure Storage Grain Persistence</a>.</li>
+<li><a href="https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB">Microsoft.Orleans.Persistence.DynamoDB</a> is for Amazon DynamoDB. For more information, see <a href="dynamodb_storage.html">Amazon DynamoDB Grain Persistence</a>.</li>
+</ul>
+<h2 id="api">API</h2>
+<p>Grains interact with their persistent state using <code>IPersistentState&lt;TState&gt;</code> where <code>TState</code> is the serializable state type:</p>
+<pre><code class="lang-csharp">public interface IPersistentState&lt;TState&gt; where TState : new()
+{
+  TState State { get; set; }
+  string Etag { get; }
+  Task ClearStateAsync();
+  Task WriteStateAsync();
+  Task ReadStateAsync();
+}
+</code></pre><p>Instances of <code>IPersistentState&lt;TState&gt;</code> are injected into the grain as constructor parameters. These parameters can be annotated with a <code>[PersistentState(stateName, storageName)]</code> attribute to identify the name of the state being injected and the name of the storage provider which provides it. The following example demonstrates this by injecting two named states into the <code>UserGrain</code> constructor:</p>
+<pre><code class="lang-csharp">public class UserGrain : Grain, IUserGrain
+{
+  private readonly IPersistentState&lt;ProfileState&gt; _profile;
+  private readonly IPersistentState&lt;CartState&gt; _cart;
+
+  public UserGrain(
+    [PersistentState(&quot;profile&quot;, &quot;profileStore&quot;)] IPersistentState&lt;ProfileState&gt; profile,
+    [PersistentState(&quot;cart&quot;, &quot;cartStore&quot;)] IPersistentState&lt;CartState&gt; cart,
+    )
+  {
+    _profile = profile;
+    _cart = cart;
+  }
+}
+</code></pre><p>Different grain types can use different configured storage providers, even if both are the same type; for example, two different Azure Table Storage provider instances, connected to different Azure Storage accounts.</p>
+<h3 id="reading-state">Reading State</h3>
+<p>Grain state will automatically be read when the grain is activated, but grains are responsible for explicitly triggering the write for any changed grain state when necessary.</p>
+<p>If a grain wishes to explicitly re-read the latest state for this grain from the backing store, the grain should call the <code>ReadStateAsync()</code> method.
+This will reload the grain state from the persistent store via the storage provider, and the previous in-memory copy of the grain state will be overwritten and replaced when the <code>ReadStateAsync()</code> <code>Task</code> completes.</p>
+<p>The value of the state is accessed using the <code>State</code> property. For example, the following method accesses the profile state declared in the code above:</p>
+<pre><code class="lang-csharp">public Task&lt;string&gt; GetNameAsync() =&gt; Task.FromResult(_profile.State.Name);
+</code></pre><p>There is no need to call <code>ReadStateAsync()</code> during normal operation; the state is loaded automatically during activation. However, <code>ReadStateAsync()</code> can be used to refresh state which is modified externally.</p>
+<p>See the <a href="#FailureModes">Failure Modes</a> section below for details of error-handling mechanisms.</p>
+<h3 id="writing-state">Writing State</h3>
+<p>State can be modified via the <code>State</code> property. Modified state is not automatically persisted. Instead, the developer decides when to persist state by calling the <code>WriteStateAsync()</code> method. For example, the following method updates a property on <code>State</code> and persists the updated state:</p>
+<pre><code class="lang-csharp">public async Task SetNameAsync(string name)
+{
+  _profile.State.Name = name;
+  await _profile.WriteStateAsync();
+}
+</code></pre><p>Conceptually, the Orleans Runtime will take a deep copy of the grain state data object for its own use during any write operations. Under the covers, the runtime <em>may</em> use optimization rules and heuristics to avoid performing some or all of the deep copy in some circumstances, provided that the expected logical isolation semantics are preserved.</p>
+<p>See the <a href="#FailureModes">Failure Modes</a> section below for details of error handling mechanisms.</p>
+<h3 id="clearing-state">Clearing State</h3>
+<p>The <code>ClearStateAsync()</code> method clears the grain&#39;s state in storage. Depending on the provider, this operation may optionally delete the grain state entirely.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>Before a grain can use persistence, a storage provider must be configured on the silo.</p>
+<p>First, configure storage providers, one for profile state and one for cart state:</p>
+<pre><code class="lang-csharp">var host = new HostBuilder()
+  .UseOrleans(siloBuilder =&gt;
+  {
+    // Configure Azure Table storage using the name &quot;profileStore&quot;
+    siloBuilder.AddAzureTableGrainStorage(
+      name: &quot;profileStore&quot;,
+      configureOptions: options =&gt;
+      {
+        // Use JSON for serializing the state in storage
+        options.UseJson = true;
+
+        // Configure the storage connection key
+        options.ConnectionString = &quot;DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1&quot;;
+      })
+
+      // Configure Azure Blob storage using the name &quot;cartStore&quot;
+      .AddAzureBlobGrainStorage(
+        name: &quot;cartStore&quot;,
+        configureOptions: options =&gt;
+        {
+            // Use JSON for serializing the state in storage
+            options.UseJson = true;
+
+            // Configure the storage connection key
+            options.ConnectionString = &quot;DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2&quot;;
+        });
+    // -- other options
+  })
+  .Build();
+</code></pre><p>Now that a storage provider has been configured with the name <code>&quot;profileStore&quot;</code>, we can access this provider from a grain.</p>
+<p>Persistent state can be added to a grain in two primary ways:</p>
+<ol>
+<li>By injecting <code>IPersistentState&lt;TState&gt;</code> into the grain&#39;s constructor</li>
+<li>By inheriting from <code>Grain&lt;TState&gt;</code></li>
+</ol>
+<p>The recommended way to add storage to a grain is by injecting <code>IPersistentState&lt;TState&gt;</code> into the grain&#39;s constructor with an associated <code>[PersistentState(&quot;stateName&quot;, &quot;providerName&quot;)]</code> attribute. For details on <a href="#using-grainlttstategt-to-add-storage-to-a-grain"><code>Grain&lt;TState&gt;</code>, see below</a>. This is still supported, but is considered legacy.</p>
+<p>Declare a class to hold our grain&#39;s state:</p>
+<pre><code class="lang-csharp">[Serializable]
+public class ProfileState
+{
+  public string Name { get; set; }
+
+  public Date DateOfBirth
+}
+</code></pre><p>Inject <code>IPersistentState&lt;ProfileState&gt;</code> into the grain&#39;s constructor:</p>
+<pre><code class="lang-csharp">public class UserGrain : Grain, IUserGrain
+{
+  private readonly IPersistentState&lt;ProfileState&gt; _profile;
+
+  public UserGrain([PersistentState(&quot;profile&quot;, &quot;profileStore&quot;)] IPersistentState&lt;ProfileState&gt; profile)
+  {
+    _profile = profile;
+  }
+}
+</code></pre><p>Note: the profile state will not be loaded at the time it is injected into the constructor, so accessing it is invalid at that time. The state will be loaded before <code>OnActivateAsync</code> is called.</p>
+<p>Now that the grain has persistent state, we can add methods to read and write the state:</p>
+<pre><code class="lang-csharp">public class UserGrain : Grain, IUserGrain
+{
+  private readonly IPersistentState&lt;ProfileState&gt; _profile;
+
+  public UserGrain([PersistentState(&quot;profile&quot;, &quot;profileStore&quot;)] IPersistentState&lt;ProfileState&gt; profile)
+  {
+    _profile = profile;
+  }
+
+  public Task&lt;string&gt; GetNameAsync() =&gt; Task.FromResult(_profile.State.Name);
+
+  public async Task SetNameAsync(string name)
+  {
+    _profile.State.Name = name;
+    await _profile.WriteStateAsync();
+  }
+}
+</code></pre><h2 id="failure-modes-for-persistence-operations-a-namefailuremodesa">Failure modes for persistence operations <a name="FailureModes"></a></h2>
+<h3 id="failure-modes-for-read-operations">Failure modes for read operations</h3>
+<p>Failures returned by the storage provider during the initial read of state data for that particular grain will result in failure of the activate operation for that grain; in such case, there will <em>not</em> be any call to that grain’s <code>OnActivateAsync()</code> life cycle callback method.
+The original request to the grain which caused the activation will be faulted back to the caller, the same way as any other failure during grain activation.
+Failures encountered by the storage provider when reading state data for a particular grain will result in an exception from <code>ReadStateAsync()</code> <code>Task</code>.
+The grain can choose to handle or ignore the <code>Task</code> exception, just like any other <code>Task</code> in Orleans.</p>
+<p>Any attempt to send a message to a grain which failed to load at silo startup time due to a missing / bad storage provider config will return the permanent error <code>Orleans.BadProviderConfigException</code>.</p>
+<h3 id="failure-modes-for-write-operations">Failure modes for write operations</h3>
+<p>Failures encountered by the storage provider when writing state data for a particular grain will result in an exception thrown by <code>WriteStateAsync()</code> <code>Task</code>.
+Usually this means that the grain call exception will be thrown back to the client caller, provided the <code>WriteStateAsync()</code> <code>Task</code> is correctly chained in to the final return <code>Task</code> for this grain method.
+However, it is possible in certain advanced scenarios to write grain code to specifically handle such write errors, just like they can handle any other faulted <code>Task</code>.</p>
+<p>Grains that execute error-handling / recovery code <em>must</em> catch exceptions / faulted <code>WriteStateAsync()</code> <code>Task</code>s and not re-throw them, to signify that they have successfully handled the write error.</p>
+<h2 id="recommendations">Recommendations</h2>
+<h3 id="use-json-serialization-or-another-version-tolerant-serialization-format">Use JSON serialization or another version-tolerant serialization format</h3>
+<p>Code evolves over time and this often includes storage types, too. To accommodate for these changes, an appropriate serializer should be configured. For most storage providers, a <code>UseJson</code> option or similar is available to use JSON as a serialization format. Ensure that when evolving data contracts that already-stored data will still be loadable.</p>
+<h2 id="using-grainlttstategt-to-add-storage-to-a-grain">Using Grain&lt;TState&gt; to add storage to a grain</h2>
+<p><strong>NOTE:</strong> Using <code>Grain&lt;T&gt;</code> to add storage to a grain is considered <em>legacy</em> functionality: grain storage should be added using <code>IPersistentState&lt;T&gt;</code> as previously described.</p>
+<p>Grain classes that inherit from <code>Grain&lt;T&gt;</code> (where <code>T</code> is an application-specific state data type that needs to be persisted) will have their state loaded automatically from a specified storage.</p>
+<p>Such grains are marked with a <code>[StorageProvider]</code> attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain.</p>
+<pre><code class="lang-csharp">[StorageProvider(ProviderName=&quot;store1&quot;)]
+public class MyGrain : Grain&lt;MyGrainState&gt;, /*...*/
+{
+  /*...*/
+}
+</code></pre><p>The <code>Grain&lt;T&gt;</code> base class defined the following methods for subclasses to call:</p>
+<pre><code class="lang-csharp">protected virtual Task ReadStateAsync() { /*...*/ }
+protected virtual Task WriteStateAsync() { /*...*/ }
+protected virtual Task ClearStateAsync() { /*...*/ }
+</code></pre><p>The behavior of these methods corresponds to their counterparts on <code>IPersistentState&lt;TState&gt;</code> defined earlier.</p>
+<h2 id="creating-a-storage-provider">Creating a storage provider</h2>
+<p>There are two parts to the state persistence APIs: the API exposed to the grain via <code>IPersistentState&lt;T&gt;</code> or <code>Grain&lt;T&gt;</code>, and the storage provider API, which is centered around <code>IGrainStorage</code> — the interface which storage providers must implement:</p>
+<pre><code class="lang-csharp">/// &lt;summary&gt;
+/// Interface to be implemented for a storage able to read and write Orleans grain state data.
+/// &lt;/summary&gt;
+public interface IGrainStorage
+{
+  /// &lt;summary&gt;Read data function for this storage instance.&lt;/summary&gt;
+  /// &lt;param name=&quot;grainType&quot;&gt;Type of this grain [fully qualified class name]&lt;/param&gt;
+  /// &lt;param name=&quot;grainReference&quot;&gt;Grain reference object for this grain.&lt;/param&gt;
+  /// &lt;param name=&quot;grainState&quot;&gt;State data object to be populated for this grain.&lt;/param&gt;
+  /// &lt;returns&gt;Completion promise for the Read operation on the specified grain.&lt;/returns&gt;
+  Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+
+  /// &lt;summary&gt;Write data function for this storage instance.&lt;/summary&gt;
+  /// &lt;param name=&quot;grainType&quot;&gt;Type of this grain [fully qualified class name]&lt;/param&gt;
+  /// &lt;param name=&quot;grainReference&quot;&gt;Grain reference object for this grain.&lt;/param&gt;
+  /// &lt;param name=&quot;grainState&quot;&gt;State data object to be written for this grain.&lt;/param&gt;
+  /// &lt;returns&gt;Completion promise for the Write operation on the specified grain.&lt;/returns&gt;
+  Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+
+  /// &lt;summary&gt;Delete / Clear data function for this storage instance.&lt;/summary&gt;
+  /// &lt;param name=&quot;grainType&quot;&gt;Type of this grain [fully qualified class name]&lt;/param&gt;
+  /// &lt;param name=&quot;grainReference&quot;&gt;Grain reference object for this grain.&lt;/param&gt;
+  /// &lt;param name=&quot;grainState&quot;&gt;Copy of last-known state data object for this grain.&lt;/param&gt;
+  /// &lt;returns&gt;Completion promise for the Delete operation on the specified grain.&lt;/returns&gt;
+  Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+}
+</code></pre><p>Create a custom storage provider by implementing this interface and <a href="#registering-a-storage-provider">registering</a> that implementation. For an example of an existing storage provider implementation, see <a href="https://github.com/dotnet/orleans/blob/af974d37864f85bfde5dc02f2f60bba997f2162d/src/Azure/Orleans.Persistence.AzureStorage/Providers/Storage/AzureBlobStorage.cs"><code>AzureBlobGrainStorage</code></a>.</p>
+<h3 id="storage-provider-semantics">Storage provider semantics</h3>
+<p>An opaque provider-specific <code>Etag</code> value (<code>string</code>) <em>may</em> be set by a storage provider as part of the grain state metadata populated when state was read. Some providers may choose to leave this as <code>null</code> if they do not use <code>Etag</code>s.</p>
+<p>Any attempt to perform a write operation when the storage provider detects an <code>Etag</code> constraint violation <em>should</em> cause the write <code>Task</code> to be faulted with transient error <code>Orleans.InconsistentStateException</code> and wrapping the underlying storage exception.</p>
+<pre><code class="lang-csharp">public class InconsistentStateException : OrleansException
+{
+  public InconsistentStateException(
+    string message,
+    string storedEtag,
+    string currentEtag,
+    Exception storageException)
+    : base(message, storageException)
+  {
+    this.StoredEtag = storedEtag;
+    this.CurrentEtag = currentEtag;
+  }
+
+  public InconsistentStateException(string storedEtag, string currentEtag, Exception storageException)
+    : this(storageException.Message, storedEtag, currentEtag, storageException)
+  { }
+
+  /// &lt;summary&gt;The Etag value currently held in persistent storage.&lt;/summary&gt;
+  public string StoredEtag { get; private set; }
+
+  /// &lt;summary&gt;The Etag value currently held in memory, and attempting to be updated.&lt;/summary&gt;
+  public string CurrentEtag { get; private set; }
+}
+</code></pre><p>Any other failure conditions from a storage operation <em>must</em> cause the returned <code>Task</code> to be broken with an exception indicating the underlying storage issue. In many cases, this exception may be thrown back to the caller which triggered the storage operation by calling a method on the grain. It is important to consider whether or not the caller will be able to deserialize this exception. For example, the client might not have loaded the specific persistence library containing the exception type. For this reason, it is advisable to convert exceptions into exceptions which can be propagated back to the caller.</p>
+<h3 id="data-mapping">Data mapping</h3>
+<p>Individual storage providers should decide how best to store grain state – blob (various formats / serialized forms) or column-per-field are obvious choices.</p>
+<h3 id="registering-a-storage-provider">Registering a storage provider</h3>
+<p>The Orleans runtime will resolve a storage provider from the service provider (<code>IServiceProvider</code>) when a grain is created. The runtime will resolve an instance of <code>IGrainStorage</code>. If the storage provider is named, for example via the <code>[PersistentState(stateName, storageName)]</code> attribute, then a named instance of <code>IGrainStorage</code> will be resolved.</p>
+<p>To register a named instance of <code>IGrainStorage</code>, use the <code>IServiceCollection.AddSingletonNamedService</code> extension method following the example of the <a href="https://github.com/dotnet/orleans/blob/af974d37864f85bfde5dc02f2f60bba997f2162d/src/Azure/Orleans.Persistence.AzureStorage/Hosting/AzureTableSiloBuilderExtensions.cs#L78">AzureTableGrainStorage provider here</a>.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_persistence/index.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Streams Programming APIs | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Streams Programming APIs | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-streams-programming-apis">Orleans Streams Programming APIs</h1>
+
+<p>Applications interact with streams via APIs that are very similar to the well known <a href="https://msdn.microsoft.com/en-us/data/gg577609.aspx">Reactive Extensions (Rx) in .NET</a>. The main difference is that Orleans stream extensions are <strong>asynchronous</strong>, to make processing more efficient in Orleans&#39; distributed and scalable compute fabric.</p>
+<h3 id="async-streama-nameasync-streama">Async Stream<a name="Async-Stream"></a></h3>
+<p>An application starts by using a <em>stream provider</em> to get a handle to a stream. You can read more about stream providers <a href="stream_providers.html">here</a>, but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:</p>
+<pre><code class="lang-csharp">IStreamProvider streamProvider = base.GetStreamProvider(&quot;SimpleStreamProvider&quot;);
+IAsyncStream&lt;T&gt; stream = streamProvider.GetStream&lt;T&gt;(Guid, &quot;MyStreamNamespace&quot;);
+</code></pre><p>An application can get a reference to the stream provider either by calling the <code>GetStreamProvider</code> method on the <code>Grain</code> class when inside a grain, or by calling the <code>GrainClient.GetStreamProvider()</code> method when on the client.</p>
+<p><a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncStream.cs"><strong><code>Orleans.Streams.IAsyncStream&lt;T&gt;</code></strong></a> is a <strong>logical, strongly-typed handle to a virtual stream</strong>. It is similar in spirit to Orleans Grain Reference. Calls to <code>GetStreamProvider</code> and <code>GetStream</code> are purely local. The arguments to <code>GetStream</code> are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to <code>GrainFactory.GetGrain</code>). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type <code>PlayerGrain</code> and a different grain 7 may exist within the grain type <code>ChatRoomGrain</code>, Stream 123 may exist with the stream namespace <code>PlayerEventsStream</code> and a different stream 123 may exist within the stream namespace <code>ChatRoomMessagesStream</code>.</p>
+<h3 id="producing-and-consuminga-nameproducing-and-consuminga">Producing and Consuming<a name="Producing-and-Consuming"></a></h3>
+<p><code>IAsyncStream&lt;T&gt;</code> implements both
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObserver.cs"><strong><code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code></strong></a> and
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObservable.cs"><strong><code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code></strong></a> interfaces.
+That way an application can use the stream either to produce new events into the stream by using <code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code> or to subscribe to and consume events from a stream by using <code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code>.</p>
+<pre><code class="lang-csharp">public interface IAsyncObserver&lt;in T&gt;
+{
+    Task OnNextAsync(T item, StreamSequenceToken token = null);
+    Task OnCompletedAsync();
+    Task OnErrorAsync(Exception ex);
+}
+
+public interface IAsyncObservable&lt;T&gt;
+{
+    Task&lt;StreamSubscriptionHandle&lt;T&gt;&gt; SubscribeAsync(IAsyncObserver&lt;T&gt; observer);
+}
+</code></pre><p>To produce events into the stream, an application just calls</p>
+<pre><code class="lang-csharp">await stream.OnNextAsync&lt;T&gt;(event)
+</code></pre><p>To subscribe to a stream, an application calls</p>
+<pre><code class="lang-csharp">StreamSubscriptionHandle&lt;T&gt; subscriptionHandle = await stream.SubscribeAsync(IAsyncObserver)
+</code></pre><p>The argument to <code>SubscribeAsync</code> can either be an object that implements the <code>IAsyncObserver</code> interface or a combination of
+lambda functions to process incoming events. More options for <code>SubscribeAsync</code> are available via <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Extensions/AsyncObservableExtensions.cs"><strong><code>AsyncObservableExtensions</code></strong></a> class.
+<code>SubscribeAsync</code> returns a <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSubscriptionHandle&lt;T&gt;</code></strong></a>, which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of <code>IDisposable</code>).</p>
+<pre><code class="lang-csharp">await subscriptionHandle.UnsubscribeAsync()
+</code></pre><p>It is important to note that <strong>the subscription is for a grain, not for an activation</strong>. Once the grain code is subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a <strong>virtual stream abstraction</strong>: not only do all streams always exist, logically, but also a stream subscription is durable and lives beyond a particular physical activation that created the subscription.</p>
+<h3 id="multiplicitya-namemultiplicitya">Multiplicity<a name="Multiplicity"></a></h3>
+<p>An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.</p>
+<p>In addition, the consumer can subscribe to the same stream multiple times. Each time it subscribes it gets back a unique <code>StreamSubscriptionHandle&lt;T&gt;</code>. If a grain (or client) is subscribed X times to the same stream, it will receive the same event X times, once for each subscription. The consumer can also unsubscribe from an individual subscription. It can find all its current subscriptions by calling:</p>
+<pre><code class="lang-csharp">IList&lt;StreamSubscriptionHandle&lt;T&gt;&gt; allMyHandles = await IAsyncStream&lt;T&gt;.GetAllSubscriptionHandles()
+</code></pre><h3 id="recovering-from-failuresa-namerecovering-from-failuresa">Recovering From Failures<a name="Recovering-From-Failures"></a></h3>
+<p>If the producer of a stream dies (or its grain is deactivated), there is nothing it needs to do. The next time this grain wants to produce more events it can get the stream handle again and produce new events in the same way.</p>
+<p>Consumer logic is a little bit more involved. As we said before, once a consumer grain is subscribed to a stream, this subscription is valid until the grain explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and a new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated when a message is sent to it). The only thing that the grain code needs to do now is to provide an <code>IAsyncObserver&lt;T&gt;</code> to process the data. The consumer basically needs to re-attach processing logic as part of the <code>OnActivateAsync</code> method. To do that it can call:</p>
+<pre><code class="lang-csharp">StreamSubscriptionHandle&lt;int&gt; newHandle = await subscriptionHandle.ResumeAsync(IAsyncObserver)
+</code></pre><p>The consumer uses the previous handle it got when it first subscribed in order to &quot;resume processing&quot;. Notice that <code>ResumeAsync</code> merely updates an existing subscription with the new instance of <code>IAsyncObserver</code> logic and does not change the fact that this consumer is already subscribed to this stream.</p>
+<p>How does the consumer get an old subscriptionHandle? There are 2 options. The consumer may have persisted the handle it was given back from the original <code>SubscribeAsync</code> operation and can use it now. Alternatively, if the consumer does not have the handle, it can ask the <code>IAsyncStream&lt;T&gt;</code> for all its active subscription handles, by calling:</p>
+<pre><code class="lang-csharp">IList&lt;StreamSubscriptionHandle&lt;T&gt;&gt; allMyHandles = await IAsyncStream&lt;T&gt;.GetAllSubscriptionHandles()
+</code></pre><p>The consumer can now resume all of them, or unsubscribe from some if it wishes to.</p>
+<p><strong>COMMENT:</strong> If the consumer grain implements the <code>IAsyncObserver</code> interface directly (<code>public class MyGrain&lt;T&gt; : Grain, IAsyncObserver&lt;T&gt;</code>), it should in theory not be required to re-attach the <code>IAsyncObserver</code> and thus will not need to call <code>ResumeAsync</code>. The streaming runtime should be able to automatically figure out that the grain already implements <code>IAsyncObserver</code> and will just invoke those <code>IAsyncObserver</code> methods. However, the streaming runtime currently does not support this and the grain code still needs to explicitly call <code>ResumeAsync</code>, even if the grain implements <code>IAsyncObserver</code> directly. Supporting this is on our TODO list.</p>
+<h3 id="explicit-and-implicit-subscriptionsa-nameexplicit-and-implicit-subscriptionsa">Explicit and Implicit Subscriptions<a name="Explicit-and-Implicit-Subscriptions"></a></h3>
+<p>By default, a stream consumer has to explicitly subscribe to the stream. This subscription would usually be triggered by some external message that the grain (or client) receives that instructs it to subscribe. For example, in a chat service when a user joins a chat room his grain receives a <code>JoinChatGroup</code> message with the chat name, which will cause the user grain to subscribe to this chat stream.</p>
+<p>In addition, Orleans Streams also support <strong>&quot;Implicit Subscriptions&quot;</strong>. In this model the grain does not explicitly subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and an <code>ImplicitStreamSubscription</code> attribute. Implicit subscriptions&#39; main value is allowing the stream activity to trigger the grain activation (hence triggering the subscription) automatically. For example, using SMS streams, if one grain wanted to produce a stream and another grain process this stream, the producer  would need to know the identity of the consumer grain and make a grain call to it telling it to subscribe to the stream. Only after that can it start sending events. Instead, using implicit subscriptions, the producer can just start producing events to a stream, and the consumer grain will automatically be activated and subscribe to the stream. In that case, the producer doesn&#39;t care at all who is reading the events</p>
+<p>Grain implementation class of type <code>MyGrainType</code> can declare an attribute <code>[ImplicitStreamSubscription(&quot;MyStreamNamespace&quot;)]</code>. This tells the streaming runtime that when an event is generated on a stream whose identity is GUID XXX and <code>&quot;MyStreamNamespace&quot;</code> namespace, it should be delivered to the grain whose identity is XXX of type <code>MyGrainType</code>. That is, the runtime maps stream <code>&lt;XXX, MyStreamNamespace&gt;</code> to consumer grain <code>&lt;XXX, MyGrainType&gt;</code>.</p>
+<p>The presence  of <code>ImplicitStreamSubscription</code>causes the streaming runtime to automatically subscribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentially, it needs to attach the <code>IAsyncObserver</code>. Therefore, when the grain is activated, the grain code inside <code>OnActivateAsync</code> needs to call:</p>
+<pre><code class="lang-csharp">IStreamProvider streamProvider = base.GetStreamProvider(&quot;SimpleStreamProvider&quot;);
+IAsyncStream&lt;T&gt; stream = streamProvider.GetStream&lt;T&gt;(this.GetPrimaryKey(), &quot;MyStreamNamespace&quot;);
+StreamSubscriptionHandle&lt;T&gt; subscription = await stream.SubscribeAsync(IAsyncObserver&lt;T&gt;);
+</code></pre><h3 id="writing-subscription-logica-namewriting-subscription-logica">Writing Subscription Logic<a name="Writing-Subscription-Logic"></a></h3>
+<p>Below are the guidelines on how to write the subscription logic for various cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace; there is no way to create multiple subscriptions (there is no subscription multiplicity), there is no way to unsubscribe, and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subscription.
+On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subscribes again it will result in the grain being subscribed multiple times.</p>
+<p><strong>Implicit Subscriptions:</strong></p>
+<p>For implicit subscriptions the grain needs to subscribe to attach the processing logic. This should be done in the grain&#39;s <code>OnActivateAsync</code> method. The grain should simply execute <code>await stream.SubscribeAsync(OnNext ...)</code> in its <code>OnActivateAsync</code> method. That will cause this particular activation to attach the <code>OnNext</code> function to process that stream. The grain can optionally specify the <code>StreamSequenceToken</code> as an argument to <code>SubscribeAsync</code>, which will cause this implicit subscription to start consuming from that token. There is never a need for implicit subscription to call <code>ResumeAsync</code>.</p>
+<pre><code class="lang-csharp">public async override Task OnActivateAsync()
+{
+    var streamProvider = GetStreamProvider(PROVIDER_NAME);
+    var stream = streamProvider.GetStream&lt;string&gt;(this.GetPrimaryKey(), &quot;MyStreamNamespace&quot;);
+    await stream.SubscribeAsync(OnNextAsync)
+}
+</code></pre><p><strong>Explicit Subscriptions:</strong></p>
+<p>For explicit subscriptions, a grain must call <code>SubscribeAsync</code> to subscribe to the stream.  This creates a subscription, as well as attaches the processing logic.
+The explicit subscription will exist until the grain unsubscribes, so if a grain gets deactivated and reactivated, the grain is still explicitly subscribed, but no processing logic will be attached. In this case the grain needs to re-attach the processing logic. To do that, in its <code>OnActivateAsync</code>, the grain first needs to find out what subscriptions it has, by calling <code>stream.GetAllSubscriptionHandles()</code>. The grain must execute <code>ResumeAsync</code> on each handle it wishes to continue processing or UnsubscribeAsync on any handles it is done with. The grain can also optionally specify the <code>StreamSequenceToken</code> as an argument to the <code>ResumeAsync</code> calls, which will cause this explicit subscription to start consuming from that token.</p>
+<pre><code class="lang-csharp">public async override Task OnActivateAsync()
+{
+    var streamProvider = GetStreamProvider(PROVIDER_NAME);
+    var stream = streamProvider.GetStream&lt;string&gt;(this.GetPrimaryKey(), &quot;MyStreamNamespace&quot;);
+    var subscriptionHandles = await stream.GetAllSubscriptionHandles();
+    if (!subscriptionHandles.IsNullOrEmpty())
+        subscriptionHandles.ForEach(async x =&gt; await x.ResumeAsync(OnNextAsync));
+}
+</code></pre><h3 id="stream-order-and-sequence-tokensa-namestream-order-and-sequence-tokensa">Stream Order and Sequence Tokens<a name="Stream-Order-and-Sequence-Tokens"></a></h3>
+<p>The order of event delivery between an individual producer and an individual consumer depends on the stream provider.</p>
+<p>With SMS the producer explicitly controls the order of events seen by the consumer by controlling the way the producer publishes them. By default (if the <code>FireAndForget</code> option for SMS provider is set to false) and if the producer awaits every <code>OnNextAsync</code> call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle delivery failures that will be indicated by a broken <code>Task</code> returned by the <code>OnNextAsync</code> call.</p>
+<p>Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases. (They do guarantee FIFO order in failure-free executions.) When a producer produces the event into Azure Queue, if the enqueue operation fails, it is up to the producer to attempt another enqueue and later on deal with potential duplicate messages. On the delivery side, the Orleans Streaming runtime dequeues the event from the queue and attempts to deliver it for processing to consumers. The Orleans Streaming runtime deletes the event from the queue only upon successful processing. If the delivery or processing fails, the event is not deleted from the queue and will automatically re-appear in the queue later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The above behavior matches the normal semantics of Azure Queues.</p>
+<p><strong>Application Defined Order</strong>: To deal with the above ordering issues, an application can optionally specify its own ordering. This is achieved via a <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSequenceToken</code></strong></a>, which is an opaque <code>IComparable</code> object that can be used to order events.
+A producer can pass an optional <code>StreamSequenceToken</code> to the <code>OnNext</code> call. This <code>StreamSequenceToken</code> will be passed all the way to the consumer and will be delivered together with the event. That way, an application can reason and reconstruct its order independently of the streaming runtime.</p>
+<h3 id="rewindable-streamsa-namerewindable-streamsa">Rewindable Streams<a name="Rewindable-Streams"></a></h3>
+<p>Some streams only allow an application to subscribe to them starting at the latest point in time, while other streams allow &quot;going back in time&quot;. The latter capability is dependent on the underlying queuing technology and the particular stream provider. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time). Streams that support going back in time are called <strong>Rewindable Streams</strong>.</p>
+<p>The consumer of a rewindable stream can pass a <code>StreamSequenceToken</code> to the <code>SubscribeAsync</code> call. The runtime will deliver events to it starting from that <code>StreamSequenceToken</code>. A null token means the consumer wants to receive events starting from the latest.</p>
+<p>The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.</p>
+<p><a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansServiceBus/">Event Hubs provider</a> is rewindable.
+You can find its code <a href="https://github.com/dotnet/orleans/tree/master/src/Azure/Orleans.Streaming.EventHubs">here</a>.
+<a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/">SMS</a> and <a href="https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage/">Azure Queue</a> providers are not rewindable.</p>
+<h3 id="stateless-automatically-scaled-out-processinga-namestateless-automatically-scaled-out-processinga">Stateless Automatically Scaled-Out Processing<a name="Stateless-Automatically-Scaled-Out-Processing"></a></h3>
+<p>By default Orleans Streaming is targeted to support a large number of relatively small streams, each processed by one or more stateful grains. Collectively, the processing of all the streams together is sharded among a large number of regular (stateful) grains. The application code controls this sharding by assigning stream ids and grain ids and by explicitly subscribing. <strong>The goal is sharded stateful processing</strong>.</p>
+<p>However, there is also an interesting scenario of <strong>automatically scaled-out stateless processing</strong>. In this scenario an application has a small number of streams (or even one large stream) and the goal is stateless processing. An example is a global stream of events, where the processing involves decoding each event and potentially forwarding it to other streams for further stateful processing. The stateless scaled-out stream processing can be supported in Orleans via <code>StatelessWorker</code> grains.</p>
+<p><strong>Current Status of Stateless Automatically Scaled-Out Processing:</strong>
+This is not yet implemented. An attempt to subscribe to a stream from a <code>StatelessWorker</code> grain will result in undefined behavior. <a href="https://github.com/dotnet/orleans/issues/433">We are considering to support this option</a>.</p>
+<h3 id="grains-and-orleans-clientsa-namegrains-and-orleans-clientsa">Grains and Orleans Clients<a name="Grains-and-Orleans-Clients"></a></h3>
+<p>Orleans streams work <strong>uniformly across grains and Orleans clients</strong>. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.</p>
+<h3 id="fully-managed-and-reliable-streaming-pub-suba-namefully-managed-and-reliable-streaming-pub-suba">Fully Managed and Reliable Streaming Pub-Sub<a name="Fully-Managed-and-Reliable-Streaming-Pub-Sub"></a></h3>
+<p>To track stream subscriptions, Orleans uses a runtime component called <strong>Streaming Pub-Sub</strong> which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers.</p>
+<p>Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called <code>PubSubRendezvousGrain</code>), which use Orleans Declarative Persistence. <code>PubSubRendezvousGrain</code> uses the storage provider named <code>PubSubStore</code>. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the <code>PubSubStore</code> at silo construction time using the silo host builder:</p>
+<p>The following configures Pub-Sub to store its state in Azure tables.</p>
+<pre><code class="lang-csharp">hostBuilder.AddAzureTableGrainStorage(&quot;PubSubStore&quot;, 
+    options=&gt;{ options.ConnectionString = &quot;Secret&quot;; });
+</code></pre><p>That way Pub-Sub data will be durably stored in Azure Table.
+For initial development you can use memory storage as well.
+In addition to Pub-Sub, the Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.</p>
+<h3 id="configurationa-nameconfigurationa">Configuration<a name="Configuration"></a></h3>
+<p>In order to use streams you need to enable stream providers via the silo host or cluster client builders. You can read more about stream providers <a href="stream_providers.html">here</a>. Sample stream provider setup:</p>
+<pre><code class="lang-csharp">hostBuilder.AddSimpleMessageStreamProvider(&quot;SMSProvider&quot;)
+  .AddAzureQueueStreams&lt;AzureQueueDataAdapterV2&gt;(&quot;AzureQueueProvider&quot;,
+    optionsBuilder =&gt; optionsBuilder.Configure(
+      options=&gt;{ options.ConnectionString = &quot;Secret&quot;; }))
+  .AddAzureTableGrainStorage(&quot;PubSubStore&quot;,
+    options=&gt;{ options.ConnectionString = &quot;Secret&quot;; });
+</code></pre><h2 id="next">Next</h2>
+<p><a href="stream_providers.html">Orleans Stream Providers</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/streaming/streams_programming_APIs.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

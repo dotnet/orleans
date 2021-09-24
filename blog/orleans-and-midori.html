@@ -1,0 +1,349 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans and Midori | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans and Midori | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-and-midori">Orleans and Midori</h1>
+
+<p><a href="https://github.com/sergeybykov">Sergey Bykov</a>
+12/11/2016 10:56:13 PM</p>
+<hr>
+<p>Reading the epic Joe Duffy’s <a href="http://joeduffyblog.com/2016/11/30/15-years-of-concurrency/">15 Years of Concurrency</a> post brought some old memories from the early days of Orleans.
+It even compelled me to dig up and try to compile the code from 2009.
+It was an entertaining exercise.</p>
+<p>When we were just starting the Orleans project, we would meet and talk with Midori people on a regular basis.
+That was natural not only because of some obvious overlap of the problem spaces, but also because Jim Larus who conceived Orleans was one of the creators of <a href="https://www.microsoft.com/en-us/research/project/singularity/">Singularity</a>, the base from which Midori started.
+We immediately borrowed the promises library of Midori because we wanted to use the promise-based concurrency
+for safe execution and efficient RPC. We didn’t bother to try to
+integrate the code, and simply grabbed the binaries and checked them in
+into our source tree. We were at an early prototyping stage, and didn’t
+have to worry about the long term yet.</p>
+<p>At the time, grain interfaces looked like this:</p>
+<pre><code class="lang-csharp">[Eventual]
+public interface ISimpleGrain : IEventual
+{
+    [Eventual]
+    PVoid SetA(int a);
+
+    [Eventual]
+    PVoid SetB(int b);
+
+    [Eventual]
+    PInt32 GetAxB();
+}
+</code></pre><p><code>PVoid</code> and <code>Pint32</code> were moral equivalents of <a href="https://msdn.microsoft.com/en-us/library/dd537609(v=vs.110).aspx">Task and Task&lt;int> in TPL</a>.
+Unlike Tasks, they had a bunch of static methods, with one of the simpler overloads taking two lambdas: one for success case and one to
+handle a thrown exception:  </p>
+<pre><code class="lang-csharp">public static PVoid When(PVoid target, Action fn, Action&lt;Exception&gt; catchFn);
+</code></pre><p>A trivial grain method looked like:</p>
+<pre><code class="lang-csharp">public PVoid SetA(int a)
+{
+    this.a = a;
+    return PVoid.DONE;
+}
+</code></pre><p>You can see here where TaskDone.Done came from.
+A simple unit test method looked rather convoluted:</p>
+<pre><code class="lang-csharp">[TestMethod]
+public void SimpleGrainDataFlow()
+{
+    result = new ResultHandle();
+    Runner.Enqueue(new SimpleTodo(() =&gt;
+    {
+
+       Promise&lt;SimpleGrainReference&gt; clientPromise = SimpleGrainReference.GetReference(&quot;foo&quot;);
+       PVoid.When(clientPromise,
+           reference =&gt;
+           {
+                grain = reference;
+                Assert.IsNotNull(grain);
+                PVoid setPromise = grain.SetA(3);
+                PVoid.When(setPromise,
+                    () =&gt;
+                    {
+                        setPromise = grain.SetB(4);
+                        PVoid.When(setPromise,
+                            () =&gt;
+                            {
+                                PInt32 intPromise = grain.GetAxB();
+                                PVoid.When&lt;Int32&gt;(intPromise,
+                                    x =&gt;
+                                    {
+                                        result.Result = x;
+                                        result.Done = true;
+                                    },
+                                    exc =&gt;
+                                    {
+                                        Assert.Fail(&quot;Exception thrown by GetAxB: &quot; + exc.Message);
+                                        return PVoid.DONE;
+                                    });
+                            },
+                            exc =&gt;
+                            {
+                                Assert.Fail(&quot;Exception thrown by SetB: &quot; + exc.Message);
+                                return PVoid.DONE;
+                            });
+                    },
+                    exc =&gt;
+                    {
+                        Assert.Fail(&quot;Exception thrown by SetA: &quot; + exc.Message);
+                        return PVoid.DONE;
+                    });
+            },
+            exc =&gt;
+            {
+                result.Exception =  exc;
+                result.Done = true;
+                return PVoid.DONE;
+            });
+    })); 
+
+    Assert.IsTrue(result.WaitForFinished(timeout));
+    Assert.IsNotNull(result.Result);
+    Assert.AreEqual(12, result.Result);
+}
+</code></pre><p>The nested Whens were necessary to organize a data flow execution pipeline.
+<code>Runner</code> was an instance of <code>ForeignTodoRunner</code>, which was one of the ways of injecting asynchronous tasks (<code>ToDo</code>s) into a <code>TodoManager</code>.
+<code>TodoManager</code> was a single-threaded execution manager a.k.a. a vat, <a href="http://www.erights.org/elib/concurrency/vat.html">the notion that came from E language</a>.
+Initialization of the vat-based execution system was a few lines of code:</p>
+<pre><code class="lang-csharp">todoManager = new TodoManager();
+
+Thread t = new Thread(todoManager.Run);
+t.Name = &quot;Unit test TodoManager&quot;;
+t.Start();
+
+runner = new ForeignTodoRunner(todoManager);
+</code></pre><p>Within a silo, we also used vats for managing single-threaded execution of grain turns.
+As part of silo startup we set up N of them to match the number of available CPU cores:</p>
+<pre><code class="lang-csharp">for (int i = 0; i &lt; nTodoManagers; i++)
+{
+    todoManagers[i] = new TodoManager();
+
+    for (int j = 0; j &lt; runnerFactor; j++)
+        todoRunners[i \* runnerFactor + j] = new ForeignTodoRunner(todoManagers[i]);
+
+    Thread t = new Thread(todoManagers[i].Run);
+    t.Name = String.Format(&quot;TodoManager: {0}&quot;, i);
+    t.Start();
+}
+</code></pre><p>We argued with Dean Tribble at the time that using static methods on promises in our view was too inconvenient for most developers.
+We wanted them to be instance methods instead.
+A few months later we introduced our own promises, AsyncCompletion and AsyncValue<t>.
+They were wrappers around Task and Task<t> of TPL and had instance methods.
+This compressed the code by quite a bit:<p>
+<pre><code class="lang-csharp">[TestMethod]
+public void SimpleGrainDataFlow()
+{
+    ResultHandle result = new ResultHandle(); 
+    SimpleGrainReference grain = SimpleGrainReference.GetReference(&quot;foo&quot;);
+
+    AsyncCompletion setPromise = grain.SetA(3);
+    setPromise.ContinueWith(() =&gt;
+    {
+        setPromise = grain.SetB(4);
+        setPromise.ContinueWith(
+        () =&gt;
+        {
+            AsyncValue&lt;int&gt; intPromise = grain.GetAxB();
+            intPromise.ContinueWith(
+            x =&gt;
+            {
+                result.Result = x;
+                result.Done = true;
+            });
+        });
+    });
+
+    Assert.IsTrue(result.WaitForFinished(timeout));
+    Assert.IsNotNull(result.Result);
+    Assert.AreEqual(12, result.Result);
+}
+</code></pre><p>Initially, we allowed grain methods to be synchronous, and had grain references be their asynchronous proxies.</p>
+<pre><code class="lang-csharp">public class SimpleGrain : GrainBase
+{
+    public void SetA(int a)
+
+    public void SetB(int b)
+
+    public int GetAxB()
+}
+
+public class SimpleGrainReference : GrainReference
+{
+    public AsyncCompletion SetA(int a)
+
+    public AsyncCompletion SetB(int b)
+
+    public AsyncValue&lt;int&gt; GetAxB()
+}
+</code></pre><p>We quickly realized that was a bad idea, and switched to grain methods returning <code>AsyncCompletion</code>/<code>AsyncValue&lt;T&gt;</code>.
+We went through and eventually discarded a number of other bad ideas.
+We supported properties on grain classes.
+Async setters were a problem, and in general, async properties were rather misleading and provided no benefit over explicit getter methods.
+We initially supported .NET events on grains.
+Had to scrap them because of the fundamentally synchronous nature of += and -= operations in .NET.</p>
+<p>Why didn’t we simply use <code>Task</code>/<code>Task&lt;T&gt;</code> instead of <code>AsyncCompletion</code>/<code>AsyncValue&lt;T&gt;</code>?</p>
+<p>We needed to intercept every scheduling and continuation call in order to guarantee single-threaded execution.
+<code>Task</code> was a sealed class, and hence we couldn’t subclass it to override the key methods we needed.
+We didn’t have a custom TPL scheduler yet either.</p>
+<p>After we switched to using our own promises, we lost the opportunity to use some of the advanced features that Midori had for theirs.
+For example, they supported a three-party promise handoff protocol.
+If node A called node B and held a promise for that call, but B as part of processing the request made a call to C for the final value, B could hand off a reference to the promise held by A, so that C could reply directly to A instead of making an extra hop back to B.
+In this tradeoff between performance and complexity we chose to prioritize for simplicity.</p>
+<p>Another lesson we learned from talking to Midori people was that the source of some of the hardest to track down bugs in their codebase was interleaving of
+execution turns.
+Even though a vat had a single thread to execute all turns (synchronous pieces of code between yield points), it was totally legal for it to execute turns belonging to different requests in an arbitrary order.</p>
+<p>Imagine your component is processing a request and needs to call another component, for example, make an IO call in the middle of it.
+You make that IO call, receive a promise for its completion or its return value, and schedule a continuation with a <code>When</code> or <code>ContinueWith</code> call.
+The trap here is that when the IO call completes and the scheduled continuation starts executing, it is too easy to assume that the state of the component hasn’t changed since the IO call was issued.
+In fact, the component might have received and processed a number of other requests while asynchronously waiting for that IO call, and processing of those requests could have mutated the state of the component in a non-obvious way.
+The Midori team was very senior. At the time, the majority of them were principal and partner level engineers and architects.
+We wondered if interleaving was so perilous to people of that caliber and experience, it must be even worse for mere mortals like us.
+That lead to the later decision to make grains in Orleans non-reentrant by default.</p>
+<p>At around the same time, Niklas Gustafsson worked on project <a href="https://channel9.msdn.com/shows/Going+Deep/Maestro-A-Managed-Domain-Specific-Language-For-Concurrent-Programming/">Maestro</a> that was later renamed and released as <a href="https://web.archive.org/web/20090511155406/http:/msdn.microsoft.com/en-us/devlabs/dd795202.aspx">Axum</a>.
+We had an intern prototype one of the early Orleans applications on Axum to compare the programming experience with the promise-based one in spring of 2009.
+We concluded that the promises model was more attainable for developers.
+In parallel Niklas created a proposal and a prototype of what eventually, after he convinced Anders Hejlsberg and others, became the <code>async</code>/<code>await</code> keywords in C#.
+By now it propagated to even more languages.</p>
+<p>After .NET 4.5 with async and await was released, we finally abandoned <code>AsyncCompletion</code>/<code>AsyncValue&lt;T&gt;</code> in favor of <code>Task</code>/<code>Task&lt;T&gt;</code> to leverage the power of await.
+It was another tradeoff that made us rewrite our scheduler a couple of times (not a trivial task) and give up some of the nice features we had in our promises.
+For example, before we could easily detect if grain code tried to block the thread by calling <code>Result</code> or <code>Wait()</code> on an unresolved promise, and throw an
+<code>InvalidOperationException</code> to indicate that this was not allowed in the cooperative multi-tasking environment of a silo.
+We couldn’t do that anymore.
+But we gained the cleaner programming model that we have today:</p>
+<pre><code class="lang-csharp">public interface ISimpleGrain : IGrainWithIntegerKey
+{
+    Task SetA(int a);
+
+    Task SetB(int b);
+
+    Task&lt;int&gt; GetAxB();
+}
+
+[Fact, TestCategory(&quot;BVT&quot;), TestCategory(&quot;Functional&quot;)]
+public async Task SimpleGrainDataFlow()
+{
+    var grain = GrainFactory.GetGrain&lt;ISimpleGrain&gt;(GetRandomGrainId());
+
+    Task setAPromise = grain.SetA(3);
+    Task setBPromise = grain.SetB(4);
+
+    await Task.WhenAll(setAPromise, setBPromise);
+
+    var x = await grain.GetAxB();
+    Assert.Equal(12, x);
+}
+</code></pre><p>Midori was an interesting experiment of a significant scale, to try to build a ‘safe by construction’ OS with asynchrony and isolation top to bottom.
+It is always difficult to judge such efforts in terms of successes, failures, and missed opportunities.
+One thing is clear – Midori did influence early thinking and design about asynchrony and concurrency in Orleans, and helped bootstrap its initial prototypes.</p>
+</t></t></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/blog/orleans-and-midori.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

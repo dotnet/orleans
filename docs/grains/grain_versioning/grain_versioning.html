@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Interface Versioning | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Interface Versioning | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grain-interface-versioning">Grain Interface Versioning</h1>
+
+<div class="WARNING"><h5>Warning</h5><p>This page describes how to use grain interface versioning. The versioning of
+Grain state is out of scope.</p>
+</div>
+<h2 id="overview">Overview</h2>
+<p>On a given cluster, silos can support different versions of a grain type.
+<img src="version.png" alt="Cluster with different versions of a grain">
+In this example the client and Silo{1,2,3} were compiled with grain interface <code>A</code> version 1. Silo 4 was compiled with <code>A</code> version 2.</p>
+<h2 id="limitations">Limitations:</h2>
+<ul>
+<li>No versioning on stateless worker</li>
+<li>Streaming interfaces are not versioned</li>
+</ul>
+<h2 id="enable-versioning">Enable versioning</h2>
+<p>If the version attribute is not explicitly added to the grain interface, then the grains have a default version of 0. You can version grain by using the VersionAttribute on the grain interface:</p>
+<pre><code class="lang-cs">[Version(X)]
+public interface IVersionUpgradeTestGrain : IGrainWithIntegerKey {}
+</code></pre><p>Where <code>X</code> is the version number of the grain interface, which is typically monotonically increasing.</p>
+<h2 id="grain-version-compatibility-and-placement">Grain version compatibility and placement</h2>
+<p>When a call from a versioned grain arrives in a cluster:</p>
+<ul>
+<li>If no activation exists, a compatible activation will be created</li>
+<li>If an activation exists:<ul>
+<li>If the current one is not compatible, it will be deactivated and new compatible one will be created (see <a href="version_selector_strategy.html">version selector strategy</a>)</li>
+<li>If the current one is compatible (see <a href="compatible_grains.html">compatible grains</a>), the call will be handled normally.</li>
+</ul>
+</li>
+</ul>
+<p>By default:</p>
+<ul>
+<li>All versioned grains are supposed to be backward-compatible only (see <a href="backward_compatibility_guidelines.html">backward compatibility guidelines</a> and <a href="compatible_grains.html">compatible grains</a>). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. </li>
+<li>When multiple versions exist in the cluster, the new activation will be randomly placed on a compatible silo. </li>
+</ul>
+<p>You can change this default behavior via the option <code>GrainVersioningOptions</code>:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
+  })
+  [...]
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_versioning/grain_versioning.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

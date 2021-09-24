@@ -1,0 +1,249 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Transactions in Orleans 2.0 | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Transactions in Orleans 2.0 | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-transactions">Orleans Transactions</h1>
+
+<p>Orleans supports distributed ACID transactions against persistent grain state.</p>
+<h2 id="setup">Setup</h2>
+<p>Orleans transactions are opt-in.
+A silo must be configured to use transactions.
+If it is not, any calls to transactional methods on grains will receive an <code>OrleansTransactionsDisabledException</code>.
+To enable transactions on a silo, call <code>UseTransactions()</code> on the silo host builder.</p>
+<pre><code class="lang-csharp">var builder = new SiloHostBuilder().UseTransactions();
+</code></pre><h3 id="transactional-state-storage">Transactional State Storage</h3>
+<p>To use transactions, the user needs to configure a data store.
+To support various data stores with transactions, the storage abstraction <code>ITransactionalStateStorage</code> has been introduced.
+This abstraction is specific to the needs of transactions, unlike generic grain storage (<code>IGrainStorage</code>).
+To use transaction-specific storage, the user can configure their silo using any implementation of <code>ITransactionalStateStorage</code>, such as Azure (<code>AddAzureTableTransactionalStateStorage</code>).</p>
+<p>Example:</p>
+<pre><code class="lang-csharp">
+var builder = new SiloHostBuilder()
+    .AddAzureTableTransactionalStateStorage(&quot;TransactionStore&quot;, options =&gt;
+    {
+        options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”);
+    })
+    .UseTransactions();
+</code></pre><p>For development purposes, if transaction-specific storage is not available for the data store you need, an <code>IGrainStorage</code> implementation may be used instead.
+For any transactional state that does not have a store configured for it, transactions will attempt to fail over to grain storage using a bridge.
+Accessing transactional state via a bridge to grain storage will be less efficient and is not a pattern we intend to support long term, hence the recommendation that this only be used for development purposes.</p>
+<h2 id="programming-model">Programming Model</h2>
+<h3 id="grain-interfaces">Grain Interfaces</h3>
+<p>For a grain to support transactions, transactional methods on a grain interface must be marked as being part of a transaction using the “Transaction” attribute.
+The attribute needs indicate how the grain call behaves in a transactional environment via the transaction options below:</p>
+<ul>
+<li><code>TransactionOption.Create</code> - Call is transactional and will always create a new transaction context (i.e., it will start a new transaction), even if called within an existing transaction context.</li>
+<li><code>TransactionOption.Join</code> - Call is transactional but can only be called within the context of an existing transaction.</li>
+<li><code>TransactionOption.CreateOrJoin</code> - Call is transactional. If called within the context of a transaction, it will use that context, else it will create a new context.</li>
+<li><code>TransactionOption.Suppress</code> - Call is not transactional but can be called from within a transaction. If called within the context of a transaction, the context will not be passed to the call.</li>
+<li><code>TransactionOption.Supported</code> - Call is not transactional but supports transactions. If called within the context of a transaction, the context will be passed to the call.</li>
+<li><code>TransactionOption.NotAllowed</code> - Call is not transactional and cannot be called from within a transaction. If called within the context of a transaction, it will throw a <code>NotSupportedException</code>.</li>
+</ul>
+<p>Calls can be marked as “Create”, meaning the call will always start its own transaction.
+For example, the Transfer operation in the ATM grain below will always start a new transaction which involves the two referenced accounts.</p>
+<pre><code class="lang-csharp">
+public interface IATMGrain : IGrainWithIntegerKey
+{
+    [Transaction(TransactionOption.Create)]
+    Task Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer);
+}
+</code></pre><p>The transactional operations Withdraw and Deposit on the account grain are marked “Join”, indicating that they can only be called within the context of an existing transaction, which would be the case if they were called during <code>IATMGrain.Transfer(…)</code>.
+The <code>GetBalance</code> call is marked <code>CreateOrJoin</code> so it can be called from within an existing transaction, like via <code>IATMGrain.Transfer(…)</code>, or on its own.</p>
+<pre><code class="lang-csharp">
+public interface IAccountGrain : IGrainWithGuidKey
+{
+    [Transaction(TransactionOption.Join)]
+    Task Withdraw(uint amount);
+
+    [Transaction(TransactionOption.Join)]
+    Task Deposit(uint amount);
+
+    [Transaction(TransactionOption.CreateOrJoin)]
+    Task&lt;uint&gt; GetBalance();
+}
+</code></pre><h4 id="important-considerations">Important Considerations</h4>
+<p>Please be aware that OnActivateAsync could NOT be marked as transactional as any such call requires a proper setup before the call. It does exist only for the grain application API. This means that an attempt to read transactional state as part of these methods will raise an exception in the runtime.</p>
+<h3 id="grain-implementations">Grain Implementations</h3>
+<p>A grain implementation needs to use an <code>ITransactionalState</code> facet (see Facet System) to manage grain state via ACID transactions.</p>
+<pre><code class="lang-csharp">
+    public interface ITransactionalState&lt;TState&gt;
+        where TState : class, new()
+    {
+        Task&lt;TResult&gt; PerformRead&lt;TResult&gt;(Func&lt;TState, TResult&gt; readFunction);
+        Task&lt;TResult&gt; PerformUpdate&lt;TResult&gt;(Func&lt;TState, TResult&gt; updateFunction);
+    }
+</code></pre><p>All read or write access to the persisted state must be performed via synchronous functions passed to the transactional state facet.
+This allows the transaction system to perform or cancel these operations transactionally.
+To use a transactional state within a grain, one only needs to define a serializable state class to be persisted and to declare the transactional state in the grain’s constructor with a <code>TransactionalState</code> attribute. The latter declares the state name and (optionally) which transactional state storage to use (see Setup).</p>
+<pre><code class="lang-csharp">
+[AttributeUsage(AttributeTargets.Parameter)]
+public class TransactionalStateAttribute : Attribute
+{
+    public TransactionalStateAttribute(string stateName, string storageName = null)
+    {
+      …
+    }
+}
+</code></pre><p>Example:</p>
+<pre><code class="lang-csharp">
+public class AccountGrain : Grain, IAccountGrain
+{
+    private readonly ITransactionalState&lt;Balance&gt; balance;
+
+    public AccountGrain(
+        [TransactionalState(&quot;balance&quot;, &quot;TransactionStore&quot;)]
+        ITransactionalState&lt;Balance&gt; balance)
+    {
+        this.balance = balance ?? throw new ArgumentNullException(nameof(balance));
+    }
+
+    Task IAccountGrain.Deposit(uint amount)
+    {
+        return this.balance.PerformUpdate(x =&gt; x.Value += amount);
+    }
+
+    Task IAccountGrain.Withdrawal(uint amount)
+    {
+        return this.balance.PerformUpdate(x =&gt; x.Value -= amount);
+    }
+
+    Task&lt;uint&gt; IAccountGrain.GetBalance()
+    {
+        return this.balance.PerformRead(x =&gt; x.Value);
+    }
+}
+</code></pre><p>In the above example, the attribute <code>TransactionalState</code> is used to declare that the ‘balance’ constructor argument should be associated with a transactional state named “balance”.
+With this declaration, Orleans will inject an <code>ITransactionalState</code> instance with a state loaded from the transactional state storage named &quot;TransactionStore&quot; (see Setup).
+The state can be modified via <code>PerformUpdate</code> or read via <code>PerformRead</code>.
+The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or all be undone upon completion of the grain call that created the transaction (<code>IATMGrain.Transfer</code> in the above examples).</p>
+<h3 id="calling-transactions">Calling Transactions</h3>
+<p>Transactional methods on a grain interface are called like any other grain call.</p>
+<pre><code class="lang-csharp">
+    IATMGrain atm = client.GetGrain&lt;IATMGrain&gt;(0);
+    Guid from = Guid.NewGuid();
+    Guid to = Guid.NewGuid();
+    await atm.Transfer(from, to, 100);
+    uint fromBalance = await client.GetGrain&lt;IAccountGrain&gt;(from).GetBalance();
+    uint toBalance = await client.GetGrain&lt;IAccountGrain&gt;(to).GetBalance();
+</code></pre><p>In the above calls, an ATM grain is used to transfer 100 units of currency from one account to another.
+After the transfer is complete, both accounts are queried to get their current balance.
+The currency transfer as well as both account queries are performed as ACID transactions.</p>
+<p>As seen in the above example, transactions can return values within a task, like other grain calls, but upon call failure they will not throw application exceptions, but rather an <code>OrleansTransactionException</code> or <code>TimeoutException</code>.
+If the application throws an exception during the transaction and that exception causes the transaction to fail (as opposed failing because of other system failures), the application exception will be the inner exception of the <code>OrleansTransactionException</code>.
+If a transaction exception is thrown of type <code>OrleansTransactionAbortedException</code>, the transaction failed and can be retried.
+Any other exception thrown indicates that the transaction terminated with an unknown state.
+Since transactions are distributed operations, a transaction in an unknown state could have succeeded, failed, or still be in progress.
+For this reason, it’s advisable to allow a call timeout period (<code>SiloMessagingOptions.ResponseTimeout</code>) to pass, to avoid cascading aborts, before verifying the state or retrying the operation.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/transactions.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Timers and Reminders | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Timers and Reminders | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="timers-and-reminders">Timers and Reminders</h1>
+
+<p>The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
+<h1 id="timers">Timers</h1>
+<h2 id="timer-description">Timer Description</h2>
+<p><strong>Timers</strong> are used to create periodic grain behavior that isn&#39;t required to span multiple activations (instantiations of the grain). It is essentially identical to the standard .<strong>NET System.Threading.Timer</strong> class.
+In addition, timers are subject to single-threaded execution guarantees within the grain activation that it operates on.</p>
+<p>Each activation may have zero or more timers associated with it. The runtime executes each timer routine within the runtime context of the activation that it is associated with.</p>
+<h2 id="timer-usage">Timer Usage</h2>
+<p>To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
+<pre><code class="lang-csharp">public IDisposable RegisterTimer(
+       Func&lt;object, Task&gt; asyncCallback, // function invoked when the timer ticks
+       object state,                     // object to pass to asyncCallback
+       TimeSpan dueTime,                 // time to wait before the first timer tick
+       TimeSpan period)                  // the period of the timer
+</code></pre><p>Cancel the timer by disposing it.</p>
+<p>A timer will cease to trigger if the grain is deactivated or when a fault occurs and its silo crashes.</p>
+<p>Important Considerations</p>
+<ul>
+<li>When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in-use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</li>
+<li>The period passed to <strong>Grain.RegisterTimer</strong> is the amount of time that passes from the moment the Task returned by <strong>asyncCallback</strong> is resolved to the moment that the next invocation of <strong>asyncCallback</strong> should occur. This not only makes it impossible for successive calls to <strong>asyncCallback</strong> to overlap, but also makes it so that the length of time <strong>asyncCallback</strong> takes to complete affects the frequency at which <strong>asyncCallback</strong> is invoked. This is an important deviation from the semantics of <strong>System.Threading.Timer</strong>.</li>
+<li>Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn, and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered as behaving as if running on a reentrant grain with respect to other messages to that grain.</li>
+</ul>
+<h1 id="reminders">Reminders</h1>
+<h2 id="reminder-description">Reminder Description</h2>
+<p>Reminders are similar to timers, with a few important differences:</p>
+<ul>
+<li>Reminders are persistent and will continue to trigger in almost all situations (including partial or full cluster restarts) unless explicitly cancelled.</li>
+<li>Reminder &quot;definitions&quot; are written to storage. However, each specific occurrence, with its specific time, is not. This has the side effect that if the cluster is completely down at the time of a specific reminder tick, it will be missed and only the next tick of the reminder will happen.</li>
+<li>Reminders are associated with a grain, not any specific activation.</li>
+<li>If a grain has no activation associated with it when a reminder ticks, the grain will be created. If an activation becomes idle and is deactivated, a reminder associated with the same grain will reactivate the grain when it ticks next.</li>
+<li>Reminders are delivered by message and are subject to the same interleaving semantics as all other grain methods.</li>
+<li>Reminders should not be used for high-frequency timers- their period should be measured in minutes, hours, or days.</li>
+</ul>
+<h2 id="configuration">Configuration</h2>
+<p>Reminders, being persistent, rely upon storage to function.
+You must specify which storage backing to use before the reminder subsystem will function.
+This is done by configuring one of the reminder providers via <code>UseXReminderService</code> extension methods, where X is the name of the provider, for example, <code>UseAzureTableReminderService</code>.</p>
+<p>Azure Table configuration:</p>
+<pre><code class="lang-csharp">// TODO replace with your connection string
+const string connectionString = &quot;YOUR_CONNECTION_STRING_HERE&quot;;
+var silo = new SiloHostBuilder()
+    [...]
+    .UseAzureTableReminderService(options =&gt; options.ConnectionString = connectionString)
+    [...]
+</code></pre><p>SQL:</p>
+<pre><code class="lang-csharp">// TODO replace with your connection string
+const string connectionString = &quot;YOUR_CONNECTION_STRING_HERE&quot;;
+const string invariant = &quot;YOUR_INVARIANT&quot;;
+var silo = new SiloHostBuilder()
+    [...]
+    .UseAdoNetReminderService(options =&gt; 
+    {
+        options.ConnectionString = connectionString;
+        options.Invariant = invariant;
+    })
+    [...]
+</code></pre><p> If you just want a placeholder implementation of reminders to work without needing to set up an Azure account or SQL database, then this will give you a development-only implementation of the reminder system:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+    [...]
+    .UseInMemoryReminderService()
+    [...]
+</code></pre><h2 id="reminder-usage">Reminder Usage</h2>
+<p>A grain that uses reminders must implement the <strong>IRemindable.ReceiveReminder</strong> method.</p>
+<pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+{
+    Console.WriteLine(&quot;Thanks for reminding me-- I almost forgot!&quot;);
+    return Task.CompletedTask;
+}
+</code></pre><p> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IGrainReminder</strong> object:</p>
+<pre><code class="lang-csharp">protected Task&lt;IGrainReminder&gt; RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+</code></pre><ul>
+<li>reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.</li>
+<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
+<li>period specifies the period of the timer.</li>
+</ul>
+<p>Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling <strong>Grain.UnregisterReminder</strong>:</p>
+<pre><code class="lang-csharp">protected Task UnregisterReminder(IGrainReminder reminder)
+</code></pre><p>reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
+<p> Instances of <strong>IGrainReminder</strong> aren&#39;t guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder&#39;s name.</p>
+<p> If you only have the reminder&#39;s name and need the corresponding instance of  <strong>IGrainReminder</strong>, call the <strong>Grain.GetReminder</strong> method:</p>
+<pre><code class="lang-csharp">protected Task&lt;IGrainReminder&gt; GetReminder(string reminderName)
+</code></pre><h2 id="which-should-i-use">Which Should I Use?</h2>
+<p>We recommend that you use timers in the following circumstances:</p>
+<ul>
+<li>When it doesn&#39;t matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.</li>
+<li>The resolution of the timer is small (e.g. reasonably expressible in seconds or minutes).</li>
+<li>The timer callback can be started from <code>Grain.OnActivateAsync</code> or when a grain method is invoked.</li>
+</ul>
+<p>We recommend that you use reminders in the following circumstances:</p>
+<ul>
+<li>When the periodic behavior needs to survive the activation and any failures.</li>
+<li>Performing infrequent tasks (e.g. reasonably expressible in minutes, hours, or days).</li>
+</ul>
+<h2 id="combining-timers-and-reminders">Combining Timers and Reminders</h2>
+<p>You might consider using a combination of reminders and timers to accomplish your goal.
+For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/timers_and_reminders.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

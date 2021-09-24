@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Activation Garbage Collection | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Activation Garbage Collection | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="activation-garbage-collection">Activation Garbage Collection</h1>
+
+<p>As described in the Core Concepts section, a <em>grain activation</em> is an in-memory instance of a grain class that gets automatically created by the Orleans runtime on an as-needed basis as a temporary physical embodiment of a grain.</p>
+<p>Activation Garbage Collection (Activation GC) is the process of removal from memory of unused grain activations. It is conceptually similar to how garbage collection of memory works in .NET. However, Activation GC only takes into consideration how long a particular grain activation has been idle. Memory usage is not used as a factor.</p>
+<h2 id="how-activation-gc-works">How Activation GC Works</h2>
+<p>The general process of Activation GC involves Orleans runtime in a silo periodically scanning for grain activations that have not been used at all for the configured period of time (Collection Age Limit). Once a grain activation has been idle for that long, it gets deactivated. The deactivation process begins by the runtime calling the grain’s <code>OnDeactivateAsync()</code> method, and completes by removing references to the grain activation object from all data structures of the silo, so that the memory is reclaimed by the .NET GC.</p>
+<p>As a result, with no burden put on the application code, only recently used grain activations stay in memory while activations that aren&#39;t used anymore get automatically removed, and system resources used by them get reclaimed by the runtime.</p>
+<p><strong>What counts as “being active” for the purpose of grain activation collection</strong></p>
+<ul>
+<li>receiving a method call</li>
+<li>receiving a reminder</li>
+<li>receiving an event via streaming</li>
+</ul>
+<p><strong>What does NOT count as “being active” for the purpose of grain activation collection</strong></p>
+<ul>
+<li>performing a call (to another grain or to an Orleans client)</li>
+<li>timer events</li>
+<li>arbitrary IO operations or external calls not involving Orleans framework</li>
+</ul>
+<p><strong>Collection Age Limit</strong></p>
+<p>This period of time after which an idle grain activation becomes subject to Activation GC is called Collection Age Limit. The default Collection Age Limit is 2 hours, but it can be changed globally or for individual grain classes.</p>
+<h2 id="explicit-control-of-activation-garbage-collection">Explicit Control of Activation Garbage Collection</h2>
+<h3 id="delaying-activation-gc">Delaying Activation GC</h3>
+<p>A grain activation can delay its own Activation GC, by calling <code>this.DelayDeactivation()</code> method:</p>
+<pre><code class="lang-csharp">protected void DelayDeactivation(TimeSpan timeSpan)
+</code></pre><p>This call will ensure that this activation is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
+Therefore, this call provides an additional hook to <strong>delay the deactivation beyond what is specified in the Activation Garbage Collection settings</strong>. This call can not be used to expedite Activation Garbage Collection.</p>
+<p>A positive <code>timeSpan</code> value means “prevent GC of this activation for that time span”.</p>
+<p>A negative <code>timeSpan</code> value means “cancel the previous setting of the <code>DelayDeactivation</code> call and make this activation behave based on the regular Activation Garbage Collection settings”.</p>
+<p><strong>Scenarios:</strong></p>
+<p>1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(20))</code>, it will cause this activation to not be collected for at least 20 min.</p>
+<p>2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(5))</code>, the activation will be collected after 10 min, if no extra calls were made.</p>
+<p>3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(5))</code>, and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.</p>
+<p>4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(20))</code>, and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.</p>
+<p>Note that <code>DelayDeactivation</code> does not 100% guarantee that the grain activation will not get deactivated before the specified period of time expires. There are certain failure cases that may cause &#39;premature&#39; deactivation of grains. That means that <code>DelayDeactivation</code> <strong>cannot not be used as a means to &#39;pin&#39; a grain activation in memory forever or to a specific silo</strong>. <code>DelayDeactivation</code> is merely an optimization mechanism that can help reduce the aggregate cost of a grain getting deactivated and reactivated over time, if that matters. In most cases there should be no need to use <code>DelayDeactivation</code> at all.</p>
+<h3 id="expediting-activation-gc">Expediting Activation GC</h3>
+<p>A grain activation can also instruct the runtime to deactivate it next time it becomes idle by calling <code>this.DeactivateOnIdle()</code> method:</p>
+<pre><code class="lang-csharp">protected void DeactivateOnIdle()
+</code></pre><p>A grain activation is considered idle if it is not processing any message at the moment.
+If you call <code>DeactivateOnIdle</code> while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.</p>
+<p>If there are any requests queued for the grain, they will be forwarded to the next activation.</p>
+<p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
+Note that this setting only applies to the grain activation from which it has been called and it does not apply to other grain activation of this type.</p>
+<h2 id="configuration">Configuration</h2>
+<p>Grain garbage collection can be configured using the <code>GrainCollectionOptions</code> options:</p>
+<pre><code class="lang-csharp">mySiloHostBuilder.Configure&lt;GrainCollectionOptions&gt;(options =&gt;
+{
+  // Set the value of CollectionAge to 10 minutes for all grain
+  options.CollectionAge = TimeSpan.FromMinutes(10);
+  // Override the value of CollectionAge to 5 minutes for MyGrainImplementation
+  options.ClassSpecificCollectionAge[typeof(MyGrainImplementation).FullName] = TimeSpan.FromMinutes(5);
+})
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/activation_garbage_collection.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

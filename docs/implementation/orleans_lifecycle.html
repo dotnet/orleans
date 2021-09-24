@@ -1,0 +1,193 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Lifecycle | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Lifecycle | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="orleans-lifecycle">Orleans Lifecycle</h1>
+
+<h2 id="overview">Overview</h2>
+<p>Some Orleans behaviors are sufficiently complex that they need ordered startup and shutdown.
+Some components with such behaviors include grains, silos, and clients.
+To address this, a general component lifecycle pattern has been introduced.
+This pattern consists of an observable lifecycle, which is responsible for signaling on stages of a component’s startup and shutdown, and lifecycle observers which are responsible for performing startup or shutdown operations at specific stages.</p>
+<p>See also <a href="../grains/grain_lifecycle.html">Grain Lifecycle</a> and <a href="../host/silo_lifecycle.html">Silo Lifecycle</a>.</p>
+<h2 id="observable-lifecycle">Observable Lifecycle</h2>
+<p>Components that need ordered startup and shutdown can use an observable lifecycle which allows other components to observe the LiveCycle and receive notification when a stage is reached during startup or shutdown.</p>
+<pre><code class="lang-csharp">    public interface ILifecycleObservable
+    {
+        IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer);
+    }
+</code></pre><p>The subscribe call registers an observer for notification when a stage is reached while starting or stopping.  The observer name is for reporting purposes.  The stage indicated at which point in the startup/shutdown sequence the observer will be notified.  Each stage of lifecycle is observable.  All observers will be notified when the stage is reached when starting and stopping.  Stages are started in ascending order and stopped in descending order.  The observer can unsubscribe by disposing of the returned disposable.</p>
+<h2 id="lifecycle-observer">Lifecycle Observer</h2>
+<p>Components which need to take part in another component’s lifecycle need provide hooks for their startup and shutdown behaviors and subscribe to a specific stage of an observable lifecycle.</p>
+<pre><code class="lang-csharp">    public interface ILifecycleObserver
+    {
+        Task OnStart(CancellationToken ct);
+        Task OnStop(CancellationToken ct);
+    }
+</code></pre><p><code>OnStart/OnStop</code> will be called when the stage subscribed to is reached during startup/shutdown.</p>
+<h2 id="utilities">Utilities</h2>
+<p>For convenience, helper functions have been created for common lifecycle usage patterns.</p>
+<h3 id="extensions">Extensions</h3>
+<p>Extension functions exist for subscribing to observable lifecycle which do not require that the subscribing component implement ILifecycleObserver.  Instead, these allow components to pass in lambdas or members function to be called at the subscribed stages.</p>
+<pre><code class="lang-csharp">IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func&lt;CancellationToken, Task&gt; onStart, Func&lt;CancellationToken, Task&gt; onStop);
+
+IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func&lt;CancellationToken, Task&gt; onStart);
+</code></pre><p>Similar extension functions allow generic type arguments to be used in place of the observer name.</p>
+<pre><code class="lang-csharp">IDisposable Subscribe&lt;TObserver&gt;(this ILifecycleObservable observable, int stage, Func&lt;CancellationToken, Task&gt; onStart, Func&lt;CancellationToken, Task&gt; onStop);
+
+IDisposable Subscribe&lt;TObserver&gt;(this ILifecycleObservable observable, int stage, Func&lt;CancellationToken, Task&gt; onStart);
+</code></pre><h3 id="lifecycle-participation">Lifecycle Participation</h3>
+<p>Some extensibility points need a way of recognizing what components are interested in participating in a lifecycle.  A lifecycle participant marker interface has been introduced for this purpose.  More about how this is used will be covered when exploring silo and grain lifecycles.</p>
+<pre><code class="lang-csharp">    public interface ILifecycleParticipant&lt;TLifecycleObservable&gt;
+        where TLifecycleObservable : ILifecycleObservable
+    {
+        void Participate(TLifecycleObservable lifecycle);
+    }
+</code></pre><h2 id="example">Example</h2>
+<p>From our lifecycle tests, below is an example of a component that takes part in an observable lifecycle at multiple stages of the lifecycle.</p>
+<pre><code class="lang-csharp">enum TestStages
+{
+    Down,
+    Initialize,
+    Configure,
+    Run,
+}
+
+class MultiStageObserver : ILifecycleParticipant&lt;ILifecycleObservable&gt;
+{
+    public Dictionary&lt;TestStages,bool&gt; Started { get; } = new Dictionary&lt;TestStages, bool&gt;();
+    public Dictionary&lt;TestStages, bool&gt; Stopped { get; } = new Dictionary&lt;TestStages, bool&gt;();
+
+    private Task OnStartStage(TestStages stage)
+    {
+        this.Started[stage] = true;
+        return Task.CompletedTask;
+    }
+
+    private Task OnStopStage(TestStages stage)
+    {
+        this.Stopped[stage] = true;
+        return Task.CompletedTask;
+    }
+
+    public void Participate(ILifecycleObservable lifecycle)
+    {
+        lifecycle.Subscribe&lt;MultiStageObserver&gt;((int)TestStages.Down, ct =&gt; OnStartStage(TestStages.Down), ct =&gt; OnStopStage(TestStages.Down));
+        lifecycle.Subscribe&lt;MultiStageObserver&gt;((int)TestStages.Initialize, ct =&gt; OnStartStage(TestStages.Initialize), ct =&gt; OnStopStage(TestStages.Initialize));
+        lifecycle.Subscribe&lt;MultiStageObserver&gt;((int)TestStages.Configure, ct =&gt; OnStartStage(TestStages.Configure), ct =&gt; OnStopStage(TestStages.Configure));
+        lifecycle.Subscribe&lt;MultiStageObserver&gt;((int)TestStages.Run, ct =&gt; OnStartStage(TestStages.Run), ct =&gt; OnStopStage(TestStages.Run));
+    }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/implementation/orleans_lifecycle.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

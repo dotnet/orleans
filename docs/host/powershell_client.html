@@ -1,0 +1,211 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>PowerShell Client Module | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="PowerShell Client Module | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="powershell-client-module">PowerShell Client Module</h1>
+
+<p>The Orleans PowerShell Client Module is a set of <a href="https://technet.microsoft.com/en-us/library/dd772285.aspx">PowerShell Cmdlets</a> that wraps
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs">GrainClient</a> in a set of convenient commands making possible to interact with not just
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Runtime/Core/ManagementGrain.cs">ManagementGrain</a> but any <code>IGrain</code> just as a regular Orleans application can by using Powershell scripts.</p>
+<p>These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershell scripts.</p>
+<p>Here is how to use it:</p>
+<h2 id="installing-the-module">Installing the module</h2>
+<h3 id="from-source">From Source</h3>
+<p>You can build from source the <code>OrleansPSUtils</code> project and just import it with:</p>
+<pre><code class="lang-powershell">PS&gt; Import-Module .\projectOutputDir\Orleans.psd1
+</code></pre><p>Althought you can do that, there is a much easier and interesting way for doing that by installing it from <strong>PowerShell Gallery</strong>.</p>
+<h3 id="from-powershell-gallery">From PowerShell Gallery</h3>
+<p>Powershell modules today are easily shared just as Nuget packages but instead of nuget.org, they are hosted on <a href="https://www.powershellgallery.com/">PowerShell Gallery</a>.</p>
+<ul>
+<li>To install it on a specific folder just run:</li>
+</ul>
+<pre><code class="lang-powershell">PS&gt; Save-Module -Name OrleansPSUtils -Path &lt;path&gt;
+</code></pre><ul>
+<li>To install it on your PowerShell modules path (<strong>the recommended way</strong>), just run:</li>
+</ul>
+<pre><code class="lang-powershell">PS&gt; Install-Module -Name OrleansPSUtils
+</code></pre><ul>
+<li>If you plan to use this module on an <a href="https://azure.microsoft.com/en-us/services/automation/">Azure Automation</a>, just click on the button bellow:
+<button style="border:none;background-image:none; background-color:transparent " type="button" title="Deploy this module to Azure Automation." onclick="window.open('https://www.powershellgallery.com/packages/Orleans/DeployItemToAzureAutomation?itemType=PSModule', target = '_blank')">
+  <img src="https://www.powershellgallery.com/Content/Images/DeployToAzureAutomationButton.png">
+</button></li>
+</ul>
+<h2 id="using-the-module">Using the module</h2>
+<p>Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:</p>
+<pre><code class="lang-powershell">PS&gt; Import-Module OrleansPSUtils
+</code></pre><p><strong>Note</strong>:
+In case of building from source, you must import it as suggested on the Install section by using the path to the <code>.psd1</code> instead of using the module name since it will not be on the <code>$env:PSModulePath</code> PowerShell runtime variable.
+Again, it is highly recommended that you install from PowerShell Gallery instead.</p>
+<p>After the module is imported (which means it is loaded on PowerShell session), you will have the following Cmdlets available:</p>
+<ul>
+<li><code>Start-GrainClient</code></li>
+<li><code>Stop-GrainClient</code></li>
+<li><code>Get-Grain</code></li>
+</ul>
+<h4 id="start-grainclient">Start-GrainClient</h4>
+<p>This module is a wrapper around <code>GrainClient.Initialize()</code> and its overloads.</p>
+<p><strong>Usage</strong>:     </p>
+<ul>
+<li><p><strong><code>Start-GrainClient</code></strong></p>
+<ul>
+<li>The same as call <code>GrainClient.Initialize()</code> which will look for the known Orleans Client configuration file names</li>
+</ul>
+</li>
+<li><p><strong><code>Start-GrainClient [-ConfigFilePath] &lt;string&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul>
+<li>Will use the provided file path as in <code>GrainClient.Initialize(filePath)</code></li>
+</ul>
+</li>
+<li><p><strong><code>Start-GrainClient [-ConfigFile] &lt;FileInfo&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul>
+<li>Use an instance of the <code>System.FileInfo</code> class representing the config file just as <code>GrainClient.Initialize(fileInfo)</code></li>
+</ul>
+</li>
+<li><p><strong><code>Start-GrainClient [-Config] &lt;ClientConfiguration&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul>
+<li>Use an instance of a <code>Orleans.Runtime.Configuration.ClientConfiguration</code> like in <code>GrainClient.Initialize(config)</code></li>
+</ul>
+</li>
+<li><p><strong><code>Start-GrainClient [-GatewayAddress] &lt;IPEndPoint&gt; [[-OverrideConfig] &lt;bool&gt;] [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul>
+<li>Takes a Orleans Cluster Gateway Address Endpoint</li>
+</ul>
+</li>
+</ul>
+<p><strong>Note</strong>:
+The <code>Timeout</code> parameter is optional and if it is informed and greater than <code>System.TimeSpan.Zero</code>, it will call <code>Orleans.GrainClient.SetResponseTimeout(Timeout)</code> internally.</p>
+<h4 id="stop-grainclient">Stop-GrainClient</h4>
+<p>Takes no parameters and when called, if the <code>GrainClient</code> is initialized will gracefuly uninitialize.</p>
+<h4 id="get-grain">Get-Grain</h4>
+<p>Wrapper around <code>GrainClient.GrainFactory.GetGrain&lt;T&gt;()</code> and its overloads.</p>
+<p>The mandatory parameter is <code>-GrainType</code> and the <code>-XXXKey</code> for the current Grain key types supported by Orleans (<code>string</code>, <code>Guid</code>, <code>long</code>) and also the <code>-KeyExtension</code> that can be used on Grains with compound keys.</p>
+<p>This Cmdlet return a grain reference of the type passed by as parameter on <code>-GrainType</code>.</p>
+<h2 id="example">Example:</h2>
+<p>A simple example on calling <code>MyInterfacesNamespace.IMyGrain.SayHeloTo</code> grain method:</p>
+<pre><code class="lang-powershell">PS&gt; Import-Module OrleansPSUtils
+PS&gt; $configFilePath = Resolve-Path(&quot;.\ClientConfig.xml&quot;).Path
+PS&gt; Start-GrainClient -ConfigFilePath $configFilePath
+PS&gt; Add-Type -Path .\MyGrainInterfaceAssembly.dll
+PS&gt; $grainInterfaceType = [MyInterfacesNamespace.IMyGrain]
+PS&gt; $grainId = [System.Guid]::Parse(&quot;A4CF7B5D-9606-446D-ACE9-C900AC6BA3AD&quot;)
+PS&gt; $grain = Get-Grain -GrainType $grainInterfaceType -GuidKey $grainId
+PS&gt; $message = $grain.SayHelloTo(&quot;Gutemberg&quot;).Result
+PS&gt; Write-Output $message
+Hello Gutemberg!
+PS&gt; Stop-GrainClient
+</code></pre><p>We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
+We hope that this help people as a starting point for automation. As always, this is a work-in-progress and we love contributions! :)</p>
+<p>Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/powershell_client.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

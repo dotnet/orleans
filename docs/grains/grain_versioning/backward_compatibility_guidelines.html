@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Backward compatibility guidelines | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Backward compatibility guidelines | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="backward-compatibility-guidelines">Backward compatibility guidelines</h1>
+
+<p>Writing backward compatible code can be hard and difficult to test.</p>
+<h2 id="never-change-the-signature-of-existing-methods">Never change the signature of existing methods</h2>
+<p>Because of the way on how Orleans serializer work, you should never change the signature
+of existing methods.</p>
+<p>The following example is correct:</p>
+<pre><code class="lang-cs">[Version(1)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // First method
+  Task MyMethod(int arg);
+}
+</code></pre><pre><code class="lang-cs">[Version(2)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // Method inherited from V1
+  Task MyMethod(int arg);
+
+  // New method added in V2
+  Task MyNewMethod(int arg, obj o);
+}
+</code></pre><p>This is not correct:</p>
+<pre><code class="lang-cs">[Version(1)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // First method
+  Task MyMethod(int arg);
+}
+</code></pre><pre><code class="lang-cs">[Version(2)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // Method inherited from V1
+  Task MyMethod(int arg, obj o);
+}
+</code></pre><p><strong>NOTE</strong>: you should not do this change in your code, as it&#39;s an example of a bad practice that leads to very bad side-effects.
+This is an example of what can happen if you just rename the parameter names: let&#39;s say
+that we have the two following interface version deployed in the cluster:</p>
+<pre><code class="lang-cs">[Version(1)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // return a - b
+  Task&lt;int&gt; Substract(int a, int b);
+}
+</code></pre><pre><code class="lang-cs">[Version(2)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // return y - x
+  Task&lt;int&gt; Substract(int y, int x);
+}
+</code></pre><p>This methods seems identical. But if the client was called with V1, and the request is
+handled by a V2 activation:</p>
+<pre><code class="lang-cs">var grain = client.GetGrain&lt;IMyGrain&gt;(0);
+var result = await grain.Substract(5, 4); // Will return &quot;-1&quot; instead of expected &quot;1&quot;
+</code></pre><p>This is due to how the internal Orleans serializer works.</p>
+<h2 id="avoid-changing-existing-method-logic">Avoid changing existing method logic</h2>
+<p>It can seems obvious, but you should be very careful when changing the body of an existing method.
+Unless you are fixing a bug, it is better to just add a new method if you need to modify the code.</p>
+<p>Example:</p>
+<pre><code class="lang-cs">// V1
+public interface MyGrain : IMyGrain
+{
+  // First method
+  Task MyMethod(int arg)
+  {
+    SomeSubRoutine(arg);
+  }
+}
+</code></pre><pre><code class="lang-cs">// V2
+public interface MyGrain : IMyGrain
+{
+  // Method inherited from V1
+  // Do not change the body
+  Task MyMethod(int arg)
+  {
+    SomeSubRoutine(arg);
+  }
+
+  // New method added in V2
+  Task MyNewMethod(int arg)
+  {
+    SomeSubRoutine(arg);
+    NewRoutineAdded(arg);
+  }
+}
+</code></pre><h2 id="do-not-remove-methods-from-grain-interfaces">Do not remove methods from grain interfaces</h2>
+<p>Unless you are sure that they are no longer used, you should not remove methods from the grain interface.
+If you want to remove methods, this should be done in 2 steps:</p>
+<ol>
+<li><p>Deploy V2 grains, with V1 method marked as <code>Obsolete</code></p>
+<pre><code class="lang-cs">[Version(1)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+ // First method
+ Task MyMethod(int arg);
+}
+</code></pre><pre><code class="lang-cs">[Version(2)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+ // Method inherited from V1
+ [Obsolete]
+ Task MyMethod(int arg);
+
+ // New method added in V2
+ Task MyNewMethod(int arg, obj o);
+}
+</code></pre></li>
+<li><p>When you are sure that no V1 calls are made (effectively V1 is no longer deployed in the running cluster), deploy V3 with V1 method removed</p>
+<pre><code class="lang-cs">[Version(3)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+ // New method added in V2
+ Task MyNewMethod(int arg, obj o);
+}
+</code></pre></li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_versioning/backward_compatibility_guidelines.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

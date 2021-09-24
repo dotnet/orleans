@@ -1,0 +1,225 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Multi-Cluster Configuration | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Multi-Cluster Configuration | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h2 id="multi-cluster-configuration">Multi-Cluster Configuration</h2>
+
+<p>The multi-cluster configuration determines which clusters are currently part of the multi-cluster. It does not change automatically, but is controlled by the operator. Thus, it is quite different from the membership mechanism used within a cluster, which automatically determines the set of silos that are part of the cluster.</p>
+<p>We use the following terminology for the clusters in a service:</p>
+<ul>
+<li>A cluster is <em>active</em> if it has at least one active silo, and <em>inactive</em> otherwise</li>
+<li>A cluster is <em>joined</em> if it is part of the current multi-cluster configuration, and <em>non-joined</em> otherwise</li>
+</ul>
+<p>Being active/inactive is independent from being joined/non-joined: all four combinations are possible. </p>
+<p>All the clusters for a particular service are connected by a <a href="GossipChannels.html">gossip network</a>. The gossip network propagates configuration and status information.  </p>
+<h3 id="injecting-a-configuration">Injecting a configuration</h3>
+<p>An operator issues configuration changes by injecting them into the multi-cluster network. The configurations can be injected into any cluster, and spread from there to all active clusters. Each new configuration consists of a list of cluster ids that form the multi-cluster. It also has a UTC timestamp that is used to track its propagation through the gossip network.</p>
+<p>Initially, the multi-cluster configuration is null, which means the multi-cluster list is empty (contains no clusters). Thus, the operator <em>must</em> initially inject a multi-cluster configuration. Once injected, this configuration persists in all connected silos (while running) and in all specified gossip channels (if those channels are persistent).</p>
+<p>We pose some restrictions on the injection of new configurations that an operator must follow:</p>
+<ul>
+<li>Each new configuration may add a number of clusters, or remove a number of clusters (but not both at the same time). </li>
+<li>An operator should not issue a new configuration while a previous configuration change is still being processed.</li>
+</ul>
+<p>These restrictions ensure that protocols such as the single-instance-protocol can correctly maintain mutual exclusion of activations even under configuration changes.</p>
+<h4 id="via-management-grain">Via Management Grain</h4>
+<p>Multi-cluster configurations can be injected on any node in any cluster, using the Orleans Management Grain.
+For example, to inject a multi-cluster configuration that consists of the three clusters { us1, eu1, us2 }, we can pass a string enumerable to the management grain:</p>
+<pre><code class="lang-csharp">   var clusterlist = &quot;us1,eu1,us2&quot;.Split(&#39;,&#39;);
+   var mgtGrain = client.GetGrain&lt;IManagementGrain&gt;(0); 
+   mgtGrain.InjectMultiClusterConfiguration(clusterlist, &quot;my comment here&quot;));
+</code></pre><p>The first argument to <code>InjectMultiClusterConfiguration</code> is an enumerable of cluster ids, which is going to define the new multi-cluster configuration. The second argument is an (optional) comment string that can be used to tag configurations with arbitrary information, such as who injected them and why. </p>
+<p>There is an optional third argument, a boolean called <code>checkForLaggingSilosFirst</code>, which defaults to true. It means that the system performs a best-effort check to see if there are any silos anywhere that have not caught up to the current configuration yet, and rejects the change if it finds such a silo. This helps to detect violations of the restriction that only one configuration change should be pending at a time (though it cannot guarantee it under all circumstances).</p>
+<h4 id="via-default-configuration">Via Default Configuration</h4>
+<p>In situations where the multi-cluster configuration is known in advance and the deployment is fresh every time (e.g.  for testing), we may want to supply a default configuration. The global configuration supports an optional attribute <code>DefaultMultiCluster</code> which takes a comma-separated list of cluster ids:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;MultiClusterOptions&gt;(options =&gt; 
+  {
+    [...]
+    options.DefaultMultiCluster = new[] { &quot;us1&quot;, &quot;eu1&quot;, &quot;us2&quot; }; 
+    [...]
+  })
+  [...]
+</code></pre><p>After a silo is started with this setting, it checks to see if the current multi-cluster configuration is null, and if so, injects the given configuration with the current UTC timestamp. </p>
+<p>WARNING. Persistent multi-cluster gossip channels (e.g. based on AzureTable) retain the last injected configuration unless they are deleted explicitly. In that case, specifying a DefaultMulticluster has no effect when re-deploying a cluster because the configuration stored in the gossip channels is not null.&gt;</p>
+<h4 id="via-gossip-channel">Via Gossip Channel</h4>
+<p>An operator can also inject the configuration directly into the gossip channel. Changes in the channel are picked up and propagated automatically by the periodic background gossip, though possibly very slowly (using the management grain is much faster).  A rough estimate on the propagation time is 30 seconds (or whatever gossip interval is specified in the global configuration) times the binary logarithm of the total number of silos in all clusters. But since the gossip pairs are selected randomly, it can be both much quicker or much slower.  </p>
+<p>If using the Azure Table-Based Gossip Channel, operators can inject a new configuration simply by editing the configuration record in the <code>OrleansGossipTable</code>, e.g. using some tool for editing data in Azure tables. The configuration record has the following format:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PartitionKey</td>
+<td>String</td>
+<td>the ServiceId</td>
+</tr>
+<tr>
+<td>RowKey</td>
+<td>String</td>
+<td>&quot;CONFIG&quot;</td>
+</tr>
+<tr>
+<td>Clusters</td>
+<td>String</td>
+<td>comma-separated list of cluster IDs, e.g. &quot;us1,eu1,us2&quot;</td>
+</tr>
+<tr>
+<td>Comment</td>
+<td>String</td>
+<td>optional comment</td>
+</tr>
+<tr>
+<td>GossipTimestamp</td>
+<td>DateTime</td>
+<td>UTC timestamp for the configuration</td>
+</tr>
+</tbody>
+</table>
+<p>
+
+<p><strong>NOTE</strong>. When editing this record in storage, the GossipTimestamp must also be set to a newer value than it has currently (otherwise the change is ignored).  The most convenient and recommended way to do this is to <em>delete the GossipTimestamp field</em> - our gossip channel implementation then automatically replaces it with a correct, current Timestamp (it uses the Azure Table Timestamp).  </p>
+<h3 id="cluster-additionremoval-procedures">Cluster Addition/Removal Procedures</h3>
+<p>Adding or removing a cluster from the multi-cluster often needs to be coordinated within some larger context. We recommend to always follow the procedures described below when adding/removing clusters from the multi-cluster.</p>
+<h4 id="procedure-for-adding-a-cluster">Procedure for adding a cluster</h4>
+<ol>
+<li>Start a new Orleans cluster and wait till all silos are up and running. </li>
+<li>Inject a configuration that contains the new cluster.</li>
+<li>Start routing user requests to the new cluster.</li>
+</ol>
+<h4 id="procedure-for-removing-a-cluster">Procedure for removing a cluster</h4>
+<ol>
+<li>Stop routing new user requests to the cluster. </li>
+<li>Inject a configuration that no longer contains the cluster.</li>
+<li>Stop all silos of the cluster.</li>
+</ol>
+<p>Once a cluster has been removed in this way, it can be re-added by following the procedure for adding a new cluster. </p>
+<h3 id="activity-on-non-joined-clusters">Activity on Non-Joined Clusters</h3>
+<p>There can be brief, temporary periods of time where a cluster is both active and non-joined:</p>
+<ul>
+<li>A freshly started cluster may start executing code before it is in the multicluster configuration (between steps 1 and 2 of the procedure for adding a cluster)</li>
+<li>A cluster that is being decommissioned may still execute code before the silos are shut down (between steps 2 and 3 of the procedure for removing a cluster).</li>
+</ul>
+<p>During those intermediate situations, the following are possible:</p>
+<ul>
+<li>For global-single-instance grains: A grain may have a duplicate activation on a non-joined cluster. </li>
+<li>For versioned grains: activations on non-joined clusters do not receive notifications when the grain state changes.</li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/multi-cluster_support/MultiClusterConfiguration.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

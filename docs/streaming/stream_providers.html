@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Stream Providers | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Stream Providers | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="stream-providers">Stream Providers</h1>
+
+<p>Streams can come in different shapes and forms.
+Some streams may deliver events over direct TCP links, while others deliver events via durable queues.
+Different stream types may use different batching strategies, different caching algorithms, or different back pressure procedures.
+To avoid constraining streaming applications to only a subset of those behavioral choices, <strong>Stream Providers</strong> are extensibility points to Orleans Streaming Runtime that allow users to implement any type of stream.
+This extensibility point is similar in spirit to <a href="https://github.com/dotnet/orleans/wiki/Custom%20Storage%20Providers">Orleans Storage Providers</a>.
+Orleans currently ships with many stream providers, including : <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/SimpleMessageStream/SimpleMessageStreamProvider.cs">Simple Message Stream Provider</a> and <a href="https://github.com/dotnet/orleans/tree/master/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue">Azure Queue Stream Provider</a>.</p>
+<h2 id="simple-message-stream-provider">Simple Message Stream Provider</h2>
+<p>Simple Message Stream Provider, also known as the SMS provider, delivers events over TCP by utilizing regular Orleans grain messaging.
+Since events in SMS are delivered over unreliable TCP links, SMS does <em>not</em> guarantee reliable event delivery and does not automatically resend failed messages for SMS streams. 
+By default the producer&#39;s call to <code>stream.OnNextAsync</code> returns a <code>Task</code> that represents the processing status of the stream consumer, which tells the producer whether the consumer successfully received and processed the event.
+If this Task fails, the producer can decide to send the same event again, thus achieving reliability on the application level.
+Although stream message delivery is best effort, SMS streams themselves are reliable.
+That is, the subscriber-to-producer binding performed by Pub-Sub is fully reliable.</p>
+<h2 id="azure-queue-aq-stream-provider">Azure Queue (AQ) Stream Provider</h2>
+<p>Azure Queue (AQ) Stream Provider delivers events over Azure Queues.
+On the producer side, AQ Stream Provider enqueues events directly into Azure Queue.
+On the consumer side, AQ Stream Provider manages a set of <strong>pulling agents</strong> that pull events from a set of Azure Queues and deliver them to application code that consumes them.
+One can think of the pulling agents as a distributed &quot;micro-service&quot; -- a partitioned, highly available, and elastic distributed component.
+The pulling agents run inside the same silos that host application grains.
+Thus, there is no need to run separate Azure worker roles to pull from the queues.
+The existence of pulling agents, their management, backpressure, balancing the queues between them, and handing off queues from a failed agent to another agent are fully managed by Orleans Streaming Runtime and are transparent to application code that uses streams.</p>
+<h2 id="queue-adapters">Queue Adapters</h2>
+<p>Different stream providers that deliver events over durable queues exhibit similar behavior and are subject to a similar implementation.
+Therefore, we provide a generic extensible <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/PersistentStreams/PersistentStreamProvider.cs"><code>PersistentStreamProvider</code></a> that allows developers to plug in different types of queues without writing a completely new stream provider from scratch.
+<code>PersistentStreamProvider</code> uses an <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/QueueAdapters/IQueueAdapter.cs"><code>IQueueAdapter</code></a> component, which abstracts specific queue implementation details and provides means to enqueue and dequeue events.
+All the rest is handled by the logic inside the <code>PersistentStreamProvider</code>.
+Azure Queue Provider mentioned above is also implemented this way: it is an instance of <code>PersistentStreamProvider</code> that uses an <code>AzureQueueAdapter</code>.</p>
+<h2 id="next">Next</h2>
+<p><a href="../implementation/streams_implementation/index.html">Orleans Streams Implementation Details</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/streaming/stream_providers.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

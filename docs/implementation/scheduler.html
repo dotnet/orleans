@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Scheduling | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Scheduling | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="scheduling">Scheduling</h1>
+
+<p>There are two forms of scheduling in Orleans which are relevant to grains:</p>
+<ol>
+<li>Request scheduling, the scheduling of incoming grain calls for execution according to scheduling rules discussed <a href="../grains/reentrancy.html">in <em>Reentrancy</em></a></li>
+<li>Task scheduling, the scheduling of synchronous blocks of code to be executed in a <em>single-threaded</em> manner</li>
+</ol>
+<p>All grain code is executed on the grain&#39;s task scheduler, which means that requests are also executed on the grain&#39;s task scheduler.
+Even if the request scheduling rules allow multiple requests to execute <em>concurrently</em>, they will not execute <em>in parallel</em> because the grain&#39;s task scheduler always executes tasks one-by-one and hence never executes multiple tasks in parallel.</p>
+<h2 id="task-scheduling">Task scheduling</h2>
+<p>To better understand scheduling, consider the following grain, <code>MyGrain</code>, which has a method called <code>DelayExecution()</code> which logs a message, waits some time, then logs another message before returning.</p>
+<pre><code class="lang-csharp">public interface IMyGrain : IGrain
+{
+    public Task DelayExecution();
+}
+
+public class MyGrain : Grain, IMyGrain
+{
+    private readonly ILogger&lt;MyGrain&gt; _logger;
+
+    public MyGrain(ILogger&lt;MyGrain&gt; logger) =&gt; _logger = logger;
+
+    public async Task DelayExecution()
+    {
+        _logger.LogInformation(&quot;Executing first task&quot;);
+        await Task.Delay(1000);
+        _logger.LogInformation(&quot;Executing second task&quot;);
+    }
+}
+</code></pre><p>When this method is executed, the method body will be executed in two parts:</p>
+<ol>
+<li>The first <code>_logger.LogInformation(...)</code> call and the call to <code>Task.Delay(1000)</code></li>
+<li>The second <code>_logger.LogInformation(...)</code> call</li>
+</ol>
+<p>The second task will not be scheduled on the grain&#39;s task scheduler until the <code>Task.Delay(1000)</code> call completes, at which point it will schedule the <em>continuation</em> of the grain method.</p>
+<p>Here is a graphical representation of how a request is scheduled and executed as two tasks:</p>
+<p align="center">
+    <img src="../../images/scheduling_1.png">
+</p>
+
+<p>Note that the above description is not specific to Orleans and is instead how task scheduling in .NET works: asynchronous methods in C# are converted into an asynchronous state machine by the compiler and execution progresses through the asynchronous state machine in discrete steps.
+Each step is scheduled on the current <code>TaskScheduler</code> (accessed via <code>TaskScheduler.Current</code>, defaulting to <code>TaskScheduler.Default</code>) or the current <code>SynchronizationContext</code>.
+If a <code>TaskScheduler</code> is being used, each step in the method is represented by a <code>Task</code> instance which is passed to that <code>TaskScheduler</code>.
+Therefore, a <code>Task</code> in .NET can represent two conceptual things:</p>
+<ol>
+<li>An asynchronous operation which can be waited on. The execution of the <code>DelayExecution()</code> method above is represented by a <code>Task</code> which can be awaited.</li>
+<li>A synchronous block of work. Each stage within the <code>DelayExecution()</code> method above is represented by a <code>Task</code>.</li>
+</ol>
+<p>When <code>TaskScheduler.Default</code> is in use, continuations are scheduled directly onto the .NET <code>ThreadPool</code> and are not wrapped in a <code>Task</code> object.
+The wrapping of continuations in <code>Task</code> instances occurs transparently and therefore developers rarely need to be aware of these implementation details.</p>
+<h3 id="task-scheduling-in-orleans">Task scheduling in Orleans</h3>
+<p>Each grain activation has its own <code>TaskScheduler</code> instance which is responsible for enforcing the <em>single threaded</em> execution model of grains.
+Internally, this <code>TaskScheduler</code> is implemented via <code>ActivationTaskScheduler</code> and <code>WorkItemGroup</code>.
+<code>WorkItemGroup</code> keeps enqueued tasks in a <code>Queue&lt;Task&gt;</code> internally and implements <code>IThreadPoolWorkItem</code>.
+In order to execute each currently enqueued <code>Task</code>, <code>WorkItemGroup</code> schedules <em>itself</em> on the .NET <code>ThreadPool</code>. When the .NET <code>ThreadPool</code> invokes the <code>WorkItemGroup</code>&#39;s <code>IThreadPoolWorkItem.Execute()</code> method, the <code>WorkItemGroup</code> executes the enqueued <code>Task</code> instances one-by-one.</p>
+<p>Each grain has a scheduler which executes by scheduling itself on the .NET <code>ThreadPool</code>:</p>
+<p align="center">
+    <img src="../../images/scheduling_2.png">
+</p>
+
+<p>Each scheduler contains a queue of tasks:</p>
+<p align="center">
+    <img src="../../images/scheduling_3.png">
+</p>
+
+<p>The .NET <code>ThreadPool</code> executes each work item enqueued to it. This includes <em>grain schedulers</em> as well as other work items, such as work items scheduled via <code>Task.Run(...)</code>:</p>
+<p align="center">
+    <img src="../../images/scheduling_4.png">
+</p>
+
+<p>Note that a grain&#39;s scheduler can only execute on one thread at a time, but it does not always execute on the same thread. The .NET <code>ThreadPool</code> is free to use a different thread each time the grain&#39;s scheduler is executed. The grain&#39;s scheduler is responsible for making sure that it only executes on one thread at a time and this is how the <em>single threaded</em> execution model of grains is implemented.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/implementation/scheduler.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

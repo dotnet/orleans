@@ -1,0 +1,176 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Deploy new version of grains | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Deploy new version of grains | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="deploy-new-version-of-grains">Deploy new version of grains</h1>
+
+<h3 id="rolling-upgrade">Rolling upgrade</h3>
+<p>In this method you deploy newer silos directly on your environment.
+This is the simplest method, but it can be difficult to interrupt an ongoing deployment
+and to rollback.</p>
+<p>Recommended configuration:</p>
+<ul>
+<li><code>DefaultCompatibilityStrategy</code> set to <code>BackwardCompatible</code></li>
+<li><code>DefaultVersionSelectorStrategy</code> set to <code>AllCompatibleVersions</code></li>
+</ul>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
+  })
+  [...]
+</code></pre><p>When using this configuration, &quot;old&quot; clients will be able to talk to activations
+on both versions of silos. Newer clients and silos will only trigger new activations
+on newer silos.</p>
+<p><img src="rolling.gif" alt="Rolling gif"></p>
+<h3 id="using-a-staging-environment">Using a staging environment</h3>
+<p>In this method you will need a second environment (Staging environment),
+on which you will deploy newer silos before stopping the Production environment.
+The Production and the Staging silos and clients will be <strong>part of the same
+cluster</strong>. It is important that silos from both environment can talk to each other.</p>
+<p>Recommended configuration:</p>
+<ul>
+<li><code>DefaultCompatibilityStrategy</code> set to <code>BackwardCompatible</code></li>
+<li><code>DefaultVersionSelectorStrategy</code> set to <code>MinimumVersion</code></li>
+</ul>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
+  })
+  [...]
+</code></pre><p>Suggested deployment steps:</p>
+<ol>
+<li>&quot;V1&quot; silos and clients are deployed and are running in the Production slot.</li>
+<li>&quot;V2&quot; silos and clients begin to start in the Staging slot. They will join the
+same cluster as the Production slot. No &quot;V2&quot; activations will be created so far.</li>
+<li>Once the deployment in the Staging slot is finished, the developer can redirect
+some traffic to the V2 clients (smoke tests, targeted beta users, etc.). This will
+create V2 activations, but since Grains are backward compatible and all silos
+are in the same cluster, no duplicate activations will be created.</li>
+<li>If the validation is successful, proceed to VIP swap.
+If not, you can safely shutdown the Staging cluster: existing V2 activations will be
+destroyed and V1 activations will be created if needed.</li>
+<li>V1 activations will naturally &quot;migrate&quot; to V2 silos eventually. You can safely shutdown
+V1 silos.</li>
+</ol>
+<div class="WARNING"><h5>Warning</h5><p>Remember that stateless workers are not versioned and that streaming agents will
+also start in the staging environment.</p>
+</div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_versioning/deploying_new_versions_of_grains.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

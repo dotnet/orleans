@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Immediate vs. Delayed Confirmation | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Immediate vs. Delayed Confirmation | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="immediate-confirmation">Immediate Confirmation</h1>
+
+<p>For many applications, we want to ensure that events are confirmed immediately, so that the persisted version does not lag behind the current version in memory, and we do not risk losing the latest state if the grain should fail. We can guarantee this by following these rules:</p>
+<ol>
+<li><p>Confirm all <code>RaiseEvent</code> calls using <code>ConfirmEvents</code> before the grain method returns.</p>
+</li>
+<li><p>Make sure tasks returned by <code>RaiseConditionalEvent</code> complete before the grain method returns.</p>
+</li>
+<li><p>Avoid  <code>[Reentrant]</code> or <code>[AlwaysInterleave]</code> attributes, so only one grain call can be processed at a time.</p>
+</li>
+</ol>
+<p>If we follow these rules, it means that after an event is raised, no other grain code can execute until the event has been written to storage. Therefore, it is impossible to observe inconsistencies between the version in memory and the version in storage. While this is often exactly what we want, it also has some potential disadvantages.</p>
+<h3 id="potential-disadvantages">Potential Disadvantages</h3>
+<ul>
+<li><p>if the <strong>connection to a remote cluster or to storage is temporarily interrupted</strong>, then the grain becomes unavailable: effectively, the grain cannot execute any code while it is stuck waiting to confirm the events, which can take an indefinite amount of time (the log-consistency protocol keeps retrying until storage connectivity is restored).</p>
+</li>
+<li><p>when handling <strong>a lot of of updates to a single grain instance</strong>, confirming them one at a time can become very inefficient, i.e. have poor throughput.</p>
+</li>
+</ul>
+<h1 id="delayed-confirmation">Delayed Confirmation</h1>
+<p>To improve availability and throughput in the situations mentioned above, grains can choose to do one or both of the following:</p>
+<ul>
+<li><p>allow grain methods to raise events without waiting for confirmation. </p>
+</li>
+<li><p>allow reentrancy, so the grain can keep processing new calls even if previous calls get stuck waiting for confirmation.</p>
+</li>
+</ul>
+<p>This means it is possible for grain code to execute while some events are still in the process of being confirmed. The <code>JournaledGrain</code> API has some specific provisions to give developers precise control over how to deal with unconfirmed events that are currently &quot;in flight&quot;.</p>
+<p>The following property can be examined to find out what events are currently unconfirmed:</p>
+<pre><code class="lang-csharp">IEnumerable&lt;EventType&gt; UnconfirmedEvents { get; }
+</code></pre><p>Also, since the state returned by the <code>State</code> property does not include the effect of unconfirmed events, there is an alternative property </p>
+<pre><code class="lang-csharp">StateType TentativeState { get; }
+</code></pre><p>which returns a &quot;tentative&quot; state, obtained from &quot;State&quot; by applying all the unconfirmed events. The tentative state is essentially a &quot;best guess&quot; at what will likely become the next confirmed state, after all unconfirmed events are confirmed. However, there is no guarantee that it actually will, because the grain may fail, or because the events may race against other events and lose, causing them to be canceled (if they are conditional) or appear at a later position in the sequence than anticipated (if they are unconditional). </p>
+<h1 id="concurrency-guarantees">Concurrency Guarantees</h1>
+<p>Note that Orleans turn-based scheduling (cooperative concurrency) guarantees always apply, even when using reentrancy or delayed confirmation. This means that even though several methods may be in progress, only one can be actively executing --- all others are stuck at an await, so there are never any true races caused by parallel threads. </p>
+<p>In particular, note that:</p>
+<ul>
+<li><p>The properties <code>State</code>, <code>TentativeState</code>, <code>Version</code>, and <code>UnconfirmedEvents</code> can change during the execution of a  method.</p>
+</li>
+<li><p>But such changes can only happen while stuck at an await.</p>
+</li>
+</ul>
+<p>These guarantees assume that the user code stays within the <a href="../external_tasks_and_grains.html">recommended practice</a> with respect to tasks and async/await (in particular, does not use thread pool tasks, or only uses them for code that does not call grain functionality and that are properly awaited).  </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/event_sourcing/immediate_vs_delayed_confirmation.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Configuration | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Configuration | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="configuration">Configuration</h1>
+
+<h2 id="configuring-project-references">Configuring Project References</h2>
+<h3 id="grain-interfaces">Grain Interfaces</h3>
+<p>As before, interfaces depend only on the <code>Microsoft.Orleans.Core</code> package, because the grain interface is independent of the implementation. </p>
+<h3 id="grain-implementations">Grain Implementations</h3>
+<p>JournaledGrains need to derive from <code>JournaledGrain&lt;S,E&gt;</code> or <code>JournaledGrain&lt;S&gt;</code>, which is defined in the <code>Microsoft.Orleans.EventSourcing</code> package. </p>
+<h3 id="log-consistency-providers">Log-Consistency Providers</h3>
+<p>We currently include three log-consistency providers (for state storage, log storage, and custom storage). All three are contained in the <code>Microsoft.Orleans.EventSourcing</code> package as well. Therefore, all Journaled Grains already have access to those. For a description of what these providers do and how they differ, see <a href="log_consistency_providers.html">Included Log-Consistency Providers</a>.</p>
+<h2 id="cluster-configuration">Cluster Configuration</h2>
+<p>Log-consistency providers are configured just like any other Orleans providers.
+For example, to include all three providers (of course, you probably won&#39;t need all three), add this to the <code>&lt;Globals&gt;</code> element of the configuration file:</p>
+<pre><code class="lang-xml">&lt;LogConsistencyProviders&gt;
+  &lt;Provider Type=&quot;Orleans.EventSourcing.StateStorage.LogConsistencyProvider&quot; Name=&quot;StateStorage&quot; /&gt;
+  &lt;Provider Type=&quot;Orleans.EventSourcing.LogStorage.LogConsistencyProvider&quot; Name=&quot;LogStorage&quot; /&gt;
+  &lt;Provider Type=&quot;Orleans.EventSourcing.CustomStorage.LogConsistencyProvider&quot; Name=&quot;CustomStorage&quot; /&gt;
+&lt;/LogConsistencyProviders&gt;
+</code></pre><p>The same can be achieved programmatically. Moving forward to 2.0.0 stable, ClientConfiguration and ClusterConfiguration no longer exist! It has now been replaced by a ClientBuilder and a SiloBuilder (notice there is no cluster builder). </p>
+<pre><code class="lang-csharp">builder.AddLogStorageBasedLogConsistencyProvider(&quot;LogStorage&quot;)
+</code></pre><h2 id="grain-class-attributes">Grain Class Attributes</h2>
+<p>Each journaled grain class must have a <code>LogConsistencyProvider</code> attribute to specify the log-consistency provider. Some providers additionally require a <code>StorageProvider</code> attribute.
+Eg:</p>
+<pre><code class="lang-csharp">[StorageProvider(ProviderName = &quot;OrleansLocalStorage&quot;)]
+[LogConsistencyProvider(ProviderName = &quot;LogStorage&quot;)]
+public class EventSourcedBankAccountGrain : JournaledGrain&lt;BankAccountState&gt;, IEventSourcedBankAccountGrain
+{ ... }
+</code></pre><p>So here &quot;<code>OrleansLocalStorage</code>&quot; is being used for storing the grain state, where was &quot;<code>LogStorage</code>&quot; is the in-memory storage provider for EventSourcing events.</p>
+<h3 id="logconsistencyprovider-attributes">LogConsistencyProvider Attributes</h3>
+<p>To specify the log-consistency provider, add a <code>[LogConsistencyProvider(ProviderName=...)]</code> attribute to the grain class, and give the name of the provider as configured by the Cluster Configuration. For example:</p>
+<pre><code class="lang-csharp">[LogConsistencyProvider(ProviderName = &quot;CustomStorage&quot;)]
+public class ChatGrain : JournaledGrain&lt;XDocument, IChatEvent&gt;, IChatGrain, ICustomStorage { ... }
+</code></pre><h3 id="storageprovider-attributes">StorageProvider Attributes</h3>
+<p>Some log-consistency providers (including <code>LogStorage</code> and <code>StateStorage</code>) use a standard StorageProvider to communicate with storage. This provider is specified using a separate <code>StorageProvider</code> attribute, as follows:</p>
+<pre><code class="lang-csharp">[LogConsistencyProvider(ProviderName = &quot;LogStorage&quot;)]
+[StorageProvider(ProviderName = &quot;AzureBlobStorage&quot;)]
+public class ChatGrain : JournaledGrain&lt;XDocument, IChatEvent&gt;, IChatGrain { ... }
+</code></pre><h2 id="default-providers">Default Providers</h2>
+<p>It is possible to omit the <code>LogConsistencyProvider</code> and/or the <code>StorageProvider</code> attributes, if a default is specified in the configuration. This is done by using the special name <code>Default</code> for the respective provider. For example:</p>
+<pre><code class="lang-xml">&lt;LogConsistencyProviders&gt;
+  &lt;Provider Type=&quot;Orleans.EventSourcing.LogStorage.LogConsistencyProvider&quot; Name=&quot;Default&quot; /&gt;
+&lt;/LogConsistencyProviders&gt;
+&lt;StorageProviders&gt;
+  &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;Default&quot; /&gt;
+&lt;/StorageProviders&gt;
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/event_sourcing/event_sourcing_configuration.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

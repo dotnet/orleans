@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Lifecycle | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Lifecycle | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grain-lifecycle">Grain Lifecycle</h1>
+
+<h2 id="overview">Overview</h2>
+<p>Orleans grains use an observable lifecycle (See <a href="../implementation/orleans_lifecycle.html">Orleans Lifecycle</a>) for ordered activation and deactivation.
+This allows grain logic, system components and application logic to be started and stopped in an ordered manner during grain activation and collection.</p>
+<h3 id="stages">Stages</h3>
+<p>The pre-defined grain lifecycle stages are as follows.</p>
+<pre><code class="lang-csharp">public static class GrainLifecycleStage
+{
+    public const int First = int.MinValue;
+    public const int SetupState = 1000;
+    public const int Activate = 2000;
+    public const int Last = int.MaxValue;
+}
+</code></pre><ul>
+<li><code>First</code> - First stage in grain’s lifecycle</li>
+<li><code>SetupState</code> – Setup grain state, prior to activation. For stateful grains, this is the stage where state is loaded from storage.</li>
+<li><code>Activate</code> – Stage where <code>OnActivateAsync</code> and <code>OnDeactivateAsync</code> are called</li>
+<li><code>Last</code> - Last stage in grain&#39;s lifecycle</li>
+</ul>
+<p>While the grain lifecycle will be used during grain activation, since grains are not always deactivated during some error cases (such as silo crashes), applications should not rely on the grain lifecycle always being executed during grain deactivations.</p>
+<h3 id="grain-lifecycle-participation">Grain Lifecycle Participation</h3>
+<p>Application logic can participate with a grain’s lifecycle in two ways:
+The grain can participate in its lifecycle, and/or components can access the lifecycle via the grain activation context (see IGrainActivationContext.ObservableLifecycle).</p>
+<p>A grain always participates in its own lifecycle, so application logic can be introduced by overriding the participate method.</p>
+<h3 id="example">Example</h3>
+<pre><code class="lang-csharp">public override void Participate(IGrainLifecycle lifecycle)
+{
+    base.Participate(lifecycle);
+    lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
+}
+</code></pre><p>In the above example, <code>Grain&lt;T&gt;</code> overrides the <code>Participate</code> method to tell the lifecycle to call its OnSetupState method during the SetupState stage of the lifecycle.</p>
+<p>Components created during a grain’s construction can take part in the lifecycle as well, without any special grain logic being added.
+Since the grain’s activation context (<code>IGrainActivationContext</code>), including the grain’s lifecycle (<code>IGrainActivationContext.ObservableLifecycle</code>), is created before the grain is created, any component injected into the grain by the container can participate in the grain’s lifecycle.</p>
+<h3 id="example-1">Example</h3>
+<p>The below component participates in the grain’s lifecycle when created using its factory function <code>Create(..)</code>.
+This logic could exist in the component’s constructor, but that risks the component being added to the lifecycle before it’s fully constructed, which may not be safe.</p>
+<pre><code class="lang-csharp">public class MyComponent : ILifecycleParticipant&lt;IGrainLifecycle&gt;
+{
+    public static MyComponent Create(IGrainActivationContext context)
+    {
+        var component = new MyComponent();
+        component.Participate(context.ObservableLifecycle);
+        return component;
+    }
+
+    public void Participate(IGrainLifecycle lifecycle)
+    {
+        lifecycle.Subscribe&lt;MyComponent&gt;(GrainLifecycleStage.Activate, OnActivate);
+    }
+
+    private Task OnActivate(CancellationToken ct)
+    {
+        // Do stuff
+    }
+}
+</code></pre><p>By registering the above component in the service container using its <code>Create(..)</code> factory function, any grain constructed with the component as a dependency will have the component taking part in its lifecycle without any special logic in the grain.</p>
+<h4 id="register-component-in-container">Register component in container</h4>
+<pre><code class="lang-csharp">    services.AddTransient&lt;MyComponent&gt;(sp =&gt;
+        MyComponent.Create(sp.GetRequiredService&lt;IGrainActivationContext&gt;());
+</code></pre><h4 id="grain-with-component-as-dependency">Grain with component as dependency</h4>
+<pre><code class="lang-csharp">public class MyGrain : Grain, IMyGrain
+{
+    private readonly MyComponent component;
+
+    public MyGrain(MyComponent component)
+    {
+        this.component = component;
+    }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_lifecycle.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,229 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Server Configuration | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Server Configuration | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="NOTE"><h5>Note</h5><p>If you want to start a local silo and a local client for development purposes, look at the <a href="local_development_configuration.html">Local Development Configuration page</a></p>
+</div>
+<h1 id="server-configuration">Server Configuration</h1>
+<p>A silo is configured programmatically via <code>SiloHostBuilder</code> and a number of supplemental option classes.
+Option classes in Orleans follow the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options">ASP.NET Options</a> pattern, and can be loaded via files, environment variables, etc.</p>
+<p>There are several key aspects of silo configuration:</p>
+<ul>
+<li>Orleans clustering information</li>
+<li>Clustering provider</li>
+<li>Endpoints to use for silo-to-silo and client-to-silo communications</li>
+<li>Application parts</li>
+</ul>
+<p>This is an example of a silo configuration that defines cluster information, uses Azure clustering, and configures the application parts:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+    // Clustering information
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
+    {
+        options.ClusterId = &quot;my-first-cluster&quot;;
+        options.ServiceId = &quot;AspNetSampleApp&quot;;
+    })
+    // Clustering provider
+    .UseAzureStorageClustering(options =&gt; options.ConnectionString = connectionString)
+    // Endpoints
+    .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)
+    // Application parts: just reference one of the grain implementations that we use
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(ValueGrain).Assembly).WithReferences())
+    // Now create the silo!
+    .Build();
+</code></pre><p>Let&#39;s breakdown the steps used in this sample:</p>
+<h2 id="orleans-clustering-information">Orleans clustering information</h2>
+<pre><code class="lang-csharp">    [...]
+    // Clustering information
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
+    {
+        options.ClusterId = &quot;my-first-cluster&quot;;
+        options.ServiceId = &quot;AspNetSampleApp&quot;;
+    })
+    [...]
+</code></pre><p>Here we do two things:</p>
+<ul>
+<li>Set the <code>ClusterId</code> to <code>&quot;my-first-cluster&quot;</code>: this is a unique ID for the Orleans cluster. All clients and silos that use this ID will be able to talk directly to each other. You can choose to use a different <code>ClusterId</code> for different deployments, though.</li>
+<li>Set the <code>ServiceId</code> to <code>&quot;AspNetSampleApp&quot;</code>: this is a unique ID for your application that will be used by some providers, such as persistence providers. <strong>This ID should remain stable and not change across deployments</strong>.</li>
+</ul>
+<h2 id="clustering-provider">Clustering provider</h2>
+<pre><code class="lang-csharp">    [...]
+    // Clustering provider
+    .UseAzureStorageClustering(options =&gt; options.ConnectionString = connectionString)
+    [...]
+</code></pre><p> Usually, a service built on Orleans is deployed on a cluster of nodes, either on dedicated hardware or in Azure.
+ For development and basic testing, Orleans can be deployed in a single node configuration.
+ When deployed to a cluster of nodes, Orleans internally implements a set of protocols to discover and maintain membership of Orleans silos in the cluster, including detection of node failures and automatic reconfiguration.</p>
+<p> For reliable management of cluster membership, Orleans uses Azure Table, SQL Server, or Apache ZooKeeper for synchronization of nodes.</p>
+<p> In this sample, we are using Azure Table as the membership provider.</p>
+<h2 id="endpoints">Endpoints</h2>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+    [...]
+    // Endpoints
+    .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)
+    [...]
+</code></pre><p>An Orleans silo has two typical types of endpoint configuration:</p>
+<ul>
+<li>Silo-to-silo endpoints, used for communication between silos in the same cluster</li>
+<li>Client-to-silo endpoints (or gateway), used for communication between clients and silos in the same cluster</li>
+</ul>
+<p>In the sample, we are using the helper method <code>.ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)</code> which sets the port used for silo-to-silo communication to <code>11111</code> and and the port for the gateway to <code>30000</code>.
+This method will detect which interface to listen to.</p>
+<p>This method should be sufficient in most cases, but you can customize it further if you need to.
+Here is an example of how to use an external IP address with some port-forwarding:</p>
+<pre><code class="lang-csharp">[...]
+.Configure&lt;EndpointOptions&gt;(options =&gt;
+{
+    // Port to use for Silo-to-Silo
+    options.SiloPort = 11111;
+    // Port to use for the gateway
+    options.GatewayPort = 30000;
+    // IP Address to advertise in the cluster
+    options.AdvertisedIPAddress = IPAddress.Parse(&quot;172.16.0.42&quot;);
+    // The socket used for silo-to-silo will bind to this endpoint
+    options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 40000);
+    // The socket used by the gateway will bind to this endpoint
+    options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 50000);
+
+})
+[...]
+</code></pre><p>Internally, the silo will listen on <code>0.0.0.0:40000</code> and <code>0.0.0.0:50000</code>, but the value published in the membership provider will be <code>172.16.0.42:11111</code> and <code>172.16.0.42:30000</code>.</p>
+<h2 id="application-parts">Application parts</h2>
+<pre><code class="lang-csharp">    [...]
+    // Application parts: just reference one of the grain implementations that we use
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(ValueGrain).Assembly).WithReferences())
+    [...];
+</code></pre><p>Although this step is not technically required (if not configured, Orleans will scan all assemblies in the current folder), developers are encouraged to configure this.
+This step will help Orleans to load user assemblies and types.
+These assemblies are referred to as Application Parts.
+All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.</p>
+<p>Application Parts are configured using <code>IApplicationPartsManager</code>, which can be accessed using the <code>ConfigureApplicationParts</code> extension method on <code>IClientBuilder</code> and <code>ISiloHostBuilder</code>.
+The <code>ConfigureApplicationParts</code> method accepts a delegate, <code>Action&lt;IApplicationPartManager&gt;</code>.</p>
+<p>The following extension methods on <code>IApplicationPartManager</code> support common uses:</p>
+<ul>
+<li><code>AddApplicationPart(assembly)</code> a single assembly can be added using this extension method.</li>
+<li><code>AddFromAppDomain()</code> adds all assemblies currently loaded in the <code>AppDomain</code>.</li>
+<li><code>AddFromApplicationBaseDirectory()</code> loads and adds all assemblies in the current base path (see <code>AppDomain.BaseDirectory</code>).</li>
+</ul>
+<p>Assemblies added by the above methods can be supplemented using the following extension methods on their return type, <code>IApplicationPartManagerWithAssemblies</code>:</p>
+<ul>
+<li><code>WithReferences()</code> adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.</li>
+<li><code>WithCodeGeneration()</code> generates support code for the added parts and adds it to the part manager. Note that this requires the <code>Microsoft.Orleans.OrleansCodeGenerator</code> package to be installed and is commonly referred to as runtime code generation.</li>
+</ul>
+<p>Type discovery requires that the provided Application Parts include specific attributes.
+Adding the build-time code generation package (<code>Microsoft.Orleans.CodeGenerator.MSBuild</code> or <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present.
+Build-time code generation only supports C#.
+For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the <code>WithCodeGeneration()</code> method described above. More info regarding code generation could be found in <a href="../../grains/code_generation.html">the corresponding section</a>.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/host/configuration_guide/server_configuration.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

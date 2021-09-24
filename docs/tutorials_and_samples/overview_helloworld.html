@@ -1,0 +1,259 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Tutorial 1 Hello World | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Tutorial 1 Hello World | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="overview-hello-world">Overview: Hello World</h1>
+
+<p>This overview ties into the Hello World sample application available <a href="https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld">here</a>.</p>
+<p>The main concepts of Orleans involve a silo, a client, and one or more grains.
+Creating an Orleans app involves configuring the silo, configuring the client, and writing the grains.</p>
+<h2 id="configuring-the-silo">Configuring the silo</h2>
+<p>Silos are configured programmatically via <code>SiloHostBuilder</code> and a number of supplemental option classes.
+A list of all of the options can be found <a href="../host/configuration_guide/list_of_options_classes.html">here.</a></p>
+<pre><code class="lang-csharp">[...]
+        private static async Task&lt;ISiloHost&gt; StartSilo()
+        {
+            // define the cluster configuration
+            var builder = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .Configure&lt;ClusterOptions&gt;(options =&gt;
+                {
+                    options.ClusterId = &quot;dev&quot;;
+                    options.ServiceId = &quot;HelloWorldApp&quot;;
+                })
+                .Configure&lt;EndpointOptions&gt;(options =&gt; options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
+                .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+            var host = builder.Build();
+            await host.StartAsync();
+            return host;
+        }
+</code></pre><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.UseLocalhostClustering()</code></td>
+<td>Configures the client to connect to a silo on the localhost.</td>
+</tr>
+<tr>
+<td><code>ClusterOptions</code></td>
+<td>ClusterId is the name for the Orleans cluster must be the same for silo and client so they can talk to each other. ServiceId is the ID used for the application and it must not change across deployments</td>
+</tr>
+<tr>
+<td><code>EndpointOptions</code></td>
+<td>This tells the silo where to listen. For this example, we are using a <code>loopback</code>.</td>
+</tr>
+<tr>
+<td><code>ConfigureApplicationParts</code></td>
+<td>Adds the grain class and interface assembly as application parts to your orleans application.</td>
+</tr>
+</tbody>
+</table>
+<p>After loading the configurations, the SiloHost is built and then started asynchronously.</p>
+<h2 id="configuring-the-client">Configuring the client</h2>
+<p>Similar to the silo, the client is configured via <code>ClientBuilder</code> and a similar collection of option classes.</p>
+<pre><code class="lang-csharp">        private static async Task&lt;IClusterClient&gt; StartClientWithRetries()
+        {
+            attempt = 0;
+            IClusterClient client;
+            client = new ClientBuilder()
+                .UseLocalhostClustering()
+                .Configure&lt;ClusterOptions&gt;(options =&gt;
+                {
+                    options.ClusterId = &quot;dev&quot;;
+                    options.ServiceId = &quot;HelloWorldApp&quot;;
+                })
+                .ConfigureLogging(logging =&gt; logging.AddConsole())
+                .Build();
+
+            await client.Connect(RetryFilter);
+            Console.WriteLine(&quot;Client successfully connect to silo host&quot;);
+            return client;
+        }
+</code></pre><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.UseLocalhostClustering()</code></td>
+<td>Same as for SiloHost</td>
+</tr>
+<tr>
+<td><code>ClusterOptions</code></td>
+<td>Same as for SiloHost</td>
+</tr>
+</tbody>
+</table>
+<p>A more in-depth guide to configuring your client can be found <a href="../host/configuration_guide/client_configuration.html">in the Client Configuration section of the Configuration Guide.</a></p>
+<h2 id="writing-a-grain">Writing a grain</h2>
+<p>Grains are the key primitives of the Orleans programming model.
+Grains are the building blocks of an Orleans application, they are atomic units of isolation, distribution, and persistence.
+Grains are objects that represent application entities.
+Just like in the classic Object Oriented Programming, a grain encapsulates state of an entity and encodes its behavior in the code logic.
+Grains can hold references to each other and interact by invoking each other’s methods exposed via interfaces.</p>
+<p>You can read more about them in the <a href="../grains/index.html">Core Concepts section of the Orleans documentation.</a></p>
+<p>This is the main body of code for the Hello World grain:</p>
+<pre><code class="lang-csharp">[...]
+namespace HelloWorld.Grains
+{
+    public class HelloGrain : Orleans.Grain, IHello
+    {
+        Task&lt;string&gt; IHello.SayHello(string greeting)
+        {
+            logger.LogInformation($&quot;SayHello message received: greeting = &#39;{greeting}&#39;&quot;);
+            return Task.FromResult($&quot;You said: &#39;{greeting}&#39;, I say: Hello!&quot;);
+        }
+    }
+}
+</code></pre><p>A grain class implements one or more grain interfaces, as you can read <a href="../grains/index.html">here, in the Grains section.</a></p>
+<pre><code class="lang-csharp">[...]
+namespace HelloWorld.Interfaces
+{
+    public interface IHello : Orleans.IGrainWithIntegerKey
+    {
+        Task&lt;string&gt; SayHello(string greeting);
+    }
+}
+</code></pre><h2 id="how-the-parts-work-together">How the parts work together</h2>
+<p>This programming model is built as part of our core concept of distributed Object Oriented Programming.
+SiloHost is started first.
+Then, the OrleansClient program is started.
+The Main method of OrleansClient calls the method that starts the client, <code>StartClientWithRetries().</code>
+The client is passed to the <code>DoClientWork()</code> method.</p>
+<pre><code class="lang-csharp">
+        private static async Task DoClientWork(IClusterClient client)
+        {
+            // example of calling grains from the initialized client
+            var friend = client.GetGrain&lt;IHello&gt;(0);
+            var response = await friend.SayHello(&quot;Good morning, my friend!&quot;);
+            Console.WriteLine(&quot;\n\n{0}\n\n&quot;, response);
+        }
+</code></pre><p>At this point, OrleansClient creates a reference to the IHello grain and calls its SayHello() method through its interface, IHello.
+This call activates the grain in the silo.
+OrleansClient sends a greeting to the activated grain.
+The grain returns the greeting as a response to OrleansClient, which OrleansClient displays on the console.</p>
+<h2 id="running-the-sample-app">Running the sample app</h2>
+<p>To run the sample app, refer to the <a href="https://github.com/dotnet/orleans/tree/main/samples/HelloWorld">Readme.</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/overview_helloworld.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

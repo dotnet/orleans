@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>De-inventing the wheel | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="De-inventing the wheel | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="de-inventing-the-wheel">De-inventing the wheel</h1>
+
+<p><a href="https://github.com/jdom">Julian Dominguez</a>
+4/12/2017 2:49:11 PM</p>
+<hr>
+<p>The Microsoft Orleans project started many years ago in Microsoft Research, when not even the Task class existed.
+As the project matured, many non-core abstractions &amp; functionality was needed to support its growth.
+These abstractions didn&#39;t exist as standards in .NET and .NET OSS was in its infancy.
+Examples of these pieces are cross-cutting concerns such as Logging, Configuration, and Dependency Injection.</p>
+<p>As time passed, some common abstractions and patterns emerged, and it reached a point where it makes sense to just adopt them.
+There are many reasons as to why:</p>
+<ul>
+<li>Developers are used to the standard patterns and abstractions, so newcomers do not need to learn these non-core abstractions just to use Orleans.</li>
+<li>Standard abstractions have an enormous level of adoption with almost every 3rd party component related to that abstraction. On the other hand, today it requires that the Orleans community builds integration packages to many 3rd party components (ie: to use Serilog, log4net, or push events to ETW), as the owners of these will just create integration packages for the common abstractions, but not for Orleans or any other non-standard abstraction.</li>
+<li>We created custom abstractions to be good enough to do the job, but we don&#39;t focus too much after that on usability, as it just goes into maintenance mode. Sometimes we find out that these abstractions were not good enough, so we must make breaking changes (for example our move to non-static clients and silos requires a non-static logging abstraction).</li>
+<li>These standard abstractions are very well thought out to do that specific job, and are generally very flexible, simple to use, and have a lot of documentation. We just stand on their shoulders.</li>
+<li>Deleting code that is not important to Orleans core functionality is always good.</li>
+</ul>
+<p><img src="media/2017/04/reinvent-the-wheel.jpg" alt="Reinventing the wheel leads to unnecessary work"></p>
+<p>We already started using the <a href="https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection">Microsoft.Extensions.DependencyInjection</a> abstractions for enabling DI, moving away for our poor man&#39;s object activation (and 2-step initialization) approach in many places.</p>
+<p>As we move forward, we plan to deprecate some of our custom abstractions in favor of standard ones.
+In particular we are already thinking of 2 upcoming changes:</p>
+<ul>
+<li>Migrate our logging abstractions to
+<a href="https://www.nuget.org/packages/Microsoft.Extensions.Logging">Microsoft.Extensions.Logging</a>.</li>
+<li>Revamp our configuration and startup pattern to align with ASP.NET  Core&#39;s. See <a href="https://github.com/dotnet/orleans/issues/2936">dotnet/orleans#2936</a> for an initial design of this move.</li>
+</ul>
+<p>As always, we&#39;ll try to keep breaking changes to a minimum, but we don&#39;t strictly prevent breaking changes.
+Sometimes we make our new versions be source code compatible (meaning that developers can&#39;t simply use binding redirects on Orleans assemblies, but re-building their code might still compile) or require a few minimal fixes.
+Sometimes breaking changes are *bigger* if they would just affect a small feature or something that is typically not spread-out through the entire codebase of our users (such as extensibility points that do not affect grain code).</p>
+<p>Also, it seems like an appropriate time to look at these abstractions with a fresh mind, since that&#39;s what the .NET community seems to be doing when looking forward at things like ASP.NET and .NET Core.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/blog/de-inventing-the-wheel.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

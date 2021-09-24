@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Multi-Cluster Communication | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Multi-Cluster Communication | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h2 id="multi-cluster-communication">Multi-Cluster Communication</h2>
+
+<p>The network must be configured in such a way that any Orleans silo can connect to any other Orleans silo via TCP/IP, regardless of where in the world it is located. Exactly how this is achieved is outside of the scope of Orleans, as it depends on how and where silos are deployed.</p>
+<p>For example, on Windows Azure, we can use  VNETs to connect muliple deployments within a region, and gateways to connect VNETs across different regions. </p>
+<h3 id="cluster-id">Cluster Id</h3>
+<p>Each cluster has its own unique cluster id. The cluster id must be specified in the global configuration. </p>
+<p>Cluster ids may not be empty, nor may they contain commas. Also, if using Azure Table Storage, cluster ids may not contain the characters forbidden for row keys 
+(/, , #, ?).</p>
+<p>We recommend using very short strings for the cluster ids, because cluster ids are transmitted frequently and may be stored in storage by some log-view providers.</p>
+<h3 id="cluster-gateways">Cluster Gateways</h3>
+<p>Each cluster automatically designates a subset of its active silos to serve as <em>cluster gateways</em>. Cluster gateways directly advertise their IP addresses to other clusters, and can thus serve as  &quot;points of first contact&quot;. By default, at most 10 silos (or whatever number is configured as <code>MaxMultiClusterGateways</code>) are designated as cluster gateways.</p>
+<p>Communication between silos in different clusters does <em>not</em> always pass through a gateway. Once a silo has learned and cached the location of a grain activation (no matter in what cluster), it sends messages to that silo directly, even if the silo is not a cluster gateway.</p>
+<h3 id="gossip">Gossip</h3>
+<p>Gossip is a mechanism for clusters to share configuration and status information. As the name suggests, gossip is decentralized and bidirectional: each silo communicates directly with other silos, both in the same cluster and in other clusters, to exchange information in both directions. </p>
+<p><strong>Content</strong>. Gossip contains some or all of the following information:</p>
+<ul>
+<li>The current time-stamped <a href="MultiClusterConfiguration.html">multi-cluster configuration</a>.</li>
+<li>A dictionary that contains information about cluster gateways. The key is the silo address, and the value contains (1) a timestamp, (2) the cluster id, and (3) a status, which is either active or inactive. </li>
+</ul>
+<p><strong>Fast &amp; Slow Propagation</strong>. When a gateway changes its status, or when an operator injects a new configuration, this gossip information is immediately sent  to all silos, clusters, and gossip channels. This happens fast, but is not reliable. Should the message be lost due to any reasons (e.g. races, broken sockets, silo failures), our periodic background gossip ensures that the information eventually spreads, albeit more slowly.  All information is eventually propagated everywhere, and is highly resilient to occasional message loss and failures. </p>
+<p>All gossip data is timestamped, which ensures that newer information replaces older information regardless of the relative timing of messages. For example, newer multi-cluster configurations replace older ones, and newer information about a gateway replaces older information about that gateway. For more details on the representation of gossip data, see the <code>MultiClusterData</code> class. It has a <code>Merge</code> method that combines gossip data, resolving conflicts using timestamps. </p>
+<h3 id="gossip-channels">Gossip Channels</h3>
+<p>When a silo is first started, or when it is restarted after a failure, it needs to have a way to <strong>bootstrap the gossip</strong>. This is the role of the <em>gossip channel</em>, which can be configured in the <a href="SiloConfiguration.html">Silo Configuration</a>. On startup, a silo fetches all the information from the gossip channels. After startup, a silo keeps gossiping periodically, every 30 seconds or whatever is configured as <code>BackgroundGossipInterval</code>. Each time it synchronizes its gossip information with a partner randomly selected from all cluster gateways and gossip channels. </p>
+<p>Notes: </p>
+<ul>
+<li><p>Though not strictly required, we recommend to always configure at least two gossip channels, in distinct regions, for better availability.  </p>
+</li>
+<li><p>Latency of communication with gossip channels is not critical.</p>
+</li>
+<li><p>Multiple different services can use the same gossip channel without interference, as long as the ServiceId Guid (as specified by their respective configuration) is distinct.</p>
+</li>
+<li><p>There is no strict requirement that all silos use the same gossip channels, as long as the channels are sufficient to let a silo initially connect with the &quot;gossiping community&quot; when it starts up. But if a gossip channel is not part of a  silo&#39;s configuration, and that silo is a gateway, it does not push its status updates to the channel (fast propagation), so it may take longer before those reach the channel via periodic background gossip (slow propagation). </p>
+</li>
+</ul>
+<h4 id="azure-table-based-gossip-channel">Azure-Table-Based Gossip Channel</h4>
+<p>We have already implemented a gossip channel based on Azure Tables. The configuration specifies standard connection strings used for Azure accounts. For example, a configuration could specify two gossip channels with separate Azure storage accounts <code>usa</code> and <code>europe</code> as follows:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;MultiClusterOptions&gt;(options =&gt; 
+  {
+    [...]
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=usa;AccountKey=...&quot;);
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=europe;AccountKey=...&quot;)
+    [...]
+  })
+  [...]
+</code></pre><p>Multiple different services can use the same gossip channel without interference, as long as the ServiceId guid specified by their respective configuration is distinct.</p>
+<h4 id="other-gossip-channel-implementations">Other Gossip Channel Implementations</h4>
+<p>We are working on other gossip channel providers, similar to how membership and reminders are packaged for many different storage back-ends.  </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/multi-cluster_support/GossipChannels.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

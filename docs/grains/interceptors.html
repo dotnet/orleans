@@ -1,0 +1,487 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Call Filters | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Call Filters | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grain-call-filters">Grain Call Filters</h1>
+
+<p>Grain call filters provide a means for intercepting grain calls. Filters can execute code both before and after a grain call. Multiple filters can be installed simultaneously. Filters are asynchronous and can modify <code>RequestContext</code>, arguments, and the return value of the method being invoked. Filters can also inspect the <code>MethodInfo</code> of the method being invoked on the grain class and can be used to throw or handle exceptions.</p>
+<p>Some example usages of grain call filters are:</p>
+<ul>
+<li>Authorization: a filter can inspect the method being invoked and the arguments or some authorization information in the <code>RequestContext</code> to determine whether or not to allow the call to proceed.</li>
+<li>Logging/Telemetry: a filter can log information and capture timing data and other statistics about method invocation.</li>
+<li>Error Handling: a filter can intercept exceptions thrown by a method invocation and transform it into another exception or handle the exception as it passes through the filter.</li>
+</ul>
+<p>Filters come in two flavors:</p>
+<ul>
+<li>Incoming call filters</li>
+<li>Outgoing call filters</li>
+</ul>
+<p>Incoming call filters are executed when receiving a call. Outgoing call filters are executed when making a call.</p>
+<h1 id="incoming-call-filters">Incoming Call Filters</h1>
+<p>Incoming grain call filters implement the <code>IIncomingGrainCallFilter</code> interface, which has one method:</p>
+<pre><code class="lang-csharp">public interface IIncomingGrainCallFilter
+{
+    Task Invoke(IIncomingGrainCallContext context);
+}
+</code></pre><p>The <code>IIncomingGrainCallContext</code> argument passed to the <code>Invoke</code> method has the following shape:</p>
+<pre><code class="lang-csharp">public interface IIncomingGrainCallContext
+{
+    /// &lt;summary&gt;
+    /// Gets the grain being invoked.
+    /// &lt;/summary&gt;
+    IAddressable Grain { get; }
+
+    /// &lt;summary&gt;
+    /// Gets the &lt;see cref=&quot;MethodInfo&quot;/&gt; for the interface method being invoked.
+    /// &lt;/summary&gt;
+    MethodInfo InterfaceMethod { get; }
+
+    /// &lt;summary&gt;
+    /// Gets the &lt;see cref=&quot;MethodInfo&quot;/&gt; for the implementation method being invoked.
+    /// &lt;/summary&gt;
+    MethodInfo ImplementationMethod { get; }
+
+    /// &lt;summary&gt;
+    /// Gets the arguments for this method invocation.
+    /// &lt;/summary&gt;
+    object[] Arguments { get; }
+
+    /// &lt;summary&gt;
+    /// Invokes the request.
+    /// &lt;/summary&gt;
+    Task Invoke();
+
+    /// &lt;summary&gt;
+    /// Gets or sets the result.
+    /// &lt;/summary&gt;
+    object Result { get; set; }
+}
+</code></pre><p>The <code>IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext)</code> method must await or return the result of <code>IIncomingGrainCallContext.Invoke()</code> to execute the next configured filter and eventually the grain method itself. The <code>Result</code> property can be modified after awaiting the <code>Invoke()</code> method. The <code>ImplementationMethod</code> property returns the <code>MethodInfo</code> of the implementation class. The <code>MethodInfo</code> of the interface method can be accessed using the <code>InterfaceMethod</code> property. Grain call filters are called for all method calls to a grain and this includes calls to grain extensions (implementations of <code>IGrainExtension</code>) which are installed in the grain. For example, grain extensions are used to implement Streams and Cancellation Tokens. Therefore, it should be expected that the value of <code>ImplementationMethod</code> is not always a method in the grain class itself.</p>
+<h2 id="configuring-incoming-grain-call-filters">Configuring Incoming Grain Call Filters</h2>
+<p>Implementations of <code>IIncomingGrainCallFilter</code> can either be registered as silo-wide filters via Dependency Injection or they can be registered as grain-level filters via a grain implementing <code>IIncomingGrainCallFilter</code> directly.</p>
+<h3 id="silo-wide-grain-call-filters">Silo-wide Grain Call Filters</h3>
+<p>A delegate can be registered as a silo-wide grain call filters using Dependency Injection like so:</p>
+<pre><code class="lang-csharp">siloHostBuilder.AddIncomingGrainCallFilter(async context =&gt;
+{
+    // If the method being called is &#39;MyInterceptedMethod&#39;, then set a value
+    // on the RequestContext which can then be read by other filters or the grain.
+    if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrain.MyInterceptedMethod)))
+    {
+        RequestContext.Set(&quot;intercepted value&quot;, &quot;this value was added by the filter&quot;);
+    }
+
+    await context.Invoke();
+
+    // If the grain method returned an int, set the result to double that value.
+    if (context.Result is int resultValue) context.Result = resultValue * 2;
+});
+</code></pre><p>Similarly, a class can be registered as a grain call filter using the <code>AddIncomingGrainCallFilter</code> helper method.
+Here is an example of a grain call filter which logs the results of every grain method:</p>
+<pre><code class="lang-csharp">public class LoggingCallFilter : IIncomingGrainCallFilter
+{
+    private readonly Logger log;
+
+    public LoggingCallFilter(Factory&lt;string, Logger&gt; loggerFactory)
+    {
+        this.log = loggerFactory(nameof(LoggingCallFilter));
+    }
+
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        try
+        {
+            await context.Invoke();
+            var msg = string.Format(
+                &quot;{0}.{1}({2}) returned value {3}&quot;,
+                context.Grain.GetType(),
+                context.InterfaceMethod.Name,
+                string.Join(&quot;, &quot;, context.Arguments),
+                context.Result);
+            this.log.Info(msg);
+        }
+        catch (Exception exception)
+        {
+            var msg = string.Format(
+                &quot;{0}.{1}({2}) threw an exception: {3}&quot;,
+                context.Grain.GetType(),
+                context.InterfaceMethod.Name,
+                string.Join(&quot;, &quot;, context.Arguments),
+                exception);
+            this.log.Info(msg);
+
+            // If this exception is not re-thrown, it is considered to be
+            // handled by this filter.
+            throw;
+        }
+    }
+}
+</code></pre><p>This filter can then be registered using the <code>AddIncomingGrainCallFilter</code> extension method:</p>
+<pre><code class="lang-csharp">siloHostBuilder.AddIncomingGrainCallFilter&lt;LoggingCallFilter&gt;();
+</code></pre><p>Alternatively, the filter can be registered without the extension method:</p>
+<pre><code class="lang-csharp">siloHostBuilder.ConfigureServices(
+    services =&gt; services.AddSingleton&lt;IIncomingGrainCallFilter, LoggingCallFilter&gt;());
+</code></pre><h3 id="per-grain-grain-call-filters">Per-grain Grain Call Filters</h3>
+<p>A grain class can register itself as a grain call filter and filter any calls made to it by implementing <code>IIncomingGrainCallFilter</code> like so:</p>
+<pre><code class="lang-csharp">public class MyFilteredGrain : Grain, IMyFilteredGrain, IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        await context.Invoke();
+
+        // Change the result of the call from 7 to 38.
+        if (string.Equals(context.InterfaceMethod.Name, nameof(this.GetFavoriteNumber)))
+        {
+            context.Result = 38;
+        }
+    }
+
+    public Task&lt;int&gt; GetFavoriteNumber() =&gt; Task.FromResult(7);
+}
+</code></pre><p>In the above example, all calls to the <code>GetFavoriteNumber</code> method will return <code>38</code> instead of <code>7</code>, because the return value has been altered by the filter.</p>
+<p>Another use case for filters is in access control, as in this example:</p>
+<pre><code class="lang-csharp">[AttributeUsage(AttributeTargets.Method)]
+public class AdminOnlyAttribute : Attribute { }
+
+public class MyAccessControlledGrain : Grain, IMyFilteredGrain, IIncomingGrainCallFilter
+{
+    public Task Invoke(IIncomingGrainCallContext context)
+    {
+        // Check access conditions.
+        var isAdminMethod = context.ImplementationMethod.GetCustomAttribute&lt;AdminOnlyAttribute&gt;();
+        if (isAdminMethod &amp;&amp; !(bool) RequestContext.Get(&quot;isAdmin&quot;))
+        {
+            throw new AccessDeniedException($&quot;Only admins can access {context.ImplementationMethod.Name}!&quot;);
+        }
+
+        return context.Invoke();
+    }
+
+    [AdminOnly]
+    public Task&lt;int&gt; SpecialAdminOnlyOperation() =&gt; Task.FromResult(7);
+}
+</code></pre><p>In the above example, the <code>SpecialAdminOnlyOperation</code> method can only be called if <code>&quot;isAdmin&quot;</code> is set to <code>true</code> in the <code>RequestContext</code>. In this way, grain call filters can be used for authorization. In this example, it is the responsibility of the caller to ensure that the <code>&quot;isAdmin&quot;</code> value is set correctly and that authentication is performed correctly. Note that the <code>[AdminOnly]</code> attribute is specified on the grain class method. This is because the <code>ImplementationMethod</code> property returns the <code>MethodInfo</code> of the implementation, not the interface. The filter could also check the <code>InterfaceMethod</code> property.</p>
+<h2 id="ordering-of-grain-call-filters">Ordering of Grain Call Filters</h2>
+<p>Grain call filters follow a defined ordering:</p>
+<ol>
+<li><code>IIncomingGrainCallFilter</code> implementations configured in the dependency injection container, in the order in which they are registered.</li>
+<li>Grain-level filter, if the grain implements <code>IIncomingGrainCallFilter</code>.</li>
+<li>Grain method implementation or grain extension method implementation.</li>
+</ol>
+<p>Each call to <code>IIncomingGrainCallContext.Invoke()</code> encapsulates the next defined filter so that each filter has a chance to execute code before and after the next filter in the chain and eventually the grain method itself.</p>
+<h1 id="outgoing-call-filters">Outgoing Call Filters</h1>
+<p>Outgoing grain call filters are similar to incoming grain call filters with the major difference being that they are invoked on the caller (client) rather than the callee (grain).</p>
+<p>Outgoing grain call filters implement the <code>IOutgoingGrainCallFilter</code> interface, which has one method:</p>
+<pre><code class="lang-csharp">public interface IOutgoingGrainCallFilter
+{
+    Task Invoke(IOutgoingGrainCallContext context);
+}
+</code></pre><p>The <code>IOutgoingGrainCallContext</code> argument passed to the <code>Invoke</code> method has the following shape:</p>
+<pre><code class="lang-csharp">public interface IOutgoingGrainCallContext
+{
+    /// &lt;summary&gt;
+    /// Gets the grain being invoked.
+    /// &lt;/summary&gt;
+    IAddressable Grain { get; }
+
+    /// &lt;summary&gt;
+    /// Gets the &lt;see cref=&quot;MethodInfo&quot;/&gt; for the interface method being invoked.
+    /// &lt;/summary&gt;
+    MethodInfo InterfaceMethod { get; }
+
+    /// &lt;summary&gt;
+    /// Gets the arguments for this method invocation.
+    /// &lt;/summary&gt;
+    object[] Arguments { get; }
+
+    /// &lt;summary&gt;
+    /// Invokes the request.
+    /// &lt;/summary&gt;
+    Task Invoke();
+
+    /// &lt;summary&gt;
+    /// Gets or sets the result.
+    /// &lt;/summary&gt;
+    object Result { get; set; }
+}
+</code></pre><p>The <code>IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext)</code> method must await or return the result of <code>IOutgoingGrainCallContext.Invoke()</code> to execute the next configured filter and eventually the grain method itself. The <code>Result</code> property can be modified after awaiting the <code>Invoke()</code> method. The <code>MethodInfo</code> of the interface method being called can be accessed using the <code>InterfaceMethod</code> property. Outgoing grain call filters are invoked for all method calls to a grain and this includes calls to system methods made by Orleans.</p>
+<h2 id="configuring-outgoing-grain-call-filters">Configuring Outgoing Grain Call Filters</h2>
+<p>Implementations of <code>IOutgoingGrainCallFilter</code> can either be registered on both silos and clients using Dependency Injection.</p>
+<p>A delegate can be registered as a call filter like so:</p>
+<pre><code class="lang-csharp">builder.AddOutgoingGrainCallFilter(async context =&gt;
+{
+    // If the method being called is &#39;MyInterceptedMethod&#39;, then set a value
+    // on the RequestContext which can then be read by other filters or the grain.
+    if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrain.MyInterceptedMethod)))
+    {
+        RequestContext.Set(&quot;intercepted value&quot;, &quot;this value was added by the filter&quot;);
+    }
+
+    await context.Invoke();
+
+    // If the grain method returned an int, set the result to double that value.
+    if (context.Result is int resultValue) context.Result = resultValue * 2;
+});
+</code></pre><p>In the above code, <code>builder</code> may be either an instance of <code>ISiloHostBuilder</code> or <code>IClientBuilder</code>.</p>
+<p>Similarly, a class can be registered as an outgoing grain call filter.
+Here is an example of a grain call filter which logs the results of every grain method:</p>
+<pre><code class="lang-csharp">public class LoggingCallFilter : IOutgoingGrainCallFilter
+{
+    private readonly Logger log;
+
+    public LoggingCallFilter(Factory&lt;string, Logger&gt; loggerFactory)
+    {
+        this.log = loggerFactory(nameof(LoggingCallFilter));
+    }
+
+    public async Task Invoke(IOutgoingGrainCallContext context)
+    {
+        try
+        {
+            await context.Invoke();
+            var msg = string.Format(
+                &quot;{0}.{1}({2}) returned value {3}&quot;,
+                context.Grain.GetType(),
+                context.InterfaceMethod.Name,
+                string.Join(&quot;, &quot;, context.Arguments),
+                context.Result);
+            this.log.Info(msg);
+        }
+        catch (Exception exception)
+        {
+            var msg = string.Format(
+                &quot;{0}.{1}({2}) threw an exception: {3}&quot;,
+                context.Grain.GetType(),
+                context.InterfaceMethod.Name,
+                string.Join(&quot;, &quot;, context.Arguments),
+                exception);
+            this.log.Info(msg);
+
+            // If this exception is not re-thrown, it is considered to be
+            // handled by this filter.
+            throw;
+        }
+    }
+}
+</code></pre><p>This filter can then be registered using the <code>AddOutgoingGrainCallFilter</code> extension method:</p>
+<pre><code class="lang-csharp">builder.AddOutgoingGrainCallFilter&lt;LoggingCallFilter&gt;();
+</code></pre><p>Alternatively, the filter can be registered without the extension method:</p>
+<pre><code class="lang-csharp">builder.ConfigureServices(
+    services =&gt; services.AddSingleton&lt;IOutgoingGrainCallFilter, LoggingCallFilter&gt;());
+</code></pre><p>As with the delegate call filter example, <code>builder</code> may be an instance of either <code>ISiloHostBuiler</code> or <code>IClientBuilder</code>.</p>
+<h2 id="use-cases">Use Cases</h2>
+<h3 id="exception-conversion">Exception Conversion</h3>
+<p>When an exception which has been thrown from the server is getting deserialized on the client, you may sometimes get the following exception instead of the actual one: <code>TypeLoadException: Could not find Whatever.dll.</code></p>
+<p>This happens if the assembly containing the exception is not available to the client. For example, say you are using Entity Framework in your grain implementations; then it is possible that an <code>EntityException</code> is thrown. The client on the other hand does not (and should not) reference <code>EntityFramework.dll</code> since it has no knowledge about the underlying data access layer.</p>
+<p>When the client tries to deserialize the <code>EntityException</code>, it will fail due to the missing DLL; as a consequence a <code>TypeLoadException</code> is thrown hiding the original <code>EntityException</code>.</p>
+<p>One may argue that this is pretty okay, since the client would never handle the <code>EntityException</code>; otherwise it would have to reference <code>EntityFramework.dll</code>.</p>
+<p>But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type <code>Exception</code> if the exception type is presumably unknown on the client side.</p>
+<p>However, there is one important thing we have to keep in mind: we only want to replace an exception <strong>if the caller is the grain client</strong>. We don&#39;t want to replace an exception if the caller is another grain (or the Orleans infrastructure which is making grain calls, too; e.g. on the <code>GrainBasedReminderTable</code> grain).</p>
+<p>On the server side this can be done with a silo-level interceptor:</p>
+<pre><code class="lang-csharp">public class ExceptionConversionFilter : IIncomingGrainCallFilter
+{
+    private static readonly HashSet&lt;string&gt; KnownExceptionTypeAssemblyNames =
+        new HashSet&lt;string&gt;
+        {
+            typeof(string).Assembly.GetName().Name,
+            &quot;System&quot;,
+            &quot;System.ComponentModel.Composition&quot;,
+            &quot;System.ComponentModel.DataAnnotations&quot;,
+            &quot;System.Configuration&quot;,
+            &quot;System.Core&quot;,
+            &quot;System.Data&quot;,
+            &quot;System.Data.DataSetExtensions&quot;,
+            &quot;System.Net.Http&quot;,
+            &quot;System.Numerics&quot;,
+            &quot;System.Runtime.Serialization&quot;,
+            &quot;System.Security&quot;,
+            &quot;System.Xml&quot;,
+            &quot;System.Xml.Linq&quot;,
+
+            &quot;MyCompany.Microservices.DataTransfer&quot;,
+            &quot;MyCompany.Microservices.Interfaces&quot;,
+            &quot;MyCompany.Microservices.ServiceLayer&quot;
+        };
+
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        var isConversionEnabled =
+            RequestContext.Get(&quot;IsExceptionConversionEnabled&quot;) as bool? == true;
+        if (!isConversionEnabled)
+        {
+            // If exception conversion is not enabled, execute the call without interference.
+            await context.Invoke();
+            return;
+        }
+
+        RequestContext.Remove(&quot;IsExceptionConversionEnabled&quot;);
+        try
+        {
+            await context.Invoke();
+        }
+        catch (Exception exc)
+        {
+            var type = exc.GetType();
+
+            if (KnownExceptionTypeAssemblyNames.Contains(type.Assembly.GetName().Name))
+            {
+                throw;
+            }
+
+            // Throw a base exception containing some exception details.
+            throw new Exception(
+                string.Format(
+                    &quot;Exception of non-public type &#39;{0}&#39; has been wrapped.&quot;
+                    + &quot; Original message: &lt;&lt;&lt;&lt;----{1}{2}{3}----&gt;&gt;&gt;&gt;&quot;,
+                    type.FullName,
+                    Environment.NewLine,
+                    exc,
+                    Environment.NewLine));
+        }
+    }
+}
+</code></pre><p>This filter can then be registered on the silo:</p>
+<pre><code class="lang-csharp">siloHostBuilder.AddIncomingGrainCallFilter&lt;ExceptionConversionFilter&gt;();
+</code></pre><p>Enable the filter for calls made by the client by adding an outgoing call filter:</p>
+<pre><code class="lang-csharp">clientBuilder.AddOutgoingGrainCallFilter(context =&gt;
+{
+    RequestContext.Set(&quot;IsExceptionConversionEnabled&quot;, true);
+    return context.Invoke();
+});
+</code></pre><p>This way the client tells the server that it wants to use exception conversion.</p>
+<h3 id="calling-grains-from-interceptors">Calling Grains from Interceptors</h3>
+<p>It is possible to make grain calls from an interceptor by injecting <code>IGrainFactory</code> into the interceptor class:</p>
+<pre><code class="lang-csharp">private readonly IGrainFactory grainFactory;
+
+public CustomCallFilter(IGrainFactory grainFactory)
+{
+  this.grainFactory = grainFactory;
+}
+
+public async Task Invoke(IIncomingGrainCallContext context)
+{
+  // Hook calls to any grain other than ICustomFilterGrain implementations.
+  // This avoids potential infinite recursion when calling OnReceivedCall() below.
+  if (!(context.Grain is ICustomFilterGrain))
+  {
+    var filterGrain = this.grainFactory.GetGrain&lt;ICustomFilterGrain&gt;(context.Grain.GetPrimaryKeyLong());
+
+    // Perform some grain call here.
+    await filterGrain.OnReceivedCall();
+  }
+
+  // Continue invoking the call on the target grain.
+  await context.Invoke();
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/interceptors.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

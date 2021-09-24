@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Multi-Cluster Silo Configuration | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Multi-Cluster Silo Configuration | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
+
+<p>To get a quick overview, we show all relevant configuration parameters (including optional ones) in XML syntax below:</p>
+<pre><code class="lang-html">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+  &lt;Globals&gt;
+    &lt;MultiClusterNetwork
+      ClusterId=&quot;clusterid&quot;
+      DefaultMultiCluster=&quot;uswest,europewest,useast&quot;
+      BackgroundGossipInterval=&quot;30s&quot;
+      UseGlobalSingleInstanceByDefault=&quot;false&quot;
+      GlobalSingleInstanceRetryInterval=&quot;30s&quot;
+      GlobalSingleInstanceNumberRetries=&quot;3&quot;
+      MaxMultiClusterGateways=&quot;10&quot;&gt;
+         &lt;GossipChannel  Type=&quot;...&quot;  ConnectionString=&quot;...&quot;/&gt;      
+         &lt;GossipChannel  Type=&quot;...&quot;  ConnectionString=&quot;...&quot;/&gt;      
+    &lt;/MultiClusterNetwork&gt;
+    &lt;SystemStore ... ServiceId=&quot;some-guid&quot; .../&gt;
+  &lt;/Globals&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre><pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;ClusterInfo&gt;(options =&gt;
+  {
+    options.ClusterId = &quot;us3&quot;;
+    options.ServiceId = &quot;myawesomeservice&quot;;
+  })
+  .Configure&lt;MultiClusterOptions&gt;(options =&gt; 
+  {
+    options.HasMultiClusterNetwork = true;
+    options.DefaultMultiCluster = new[] { &quot;us1&quot;, &quot;eu1&quot;, &quot;us2&quot; };
+    options.BackgroundGossipInterval = TimeSpan.FromSeconds(30);
+    options.UseGlobalSingleInstanceByDefault = false;
+    options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(30);
+    options.GlobalSingleInstanceNumberRetries = 3;
+    options.MaxMultiClusterGateways = 10;
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=usa;AccountKey=...&quot;);
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=europe;AccountKey=...&quot;)
+    [...]
+  })
+  [...]
+</code></pre><p>As usual, all configuration settings can also be read and written programmatically, via the respective members of the <code>GlobalConfiguration</code> class.</p>
+<p>The <code>Service Id</code> is an arbitrary ID for identifying this service. It must be the same for all clusters and all silos. </p>
+<p>The <code>MultiClusterNetwork</code> section is optional - if not present, all multi-cluster support is disabled for this silo.</p>
+<p>The <strong>required parameters</strong> <code>ClusterId</code> and <code>GossipChannel</code> are explained in the section on <a href="GossipChannels.html">Multi-Cluster Communication</a>.</p>
+<p>The  optional parameters <code>MaxMultiClusterGateways</code> and <code>BackgroundGossipInterval</code>  are explained in the section on <a href="GossipChannels.html">Multi-Cluster Communication</a>.</p>
+<p>The optional parameter <code>DefaultMultiCluster</code> is explained in the section on <a href="MultiClusterConfiguration.html">Multi-Cluster Configuration</a>.</p>
+<p>The optional parameters <code>UseGlobalSingleInstanceByDefault</code>,  <code>GlobalSingleInstanceRetryInterval</code> and <code>GlobalSingleInstanceNumberRetries</code> are explained in the section on <a href="GlobalSingleInstance.html">Global-Single-Instance Grains</a>.</p>
+<h2 id="orleans-client-configuration">Orleans Client Configuration</h2>
+<p>No extra configuration is required for Orleans client. The same client may not connect to silos in different clusters (the silo refuses the connection in that situation). </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/deployment/multi-cluster_support/SiloConfiguration.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

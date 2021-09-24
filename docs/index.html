@@ -1,0 +1,310 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Introduction | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Introduction | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h3 id="orleans-is-a-cross-platform-framework-for-building-robust-scalable-distributed-applications">Orleans is a cross-platform framework for building robust, scalable distributed applications</h3>
+
+<p>Orleans builds on the developer productivity of .NET and brings it to the world of distributed applications, such as cloud services.
+Orleans scales from a single on-premises server to globally distributed, highly-available applications in the cloud.</p>
+<p>Orleans takes familiar concepts like objects, interfaces, async/await, and try/catch and extends them to multi-server environments.
+As such, it helps developers experienced with single-server applications transition to building resilient, scalable cloud services and other distributed applications.
+For this reason, Orleans has often been referred to as &quot;Distributed .NET&quot;.</p>
+<p>It was created by <a href="http://research.microsoft.com/projects/orleans/">Microsoft Research</a> and introduced the <a href="http://research.microsoft.com/apps/pubs/default.aspx?id=210931">Virtual Actor Model</a> as a novel approach to building a new generation of distributed systems for the Cloud era.
+The core contribution of Orleans is its programming model which tames the complexity inherent to highly-parallel distributed systems without restricting capabilities or imposing onerous constraints on the developer.</p>
+<h2 id="grains">Grains</h2>
+<p><img src="../images/grain_formulation.svg" alt="A grain is composed of a stable identity, behavior, and state"></p>
+<p>The fundamental building block in any Orleans application is a <em>grain</em>.
+Grains are entities comprising user-defined identity, behavior, and state.
+Grain identities are user-defined keys which make Grains always available for invocation.
+Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts).
+Each grain is an instance of a class which implements one or more of these interfaces.</p>
+<p>Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifying recovery from failures.
+Grain state is kept in memory while the grain is active, leading to lower latency and less load on data stores.</p>
+<p align="center">
+  <img src="../images/managed_lifecycle.svg" alt="">
+</p>
+
+<p>Instantiation of grains is automatically performed on demand by the Orleans runtime. Grains which are not used for a while are automatically removed from memory to free up resources.
+This is possible because of their stable identity, which allows invoking grains whether they are already loaded into memory or not.
+This also allows for transparent recovery from failure because the caller does not need to know on which server a grain is instantiated on at any point in time.
+Grains have a managed lifecycle, with the Orleans runtime responsible for activating/deactivating, and placing/locating grains as needed. This allows the developer to write code as if all grains were always in-memory.</p>
+<p>Taken together, the stable identity, statefulness, and managed lifecycle of Grains are core factors that make systems built on Orleans scalable, performant, &amp; reliable without forcing developers to write complex distributed systems code.</p>
+<h3 id="example-internet-of-things-cloud-backend">Example: Internet of Things Cloud Backend</h3>
+<p>Consider a cloud backend for an <a href="https://en.wikipedia.org/wiki/Internet_of_things">Internet of Things</a> system.
+This application needs to process incoming device data, filter, aggregate, and process this information, and enable sending commands to devices.
+In Orleans, it is natural to model each device with a grain which becomes a <em>digital twin</em> of the physical device it corresponds to.
+These grains keep the latest device data in memory, so that they can be quickly queried and processed without the need to communicate with the physical device directly.
+By observing streams of time-series data from the device, the grain can detect changes in conditions, such as measurements exceeding a threshold, and trigger an action.</p>
+<p>A simple thermostat could be modeled as follows:</p>
+<pre><code class="lang-C#">public interface IThermostat : IGrainWithStringKey
+{
+  Task&lt;List&lt;Command&gt;&gt; OnUpdate(ThermostatStatus update);
+}
+</code></pre><p>Events arriving from the thermostat from a Web frontend can be sent to its grain by invoking the <code>OnUpdate</code> method which optionally returns a command back to the device.</p>
+<pre><code class="lang-C#">var thermostat = client.GetGrain&lt;IThermostat&gt;(id);
+return await thermostat.OnUpdate(update);
+</code></pre><p>The same thermostat grain can implement a separate interface for control systems to interact with:</p>
+<pre><code class="lang-C#">public interface IThermostatControl : IGrainWithStringKey
+{
+  Task&lt;ThermostatStatus&gt; GetStatus();
+
+  Task UpdateConfiguration(ThermostatConfiguration config);
+}
+</code></pre><p>These two interfaces (<code>IThermostat</code> and <code>IThermostatControl</code>) are implemented by a single implementation class:</p>
+<pre><code class="lang-C#">public class ThermostatGrain : Grain, IThermostat, IThermostatControl
+{
+  private ThermostatStatus _status;
+  private List&lt;Command&gt; _commands;
+
+  public Task&lt;List&lt;Command&gt;&gt; OnUpdate(ThermostatStatus status)
+  {
+    _status = status;
+    var result = _commands;
+    _commands = new List&lt;Command&gt;();
+    return Task.FromResult(result);
+  }
+
+  public Task&lt;ThermostatStatus&gt; GetStatus() =&gt; Task.FromResult(_status);
+
+  public Task UpdateConfiguration(ThermostatConfiguration config)
+  {
+    _commands.Add(new ConfigUpdateCommand(config));
+    return Task.CompletedTask;
+  }
+}
+</code></pre><p>The grain class above does not persist its state.
+More thorough example demonstrating state persistence is available in the <a href="grains/grain_persistence/index.html">documentation</a>.</p>
+<h2 id="orleans-runtime">Orleans Runtime</h2>
+<p>The Orleans runtime is what implements the programming model for applications.The main component of the runtime is the <em>silo</em>, which is responsible for hosting grains.
+Typically, a group of silos run as a cluster for scalability and fault-tolerance.
+When run as a cluster, silos coordinate with each other to distribute work, detect and recover from failures.
+The runtime enables grains hosted in the cluster to communicate with each other as if they are within a single process.</p>
+<p>In addition to the core programming model, the silo provides grains with a set of runtime services, such as timers, reminders (persistent timers), persistence, transactions, streams, and more.
+See the <a href="#features">features section</a> below for more detail.</p>
+<p>Web frontends and other external clients call grains in the cluster using the client library which automatically manages network communication.
+Clients can also be co-hosted in the same process with silos for simplicity.</p>
+<p>Orleans is compatible with .NET Standard 2.0 and above, running on Windows, Linux, and macOS, in full .NET Framework or .NET Core.</p>
+<h2 id="features">Features</h2>
+<h3 id="persistence">Persistence</h3>
+<p>Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained.
+Grains can have multiple named persistent data objects, for example, one called &quot;profile&quot; for a user&#39;s profile and one called &quot;inventory&quot; for their inventory. This state can be stored in any storage system.
+For example, profile data may be stored in one database and inventory in another.
+While a grain is running, this state is kept in memory so that read requests can be served without accessing storage.
+When the grain updates its state, a <code>state.WriteStateAsync()</code> call ensures that the backing store is updated for durability and consistency.
+For more information, see the <a href="grains/grain_persistence/index.html">Grain Persistence</a> documentation.</p>
+<h3 id="distributed-acid-transactions">Distributed ACID Transactions</h3>
+<p>In addition to the simple persistence model described above, grains can have <em>transactional state</em>.
+Multiple grains can participate in <a href="https://en.wikipedia.org/wiki/ACID">ACID</a> transactions together regardless of where their state is ultimately stored.
+Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have <a href="https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels">serializable isolation</a>.
+For more information on transactions in Orleans, see the <a href="grains/transactions.html">documentation</a> and the <a href="https://www.microsoft.com/en-us/research/publication/transactions-distributed-actors-cloud-2/">Microsoft Research technical report</a>.</p>
+<h3 id="streams">Streams</h3>
+<p>Streams help developers to process series of data items in near-real time.
+Streams in Orleans are <em>managed</em>: streams do not need to be created or registered before a grain or client publishes to a stream or subscribes to a stream.
+This allows for greater decoupling of stream producers and consumers from each other and from the infrastructure.
+Stream processing is reliable: grains can store checkpoints (cursors) and reset to a stored checkpoint during activation or at any point afterwards.
+Streams supports batch delivery of messages to consumers to improve efficiency and recovery performance.
+Streams are backed by queueing services such as Azure Event Hubs, Amazon Kinesis, and others.
+An arbitrary number of streams can be multiplexed onto a smaller number of queues and the responsibility for processing these queues is balanced evenly across the cluster. </p>
+<h3 id="timers-amp-reminders">Timers &amp; Reminders</h3>
+<p>Reminders are a durable scheduling mechanism for grains.
+They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time.
+Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability.
+For more information, see the <a href="grains/timers_and_reminders.html">Timers and Reminders</a> documentation.</p>
+<h3 id="flexible-grain-placement">Flexible Grain Placement</h3>
+<p>When a grain is activated in Orleans, the runtime decides which server (silo) to activate that grain on.
+This is called grain placement.
+The placement process in Orleans is fully configurable: developers can choose from a set of out-of-the-box placement policies such as random, prefer-local, and load-based, or custom logic can be configured.
+This allows for full flexibility in deciding where grains are created. For example, grains can be placed on a server close to resources which they need to operate on or other grains which they communicate with.
+For more information see the <a href="grains/grain_placement.html">Grain Placement</a> documentation.</p>
+<h3 id="grain-versioning-amp-heterogeneous-clusters">Grain Versioning &amp; Heterogeneous Clusters</h3>
+<p>Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems.
+Grain interfaces in Orleans can be optionally versioned.
+The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations.
+This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains.
+In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available.
+For more information, see the <a href="grains/grain_versioning/grain_versioning.html">Grain Versioning</a> documentation.</p>
+<h3 id="elastic-scalability-amp-fault-tolerance">Elastic Scalability &amp; Fault Tolerance</h3>
+<p>Orleans is designed to scale elastically. When a silo joins a cluster it is able to accept new activations and when a silo leaves the cluster (either because of scale down or a machine failure) the grains which were activated on that silo will be re-activated on remaining silos as needed.
+An Orleans cluster can be scaled down to a single silo.
+The same properties which enable elastic scalability also enable fault tolerance: the cluster automatically detects and quickly recovers from failures.</p>
+<h3 id="run-anywhere">Run Anywhere</h3>
+<p>Orleans runs anywhere that .NET Core or .NET Framework are supported.
+This includes hosting on Linux, Windows, and macOS and deploying to Kubernetes, virtual or physical machines, on premises or in the cloud, and PaaS services such as Azure Cloud Services.</p>
+<h3 id="stateless-workers">Stateless Workers</h3>
+<p>Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously.
+This enables increased parallelism for stateless functions. For more information, see the <a href="grains/stateless_worker_grains.html">Stateless Worker Grains</a> documentation.</p>
+<h3 id="grain-call-filters">Grain Call Filters</h3>
+<p>Logic which is common to many grains can be expressed as <a href="grains/interceptors.html">Grain Call Filters</a>.
+Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.</p>
+<h3 id="request-context">Request Context</h3>
+<p>Metadata and other information can be passed along a series of requests using <a href="grains/request_context.html">request context</a>.
+Request context can be used for holding distributed tracing information or any other user-defined values.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>Please see the <a href="tutorials_and_samples/tutorial_1.html">getting started tutorial</a>.</p>
+<h3 id="building">Building</h3>
+<p>On Windows, run the <code>build.cmd</code> script to build the NuGet packages locally, then reference the required NuGet packages from <code>/Artifacts/Release/*</code>.
+You can run <code>Test.cmd</code> to run all BVT tests, and <code>TestAll.cmd</code> to also run Functional tests.</p>
+<p>On Linux and macOS, run the <code>build.sh</code> script or <code>dotnet build ./OrleansCrossPlatform.sln</code> to build Orleans.</p>
+<h2 id="official-builds">Official Builds</h2>
+<p>The latest stable, production-quality release is located <a href="https://github.com/dotnet/orleans/releases/latest">here</a>.</p>
+<p>Nightly builds are published to <a href="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json">https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json</a>.
+These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.</p>
+<h3 id="using-the-nightly-build-packages-in-your-project">Using the nightly build packages in your project</h3>
+<p>To use nightly builds in your project, add the MyGet feed using either of the following methods:</p>
+<ol>
+<li>Changing the .csproj file to include this section:</li>
+</ol>
+<pre><code class="lang-xml">  &lt;RestoreSources&gt;
+    $(RestoreSources);
+    https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json;
+  &lt;/RestoreSources&gt;
+</code></pre><p>or</p>
+<ol>
+<li>Creating a <code>NuGet.config</code> file in the solution directory with the following contents:</li>
+</ol>
+<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;configuration&gt;
+ &lt;packageSources&gt;
+  &lt;clear /&gt;
+  &lt;add key=&quot;orleans-ci&quot; value=&quot;https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json&quot; /&gt;
+  &lt;add key=&quot;nuget&quot; value=&quot;https://api.nuget.org/v3/index.json&quot; /&gt;
+ &lt;/packageSources&gt;
+&lt;/configuration&gt;
+</code></pre><h2 id="community">Community</h2>
+<ul>
+<li>Ask questions by <a href="https://github.com/dotnet/orleans/issues">opening an issue on GitHub</a> or on <a href="https://stackoverflow.com/questions/ask?tags=orleans">Stack Overflow</a></li>
+<li><a href="https://gitter.im/dotnet/orleans">Chat on Gitter</a></li>
+<li><a href="../blog/index.html">Orleans Blog</a></li>
+<li>Follow the <a href="https://twitter.com/msftorleans">@msftorleans</a> Twitter account for Orleans announcements.</li>
+<li><a href="https://github.com/OrleansContrib/">OrleansContrib - GitHub organization for community add-ons to Orleans</a> Various community projects, including Monitoring, Design Patterns, Storage Providers, etc.</li>
+<li>Guidelines for developers wanting to <a href="resources/contributing.html">contribute code changes to Orleans</a>.</li>
+<li>You are also encouraged to report bugs or start a technical discussion by starting a new <a href="https://github.com/dotnet/orleans/issues">thread</a> on GitHub.</li>
+</ul>
+<h2 id="license">License</h2>
+<p>This project is licensed under the <a href="https://github.com/dotnet/orleans/blob/master/LICENSE">MIT license</a>.</p>
+<h2 id="quick-links">Quick Links</h2>
+<ul>
+<li><a href="http://research.microsoft.com/projects/orleans/">Microsoft Research project home</a></li>
+<li>Technical Report: <a href="http://research.microsoft.com/apps/pubs/default.aspx?id=210931">Distributed Virtual Actors for Programmability and Scalability</a></li>
+<li><a href="http://dotnet.github.io/orleans/">Orleans Documentation</a></li>
+</ul>
+<h2 id="origin-of-orleans">Origin of Orleans</h2>
+<p>Orleans was created at <a href="https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/">Microsoft Research and designed for use in the cloud</a>.
+Since 2011, it has been used extensively in the cloud and on premises by several Microsoft product groups, most notably by game studios, such as 343 Industries and The Coalition as a platform for cloud services behind Halo 4 and 5, and Gears of War 4, as well as by a number of other companies.</p>
+<p>Orleans was open-sourced in January 2015, and attracted many developers that formed <a href="http://mattwarren.org/2016/11/23/open-source-net-2-years-later/">one of the most vibrant open source communities in the .NET ecosystem</a>.
+In an active collaboration between the developer community and the Orleans team at Microsoft, features are added and improved on a daily basis.
+Microsoft Research continues to partner with the Orleans team to bring new major features, such as <a href="https://www.microsoft.com/en-us/research/publication/geo-distribution-actor-based-services/">geo-distribution</a>, <a href="https://www.microsoft.com/en-us/research/publication/indexing-in-an-actor-oriented-database/">indexing</a>, and <a href="https://www.microsoft.com/en-us/research/publication/transactions-distributed-actors-cloud-2/">distributed transactions</a>, that are pushing the state of the art.
+Orleans has become the framework of choice for building distributed systems and cloud services for many .NET developers.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/index.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

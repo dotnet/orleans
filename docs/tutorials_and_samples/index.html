@@ -1,0 +1,316 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Samples | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Samples | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="samples">Samples</h1>
+
+<h2 id="hello-worldhttpsgithubcomdotnetorleansrawmainsampleshelloworldreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/HelloWorld/#readme">Hello, World!</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/HelloWorld/code.png?sanitize=true">
+</p>
+
+<p>A <em>Hello, World!</em> application which demonstrates how to create and use your first grains.</p>
+<h3 id="demonstrates">Demonstrates</h3>
+<ul>
+<li>How to get started with Orleans</li>
+<li>How to define and implement grain interface</li>
+<li>How to get a reference to a grain and call a grain</li>
+</ul>
+<h2 id="adventurehttpsgithubcomdotnetorleansrawmainsamplesadventurereadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Adventure/#readme">Adventure</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Adventure/assets/BoxArt.jpg?sanitize=true">
+</p>
+
+<p>Before there were graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was <a href="https://en.wikipedia.org/wiki/Colossal_Cave_Adventure">Colossal Cave Adventure</a>, <a href="https://en.wikipedia.org/wiki/Zork">Zork</a>, and <a href="https://en.wikipedia.org/wiki/Microsoft_Adventure">Microsoft Adventure</a>.
+Possibly lame by today&#39;s standards, back then it was a magical world of monsters, chirping birds, and things you could pick up.
+It&#39;s the inspiration for this sample.</p>
+<h3 id="demonstrates-1">Demonstrates</h3>
+<ul>
+<li>How to structure an application (in this case, a game) using grains</li>
+<li>How to connect an external client to an Orleans cluster (<code>ClientBuilder</code>)</li>
+</ul>
+<h2 id="chirperhttpsgithubcomdotnetorleansrawmainsampleschirperreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Chirper/#readme">Chirper</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Chirper/screenshot.png?sanitize=true">
+</p>
+
+<p>A social network pub/sub system, with short text messages being sent between users.
+Publishers send out short <em>&quot;Chirp&quot;</em> messages (not to be confused with <em>&quot;Tweets&quot;</em>, for a variety of legal reasons) to any other users that are following them.</p>
+<h3 id="demonstrates-2">Demonstrates</h3>
+<ul>
+<li>How to build a simplified social media / social network application using Orleans </li>
+<li>How to store state within a grain using grain persistence (<code>IPersistentState&lt;T&gt;</code>)</li>
+<li>Grains which implement multiple grain interfaces</li>
+<li>Reentrant grains, which allow for multiple grain calls to be executed concurrently, in a single-threaded, interleaving fashion</li>
+<li>Using a <em>grain observer</em> (<code>IGrainObserver</code>) to receive push notifications from grains
+## <a href="https://github.com/dotnet/orleans/raw/main/samples/GPSTracker/#readme">GPS Tracker</a></li>
+</ul>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/GPSTracker/screenshot.jpeg?sanitize=true">
+</p>
+
+<p>A service for tracking GPS-equipped <a href="https://en.wikipedia.org/wiki/Internet_of_Things">IoT</a> devices on a map.
+Device locations are updated in near-real-time using SignalR and hence this sample demonstrates one approach to integrating Orleans with SignalR.
+The device updates originate from a <em>device gateway</em>, which is implemented using a separate process which connects to the main service and simulates a number of devices moving in a pseudorandom fashion around an area of San Francisco.</p>
+<h3 id="demonstrates-3">Demonstrates</h3>
+<ul>
+<li>How to use Orleans to build an <a href="https://en.wikipedia.org/wiki/Internet_of_Things">Internet of Things</a> application</li>
+<li>How Orleans can be co-hosted and integrated with <a href="https://docs.microsoft.com/aspnet/core/signalr/introduction">ASP.NET Core SignalR</a></li>
+<li>How to broadcast real-time updates from a grain to a set of clients using Orleans and SignalR</li>
+</ul>
+<h2 id="hanbaobaohttpsgithubcomreubenbondhanbaobao-web"><a href="https://github.com/ReubenBond/hanbaobao-web">HanBaoBao</a></h2>
+<p align="center">
+    <img src="https://github.com/ReubenBond/hanbaobao-web/blob/main/assets/demo-1.png?raw=true">
+</p>
+
+<p>An English-Mandarin dictionary Web application demonstrating deployment to Kubernetes, fan-out grain calls, and request throttling.</p>
+<h3 id="demonstrates-4">Demonstrates</h3>
+<ul>
+<li>How to build a realistic application using Orleans</li>
+<li>How to deploy an Orleans-based application to Kubernetes</li>
+<li>How to integrate Orleans with ASP.NET Core and a <a href="https://en.wikipedia.org/wiki/Single-page_application"><em>Single-page Application</em></a> JavaScript framework (<a href="https://vuejs.org/">Vue.js</a>)</li>
+<li>How to implement leaky-bucket request throttling</li>
+<li>How to load and query data from a database</li>
+<li>How to cache results lazily and temporarily</li>
+<li>How to fan-out requests to many grains and collect the results</li>
+</ul>
+<h2 id="presence-servicehttpsgithubcomdotnetorleansrawmainsamplespresencereadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Presence/#readme">Presence Service</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Presence/screenshot.png?sanitize=true">
+</p>
+
+<p>A gaming presence service, similar to one of the Orleans-based services built for <a href="https://www.xbox.com/games/halo">Halo</a>.
+A presence service tracks players and game sessions in near-real-time.</p>
+<h3 id="demonstrates-5">Demonstrates</h3>
+<ul>
+<li>A simplified version of a real-world use of Orleans</li>
+<li>Using a <em>grain observer</em> (<code>IGrainObserver</code>) to receive push notifications from grains</li>
+</ul>
+<h2 id="tic-tac-toehttpsgithubcomdotnetorleansrawmainsamplestictactoereadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/TicTacToe/#readme">Tic Tac Toe</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/TicTacToe/logo.png?sanitize=true">
+</p>
+
+<p>A Web-based <a href="https://en.wikipedia.org/wiki/Tic-tac-toe">Tic-tac-toe</a> game using ASP.NET MVC, JavaScript, and Orleans.</p>
+<h3 id="demonstrates-6">Demonstrates</h3>
+<ul>
+<li>How to build an online game using Orleans</li>
+<li>How to build a basic game lobby system</li>
+<li>How to access Orleans grains from an ASP.NET Core MVC application</li>
+</ul>
+<h2 id="votinghttpsgithubcomdotnetorleansrawmainsamplesvotingreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Voting/#readme">Voting</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Voting/screenshot.png?sanitize=true">
+</p>
+
+<p>A Web application for voting on a set of choices. This sample demonstrates deployment to Kubernetes.
+The application uses <a href="https://docs.microsoft.com/dotnet/core/extensions/generic-host">.NET Generic Host</a> to co-host <a href="https://docs.microsoft.com/aspnet/core">ASP.NET Core</a> and Orleans as well as the <a href="https://github.com/OrleansContrib/OrleansDashboard">Orleans Dashboard</a> together in the same process.</p>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Voting/dashboard.png?sanitize=true">
+</p>
+
+<h3 id="demonstrates-7">Demonstrates</h3>
+<ul>
+<li>How to deploy an Orleans-based application to Kubernetes</li>
+<li>How to configure the <a href="https://github.com/OrleansContrib/OrleansDashboard">Orleans Dashboard</a></li>
+</ul>
+<h2 id="chat-roomhttpsgithubcomdotnetorleansrawmainsampleschatroomreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/ChatRoom/#readme">Chat Room</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/ChatRoom/screenshot.png?sanitize=true">
+</p>
+
+<p>A terminal-based chat application built using <a href="https://dotnet.github.io/orleans/docs/streaming/index.html">Orleans Streams</a>.</p>
+<h3 id="demonstrates-8">Demonstrates</h3>
+<ul>
+<li>How to build a chat application using Orleans</li>
+<li>How to use <a href="https://dotnet.github.io/orleans/docs/streaming/index.html">Orleans Streams</a></li>
+</ul>
+<h2 id="bank-accounthttpsgithubcomdotnetorleansrawmainsamplesbankaccountreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/BankAccount/#readme">Bank Account</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/BankAccount/assets/BankClient.png?sanitize=true">
+</p>
+
+<p>Simulates bank accounts, using ACID transactions to transfer random amounts between a set of accounts.</p>
+<h3 id="demonstrates-9">Demonstrates</h3>
+<ul>
+<li>How to use Orleans Transactions to safely perform operations involving multiple stateful grains with ACID guarantees and serializable isolation.</li>
+</ul>
+<h2 id="blazor-serverhttpsgithubcomdotnetorleansrawmainsamplesblazorblazorserverreadme-and-blazor-webassemblyhttpsgithubcomdotnetorleansrawmainsamplesblazorblazorwasmreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Blazor/BlazorServer/#readme">Blazor Server</a> and <a href="https://github.com/dotnet/orleans/raw/main/samples/Blazor/BlazorWasm/#readme">Blazor WebAssembly</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Blazor/BlazorServer/screenshot.jpeg?sanitize=true">
+</p>
+
+<p>These two Blazor samples are based on the <a href="https://dotnet.microsoft.com/learn/aspnet/blazor-tutorial/intro">Blazor introductory tutorials</a>, adapted for use with Orleans.
+The <a href="https://github.com/dotnet/orleans/raw/main/samples/Blazor/BlazorWasm/#readme">Blazor WebAssembly</a> sample uses the <a href="https://docs.microsoft.com/aspnet/core/blazor/hosting-models#blazor-webassembly">Blazor WebAssembly hosting model</a>.
+The <a href="https://github.com/dotnet/orleans/raw/main/samples/Blazor/BlazorServer/#readme">Blazor Server</a> sample uses the <a href="https://docs.microsoft.com/aspnet/core/blazor/hosting-models#blazor-server">Blazor Server hosting model</a>.
+They include an interactive counter, a TODO list, and a Weather service.</p>
+<h3 id="demonstrates-10">Demonstrates</h3>
+<ul>
+<li>How to integrate ASP.NET Core Blazor Server with Orleans</li>
+<li>How to integrate ASP.NET Core Blazor WebAssembly (WASM) with Orleans</li>
+</ul>
+<h2 id="stockshttpsgithubcomdotnetorleansrawmainsamplesstocksreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Stocks/#readme">Stocks</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/Stocks/screenshot.png?sanitize=true">
+</p>
+
+<p>A stock price application which fetches prices from a remote service using an HTTP call and caches prices temporarily in a grain.
+A <a href="https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class"><code>BackgroundService</code></a> periodically polls for updates stock prices from various <code>StockGrain</code> grains which correspond to a set of stock symbols.</p>
+<h3 id="demonstrates-11">Demonstrates</h3>
+<ul>
+<li>How to use Orleans from within a <a href="https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class"><code>BackgroundService</code></a>.</li>
+<li>How to use timers within a grain</li>
+<li>How to make external service calls using .NET&#39;s <code>HttpClient</code> and cache the results within a grain.</li>
+</ul>
+<h2 id="transport-layer-securityhttpsgithubcomdotnetorleansrawmainsamplestransportlayersecurityreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/TransportLayerSecurity/#readme">Transport Layer Security</a></h2>
+<p align="center">
+    <img src="https://raw.githubusercontent.com/dotnet/orleans/main/samples/TransportLayerSecurity/screenshot.png?sanitize=true">
+</p>
+
+<p>A <em>Hello, World!</em> application configured to use mutual <a href="https://en.wikipedia.org/wiki/Transport_Layer_Security"><em>Transport Layer Security</em></a> to secure network communication between every server.</p>
+<h3 id="demonstrates-12">Demonstrates</h3>
+<ul>
+<li>How to configure mutual-TLS (mTLS) authentication for Orleans</li>
+</ul>
+<h2 id="visual-basic-hello-worldhttpsgithubcomdotnetorleansrawmainsamplesvbhelloworldreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/VBHelloWorld/#readme">Visual Basic Hello World</a></h2>
+<p>A <em>Hello, World!</em> application using Visual Basic.</p>
+<h3 id="demonstrates-13">Demonstrates</h3>
+<ul>
+<li>How to develop Orleans-based applications using Visual Basic</li>
+</ul>
+<h2 id="f-hello-worldhttpsgithubcomdotnetorleansrawmainsamplesfsharphelloworldreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/FSharpHelloWorld/#readme">F# Hello World</a></h2>
+<p>A <em>Hello, World!</em> application using F#.</p>
+<h3 id="demonstrates-14">Demonstrates</h3>
+<ul>
+<li>How to develop Orleans-based applications using F#</li>
+</ul>
+<h2 id="streaming-pubsub-streams-over-azure-event-hubshttpsgithubcomdotnetorleansrawmainsamplesstreamingsimplereadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Streaming/Simple/#readme">Streaming: Pub/Sub Streams over Azure Event Hubs</a></h2>
+<p>An application using Orleans Streams with <a href="https://azure.microsoft.com/services/event-hubs/">Azure Event Hubs</a> as the provider and implicit subscribers.</p>
+<h3 id="demonstrates-15">Demonstrates</h3>
+<ul>
+<li>How to use <a href="https://dotnet.github.io/orleans/docs/streaming/index.html">Orleans Streams</a></li>
+<li>How to use the <code>[ImplicitStreamSubscription(namespace)]</code> attribute to implicitly subscribe a grain to the stream with the corresponding id</li>
+<li>How to configure Orleans Streams for use with <a href="https://azure.microsoft.com/services/event-hubs/">Azure Event Hubs</a></li>
+</ul>
+<h2 id="streaming-custom-data-adapterhttpsgithubcomdotnetorleansrawmainsamplesstreamingcustomdataadapterreadme"><a href="https://github.com/dotnet/orleans/raw/main/samples/Streaming/CustomDataAdapter/#readme">Streaming: Custom Data Adapter</a></h2>
+<p>An application using Orleans Streams with a non-Orleans publisher pushing to a stream which a grain consumes via a <em>custom data adapter</em> which tells Orleans how to interpret stream messages.</p>
+<h3 id="demonstrates-16">Demonstrates</h3>
+<ul>
+<li>How to use <a href="https://dotnet.github.io/orleans/docs/streaming/index.html">Orleans Streams</a></li>
+<li>How to use the <code>[ImplicitStreamSubscription(namespace)]</code> attribute to implicitly subscribe a grain to the stream with the corresponding id</li>
+<li>How to configure Orleans Streams for use with <a href="https://azure.microsoft.com/services/event-hubs/">Azure Event Hubs</a></li>
+<li>How to consume stream messages published by non-Orleans publishers by providing a custom <code>EventHubDataAdapter</code> implementation (a custom data adapter)</li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/tutorials_and_samples/index.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

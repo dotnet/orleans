@@ -1,0 +1,193 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Identity | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Identity | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="grain-identity">Grain Identity</h1>
+
+<p>In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
+Thus, when an object is created using new, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.</p>
+<p>In distributed systems, object references cannot represent instance identity, since references are typically limited to a single address space.
+That is certainly the case for .NET references.
+Furthermore, a grain must have an identity regardless of whether it is active, so that we can activate it on demand.
+Therefore grains have a primary key.
+The primary key can be a Globally Unique Identifier (GUID), a long integer, or a string.</p>
+<p>The primary key is scoped to the grain type.
+Therefore, the complete identity of a grain is formed from the grain&#39;s type and its key.</p>
+<p>The caller of the grain decides which scheme should be used. 
+The options are:</p>
+<ul>
+<li>long</li>
+<li>GUID</li>
+<li>string</li>
+<li>GUID + string</li>
+<li>long + string</li>
+</ul>
+<p>Because the underlying data is the same, the schemes can be used interchangeably.
+When a long integer is used, a GUID is actually created and padded with zeros.</p>
+<p>Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using <code>Guid.Empty</code> as its key.
+This is merely a convention, but by adhering to this convention it becomes clear at the caller site that a singleton grain is in use, as we saw in the first tutorial.</p>
+<h2 id="using-guids">Using GUIDs</h2>
+<p>GUIDs are useful when there are several processes that could request a grain, such as a number of web servers in a web farm.
+You don&#39;t need to coordinate the allocation of keys, which could introduce a single point of failure in the system, or a system-side lock on a resource which could present a bottleneck.
+There is a very low chance of GUIDs colliding, so they would probably be the default choice when architecting an Orleans system.</p>
+<p>Referencing a grain by GUID in client code:</p>
+<pre><code class="lang-csharp">var grain = grainFactory.GetGrain&lt;IExample&gt;(Guid.NewGuid());
+</code></pre><p>Retrieving the primary key from grain code:</p>
+<pre><code class="lang-csharp">public override Task OnActivateAsync()
+{
+    Guid primaryKey = this.GetPrimaryKey();
+    return base.OnActivateAsync();
+}
+</code></pre><h2 id="using-longs">Using Longs</h2>
+<p>A long integer is also available, which would make sense if the grain is persisted to a relational database, where numerical indexes are preferred over GUIDs.</p>
+<p>Referencing a grain by long integer in client code:</p>
+<pre><code class="lang-csharp">var grain = grainFactory.GetGrain&lt;IExample&gt;(1);
+</code></pre><p>Retrieving the primary key from grain code:</p>
+<pre><code class="lang-csharp">public override Task OnActivateAsync()
+{
+    long primaryKey = this.GetPrimaryKeyLong();
+    return base.OnActivateAsync();
+}
+</code></pre><h2 id="using-strings">Using Strings</h2>
+<p>A string is also available.</p>
+<p>Referencing a grain by String in client code:</p>
+<pre><code class="lang-csharp">var grain = grainFactory.GetGrain&lt;IExample&gt;(&quot;myGrainKey&quot;);
+</code></pre><p>Retrieving the primary key from grain code:</p>
+<pre><code class="lang-csharp">public override Task OnActivateAsync()
+{
+    string primaryKey = this.GetPrimaryKeyString();
+    return base.OnActivateAsync();
+}
+</code></pre><h2 id="using-compound-primary-key">Using Compound Primary Key</h2>
+<p>If you have a system that doesn&#39;t fit well with either GUIDs or longs, you can opt for a compound primary key, which allows you to use a combination of a GUID or long and a string to reference a grain.</p>
+<p>You can inherit your interface from &#39;IGrainWithGuidCompoundKey&#39; or &#39;IGrainWithIntegerCompoundKey&quot; interface like this:</p>
+<pre><code class="lang-csharp">public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
+{
+    Task Hello();
+}
+</code></pre><p>In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory:</p>
+<pre><code class="lang-csharp">var grain = grainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;, null);
+</code></pre><p>To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
+<pre><code class="lang-csharp">public class ExampleGrain : Orleans.Grain, IExampleGrain
+{
+    public Task Hello()
+    {
+        string keyExtension;
+        long primaryKey = this.GetPrimaryKeyLong(out keyExtension);
+        Console.WriteLine(&quot;Hello from &quot; + keyExtension);
+        Task.CompletedTask;
+    }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/docs/grains/grain_identity.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

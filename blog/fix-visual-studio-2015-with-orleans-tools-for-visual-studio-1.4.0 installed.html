@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Fix Visual Studio 2015 with Orleans Tools for Visual Studio 1.4.0 installed | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Fix Visual Studio 2015 with Orleans Tools for Visual Studio 1.4.0 installed | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../images/logo-light-padded.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="fix-visual-studio-2015-with-orleans-tools-for-visual-studio-140-installed">Fix Visual Studio 2015 with Orleans Tools for Visual Studio 1.4.0 installed</h1>
+
+<p><a href="https://github.com/attilah">Attila Hajdrik</a>
+3/10/2017 10:06:17 AM</p>
+<hr>
+<p>Today two community members was hit by an issue with Visual Studio 2015 if they&#39;ve installed the 1.4.0 version of the Orleans VSIX package.
+We have an open issue to track this on <a href="https://github.com/dotnet/orleans/issues/2835">GitHub</a>.
+If you installed the extension on Visual Studio 2017, it will work, only 2015 has this problem.
+The issue we&#39;re seeing is that you cannot open the Tools &amp; Extensions window, VS will show this error dialog:</p>
+<p><img src="media/2017/03/vsix-error-dialog-300x148.jpg" alt="vsix-error-dialog"> </p>
+<p>While we working on the solution we unpublished the problematic version and published an older version of the extension which does not work with Visual Studio 2017, but neither it renders Visual Studio 2015 unusable.
+If you were hit by this isse, here are the steps to fix it:</p>
+<p> 1) Exit all Visual Studio instances.</p>
+<p> 2) Open an Administrator Visual Studio developer command prompt.</p>
+<p> 3) cd /D &quot;%USERPROFILE%\Local Settings\Microsoft\VisualStudio\14.0\Extensions&quot;</p>
+<p> 4) dir OrleansVSTools.dll /s </p>
+<p>You&#39;ll get a result like this: </p>
+<p><code>Directory of C:\Users\\Local Settings\Microsoft\VisualStudio\14.0\Extensions\pxzkggpq.50t</code></p>
+<p>03/10/2017 02:36 PM 18,608 OrleansVSTools.dll</p>
+<p>1 File(s) 18,608 bytes</p>
+<p>5) Copy the full directory path to clipboard.</p>
+<p>6) rmdir &quot;&quot; /q /s</p>
+<p>Make sure you&#39;re still in the Extensions directory.</p>
+<p>7) del *.cache</p>
+<p>8) devenv /setup</p>
+<p>This can run for a few minutes...be patient.</p>
+<p>Now you can start Visual Studio 2015 and verify that the Extensions dialog opens and everything works fine.</p>
+<p>If you&#39;ve special root suffixes configured for Visual Studio 2015 then you&#39;ve to execute these commands for that specific instance, so not in the 14.0, but maybe in the 14.0Exp directory.</p>
+<h5 id="update-3172017"><strong>UPDATE 3/17/2017</strong></h5>
+<p>We published an updated VSIX which works correctly with VS2013, VS2015, VS2017: <a href="https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio">Microsoft Orleans Tools for Visual Studio</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans-docs/blob/master/src/blog/fix-visual-studio-2015-with-orleans-tools-for-visual-studio-1.4.0 installed.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>
