@@ -1,8 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StorageProviders>
-      <Provider Type="AzureTable" Name="orleanstest1" ConnectionString="DefaultEndpointsProtocol=https;AccountName=orleansdata1;AccountKey=SOMETHING1" />
-    </StorageProviders>
-  </Globals>
-</OrleansConfiguration>

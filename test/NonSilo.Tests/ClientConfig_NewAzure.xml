@@ -1,6 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<ClientConfiguration xmlns="urn:orleans">
-  <SystemStore
-    DeploymentId="x"
-    DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleansdata1;AccountKey=SOMETHING1"/>
-</ClientConfiguration>
