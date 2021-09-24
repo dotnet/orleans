@@ -289,7 +289,7 @@ namespace Orleans.Transactions.AzureStorage
             public ETag KeyETag => key.ETag;
             private bool BatchHasKey => keyIndex >= 0;
 
-            public async Task Add(TableTransactionAction operation)
+            public async ValueTask Add(TableTransactionAction operation)
             {
                 if (!BatchHasKey && operation.Entity.RowKey == key.RowKey && operation.Entity.PartitionKey == key.PartitionKey)
                 {
@@ -319,9 +319,6 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
                     await Flush().ConfigureAwait(false);
-
-                    batchOperation.Clear();
-                    keyIndex = -1;
                 }
             }
 

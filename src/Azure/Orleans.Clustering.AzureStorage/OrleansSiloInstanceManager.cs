@@ -117,7 +117,9 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync($"PartitionKey eq '{DeploymentId}' and Status eq 'Active' and ProxyPort ne '0'");
+                const string Active = nameof(SiloStatus.Active);
+                const string Zero = "0";
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {Active} and ProxyPort ne {Zero}"));
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
@@ -162,7 +164,7 @@ namespace Orleans.AzureUtils
             return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
         }
 
-        internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<(SiloInstanceTableEntry, string)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -172,11 +174,10 @@ namespace Orleans.AzureUtils
             if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
-            var entriesList = new List<Tuple<SiloInstanceTableEntry, string>>(entries);
 
-            await DeleteEntriesBatch(entriesList);
+            await DeleteEntriesBatch(entries);
 
-            return entriesList.Count;
+            return entries.Count;
         }
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
@@ -190,7 +191,7 @@ namespace Orleans.AzureUtils
             await DeleteEntriesBatch(entriesList);
         }
 
-        private async Task DeleteEntriesBatch(List<Tuple<SiloInstanceTableEntry, string>> entriesList)
+        private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList)
         {
             if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
             {
@@ -207,7 +208,7 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal async Task<List<Tuple<SiloInstanceTableEntry, string>>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
+        internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
         {
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
@@ -228,7 +229,7 @@ namespace Orleans.AzureUtils
             return asList;
         }
 
-        internal async Task<List<Tuple<SiloInstanceTableEntry, string>>> FindAllSiloEntries()
+        internal async Task<List<(SiloInstanceTableEntry, string)>> FindAllSiloEntries()
         {
             var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
 
@@ -253,10 +254,11 @@ namespace Orleans.AzureUtils
             try
             {
                 var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
-                if (versionRow != null && versionRow.Item1 != null)
+                if (versionRow.Entity != null)
                 {
                     return false;
                 }
+
                 SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
                 await storage.CreateTableEntryAsync(entry);
                 return true;
