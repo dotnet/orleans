@@ -143,7 +143,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Completion promise for this operation.</returns>
         public async Task ClearTableAsync()
         {
-            IEnumerable<Tuple<T, string>> items = await ReadAllTableEntriesAsync();
+            var items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
                                           .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
@@ -389,7 +389,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="partitionKey">The partition key for the entry.</param>
         /// <param name="rowKey">The row key for the entry.</param>
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
-        public async Task<Tuple<T, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        public async Task<(T Entity, string ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -411,9 +411,9 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
 
                 //The ETag of data is needed in further operations.
-                if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag.ToString());
+                if (retrievedResult != null) return (retrievedResult, retrievedResult.ETag.ToString());
                 if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
-                return null;  // No data
+                return (default, default);  // No data
             }
             finally
             {
@@ -427,7 +427,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="partitionKey">The key for the partition to be searched.</param>
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
-        public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
         {
             string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
             return ReadTableEntriesAndEtagsAsync(query);
@@ -438,7 +438,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
         /// <returns>Enumeration of all entries in the table.</returns>
-        public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync()
         {
             return ReadTableEntriesAndEtagsAsync(null);
         }
@@ -449,7 +449,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="collection">Data entries and their corresponding etags to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> collection)
+        public async Task DeleteTableEntriesAsync(List<(T Entity, string ETag)> collection)
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
@@ -500,7 +500,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="filter">Filter string to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(string filter)
+        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string filter)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
@@ -510,13 +510,13 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
+                    Func<Task<List<(T Entity, string ETag)>>> executeQueryHandleContinuations = async () =>
                     {
-                        var list = new List<T>();
-                        var pages = Table.QueryAsync<T>(filter).AsPages();
-                        await foreach (var page in pages)
+                        var list = new List<(T, string)>();
+                        var results = Table.QueryAsync<T>(filter);
+                        await foreach (var value in results)
                         {
-                            list.AddRange(page.Values);
+                            list.Add((value, value.ETag.ToString()));
                         }
 
                         return list;
@@ -525,17 +525,17 @@ namespace Orleans.GrainDirectory.AzureStorage
 #if !ORLEANS_TRANSACTIONS
                     IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);
 
-                    List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    List<(T, string)> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         counter => executeQueryHandleContinuations(),
                         this.StoragePolicyOptions.MaxOperationRetries,
                         (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
                         this.StoragePolicyOptions.OperationTimeout,
                         backoff);
 #else
-                    List<T> results = await executeQueryHandleContinuations();
+                    List<(T, string)> results = await executeQueryHandleContinuations();
 #endif
                     // Data was read successfully if we got to here
-                    return results.Select(i => Tuple.Create(i, i.ETag.ToString())).ToList();
+                    return results;
 
                 }
                 catch (Exception exc)
@@ -546,6 +546,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     {
                         Logger.Warn((int)Utilities.ErrorCode.AzureTable_09, errorMsg, exc);
                     }
+
                     throw new OrleansException(errorMsg, exc);
                 }
             }

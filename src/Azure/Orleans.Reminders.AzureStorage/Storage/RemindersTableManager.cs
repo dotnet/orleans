@@ -117,7 +117,7 @@ namespace Orleans.Runtime.ReminderService
             ServiceId = serviceId;
         }
 
-        internal async Task<List<Tuple<ReminderTableEntry, string>>> FindReminderEntries(uint begin, uint end)
+        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(uint begin, uint end)
         {
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
@@ -151,7 +151,7 @@ namespace Orleans.Runtime.ReminderService
             return queryResults.ToList();
         }
 
-        internal async Task<List<Tuple<ReminderTableEntry, string>>> FindReminderEntries(GrainReference grainRef)
+        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainReference grainRef)
         {
             var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
             var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainRef);
@@ -160,7 +160,7 @@ namespace Orleans.Runtime.ReminderService
             return queryResults.ToList();
         }
 
-        internal async Task<Tuple<ReminderTableEntry, string>> FindReminderEntry(GrainReference grainRef, string reminderName)
+        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainReference grainRef, string reminderName)
         {
             string partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
             string rowKey = ReminderTableEntry.ConstructRowKey(grainRef, reminderName);
@@ -168,7 +168,7 @@ namespace Orleans.Runtime.ReminderService
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        private Task<List<Tuple<ReminderTableEntry, string>>> FindAllReminderEntries()
+        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries()
         {
             return FindReminderEntries(0, 0);
         }
@@ -214,14 +214,14 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task DeleteTableEntries()
         {
-            List<Tuple<ReminderTableEntry, string>> entries = await FindAllReminderEntries();
+            List<(ReminderTableEntry Entity, string ETag)> entries = await FindAllReminderEntries();
             // return manager.DeleteTableEntries(entries); // this doesnt work as entries can be across partitions, which is not allowed
             // group by grain hashcode so each query goes to different partition
             var tasks = new List<Task>();
             var groupedByHash = entries
-                .Where(tuple => tuple.Item1.ServiceId.Equals(ServiceId))
-                .Where(tuple => tuple.Item1.DeploymentId.Equals(ClusterId))  // delete only entries that belong to our DeploymentId.
-                .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
+                .Where(tuple => tuple.Entity.ServiceId.Equals(ServiceId))
+                .Where(tuple => tuple.Entity.DeploymentId.Equals(ClusterId))  // delete only entries that belong to our DeploymentId.
+                .GroupBy(x => x.Entity.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {

@@ -50,7 +50,7 @@ namespace Tester.AzureUtils
                 Assert.Equal("EntityAlreadyExists", restStatus);
             }
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Equal(data.StringData, tuple.Item1.StringData);
+            Assert.Equal(data.StringData, tuple.Entity.StringData);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -59,13 +59,13 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             await manager.UpsertTableEntryAsync(data);
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Equal(data.StringData, tuple.Item1.StringData);
+            Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             await manager.UpsertTableEntryAsync(data2);
             tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
-            Assert.Equal(data2.StringData, tuple.Item1.StringData);
+            Assert.Equal(data2.StringData, tuple.Entity.StringData);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -89,19 +89,19 @@ namespace Tester.AzureUtils
 
             await manager.UpsertTableEntryAsync(data);
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Equal(data.StringData, tuple.Item1.StringData);
+            Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
             tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
-            Assert.Equal(data2.StringData, tuple.Item1.StringData);
+            Assert.Equal(data2.StringData, tuple.Entity.StringData);
 
             var data3 = data.Clone();
             data3.StringData = "EvenNewerData";
             _ = await manager.UpdateTableEntryAsync(data3, eTag1);
             tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
-            Assert.Equal(data3.StringData, tuple.Item1.StringData);
+            Assert.Equal(data3.StringData, tuple.Entity.StringData);
 
             try
             {
@@ -153,7 +153,7 @@ namespace Tester.AzureUtils
             }
 
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Null(tuple);
+            Assert.Null(tuple.Entity);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -196,7 +196,7 @@ namespace Tester.AzureUtils
             }
 
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Equal("NewData", tuple.Item1.StringData);
+            Assert.Equal("NewData", tuple.Entity.StringData);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -204,7 +204,7 @@ namespace Tester.AzureUtils
         {
             var data = GenerateNewData();
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
-            Assert.Null(tuple);
+            Assert.Null(tuple.Entity);
         }
 
         [SkippableFact, TestCategory("Functional")]

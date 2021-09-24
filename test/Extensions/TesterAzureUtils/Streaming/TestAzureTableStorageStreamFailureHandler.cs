@@ -20,11 +20,10 @@ namespace Tester.AzureUtils.Streaming
         {
             var dataManager = GetDataManager();
             await dataManager.InitTableAsync();
-            IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
-                await
-                    dataManager.ReadAllTableEntriesForPartitionAsync(
+            var deliveryErrors =
+                await dataManager.ReadAllTableEntriesForPartitionAsync(
                         StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
-            return deliveryErrors.Count();
+            return deliveryErrors.Count;
         }
 
         public static async Task DeleteAll()

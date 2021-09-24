@@ -41,14 +41,14 @@ namespace Orleans.Runtime.ReminderService
                 options: this.storageOptions);
         }
 
-        private ReminderTableData ConvertFromTableEntryList(IEnumerable<Tuple<ReminderTableEntry, string>> entries)
+        private ReminderTableData ConvertFromTableEntryList(List<(ReminderTableEntry Entity, string ETag)> entries)
         {
             var remEntries = new List<ReminderEntry>();
             foreach (var entry in entries)
             {
                 try
                 {
-                    ReminderEntry converted = ConvertFromTableEntry(entry.Item1, entry.Item2);
+                    ReminderEntry converted = ConvertFromTableEntry(entry.Entity, entry.ETag);
                     remEntries.Add(converted);
                 }
                 catch (Exception)
@@ -162,7 +162,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainRef, reminderName);
-                return result == null ? null : ConvertFromTableEntry(result.Item1, result.Item2);
+                return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
             }
             catch (Exception exc)
             {

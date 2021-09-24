@@ -70,8 +70,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
 
-            if (result == null)
+            if (result.Entity is null)
+            {
                 return null;
+            }
 
             return result.Item1.ToGrainAddress();
         }
@@ -89,8 +91,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
 
             // No entry found
-            if (result == null)
+            if (result.Entity is null)
+            {
                 return;
+            }
 
             // Check if the entry in storage match the one we were asked to delete
             var entity = result.Item1;
@@ -144,7 +148,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             queryBuilder.Append(')');
             var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
-            await this.tableDataManager.DeleteTableEntriesAsync(entities.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList());
+            await this.tableDataManager.DeleteTableEntriesAsync(entities);
         }
 
         // Called by lifecycle, should not be called explicitely, except for tests

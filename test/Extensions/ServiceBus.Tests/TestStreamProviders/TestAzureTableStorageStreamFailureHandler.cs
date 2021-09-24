@@ -33,10 +33,10 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             var dataManager = GetDataManager();
             await dataManager.InitTableAsync();
-            IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
+            var deliveryErrors =
                 await dataManager.ReadAllTableEntriesForPartitionAsync(
                         StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
-            return deliveryErrors.Count();
+            return deliveryErrors.Count;
         }
 
         private static AzureTableDataManager<TableEntity> GetDataManager()
