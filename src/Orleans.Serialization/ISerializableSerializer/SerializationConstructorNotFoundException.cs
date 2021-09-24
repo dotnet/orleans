@@ -2,7 +2,7 @@ using System;
 using System.Runtime.Serialization;
 using System.Security;
 
-namespace Orleans.Serialization.ISerializableSupport
+namespace Orleans.Serialization
 {
     [Serializable]
     public class SerializationConstructorNotFoundException : Exception
