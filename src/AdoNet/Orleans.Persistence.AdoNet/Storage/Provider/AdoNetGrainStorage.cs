@@ -154,8 +154,8 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ClearStateAsync(string, GrainReference, IGrainState)"/>.
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
@@ -208,8 +208,8 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ReadStateAsync(string, GrainReference, IGrainState)"/>.
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -258,7 +258,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetStream(binaryColumnPositionInSelect, Storage))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -266,7 +266,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(xmlColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -274,7 +274,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(jsonColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
                             }
                         }
 
@@ -299,7 +299,7 @@ namespace Orleans.Storage
 
                         if(payload != null)
                         {
-                            storageState = choice.Deserializer.Deserialize(payload, grainState.Type);
+                            storageState = choice.Deserializer.Deserialize(payload, typeof(T));
                         }
 
                         version = selector.GetNullableInt32("Version");
@@ -308,13 +308,13 @@ namespace Orleans.Storage
                     return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
                 }, CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
 
-                object state = readRecords != null ? readRecords.Item1 : null;
+                T state = readRecords != null ? (T) readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
                 bool recordExists = readRecords != null;
                 if(state == null)
                 {
                     logger.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
-                    state = Activator.CreateInstance(grainState.Type);
+                    state = Activator.CreateInstance<T>();
                 }
 
                 grainState.State = state;
@@ -335,7 +335,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.

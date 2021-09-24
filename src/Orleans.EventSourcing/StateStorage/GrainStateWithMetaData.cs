@@ -1,4 +1,4 @@
-﻿using Orleans.EventSourcing.Common;
+using Orleans.EventSourcing.Common;
 using System;
 
 namespace Orleans.EventSourcing.StateStorage
@@ -10,7 +10,7 @@ namespace Orleans.EventSourcing.StateStorage
     /// <typeparam name="TView">The type used for log view</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainStateWithMetaDataAndETag<TView> : IGrainState where TView : class, new()
+    public class GrainStateWithMetaDataAndETag<TView> : IGrainState<GrainStateWithMetaData<TView>> where TView : class, new()
     {
         /// <summary>
         /// Gets and Sets StateAndMetaData
@@ -24,25 +24,10 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(1)]
         public string ETag { get; set; }
 
-        /// <summary>
-        /// Gets Type
-        /// </summary>
-        public Type Type => typeof(GrainStateWithMetaData<TView>);
-
-        object IGrainState.State
-        {
-            get
-            {
-                return StateAndMetaData;
-            }
-            set
-            {
-                StateAndMetaData = (GrainStateWithMetaData<TView>)value;
-            }
-        }
-
         [Id(2)]
         public bool RecordExists { get; set; }
+
+        public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView

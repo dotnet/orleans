@@ -11,7 +11,7 @@ namespace Orleans.EventSourcing.LogStorage
     /// <typeparam name="TEntry">The type used for log entries</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class LogStateWithMetaDataAndETag<TEntry> : IGrainState where TEntry : class
+    public class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
         /// <summary>
         /// Gets and Sets StateAndMetaData
@@ -25,25 +25,10 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(1)]
         public string ETag { get; set; }
 
-        /// <summary>
-        /// Gets Type
-        /// </summary>
-        public Type Type => typeof(LogStateWithMetaData<TEntry>);
-
-        object IGrainState.State
-        {
-            get
-            {
-                return StateAndMetaData;
-            }
-            set
-            {
-                StateAndMetaData = (LogStateWithMetaData<TEntry>)value;
-            }
-        }
-
         [Id(2)]
         public bool RecordExists { get; set; }
+
+        public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class

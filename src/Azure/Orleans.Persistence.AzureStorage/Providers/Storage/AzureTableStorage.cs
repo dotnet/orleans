@@ -65,7 +65,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -79,9 +79,9 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    var loadedState = ConvertFromStorageFormat(entity, grainState.Type);
+                    var loadedState = ConvertFromStorageFormat<T>(entity);
                     grainState.RecordExists = loadedState != null;
-                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                    grainState.State = loadedState ?? Activator.CreateInstance<T>();
                     grainState.ETag = record.ETag;
                 }
             }
@@ -91,7 +91,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -124,7 +124,7 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -340,23 +340,22 @@ namespace Orleans.Storage
         /// Deserialize from Azure storage format
         /// </summary>
         /// <param name="entity">The Azure table entity the stored data</param>
-        /// <param name="stateType">The state type</param>
-        internal object ConvertFromStorageFormat(DynamicTableEntity entity, Type stateType)
+        internal T ConvertFromStorageFormat<T>(DynamicTableEntity entity)
         {
             var binaryData = ReadBinaryData(entity);
             var stringData = ReadStringData(entity);
 
-            object dataValue = null;
+            T dataValue = default;
             try
             {
                 if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = this.serializer.Deserialize<object>(binaryData);
+                    dataValue = this.serializer.Deserialize<T>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject(stringData, stateType, this.JsonSettings);
+                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(stringData, this.JsonSettings);
                 }
 
                 // Else, no data found

@@ -52,7 +52,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading, "Reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
@@ -91,8 +91,8 @@ namespace Orleans.Storage
                     grainState.RecordExists = true;
                 }
 
-                var loadedState = this.ConvertFromStorageFormat(contents, grainState.Type);
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                var loadedState = this.ConvertFromStorageFormat<T>(contents);
+                grainState.State = loadedState ?? Activator.CreateInstance<T>();
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Read: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -113,7 +113,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try
@@ -140,7 +140,7 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try
@@ -175,7 +175,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists(string grainType, GrainReference grainId, IGrainState grainState, byte[] contents, string mimeType, BlobClient blob)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainReference grainId, IGrainState<T> grainState, byte[] contents, string mimeType, BlobClient blob)
         {
             try
             {
@@ -277,23 +277,22 @@ namespace Orleans.Storage
         /// Deserialize from the configured storage format, either binary or JSON.
         /// </summary>
         /// <param name="contents">The serialized contents.</param>
-        /// <param name="stateType">The state type.</param>
         /// <remarks>
         /// See:
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        private object ConvertFromStorageFormat(byte[] contents, Type stateType)
+        private T ConvertFromStorageFormat<T>(byte[] contents)
         {
-            object result;
+            T result;
             if (this.options.UseJson)
             {
                 var str = Encoding.UTF8.GetString(contents);
-                result = JsonConvert.DeserializeObject(str, stateType, this.jsonSettings);
+                result = JsonConvert.DeserializeObject<T>(str, this.jsonSettings);
             }
             else
             {
-                result = this.serializer.Deserialize<object>(contents);
+                result = this.serializer.Deserialize<T>(contents);
             }
 
             return result;

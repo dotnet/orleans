@@ -52,7 +52,7 @@ namespace Orleans.TestingHost
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">State data object to be populated for this grain.</param>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
@@ -74,7 +74,7 @@ namespace Orleans.TestingHost
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">State data object to be written for this grain.</param>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
@@ -96,7 +96,7 @@ namespace Orleans.TestingHost
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
