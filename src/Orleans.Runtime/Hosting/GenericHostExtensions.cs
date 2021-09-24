@@ -1,4 +1,5 @@
 using System;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
@@ -67,7 +68,7 @@ namespace Microsoft.Extensions.Hosting
         {
             if (hostBuilder.Properties.ContainsKey("ClientBuilder"))
             {
-                throw new OrleansConfigurationException("Do not use UseOrleansClient with UseOrleans");
+                throw new OrleansConfigurationException("Do not use UseOrleansClient with UseOrleans. If you want a client and server in the same process, only UseOrleans is necessary and the UseOrleansClient call can be removed.");
             }
         }
     }

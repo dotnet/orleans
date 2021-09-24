@@ -11,8 +11,8 @@ namespace Orleans.Hosting
     internal class SiloBuilder : ISiloBuilder
     {
         private readonly IHostBuilder hostBuilder;
-        private readonly List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder>> configureSiloDelegates = new List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder>>();
-        private readonly List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection>>();
+        private readonly List<Action<HostBuilderContext, ISiloBuilder>> configureSiloDelegates = new List<Action<HostBuilderContext, ISiloBuilder>>();
+        private readonly List<Action<HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<HostBuilderContext, IServiceCollection>>();
 
         /// <inheritdoc />
         public IDictionary<object, object> Properties => this.hostBuilder.Properties;
