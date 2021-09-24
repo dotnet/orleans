@@ -217,6 +217,6 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         [SecurityCritical]
         public bool IsSupportedType(Type type) =>
-            type == CodecType || typeof(Exception).IsAssignableFrom(type) || (SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type));
+            type == CodecType || typeof(Exception).IsAssignableFrom(type) || SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type);
     }
 }
