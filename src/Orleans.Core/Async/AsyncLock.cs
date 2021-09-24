@@ -54,18 +54,22 @@ namespace Orleans
             semaphore = new SemaphoreSlim(1);
         }
 
-        public Task<IDisposable> LockAsync()
+        public ValueTask<IDisposable> LockAsync()
         {
             Task wait = semaphore.WaitAsync();
-            if (wait.IsCompleted)
-                return Task.FromResult((IDisposable)new LockReleaser(this));
+            if (wait.IsCompletedSuccessfully)
+            {
+                return new(new LockReleaser(this));
+            }
             else
             {
-                return wait.ContinueWith(
-                    _ => (IDisposable)new LockReleaser(this),
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+                return LockAsyncInternal(this, wait);
+
+                static async ValueTask<IDisposable> LockAsyncInternal(AsyncLock self, Task waitTask)
+                {
+                    await waitTask.ConfigureAwait(false);
+                    return new LockReleaser(self);
+                }
             }
         }
 
