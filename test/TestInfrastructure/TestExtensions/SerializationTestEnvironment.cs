@@ -22,6 +22,7 @@ namespace TestExtensions
 
             this.Client = host.Services.GetRequiredService<IClusterClient>();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            RuntimeClient.ConsumeServices();
         }
 
         public IClusterClient Client { get; set; }
