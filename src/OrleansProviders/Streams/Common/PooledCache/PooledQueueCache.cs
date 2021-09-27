@@ -208,11 +208,11 @@ namespace Orleans.Providers.Streams.Common
             var oldestMessage = oldestBlock.Value.OldestMessage;
             if (oldestMessage.Compare(sequenceToken) > 0)
             {
-                // Check if the sequenceToken correspond to the last message purged from cache
+                // Check if we missed an event since we last purged the cache
                 var streamIdentity = new StreamIdentity(cursor.StreamIdentity.Guid, cursor.StreamIdentity.Namespace);
-                if (this.lastPurgedToken.TryGetValue(streamIdentity, out var entry) && sequenceToken.Equals(entry.Token))
+                if (this.lastPurgedToken.TryGetValue(streamIdentity, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
                 {
-                    // If it maches, then we didn't lose anything. Start from the oldest message in cache
+                    // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
                     cursor.State = CursorStates.Set;
                     cursor.CurrentBlock = oldestBlock;
                     cursor.Index = oldestBlock.Value.OldestMessageIndex;
