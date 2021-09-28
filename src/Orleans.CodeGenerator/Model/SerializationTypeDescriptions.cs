@@ -41,7 +41,7 @@ namespace Orleans.CodeGenerator.Model
 
             public int GetHashCode(SerializerTypeDescription obj)
             {
-                return obj.Target != null ? obj.Target.GetHashCode() : 0;
+                return obj.Target != null ? SymbolEqualityComparer.Default.GetHashCode(obj.target) : 0;
             }
         }
     }
@@ -74,7 +74,7 @@ namespace Orleans.CodeGenerator.Model
             {
                 unchecked
                 {
-                    return ((obj.Type != null ? obj.Type.GetHashCode() : 0) * 397);
+                    return ((obj.Type != null ? SymbolEqualityComparer.Default.GetHashCode(obj.Type) : 0) * 397);
                 }
             }
         }

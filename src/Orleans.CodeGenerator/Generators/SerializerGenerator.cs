@@ -60,7 +60,9 @@ namespace Orleans.CodeGenerator.Generators
             this.wellKnownTypes = wellKnownTypes;
         }
 
-        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
+#pragma warning disable RS1024 // Compare symbols correctly
+        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024 // Compare symbols correctly
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.

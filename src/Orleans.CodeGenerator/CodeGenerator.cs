@@ -69,7 +69,8 @@ namespace Orleans.CodeGenerator
             var types = this.compilationAnalyzer
                 .KnownAssemblies.SelectMany(a => a.GetDeclaredTypes())
                 .Concat(this.compilationAnalyzer.KnownTypes)
-                .Distinct()
+                .Distinct(SymbolEqualityComparer.Default)
+                .OfType<INamedTypeSymbol>()
                 .ToList();
 
             var model = new AggregatedModel();
@@ -142,7 +143,9 @@ namespace Orleans.CodeGenerator
 
         private CompilationUnitSyntax GenerateSyntax(AggregatedModel model)
         {
-            var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>();
+#pragma warning disable RS1024 // Compare symbols correctly
+            var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024 // Compare symbols correctly
 
             // Pass the relevant elements of the model to each of the code generators.
             foreach (var grainInterface in model.GrainInterfaces)

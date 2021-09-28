@@ -9,6 +9,7 @@ using Orleans.CodeGenerator.Utilities;
 
 namespace Orleans.CodeGenerator.Analysis
 {
+#pragma warning disable RS1024 // Compare symbols correctly
     internal class CompilationAnalyzer
     {
         private readonly ILogger log;
@@ -22,22 +23,22 @@ namespace Orleans.CodeGenerator.Analysis
         /// <summary>
         /// Assemblies whose declared types are all considered serializable.
         /// </summary>
-        private readonly HashSet<IAssemblySymbol> assembliesWithForcedSerializability = new HashSet<IAssemblySymbol>();
+        private readonly HashSet<IAssemblySymbol> assembliesWithForcedSerializability = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Types whose sub-types are all considered serializable.
         /// </summary>
-        private readonly HashSet<INamedTypeSymbol> knownBaseTypes = new HashSet<INamedTypeSymbol>();
+        private readonly HashSet<INamedTypeSymbol> knownBaseTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Types which were observed in a grain interface.
         /// </summary>
-        private readonly HashSet<ITypeSymbol> dependencyTypes = new HashSet<ITypeSymbol>();
+        private readonly HashSet<ITypeSymbol> dependencyTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
-        private readonly HashSet<INamedTypeSymbol> grainInterfacesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> grainClassesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> serializationTypesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> fieldOfSerializableType = new HashSet<INamedTypeSymbol>();
+        private readonly HashSet<INamedTypeSymbol> grainInterfacesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> grainClassesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> serializationTypesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> fieldOfSerializableType = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         public CompilationAnalyzer(ILogger log, WellKnownTypes wellKnownTypes, Compilation compilation)
         {
@@ -50,33 +51,33 @@ namespace Orleans.CodeGenerator.Analysis
             this.compilation = compilation;
         }
 
-        public HashSet<INamedTypeSymbol> CodeGenerationRequiredTypes { get; } = new HashSet<INamedTypeSymbol>();
+        public HashSet<INamedTypeSymbol> CodeGenerationRequiredTypes { get; } = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// All assemblies referenced by this compilation.
         /// </summary>
-        public HashSet<IAssemblySymbol> ReferencedAssemblies = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> ReferencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Assemblies which should be excluded from code generation (eg, because they already contain generated code).
         /// </summary>
-        public HashSet<IAssemblySymbol> AssembliesExcludedFromCodeGeneration = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromCodeGeneration = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Assemblies which should be excluded from metadata generation.
         /// </summary>
-        public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
-        public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>();
-        public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>();
+        public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+        public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         public (IEnumerable<INamedTypeSymbol> grainClasses, IEnumerable<INamedTypeSymbol> grainInterfaces, IEnumerable<INamedTypeSymbol> types) GetTypesToProcess() =>
             (this.grainClassesToProcess, this.grainInterfacesToProcess, this.GetSerializationTypesToProcess());
 
         private IEnumerable<INamedTypeSymbol> GetSerializationTypesToProcess()
         {
-            var done = new HashSet<INamedTypeSymbol>();
-            var remaining = new HashSet<INamedTypeSymbol>();
+            var done = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            var remaining = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
             while (done.Count != this.serializationTypesToProcess.Count)
             {
                 remaining.Clear();
@@ -234,7 +235,7 @@ namespace Orleans.CodeGenerator.Analysis
 
         private static IEnumerable<ITypeSymbol> ExpandType(ITypeSymbol symbol)
         {
-            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>());
+            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
             IEnumerable<ITypeSymbol> ExpandTypeInternal(ITypeSymbol s, HashSet<ITypeSymbol> emitted)
             {
                 if (!emitted.Add(s)) yield break;
@@ -431,4 +432,5 @@ namespace Orleans.CodeGenerator.Analysis
             this.dependencyTypes.Add(type);
         }
     }
+#pragma warning restore RS1024 // Compare symbols correctly
 }
