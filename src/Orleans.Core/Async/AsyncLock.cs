@@ -54,9 +54,9 @@ namespace Orleans
             semaphore = new SemaphoreSlim(1);
         }
 
-        public Task<IDisposable> LockAsync()
+        public Task<IDisposable> LockAsync(CancellationToken cancellation = default)
         {
-            Task wait = semaphore.WaitAsync();
+            Task wait = semaphore.WaitAsync(cancellation);
             if (wait.IsCompleted)
                 return Task.FromResult((IDisposable)new LockReleaser(this));
             else
