@@ -34,17 +34,13 @@ namespace Microsoft.Extensions.Hosting
             {
                 clientBuilder = new ClientBuilder(hostBuilder);
                 hostBuilder.Properties.Add(clientBuilderKey, clientBuilder);
-                hostBuilder.ConfigureServices((context, services) =>
-                {
-                    clientBuilder.Build(context, services);
-                });
             }
             else
             {
                 clientBuilder = (ClientBuilder)hostBuilder.Properties[clientBuilderKey];
             }
 
-            clientBuilder.ConfigureClient(configureDelegate);
+            clientBuilder.ConfigureServices((ctx, _) => configureDelegate(ctx, clientBuilder));
             return hostBuilder;
         }
 

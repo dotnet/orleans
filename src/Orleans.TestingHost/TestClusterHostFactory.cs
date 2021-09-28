@@ -40,10 +40,6 @@ namespace Orleans.TestingHost
 
             // Add the silo builder to the host builder so that it is executed during configuration time. 
             hostBuilder.Properties[nameof(SiloBuilder)] = siloBuilder;
-            hostBuilder.ConfigureServices((context, services) =>
-            {
-                siloBuilder.Build(context, services);
-            });
 
             siloBuilder
                 .Configure<ClusterOptions>(configuration)

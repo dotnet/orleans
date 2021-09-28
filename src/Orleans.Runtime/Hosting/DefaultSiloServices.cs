@@ -47,7 +47,7 @@ namespace Orleans.Hosting
         internal static void AddDefaultServices(IServiceCollection services)
         {
             services.AddOptions();
-
+            services.AddHostedService<SiloHostedService>();
             services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
 
             // Options logging

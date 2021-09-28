@@ -11,8 +11,6 @@ namespace Orleans.Hosting
     internal class SiloBuilder : ISiloBuilder
     {
         private readonly IHostBuilder hostBuilder;
-        private readonly List<Action<HostBuilderContext, ISiloBuilder>> configureSiloDelegates = new List<Action<HostBuilderContext, ISiloBuilder>>();
-        private readonly List<Action<HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<HostBuilderContext, IServiceCollection>>();
 
         /// <inheritdoc />
         public IDictionary<object, object> Properties => this.hostBuilder.Properties;
@@ -20,36 +18,15 @@ namespace Orleans.Hosting
         public SiloBuilder(IHostBuilder hostBuilder)
         {
             this.hostBuilder = hostBuilder;
+            hostBuilder.ConfigureServices((ctx, serviceCollection) => serviceCollection.AddHostedService<SiloHostedService>());
             this.ConfigureDefaults();
-        }
-
-        public void Build(HostBuilderContext context, IServiceCollection serviceCollection)
-        {
-            foreach (var configurationDelegate in this.configureSiloDelegates)
-            {
-                configurationDelegate(context, this);
-            }
-
-            serviceCollection.AddHostedService<SiloHostedService>();
-
-            foreach (var configurationDelegate in this.configureServicesDelegates)
-            {
-                configurationDelegate(context, serviceCollection);
-            }
-        }
-
-        public ISiloBuilder ConfigureSilo(Action<HostBuilderContext, ISiloBuilder> configureDelegate)
-        {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
-            this.configureSiloDelegates.Add(configureDelegate);
-            return this;
         }
 
         /// <inheritdoc />
         public ISiloBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
-            this.configureServicesDelegates.Add(configureDelegate);
+            hostBuilder.ConfigureServices(configureDelegate);
             return this;
         }
     }
