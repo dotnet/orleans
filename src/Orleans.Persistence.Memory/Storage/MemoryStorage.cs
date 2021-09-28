@@ -33,7 +33,6 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{" + nameof(name) + "}")]
     public class MemoryGrainStorage : IGrainStorage, IDisposable
     {
-        private const string STATE_STORE_NAME = "MemoryStorage";
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private readonly ILogger logger;
 
@@ -67,7 +66,7 @@ namespace Orleans.Storage
 
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
-            var state = await storageGrain.ReadStateAsync<T>(STATE_STORE_NAME, id);
+            var state = await storageGrain.ReadStateAsync<T>(id);
             if (state != null)
             {
                 grainState.ETag = state.ETag;
@@ -86,7 +85,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
+                grainState.ETag = await storageGrain.WriteStateAsync(key, grainState);
                 grainState.RecordExists = true;
             }
             catch (MemoryStorageEtagMismatchException e)
@@ -105,7 +104,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync<T>(STATE_STORE_NAME, key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<T>(key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
             }
