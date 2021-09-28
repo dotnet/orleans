@@ -187,6 +187,59 @@ namespace UnitTests.OrleansRuntime.Streams
             AvoidCacheMiss(true);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AvoidCacheMissMultipleStreamsActive()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(30));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var seqNumber = 123;
+            var streamKey = Guid.NewGuid();
+            var stream = StreamId.Create(TestStreamNamespace, streamKey);
+
+            // Enqueue a message for our stream
+            var firstSequenceNumber = EnqueueMessage(streamKey);
+
+            // Enqueue a few other messages for other streams
+            EnqueueMessage(Guid.NewGuid());
+            EnqueueMessage(Guid.NewGuid());
+
+            // Consume the first event and see that the cursor has moved to last seen event (not matching our streamIdentity)
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(firstSequenceNumber));
+            Assert.True(cache.TryGetNextMessage(cursor, out var firstContainer));
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            // Remove multiple events, including the one that the cursor is currently pointing to
+            cache.RemoveOldestMessage();
+            cache.RemoveOldestMessage();
+            cache.RemoveOldestMessage();
+
+            // Enqueue another message for stream
+            var lastSequenceNumber = EnqueueMessage(streamKey);
+
+            // Should be able to consume the event just pushed
+            Assert.True(cache.TryGetNextMessage(cursor, out var lastContainer));
+            Assert.Equal(stream, lastContainer.StreamId);
+            Assert.Equal(lastSequenceNumber, lastContainer.SequenceToken.SequenceNumber);
+
+            long EnqueueMessage(Guid streamId)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = StreamId.Create(TestStreamNamespace, streamId),
+                    SequenceNumber = seqNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                seqNumber++;
+                return msg.SequenceNumber;
+            }
+        }
+
         private void AvoidCacheMiss(bool emptyCache)
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
@@ -255,42 +308,50 @@ namespace UnitTests.OrleansRuntime.Streams
             evictionStrategy.PurgeObservable = cache;
             var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
 
-            int idx;
             var seqNumber = 123;
-            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
-
-            // First and last messages destined for stream, following messages
-            // destined for other streams
-            for (idx = 0; idx < 20; idx++)
-            {
-                var now = DateTime.UtcNow;
-                var msg = new TestQueueMessage
-                {
-                    StreamId = (idx == 0) ? stream : StreamId.Create(TestStreamNamespace, Guid.NewGuid()),
-                    SequenceNumber = seqNumber + idx,
-                };
-                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
-            }
+            var streamKey = Guid.NewGuid();
+            var stream = StreamId.Create(TestStreamNamespace, streamKey);
 
             var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(seqNumber));
+            // Start by enqueuing a message for stream, followed bu another one destined for another one
+            EnqueueMessage(streamKey);
+            EnqueueMessage(Guid.NewGuid());
+            // Consume the stream, should be fine
+            Assert.True(cache.TryGetNextMessage(cursor, out _));
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
 
-            // Remove first message
-            cache.RemoveOldestMessage();
+            // Enqueue a new batch
+            // First and last messages destined for stream, following messages
+            // destined for other streams
+            EnqueueMessage(streamKey);
+            for (var idx = 0; idx < 20; idx++)
+            {
+                EnqueueMessage(Guid.NewGuid());
+            }
+
+            // Remove first three messages from the cache
+            cache.RemoveOldestMessage(); // Destined for stream, consumed
+            cache.RemoveOldestMessage(); // Not destined for stream
+            cache.RemoveOldestMessage(); // Destined for stream, not consumed
 
             // Enqueue a new message for stream
+            EnqueueMessage(streamKey);
+
+            // Should throw since we missed the second message destined for stream
+            Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
+
+            long EnqueueMessage(Guid streamId)
             {
-                idx++;
                 var now = DateTime.UtcNow;
                 var msg = new TestQueueMessage
                 {
-                    StreamId = stream,
-                    SequenceNumber = seqNumber + idx,
+                    StreamId = StreamId.Create(TestStreamNamespace, streamId),
+                    SequenceNumber = seqNumber,
                 };
                 cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                seqNumber++;
+                return msg.SequenceNumber;
             }
-
-            // Should throw since we missed the first message
-            Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
         }
 
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
