@@ -30,8 +30,8 @@ namespace Orleans.Hosting
             }
 
             return builder
-            .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
-            .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
+                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
+                .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
         }
 
         /// <summary>
@@ -45,13 +45,7 @@ namespace Orleans.Hosting
             {
                 if (!context.Properties.ContainsKey("OrleansServicesAdded"))
                 {
-                    services.PostConfigure<SiloOptions>(
-                        options => options.SiloName =
-                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
-
-                    services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(services);
-
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
             });
