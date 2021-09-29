@@ -281,13 +281,13 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
-            services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+            services.TryAddSingleton<IApplicationPartManager>(sp => applicationPartManager.ConfigureDefaults());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             //Add default option formatter if none is configured, for options which are required to be configured

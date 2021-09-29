@@ -30,17 +30,13 @@ namespace Microsoft.Extensions.Hosting
             {
                 siloBuilder = new SiloBuilder(hostBuilder);
                 hostBuilder.Properties.Add(siloBuilderKey, siloBuilder);
-                hostBuilder.ConfigureServices((context, services) =>
-                {
-                    siloBuilder.Build(context, services);
-                });
             }
             else
             {
                 siloBuilder = (SiloBuilder)hostBuilder.Properties[siloBuilderKey];
             }
 
-            siloBuilder.ConfigureSilo(configureDelegate);
+            siloBuilder.ConfigureServices((context, services) => configureDelegate(context, siloBuilder));
             return hostBuilder;
         }
 

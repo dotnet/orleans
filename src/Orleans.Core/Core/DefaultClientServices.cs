@@ -74,11 +74,11 @@ namespace Orleans
 
             // Application parts
             var parts = builder.GetApplicationPartManager();
-            services.TryAddSingleton<IApplicationPartManager>(parts);
             parts.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             parts.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+            services.TryAddSingleton<IApplicationPartManager>(sp => parts.ConfigureDefaults());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));

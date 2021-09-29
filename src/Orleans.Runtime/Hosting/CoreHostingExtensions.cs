@@ -156,6 +156,7 @@ namespace Orleans.Hosting
                             options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
+                    services.AddHostedService<SiloHostedService>();
                     DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
