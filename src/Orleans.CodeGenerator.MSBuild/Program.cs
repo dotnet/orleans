@@ -67,11 +67,12 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                     {
                         case "WaitForDebugger":
                             var i = 0;
+                            var process = Process.GetCurrentProcess();
                             while (!Debugger.IsAttached)
                             {
                                 if (i++ % 50 == 0)
                                 {
-                                    Console.WriteLine("Waiting for debugger to attach.");
+                                    Console.WriteLine($"Waiting for debugger to attach to process {process.ProcessName} with PID {process.Id}");
                                 }
 
                                 Thread.Sleep(100);

@@ -322,7 +322,9 @@ namespace Orleans.CodeGenerator.Generators
                 var enumType = wellKnownTypes.TransactionOption;
                 var txRequirement = (int)attr.ConstructorArguments.First().Value;
                 var values = enumType.GetMembers().OfType<IFieldSymbol>().ToList();
+#pragma warning disable RS1024 // Compare symbols correctly
                 var mapping = values.ToDictionary(m => (int)m.ConstantValue, m => m.Name);
+#pragma warning restore RS1024 // Compare symbols correctly
                 if (!mapping.TryGetValue(txRequirement, out var value))
                 {
                     throw new NotSupportedException(

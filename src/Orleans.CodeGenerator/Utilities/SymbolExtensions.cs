@@ -252,7 +252,7 @@ namespace Orleans.CodeGenerator.Utilities
         public static IMethodSymbol Method(this ITypeSymbol type, string name, Func<IMethodSymbol, bool> predicate = null) => type.Member(name, predicate);
 
         public static IMethodSymbol Method(this ITypeSymbol type, string name, params INamedTypeSymbol[] parameters) =>
-            type.Member<IMethodSymbol>(name, m => m.Parameters.Select(p => p.Type).SequenceEqual(parameters));
+            type.Member<IMethodSymbol>(name, m => m.Parameters.Select(p => p.Type).SequenceEqual(parameters, SymbolEqualityComparer.Default));
 
         public static IPropertySymbol Property(this ITypeSymbol type, string name) => type.Member<IPropertySymbol>(name);
 
