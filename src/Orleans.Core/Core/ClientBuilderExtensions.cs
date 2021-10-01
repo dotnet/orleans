@@ -26,7 +26,7 @@ namespace Orleans
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter)
         {
-            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
+            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
         }
 
         /// <summary>
@@ -37,7 +37,7 @@ namespace Orleans
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter)
         {
-            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
+            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
         }
 
         /// <summary>
@@ -47,7 +47,7 @@ namespace Orleans
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
         {
-            return builder.ConfigureServices((context, collection) => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
+            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
         }
 
         private sealed class DelegateConnectionRetryFilter : IClientConnectionRetryFilter
@@ -65,7 +65,9 @@ namespace Orleans
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder ConfigureServices(this IClientBuilder builder, Action<IServiceCollection> configureDelegate)
         {
-            return builder.ConfigureServices((context, collection) => configureDelegate(collection));
+            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            configureDelegate(builder.Services);
+            return builder;
         }
 
         /// <summary>

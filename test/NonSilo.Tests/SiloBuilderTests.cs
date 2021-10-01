@@ -70,7 +70,7 @@ namespace NonSilo.Tests
         public void SiloBuilderTest()
         {
             var host = new HostBuilder()
-                .UseOrleans((ctx, siloBuilder) =>
+                .UseOrleans(siloBuilder =>
                 {
                     siloBuilder
                         .UseLocalhostClustering()

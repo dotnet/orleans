@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Anchor type for configuring an Orleans server.
+    /// Builder for configuring an Orleans server.
     /// </summary>
     internal class SiloBuilder : ISiloBuilder
     {
@@ -14,6 +14,7 @@ namespace Orleans.Hosting
             Services = services;
         }
 
+        /// <inheritdoc/>
         public IServiceCollection Services { get; }
     }
 }

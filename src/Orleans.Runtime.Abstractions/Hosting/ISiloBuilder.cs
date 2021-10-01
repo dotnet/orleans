@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Functionality for building Orleans server instances.
+    /// Builder for configuring an Orleans server.
     /// </summary>
     public interface ISiloBuilder
     {

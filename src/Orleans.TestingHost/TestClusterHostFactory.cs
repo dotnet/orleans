@@ -79,15 +79,15 @@ namespace Orleans.TestingHost
             {
                 configBuilder.Add(source);
             }
+
             var configuration = configBuilder.Build();
 
-            var hostBuilder = new HostBuilder()
-                .ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
-                .UseOrleansClient((context, clientBuilder) =>
+            var hostBuilder = new HostBuilder();
+            hostBuilder.Properties["Configuration"] = configuration;
+            hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
+                .UseOrleansClient(clientBuilder =>
                 {
-                    clientBuilder.Properties["Configuration"] = configuration;
                     clientBuilder.Configure<ClusterOptions>(configuration);
-
                     ConfigureAppServices(configuration, clientBuilder);
                 })
                 .ConfigureServices(services =>
@@ -219,7 +219,7 @@ namespace Orleans.TestingHost
 
                 clientBuilder.Configure(configureOptions);
 
-                clientBuilder.ConfigureServices((context, services) =>
+                clientBuilder.ConfigureServices(services =>
                 {
                     services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
                         .ConfigureFormatter<StaticGatewayListProviderOptions>();
