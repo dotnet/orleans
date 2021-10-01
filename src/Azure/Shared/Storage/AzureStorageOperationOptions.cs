@@ -94,6 +94,63 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
         /// </remarks>
         public Func<Task<TableServiceClient>> CreateClient { get; set; }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+        }
+
+        /// <summary>
+        /// Sets credential properties using a connection string.
+        /// </summary>
+        public void SetCredentials(string connectionString)
+        {
+            ClearCredentials();
+            ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            TokenCredential = tokenCredential ?? throw new ArgumentNullException(nameof(tokenCredential));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            AzureSasCredential = azureSasCredential ?? throw new ArgumentNullException(nameof(azureSasCredential));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="TableSharedKeyCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            SharedKeyCredential = sharedKeyCredential ?? throw new ArgumentNullException(nameof(sharedKeyCredential));
+        }
+
+        private void ClearCredentials()
+        {
+            ServiceUri = default;
+            TokenCredential = default;
+            ConnectionString = default;
+            AzureSasCredential = default;
+            SharedKeyCredential = default;
+        }
     }
 
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions

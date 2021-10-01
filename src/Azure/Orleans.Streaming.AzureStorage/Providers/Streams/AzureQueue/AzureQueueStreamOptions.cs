@@ -85,6 +85,64 @@ namespace Orleans.Configuration
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
         public List<string> QueueNames { get; set; }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI.
+        /// </summary>
+        /// <param name="serviceUri"></param>
+        public void SetCredentials(Uri serviceUri)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+        }
+
+        /// <summary>
+        /// Sets credential properties using a connection string.
+        /// </summary>
+        public void SetCredentials(string connectionString)
+        {
+            ClearCredentials();
+            ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            TokenCredential = tokenCredential ?? throw new ArgumentNullException(nameof(tokenCredential));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            AzureSasCredential = azureSasCredential ?? throw new ArgumentNullException(nameof(azureSasCredential));
+        }
+
+        /// <summary>
+        /// Sets credential properties using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// </summary>
+        public void SetCredentials(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+        {
+            ClearCredentials();
+            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            SharedKeyCredential = sharedKeyCredential ?? throw new ArgumentNullException(nameof(sharedKeyCredential));
+        }
+
+        private void ClearCredentials()
+        {
+            ServiceUri = default;
+            TokenCredential = default;
+            ConnectionString = default;
+            AzureSasCredential = default;
+            SharedKeyCredential = default;
+        }
     }
 
     public class AzureQueueOptionsValidator : IConfigurationValidator
