@@ -10,47 +10,48 @@ namespace Orleans.Hosting
     /// </summary>
     internal class SiloBuilder : ISiloBuilder
     {
-        private readonly IHostBuilder hostBuilder;
-        private readonly List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder>> configureSiloDelegates = new List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder>>();
-        private readonly List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection>>();
-
-        /// <inheritdoc />
-        public IDictionary<object, object> Properties => this.hostBuilder.Properties;
+        private readonly IHostBuilder _hostBuilder;
+        private readonly List<Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection>> _configureDelegates = new();
+        private Microsoft.Extensions.Hosting.HostBuilderContext _context;
+        private IServiceCollection _services;
 
         public SiloBuilder(IHostBuilder hostBuilder)
         {
-            this.hostBuilder = hostBuilder;
-        }
-
-        public void Build(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection serviceCollection)
-        {
-            foreach (var configurationDelegate in this.configureSiloDelegates)
-            {
-                configurationDelegate(context, this);
-            }
-
-            serviceCollection.AddHostedService<SiloHostedService>();
+            _hostBuilder = hostBuilder;
             this.ConfigureDefaults();
-            this.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
+            hostBuilder.ConfigureServices((ctx, services) => InvokeConfigureServicesDelegates(ctx, services));
+        }
 
-            foreach (var configurationDelegate in this.configureServicesDelegates)
+        private void InvokeConfigureServicesDelegates(Microsoft.Extensions.Hosting.HostBuilderContext ctx, IServiceCollection services)
+        {
+            // Prevent future calls to ConfigureServices from enqueuing more delegates
+            _context = ctx;
+            _services = services;
+
+            // Invoke all enqueued delegates
+            foreach (var configureDelegate in _configureDelegates)
             {
-                configurationDelegate(context, serviceCollection);
+                configureDelegate(ctx, services);
             }
         }
 
-        public ISiloBuilder ConfigureSilo(Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder> configureDelegate)
-        {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
-            this.configureSiloDelegates.Add(configureDelegate);
-            return this;
-        }
+        /// <inheritdoc />
+        public IDictionary<object, object> Properties => _hostBuilder.Properties;
 
         /// <inheritdoc />
         public ISiloBuilder ConfigureServices(Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
-            this.configureServicesDelegates.Add(configureDelegate);
+
+            if (_services is { } services)
+            {
+                configureDelegate(_context, services);
+            }
+            else
+            {
+                _configureDelegates.Add(configureDelegate);
+            }
+
             return this;
         }
     }
