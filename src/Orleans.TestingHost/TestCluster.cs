@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
@@ -552,6 +551,11 @@ namespace Orleans.TestingHost
         {
             WriteLog("Initializing Cluster Client");
 
+            if (ClientHost is not null)
+            {
+                throw new InvalidOperationException("Client host is not null. Stop the existing client before starting a new one.");
+            }
+
             this.ClientHost = TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
             this.ClientHost.StartAsync().Wait();
         }
@@ -690,6 +694,8 @@ namespace Orleans.TestingHost
                 {
                     disposable.Dispose();
                 }
+
+                ClientHost = null;
 
                 if (this.PortAllocator is object)
                 {
