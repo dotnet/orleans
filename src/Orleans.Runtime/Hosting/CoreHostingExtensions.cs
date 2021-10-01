@@ -35,23 +35,6 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure the container to use Orleans.
-        /// </summary>
-        /// <param name="builder">The silo builder.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder ConfigureDefaults(this ISiloBuilder builder)
-        {
-            return builder.ConfigureServices((context, services) =>
-            {
-                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
-                {
-                    DefaultSiloServices.AddDefaultServices(services);
-                    context.Properties.Add("OrleansServicesAdded", true);
-                }
-            });
-        }
-
-        /// <summary>
         /// Configures the silo to use development-only clustering and listen on localhost.
         /// </summary>
         /// <param name="builder">The silo builder.</param>

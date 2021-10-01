@@ -44,8 +44,17 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
+        private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
+
         internal static void AddDefaultServices(IServiceCollection services)
         {
+            if (services.Contains(ServiceDescriptor))
+            {
+                return;
+            }
+
+            services.Add(ServiceDescriptor);
+
             services.AddOptions();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
@@ -385,5 +394,7 @@ namespace Orleans.Hosting
                 return null;
             }
         }
+
+        private class ServicesAdded { }
     }
 }

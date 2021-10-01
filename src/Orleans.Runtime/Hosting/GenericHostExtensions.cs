@@ -28,19 +28,22 @@ namespace Microsoft.Extensions.Hosting
 
             VerifyOrleansClientNotIncluded(hostBuilder);
 
-            const string siloBuilderKey = "SiloBuilder";
-            SiloBuilder siloBuilder;
-            if (!hostBuilder.Properties.ContainsKey(siloBuilderKey))
+            hostBuilder.ConfigureServices((context, services) =>
             {
-                siloBuilder = new SiloBuilder(hostBuilder);
-                hostBuilder.Properties.Add(siloBuilderKey, siloBuilder);
-            }
-            else
-            {
-                siloBuilder = (SiloBuilder)hostBuilder.Properties[siloBuilderKey];
-            }
+                const string siloBuilderKey = "SiloBuilder";
+                SiloBuilder siloBuilder;
+                if (!hostBuilder.Properties.ContainsKey(siloBuilderKey))
+                {
+                    siloBuilder = new SiloBuilder(services);
+                    hostBuilder.Properties.Add(siloBuilderKey, siloBuilder);
+                }
+                else
+                {
+                    siloBuilder = (SiloBuilder)hostBuilder.Properties[siloBuilderKey];
+                }
 
-            hostBuilder.ConfigureServices((context, services) => configureDelegate(context, siloBuilder));
+                configureDelegate(context, siloBuilder);
+            });
             return hostBuilder;
         }
 

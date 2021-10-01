@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Configuration.Internal;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester
 {
@@ -55,11 +56,15 @@ namespace Tester
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloConfigurator
+        public class SiloBuilderConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.UseLocalhostClustering();
+                hostBuilder.UseOrleans(siloBuilder =>
+                {
+                    siloBuilder.UseLocalhostClustering();
+                });
+
                 hostBuilder.ConfigureServices((context, services) =>
                 {
                     var cfg = context.Configuration;

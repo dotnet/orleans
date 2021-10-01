@@ -119,7 +119,6 @@ namespace NonSilo.Tests
                 await new HostBuilder().UseOrleans(siloBuilder =>
                 {
                     siloBuilder
-                        .ConfigureDefaults()
                         .UseLocalhostClustering()
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                         .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
@@ -151,7 +150,6 @@ namespace NonSilo.Tests
                 await new HostBuilder().UseOrleans(siloBuilder =>
                 {
                     siloBuilder
-                      .ConfigureDefaults()
                       .UseLocalhostClustering()
                       .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                       .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)

@@ -13,6 +13,7 @@ using UnitTests.TimerTests;
 using Orleans.Tests.SqlUtils;
 using Orleans.Internal;
 using Xunit;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -40,14 +41,17 @@ namespace Tester.AdoNet.Reminders
             }
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.UseAdoNetReminderService(options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
-                    options.Invariant = AdoInvariant;
+                    siloBuilder.UseAdoNetReminderService(options =>
+                    {
+                        options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
+                        options.Invariant = AdoInvariant;
+                    });
                 });
             }
         }

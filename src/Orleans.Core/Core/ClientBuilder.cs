@@ -18,7 +18,7 @@ namespace Orleans
         public ClientBuilder(IHostBuilder hostBuilder)
         {
             _hostBuilder = hostBuilder;
-            this.ConfigureDefaults();
+            hostBuilder.ConfigureServices((ctx, services) => DefaultClientServices.AddDefaultServices(services));
             hostBuilder.ConfigureServices((ctx, services) => InvokeConfigureServicesDelegates(ctx, services));
         }
 

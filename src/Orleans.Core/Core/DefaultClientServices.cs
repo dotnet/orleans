@@ -25,8 +25,17 @@ namespace Orleans
 {
     internal static class DefaultClientServices
     {
+        private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
+
         public static void AddDefaultServices(IServiceCollection services)
         {
+            if (services.Contains(ServiceDescriptor))
+            {
+                return;
+            }
+
+            services.Add(ServiceDescriptor);
+
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -141,5 +150,7 @@ namespace Orleans
                 return null;
             }
         }
+
+        private class ServicesAdded { }
     }
 }

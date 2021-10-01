@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime;
@@ -149,9 +150,9 @@ namespace Orleans.TestingHost
             if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
         }
 
-        internal class ConfigureStaticClusterDeploymentOptions : ISiloConfigurator
+        internal class ConfigureStaticClusterDeploymentOptions : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 hostBuilder.ConfigureServices((context, services) =>
                 {

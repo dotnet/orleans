@@ -19,25 +19,6 @@ namespace Orleans
     public static class ClientBuilderExtensions
     {
         /// <summary>
-        /// Configures default client services.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder ConfigureDefaults(this IClientBuilder builder)
-        {
-            // Configure the container to use an Orleans client.
-            return builder.ConfigureServices(services =>
-            {
-                const string key = "OrleansClientServicesAdded";
-                if (!builder.Properties.ContainsKey(key))
-                {
-                    DefaultClientServices.AddDefaultServices(services);
-                    builder.Properties.Add(key, true);
-                }
-            });
-        }
-
-        /// <summary>
         /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
         /// </summary>
         /// <param name="builder">The host builder.</param>

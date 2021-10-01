@@ -5,6 +5,7 @@ using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.MembershipTests
 {
@@ -22,16 +23,19 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.ConnectionString = connectionString;
-                    options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
+                    siloBuilder.UseAdoNetClustering(options =>
+                    {
+                        options.ConnectionString = connectionString;
+                        options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
+                    });
                 });
             }
         }
@@ -80,16 +84,19 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.ConnectionString = connectionString;
-                    options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
+                    siloBuilder.UseAdoNetClustering(options =>
+                    {
+                        options.ConnectionString = connectionString;
+                        options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
+                    });
                 });
             }
         }
@@ -139,16 +146,19 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.ConnectionString = connectionString;
-                    options.Invariant = AdoNetInvariants.InvariantNameMySql;
+                    siloBuilder.UseAdoNetClustering(options =>
+                    {
+                        options.ConnectionString = connectionString;
+                        options.Invariant = AdoNetInvariants.InvariantNameMySql;
+                    });
                 });
             }
         }
