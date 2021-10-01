@@ -277,7 +277,8 @@ namespace AWSUtils.Tests.StorageTests
             {
                 await this.HostedCluster.RestartSiloAsync(silo);
             }
-            this.HostedCluster.InitializeClient();
+            await this.HostedCluster.StopClusterClientAsync();
+            await this.HostedCluster.InitializeClientAsync();
 
             output.WriteLine("Silos restarted");
 

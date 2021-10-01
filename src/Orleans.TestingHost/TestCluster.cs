@@ -390,7 +390,7 @@ namespace Orleans.TestingHost
             var client = this.ClientHost;
             try
             {
-                if (client != null)
+                if (client is not null)
                 {
                     await client.StopAsync().ConfigureAwait(false);
                 }                
@@ -401,16 +401,8 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                if (client is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                }
-                else if (client is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-
-                this.ClientHost = null;
+                await DisposeAsync(client).ConfigureAwait(false);
+                ClientHost = null;
             }
         }
 
@@ -488,12 +480,20 @@ namespace Orleans.TestingHost
         /// </summary>
         public async Task KillClientAsync()
         {
-            if (ClientHost != null)
+            var client = ClientHost;
+            if (client != null)
             {
                 var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
-                await this.ClientHost.StopAsync(cancelled.Token).ConfigureAwait(false);
-                this.ClientHost = null;
+                try
+                {
+                    await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DisposeAsync(client);
+                    ClientHost = null;
+                }
             }
         }
 
@@ -547,17 +547,17 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
         /// </summary>
-        public void InitializeClient()
+        public async Task InitializeClientAsync()
         {
             WriteLog("Initializing Cluster Client");
 
             if (ClientHost is not null)
             {
-                throw new InvalidOperationException("Client host is not null. Stop the existing client before starting a new one.");
+                await StopClusterClientAsync();
             }
 
             this.ClientHost = TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
-            this.ClientHost.StartAsync().Wait();
+            await this.ClientHost.StartAsync();
         }
 
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }
@@ -581,7 +581,7 @@ namespace Orleans.TestingHost
 
             if (this.options.InitializeClientOnDeploy)
             {
-                InitializeClient();
+                await InitializeClientAsync();
             }
         }
         
@@ -640,7 +640,7 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                await instance.DisposeAsync().ConfigureAwait(false);
+                await DisposeAsync(instance).ConfigureAwait(false);
 
                 Interlocked.Decrement(ref this.startedInstances);
             }
@@ -678,29 +678,18 @@ namespace Orleans.TestingHost
             {
                 foreach (var handle in this.SecondarySilos)
                 {
-                    await handle.DisposeAsync().ConfigureAwait(false);
+                    await DisposeAsync(handle).ConfigureAwait(false);
                 }
 
                 if (this.Primary is object)
                 {
-                    await this.Primary.DisposeAsync().ConfigureAwait(false);
+                    await DisposeAsync(Primary).ConfigureAwait(false);
                 }
 
-                if (this.ClientHost is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                }
-                else if (ClientHost is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-
+                await DisposeAsync(ClientHost).ConfigureAwait(false);
                 ClientHost = null;
 
-                if (this.PortAllocator is object)
-                {
-                    this.PortAllocator.Dispose();
-                }
+                this.PortAllocator?.Dispose();
             });
 
             _disposed = true;
@@ -720,13 +709,21 @@ namespace Orleans.TestingHost
 
             this.Primary?.Dispose();
             this.ClientHost?.Dispose();
-
-            if (this.PortAllocator is object)
-            {
-                this.PortAllocator.Dispose();
-            }
+            this.PortAllocator?.Dispose();
 
             _disposed = true;
+        }
+
+        private static async Task DisposeAsync(IDisposable value)
+        {
+            if (value is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            }
+            else if (value is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
     }
 }

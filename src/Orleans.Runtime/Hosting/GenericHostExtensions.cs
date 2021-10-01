@@ -36,7 +36,7 @@ namespace Microsoft.Extensions.Hosting
 
             hostBuilder.Properties["HasOrleansSiloBuilder"] = "true";
 
-            return hostBuilder.ConfigureServices((context, services) => services.UseOrleans(configureDelegate));
+            return hostBuilder.ConfigureServices((context, services) => services.AddOrleans(configureDelegate));
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace Microsoft.Extensions.Hosting
         /// Calling this method multiple times on the same <see cref="IHostBuilder"/> instance will result in one silo being configured.
         /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
         /// </remarks>
-        public static IServiceCollection UseOrleans(
+        public static IServiceCollection AddOrleans(
             this IServiceCollection services,
             Action<ISiloBuilder> configureDelegate)
         {
@@ -79,6 +79,6 @@ namespace Microsoft.Extensions.Hosting
             return services;
         }
 
-        private static OrleansConfigurationException GetOrleansClientAddedException() => new("Do not use UseOrleansClient with UseOrleans. If you want a client and server in the same process, only UseOrleans is necessary and the UseOrleansClient call can be removed.");
+        private static OrleansConfigurationException GetOrleansClientAddedException() => new("Do not call both UseOrleansClient/AddOrleansClient with UseOrleans/AddOrleans. If you want a client and server in the same process, only UseOrleans/AddOrleans is necessary and the UseOrleansClient/AddOrleansClient call can be removed.");
     }
 }

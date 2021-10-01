@@ -82,8 +82,7 @@ namespace Orleans
 
                 await _clusterClientLifecycle.OnStop(cancellationToken).ConfigureAwait(false);
 
-                var gracefully = !cancellationToken.IsCancellationRequested;
-                _runtimeClient?.Reset(gracefully);
+                _runtimeClient?.Reset();
             }
             finally
             {

@@ -32,7 +32,7 @@ namespace Microsoft.Extensions.Hosting
             }
 
             hostBuilder.Properties["HasOrleansClientBuilder"] = "true";
-            return hostBuilder.ConfigureServices((ctx, services) => services.UseOrleansClient(configureDelegate));
+            return hostBuilder.ConfigureServices((ctx, services) => services.AddOrleansClient(configureDelegate));
         }
 
         /// <summary>
@@ -47,7 +47,7 @@ namespace Microsoft.Extensions.Hosting
         /// Note that this method should not be used in conjunction with UseOrleans, since UseOrleans includes a client automatically.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="services"/> was null or <paramref name="configureDelegate"/> was null.</exception>
-        public static IServiceCollection UseOrleansClient(this IServiceCollection services, Action<IClientBuilder> configureDelegate)
+        public static IServiceCollection AddOrleansClient(this IServiceCollection services, Action<IClientBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             IClientBuilder clientBuilder = default;

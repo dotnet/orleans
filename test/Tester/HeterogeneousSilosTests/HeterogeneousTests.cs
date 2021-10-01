@@ -159,7 +159,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 // Disconnect/Reconnect the client
                 await cluster.StopClusterClientAsync();
-                cluster.InitializeClient();
+                await cluster.InitializeClientAsync();
             }
             else
             {
@@ -181,7 +181,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 // Disconnect/Reconnect the client
                 await cluster.StopClusterClientAsync();
-                cluster.InitializeClient();
+                await cluster.InitializeClientAsync();
             }
             else
             {

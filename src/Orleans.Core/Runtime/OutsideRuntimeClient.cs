@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,15 +30,12 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
-
-        private ClientProviderRuntime clientProviderRuntime;
+        private bool disposed;
 
         internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
-
-        private const string BARS = "----------";
         
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
@@ -131,8 +129,6 @@ namespace Orleans
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
                 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
-
-                this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
                 this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
@@ -255,6 +251,7 @@ namespace Orleans
 
         public void SendResponse(Message request, Response response)
         {
+            ThrowIfDisposed();
             var message = this.messageFactory.CreateResponseMessage(request);
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
@@ -264,6 +261,7 @@ namespace Orleans
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
+            ThrowIfDisposed();
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
@@ -367,7 +365,7 @@ namespace Orleans
             callbacks.TryRemove(id, out _);
         }
 
-        public void Reset(bool cleanup)
+        public void Reset()
         {
             Utils.SafeExecute(() =>
             {
@@ -475,6 +473,7 @@ namespace Orleans
             this.GatewayCountChanged = null;
 
             GC.SuppressFinalize(this);
+            disposed = true;
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
@@ -529,6 +528,18 @@ namespace Orleans
                 if (callback.IsCompleted) continue;
                 if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                ThrowObjectDisposedException();
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            void ThrowObjectDisposedException() => throw new ObjectDisposedException(nameof(OutsideRuntimeClient));
         }
     }
 }

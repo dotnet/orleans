@@ -58,7 +58,7 @@ namespace Tester.ClientConnectionTests
 
                 // Try to reconnect to GW
                 var stopwatch = Stopwatch.StartNew();
-                this.HostedCluster.InitializeClient();
+                await this.HostedCluster.InitializeClientAsync();
                 stopwatch.Stop();
 
                 // Check that we were able to connect before the first connection timeout

@@ -97,7 +97,7 @@ namespace UnitTests.MembershipTests
             {
                 if (this.hostedCluster.Client == null)
                 {
-                    this.hostedCluster.InitializeClient();
+                    await this.hostedCluster.InitializeClientAsync();
                 }
 
                 var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();

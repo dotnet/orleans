@@ -51,12 +51,13 @@ namespace UnitTests.StreamingTests
 
         private const string PubSubStoreProviderName = "PubSubStore";
 
-        public IGrainFactory GrainFactory { get; }
+        public IGrainFactory GrainFactory => _fixture.GrainFactory;
 
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
         protected TestCluster HostedCluster;
+        private readonly Fixture _fixture;
 
         public StreamPubSubReliabilityTests(Fixture fixture)
         {
@@ -64,7 +65,7 @@ namespace UnitTests.StreamingTests
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             this.HostedCluster = fixture.HostedCluster;
-            this.GrainFactory = fixture.GrainFactory;
+            _fixture = fixture;
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
 
