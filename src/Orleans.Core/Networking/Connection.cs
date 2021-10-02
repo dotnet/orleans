@@ -200,8 +200,12 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            // Wait for the transport to signal that it's closed before disposing it.
-            await _transportConnectionClosed.Task;
+            // Only wait for the transport to close if the connection actually started being processed.
+            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            {
+                // Wait for the transport to signal that it's closed before disposing it.
+                await _transportConnectionClosed.Task;
+            }
 
             try
             {
@@ -321,8 +325,8 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _transport.Input.Complete();
-                this.StartClosing(error);
                 (serializer as IDisposable)?.Dispose();
+                this.StartClosing(error);
             }
         }
 
