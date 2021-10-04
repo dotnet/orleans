@@ -266,13 +266,49 @@ namespace Orleans.CodeGeneration
             var methods = declaringType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
             foreach (var openMethod in methods)
             {
+                // is generic?
                 if (!openMethod.IsGenericMethodDefinition) continue;
 
                 // same name?
                 if (!string.Equals(openMethod.Name, methodName, StringComparison.Ordinal)) continue;
 
-                // same type parameter count?
-                if (openMethod.GetGenericArguments().Length != typeParameterCountLocal) continue;
+                var genericArgs = openMethod.GetGenericArguments();
+
+                // same generic type parameter count?
+                if (genericArgs.Length != typeParameterCountLocal) continue;
+
+                // check constraints
+                bool constraintViolated = false;
+
+                foreach (var genericArg in genericArgs)
+                {
+                    var constrainingTypes = genericArg.GetGenericParameterConstraints();
+                    for (var index = 0; index < constrainingTypes.Length; index++)
+                    {
+                        var constrainingType = constrainingTypes[index];
+                        if (!constrainingType.IsAssignableFrom(typeParameters[index]))
+                        {
+                            constraintViolated = true;
+                            break;
+                        }
+                    }
+
+                    if (constraintViolated)
+                    {
+                        // stop checking generic args
+                        break;
+                    }
+                }
+
+                if (constraintViolated)
+                {
+                    // skip to next overload, if any
+                    continue;
+                }
+
+                // same parameter count?
+                if (openMethod.GetParameters().Length != parameterTypes.Length) continue;
+
 
                 // close the definition
                 MethodInfo closedMethod = openMethod.MakeGenericMethod(typeParameters);
@@ -280,29 +316,26 @@ namespace Orleans.CodeGeneration
                 // obtain list of closed parameters (no generic placeholders any more)
                 var parameterInfos = closedMethod.GetParameters();
 
-                // same number of params?
-                if (parameterInfos.Length == parameterTypes.Length)
+                for (int i = 0; i < parameterInfos.Length; ++i)
                 {
-                    for (int i = 0; i < parameterInfos.Length; ++i)
+                    // validate compatibility - assignable/covariant array etc.
+                    if (!parameterInfos[i].ParameterType.IsAssignableFrom(parameterTypes[i]))
                     {
-                        // validate compatibility - assignable/covariant array etc.
-                        if (!parameterInfos[i].ParameterType.IsAssignableFrom(parameterTypes[i]))
-                        {
-                            skipMethod = true;
-                            break;
-                        }
+                        skipMethod = true;
+                        break;
                     }
-
-                    if (skipMethod)
-                    {
-                        skipMethod = false;
-                        continue;
-                    }
-
-                    // found compatible overload; return generic definition, not closed method
-                    methodInfo = openMethod;
-                    break;
                 }
+
+                if (skipMethod)
+                {
+                    skipMethod = false;
+                    continue;
+                }
+
+                // found compatible overload; return generic definition, not closed method
+                methodInfo = openMethod;
+                break;
+
             } // next method
 
 
