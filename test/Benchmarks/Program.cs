@@ -12,9 +12,9 @@ namespace Benchmarks
 {
     class Program
     {
-        private static readonly Dictionary<string, Action> _benchmarks = new Dictionary<string, Action>
+        private static readonly Dictionary<string, Action<string[]>> _benchmarks = new Dictionary<string, Action<string[]>>
         {
-            ["MapReduce"] = () =>
+            ["MapReduce"] = _ =>
             {
                 RunBenchmark(
                 "Running MapReduce benchmark", 
@@ -27,7 +27,7 @@ namespace Benchmarks
                 benchmark => benchmark.Bench().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Transactions.Memory"] = () =>
+            ["Transactions.Memory"] = _ =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -40,7 +40,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Transactions.Memory.Throttled"] = () =>
+            ["Transactions.Memory.Throttled"] = _ =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -53,7 +53,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Transactions.Azure"] = () =>
+            ["Transactions.Azure"] = _ =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -66,7 +66,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Transactions.Azure.Throttled"] = () =>
+            ["Transactions.Azure.Throttled"] = _ =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -79,7 +79,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Transactions.Azure.Overloaded"] = () =>
+            ["Transactions.Azure.Overloaded"] = _ =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -92,11 +92,11 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["SequentialPing"] = () =>
+            ["SequentialPing"] = _ =>
             {
                 BenchmarkRunner.Run<PingBenchmark>();
             },
-            ["ConcurrentPing"] = () =>
+            ["ConcurrentPing"] = _ =>
             {
                 {
                     Console.WriteLine("## Client to Silo ##");
@@ -127,19 +127,19 @@ namespace Benchmarks
                     test.Shutdown().GetAwaiter().GetResult();
                 }
             },
-            ["ConcurrentPing_OneSilo"] = () =>
+            ["ConcurrentPing_OneSilo"] = _ =>
             {
                 new PingBenchmark(numSilos: 1, startClient: true).PingConcurrent().GetAwaiter().GetResult();
             },
-            ["ConcurrentPing_TwoSilos"] = () =>
+            ["ConcurrentPing_TwoSilos"] = _ =>
             {
                 new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();
             },
-            ["ConcurrentPing_HostedClient"] = () =>
+            ["ConcurrentPing_HostedClient"] = _ =>
             {
                 new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
             },
-            ["ConcurrentPing_HostedClient_Forever"] = () =>
+            ["ConcurrentPing_HostedClient_Forever"] = _ =>
             {
                 var benchmark = new PingBenchmark(numSilos: 1, startClient: false);
                 Console.WriteLine("Press any key to begin.");
@@ -153,11 +153,11 @@ namespace Benchmarks
 
                 Console.WriteLine("Interrupted by user");
             },
-            ["ConcurrentPing_SiloToSilo"] = () =>
+            ["ConcurrentPing_SiloToSilo"] = _ =>
             {
                 new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();                
             },
-            ["ConcurrentPing_SiloToSilo_Forever"] = () =>
+            ["ConcurrentPing_SiloToSilo_Forever"] = _ =>
             {
                 Console.WriteLine("Press any key to begin.");
                 Console.ReadKey();
@@ -174,27 +174,27 @@ namespace Benchmarks
 
                 Console.WriteLine("Interrupted by user");
             },
-            ["ConcurrentPing_SiloToSilo_Long"] = () =>
+            ["ConcurrentPing_SiloToSilo_Long"] = _ =>
             {
                 new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
             },
-            ["ConcurrentPing_OneSilo_Forever"] = () =>
+            ["ConcurrentPing_OneSilo_Forever"] = _ =>
             {
                 new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();
             },
-            ["PingOnce"] = () =>
+            ["PingOnce"] = _ =>
             {
                 new PingBenchmark().Ping().GetAwaiter().GetResult();
             },
-            ["PingForever"] = () =>
+            ["PingForever"] = _ =>
             {
                 new PingBenchmark().PingForever().GetAwaiter().GetResult();
             },
-            ["PingPongForever"] = () =>
+            ["PingPongForever"] = _ =>
             {
                 new PingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
-            ["GrainStorage.Memory"] = () =>
+            ["GrainStorage.Memory"] = _ =>
             {
                 RunBenchmark(
                 "Running grain storage benchmark against memory",
@@ -207,7 +207,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["GrainStorage.AzureTable"] = () =>
+            ["GrainStorage.AzureTable"] = _ =>
             {
                 RunBenchmark(
                 "Running grain storage benchmark against Azure Table",
@@ -220,7 +220,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["GrainStorage.AzureBlob"] = () =>
+            ["GrainStorage.AzureBlob"] = _ =>
             {
                 RunBenchmark(
                 "Running grain storage benchmark against Azure Blob",
@@ -233,7 +233,7 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["GrainStorage.AdoNet"] = () =>
+            ["GrainStorage.AdoNet"] = _ =>
             {
                 RunBenchmark(
                 "Running grain storage benchmark against AdoNet",
@@ -246,15 +246,20 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
+            ["suite"] = args =>
+            {
+                _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+            }
         };
 
         // requires benchmark name or 'All' word as first parameter
         public static void Main(string[] args)
         {
+            var slicedArgs = args.Skip(1).ToArray();
             if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
             {
                 Console.WriteLine("Running full benchmarks suite");
-                _benchmarks.Select(pair => pair.Value).ToList().ForEach(action => action());
+                _benchmarks.Select(pair => pair.Value).ToList().ForEach(action => action(slicedArgs));
                 return;
             }
 
@@ -269,7 +274,7 @@ namespace Benchmarks
                 return;
             }
 
-            _benchmarks[args[0]]();
+            _benchmarks[args[0]](slicedArgs);
         }
 
         private static void RunBenchmark<T>(string name, Func<T> init, Action<T> benchmarkAction, Action<T> tearDown)

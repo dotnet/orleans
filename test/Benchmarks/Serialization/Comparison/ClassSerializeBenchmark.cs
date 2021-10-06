@@ -27,7 +27,7 @@ namespace Benchmarks.Comparison
         private static readonly VirtualIntsClass ZeroFormatterInput = VirtualIntsClass.Create();
         private static readonly IBufferMessage ProtoInput = ProtoIntClass.Create();
 
-        private static readonly Hyperion.Serializer HyperionSerializer = new(new SerializerOptions(knownTypes: new[] { typeof(IntClass) }));
+        private static readonly Hyperion.Serializer HyperionSerializer = new(SerializerOptions.Default.WithKnownTypes(new[] { typeof(IntClass) }));
         private static readonly Hyperion.SerializerSession HyperionSession;
         private static readonly MemoryStream HyperionBuffer = new();
 
