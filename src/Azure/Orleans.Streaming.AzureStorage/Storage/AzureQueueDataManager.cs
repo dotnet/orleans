@@ -65,8 +65,18 @@ namespace Orleans.AzureUtils
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string storageConnectionString, TimeSpan? visibilityTimeout = null)
-            : this (loggerFactory, queueName, new AzureQueueOptions { ConnectionString = storageConnectionString, MessageVisibilityTimeout = visibilityTimeout })
+            : this (loggerFactory, queueName, ConfigureOptions(storageConnectionString, visibilityTimeout))
         {
+        }
+
+        private static AzureQueueOptions ConfigureOptions(string storageConnectionString, TimeSpan? visibilityTimeout)
+        {
+            var options = new AzureQueueOptions
+            {
+                MessageVisibilityTimeout = visibilityTimeout
+            };
+            options.ConfigureQueueServiceClient(storageConnectionString);
+            return options;
         }
 
         /// <summary>
@@ -361,64 +371,8 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                QueueServiceClient client;
-                if (options.CreateClient is { } createClient)
-                {
-                    ThrowIfNotNull(options.TokenCredential, nameof(options.TokenCredential), nameof(options.TokenCredential));
-                    ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
-                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                    ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ServiceUri));
-                    client = await createClient();
-                }
-                else if (options.TokenCredential is { } tokenCredential)
-                {
-                    ValidateUrl(options, nameof(options.TokenCredential));
-                    ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
-                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                    client = new QueueServiceClient(options.ServiceUri, tokenCredential, options.ClientOptions);
-                }
-                else if (options.AzureSasCredential is { } sasCredential)
-                {
-                    ValidateUrl(options, nameof(options.AzureSasCredential));
-                    ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                    client = new QueueServiceClient(options.ServiceUri, sasCredential, options.ClientOptions);
-                }
-                else if (options.SharedKeyCredential is { } tableSharedKeyCredential)
-                {
-                    ValidateUrl(options, nameof(options.SharedKeyCredential));
-                    ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                    client = new QueueServiceClient(options.ServiceUri, tableSharedKeyCredential, options.ClientOptions);
-                }
-                else if (options.ConnectionString is { Length: > 0 } connectionString)
-                {
-                    ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ConnectionString));
-                    client = new QueueServiceClient(connectionString, options.ClientOptions);
-                }
-                else
-                {
-                    client = new QueueServiceClient(options.ServiceUri, options.ClientOptions);
-                }
-
+                var client = await options.CreateClient();
                 return client.GetQueueClient(QueueName);
-
-                static void ValidateUrl(AzureQueueOptions options, string dependentOption)
-                {
-                    if (options.ServiceUri is null)
-                    {
-                        throw new InvalidOperationException($"{nameof(options.ServiceUri)} is null, but it is required when {dependentOption} is specified");
-                    }
-                }
-
-                static void ThrowIfNotNull(object value, string propertyName, string dependentOption)
-                {
-                    if (value is not null)
-                    {
-                        throw new InvalidOperationException($"{propertyName} is not null, but it is not being used because {dependentOption} has been set and takes precedence");
-                    }
-                }
             }
             catch (Exception exc)
             {

@@ -9,12 +9,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -24,12 +23,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -39,12 +37,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -54,12 +51,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -69,12 +65,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.DataBlobUri;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -84,12 +79,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.DataQueueUri;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureQueueServiceClient(TestDefaultConfiguration.DataQueueUri, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureQueueServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -99,12 +93,11 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.DataBlobUri;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;

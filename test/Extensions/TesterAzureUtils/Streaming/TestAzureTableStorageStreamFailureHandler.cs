@@ -38,12 +38,11 @@ namespace Tester.AzureUtils.Streaming
             var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
             return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }

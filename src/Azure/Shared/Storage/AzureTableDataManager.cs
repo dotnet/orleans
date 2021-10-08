@@ -689,76 +689,12 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             try
             {
-                var creationClient = await GetCloudTableClientAsync();
-                return creationClient;
+                return await options.CreateClient();
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_18, exc, "Error creating CloudTableCreationClient.");
                 throw;
-            }
-        }
-
-        private async ValueTask<TableServiceClient> GetCloudTableClientAsync()
-        {
-            TableServiceClient client;
-
-            if (options.CreateClient is { } createTableClient)
-            {
-                ThrowIfNotNull(options.TokenCredential, nameof(options.TokenCredential), nameof(options.TokenCredential));
-                ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
-                ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ServiceUri));
-                client = await createTableClient();
-            }
-            else if (options.TokenCredential is { } tokenCredential)
-            {
-                ValidateUrl(options, nameof(options.TokenCredential));
-                ThrowIfNotNull(options.AzureSasCredential, nameof(options.AzureSasCredential), nameof(options.AzureSasCredential));
-                ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                client = new TableServiceClient(options.ServiceUri, tokenCredential, options.ClientOptions);
-            }
-            else if (options.AzureSasCredential is { } sasCredential)
-            {
-                ValidateUrl(options, nameof(options.AzureSasCredential));
-                ThrowIfNotNull(options.SharedKeyCredential, nameof(options.SharedKeyCredential), nameof(options.SharedKeyCredential));
-                ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                client = new TableServiceClient(options.ServiceUri, sasCredential, options.ClientOptions);
-            }
-            else if (options.SharedKeyCredential is { } tableSharedKeyCredential)
-            {
-                ValidateUrl(options, nameof(options.SharedKeyCredential));
-                ThrowIfNotNull(options.ConnectionString, nameof(options.ConnectionString), nameof(options.ConnectionString));
-                client = new TableServiceClient(options.ServiceUri, tableSharedKeyCredential, options.ClientOptions);
-            }
-            else if (options.ConnectionString is { Length: > 0 } connectionString)
-            {
-                ThrowIfNotNull(options.ServiceUri, nameof(options.ServiceUri), nameof(options.ConnectionString));
-                client = new TableServiceClient(connectionString, options.ClientOptions);
-            }
-            else
-            {
-                client = new TableServiceClient(options.ServiceUri, options.ClientOptions);
-            }
-
-            return client;
-
-            static void ValidateUrl(AzureStorageOperationOptions options, string dependentOption)
-            {
-                if (options.ServiceUri is null)
-                {
-                    throw new InvalidOperationException($"{nameof(options.ServiceUri)} is null, but it is required when {dependentOption} is specified");
-                }
-            }
-
-            static void ThrowIfNotNull(object value, string propertyName, string dependentOption)
-            {
-                if (value is not null)
-                {
-                    throw new InvalidOperationException($"{propertyName} is not null, but it is not being used because {dependentOption} has been set and takes precedence");
-                }
             }
         }
 

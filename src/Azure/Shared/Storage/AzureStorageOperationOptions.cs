@@ -38,118 +38,89 @@ namespace Orleans.GrainDirectory.AzureStorage
         public AzureStoragePolicyOptions StoragePolicyOptions { get; } = new AzureStoragePolicyOptions();
 
         /// <summary>
-        /// Connection string.
-        /// </summary>
-        /// <remarks>
-        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
-        /// </remarks>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
-        /// <summary>
-        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/>.
-        /// </remarks>
-        public TokenCredential TokenCredential { get; set; }
-
-        /// <summary>
-        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
-        /// </remarks>
-        public AzureSasCredential AzureSasCredential { get; set; }
-
-        /// <summary>
         /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
         /// </summary>
         public TableClientOptions ClientOptions { get; set; }
 
         /// <summary>
-        /// The table service endpoint (e.g. https://x.table.cosmos.azure.com.), which can included a shared access signature.
+        /// The delegate used to create a <see cref="TableServiceClient"/> instance.
         /// </summary>
-        /// <remarks>
-        /// If this property contains a shared access signature, then no other credential properties are required.
-        /// Otherwise, the presence of any other credential property will take precedence over this.
-        /// </remarks>
-        public Uri ServiceUri { get; set; }
+        internal Func<Task<TableServiceClient>> CreateClient { get; private set; }
 
         /// <summary>
-        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
+        /// Configures the <see cref="TableServiceClient"/> using a connection string.
         /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
-        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
-        /// </remarks>
-        public TableSharedKeyCredential SharedKeyCredential { get; set; }
-
-        /// <summary>
-        /// The optional delegate used to create a <see cref="TableServiceClient"/> instance.
-        /// </summary>
-        /// <remarks>
-        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
-        /// </remarks>
-        public Func<Task<TableServiceClient>> CreateClient { get; set; }
-
-        /// <summary>
-        /// Sets credential properties using an authenticated service URI.
-        /// </summary>
-        public void SetCredentials(Uri serviceUri)
+        public void ConfigureTableServiceClient(string connectionString)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            CreateClient = () => Task.FromResult(new TableServiceClient(connectionString, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using a connection string.
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI.
         /// </summary>
-        public void SetCredentials(string connectionString)
+        public void ConfigureTableServiceClient(Uri serviceUri)
         {
-            ClearCredentials();
-            ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// Configures the <see cref="TableServiceClient"/> using the provided callback.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, TokenCredential tokenCredential)
+        public void ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            TokenCredential = tokenCredential ?? throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, AzureSasCredential azureSasCredential)
+        public void ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            AzureSasCredential = azureSasCredential ?? throw new ArgumentNullException(nameof(azureSasCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, tokenCredential, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="TableSharedKeyCredential"/>.
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
+        public void ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            SharedKeyCredential = sharedKeyCredential ?? throw new ArgumentNullException(nameof(sharedKeyCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, azureSasCredential, ClientOptions));
         }
 
-        private void ClearCredentials()
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="TableSharedKeyCredential"/>.
+        /// </summary>
+        public void ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
         {
-            ServiceUri = default;
-            TokenCredential = default;
-            ConnectionString = default;
-            AzureSasCredential = default;
-            SharedKeyCredential = default;
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+        }
+
+        internal void Validate(string name)
+        {
+            if (CreateClient is null)
+            {
+                throw new OrleansConfigurationException($"No credentials specified. Use the {GetType().Name}.{nameof(AzureStorageOperationOptions.ConfigureTableServiceClient)} method to configure the Azure Table Service client.");
+            }
+
+            try
+            {
+                AzureTableUtils.ValidateTableName(TableName);
+            }
+            catch (Exception ex)
+            {
+                throw GetException($"{nameof(TableName)} is not valid.", ex);
+            }
+
+            Exception GetException(string message, Exception inner = null) =>
+                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner);
         }
     }
 
@@ -166,68 +137,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public virtual void ValidateConfiguration()
         {
-            if (Options.CreateClient is { } createTableClient)
-            {
-                ThrowIfNotNull(Options.TokenCredential, nameof(Options.TokenCredential), nameof(Options.TokenCredential));
-                ThrowIfNotNull(Options.AzureSasCredential, nameof(Options.AzureSasCredential), nameof(Options.AzureSasCredential));
-                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
-                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
-                ThrowIfNotNull(Options.ServiceUri, nameof(Options.ServiceUri), nameof(Options.ServiceUri));
-            }
-            else if (Options.TokenCredential is { } tokenCredential)
-            {
-                ValidateUrl(Options, nameof(Options.TokenCredential));
-                ThrowIfNotNull(Options.AzureSasCredential, nameof(Options.AzureSasCredential), nameof(Options.AzureSasCredential));
-                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
-                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
-            }
-            else if (Options.AzureSasCredential is { } sasCredential)
-            {
-                ValidateUrl(Options, nameof(Options.AzureSasCredential));
-                ThrowIfNotNull(Options.SharedKeyCredential, nameof(Options.SharedKeyCredential), nameof(Options.SharedKeyCredential));
-                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
-            }
-            else if (Options.SharedKeyCredential is { } tableSharedKeyCredential)
-            {
-                ValidateUrl(Options, nameof(Options.SharedKeyCredential));
-                ThrowIfNotNull(Options.ConnectionString, nameof(Options.ConnectionString), nameof(Options.ConnectionString));
-            }
-            else if (Options.ConnectionString is { Length: > 0 } connectionString)
-            {
-                ThrowIfNotNull(Options.ServiceUri, nameof(Options.ServiceUri), nameof(Options.ConnectionString));
-            }
-            else
-            {
-                throw new InvalidOperationException($"{nameof(Options.ServiceUri)} is null, but it is required when no other credential is specified");
-            }
-
-            try
-            {
-                AzureTableUtils.ValidateTableName(this.Options.TableName);
-            }
-            catch (Exception ex)
-            {
-                throw GetException($"{nameof(Options.TableName)} is not valid.", ex);
-            }
-
-            Exception GetException(string message, Exception inner = null) =>
-                new OrleansConfigurationException($"Configuration for {GetType().Name} {Name} is invalid. {message}", inner);
-
-            static void ValidateUrl(AzureStorageOperationOptions options, string dependentOption)
-            {
-                if (options.ServiceUri is null)
-                {
-                    throw new InvalidOperationException($"{nameof(options.ServiceUri)} is null, but it is required when {dependentOption} is specified");
-                }
-            }
-
-            static void ThrowIfNotNull(object value, string propertyName, string dependentOption)
-            {
-                if (value is not null)
-                {
-                    throw new InvalidOperationException($"{propertyName} is not null, but it is not being used because {dependentOption} has been set and takes precedence");
-                }
-            }
+            Options.Validate(Name);
         }
     }
 }

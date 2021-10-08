@@ -10,7 +10,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
-    public class AzureBlobStorageOptions : AzureBlobUtils.IBlobServiceClientOptions
+    public class AzureBlobStorageOptions
     {
         /// <summary>
         /// Container name where grain stage is stored
@@ -19,62 +19,14 @@ namespace Orleans.Configuration
         public const string DEFAULT_CONTAINER_NAME = "grainstate";
 
         /// <summary>
-        /// The service connection string.
-        /// </summary>
-        /// <remarks>
-        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
-        /// </remarks>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
-        /// <summary>
-        /// The blob service endpoint (e.g. https://x.blob.core.windows.net).
-        /// </summary>
-        /// <remarks>
-        /// If this property contains a shared access signature, then no other credential properties are required.
-        /// Otherwise, the presence of any other credential property will take precedence over this.
-        /// </remarks>
-        public Uri ServiceUri { get; set; }
-
-        /// <summary>
-        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/>.
-        /// </remarks>
-        public TokenCredential TokenCredential { get; set; }
-
-        /// <summary>
-        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
-        /// </remarks>
-        public AzureSasCredential AzureSasCredential { get; set; }
-
-        /// <summary>
         /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
         /// </summary>
         public BlobClientOptions ClientOptions { get; set; }
 
         /// <summary>
-        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
-        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
-        /// </remarks>
-        public StorageSharedKeyCredential SharedKeyCredential { get; set; }
-
-        /// <summary>
         /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
         /// </summary>
-        /// <remarks>
-        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
-        /// </remarks>
-        public Func<Task<BlobServiceClient>> CreateClient { get; set; }
+        internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -89,61 +41,59 @@ namespace Orleans.Configuration
         public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI.
+        /// Configures the <see cref="BlobServiceClient"/> using a connection string.
         /// </summary>
-        /// <param name="serviceUri"></param>
-        public void SetCredentials(Uri serviceUri)
+        public void ConfigureBlobServiceClient(string connectionString)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(connectionString, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using a connection string.
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI.
         /// </summary>
-        public void SetCredentials(string connectionString)
+        public void ConfigureBlobServiceClient(Uri serviceUri)
         {
-            ClearCredentials();
-            ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// Configures the <see cref="BlobServiceClient"/> using the provided callback.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, TokenCredential tokenCredential)
+        public void ConfigureBlobServiceClient(Func<Task<BlobServiceClient>> createClientCallback)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            TokenCredential = tokenCredential ?? throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, AzureSasCredential azureSasCredential)
+        public void ConfigureBlobServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            AzureSasCredential = azureSasCredential ?? throw new ArgumentNullException(nameof(azureSasCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, tokenCredential, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+        public void ConfigureBlobServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            SharedKeyCredential = sharedKeyCredential ?? throw new ArgumentNullException(nameof(sharedKeyCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, azureSasCredential, ClientOptions));
         }
 
-        private void ClearCredentials()
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
         {
-            ServiceUri = default;
-            TokenCredential = default;
-            ConnectionString = default;
-            AzureSasCredential = default;
-            SharedKeyCredential = default;
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
         }
     }
 
@@ -168,18 +118,9 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options.ServiceUri == null)
+            if (this.options.CreateClient is null)
             {
-                if (this.options.TokenCredential != null)
-                {
-                    throw new OrleansConfigurationException($"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
-                }
-            }
-            else
-            {
-                if (this.options.TokenCredential == null)
-                    throw new OrleansConfigurationException(
-                        $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.TokenCredential)} is missing.");
+                throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureBlobStorageOptions.ConfigureBlobServiceClient)} method to configure the Azure Blob Service client.");
             }
 
             try

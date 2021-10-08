@@ -18,7 +18,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         private const string TableName = "TestStreamFailures";
         private const string DeploymentId = "TestDeployment";
         private TestAzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer)
-            : base(serializer, NullLoggerFactory.Instance, false, DeploymentId, TableName, TestDefaultConfiguration.DataConnectionString)
+            : base(serializer, NullLoggerFactory.Instance, false, DeploymentId, GetStreamingAzureStorageOperationOptions())
         {
         }
 
@@ -41,17 +41,38 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
         private static AzureTableDataManager<TableEntity> GetDataManager()
         {
+            var options = GetAzureStorageOperationOptions();
+            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
+        }
+
+        private static AzureStorageOperationOptions GetAzureStorageOperationOptions()
+        {
             var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ServiceUri = TestDefaultConfiguration.TableEndpoint;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
-            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
+
+            return options;
+        }
+
+        private static Orleans.Streaming.AzureStorage.AzureStorageOperationOptions GetStreamingAzureStorageOperationOptions()
+        {
+            var options = new Orleans.Streaming.AzureStorage.AzureStorageOperationOptions { TableName = TableName };
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+            }
+
+            return options;
         }
     }
 }

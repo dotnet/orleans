@@ -32,7 +32,7 @@ namespace Orleans.LeaseProviders
         {
             if (this.container == null)
             {
-                this.blobClient = await AzureBlobUtils.CreateBlobServiceClient(options);
+                this.blobClient = await options.CreateClient();
                 var tmpContainer = blobClient.GetBlobContainerClient(this.options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
                 this.container = tmpContainer;

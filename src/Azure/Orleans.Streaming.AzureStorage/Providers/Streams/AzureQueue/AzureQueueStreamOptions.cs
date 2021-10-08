@@ -16,42 +16,6 @@ namespace Orleans.Configuration
     public class AzureQueueOptions
     {
         /// <summary>
-        /// The service connection string.
-        /// </summary>
-        /// <remarks>
-        /// This property is superseded by all other properties except for <see cref="ServiceUri"/>.
-        /// </remarks>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
-        /// <summary>
-        /// The Service URI (e.g. https://x.queue.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
-        /// </summary>
-        /// <remarks>
-        /// If this property contains a shared access signature, then no other credential properties are required.
-        /// Otherwise, the presence of any other credential property will take precedence over this.
-        /// </remarks>
-        public Uri ServiceUri { get; set; }
-
-        /// <summary>
-        /// Token credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>, <see cref="AzureSasCredential"/>, and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/>.
-        /// </remarks>
-        public TokenCredential TokenCredential { get; set; }
-
-        /// <summary>
-        /// Azure SAS credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/> and <see cref="SharedKeyCredential"/>.
-        /// This property is superseded by <see cref="CreateClient"/> and <see cref="TokenCredential"/>.
-        /// </remarks>
-        public AzureSasCredential AzureSasCredential { get; set; }
-
-        /// <summary>
         /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
         /// </summary>
         public QueueClientOptions ClientOptions { get; set; } = new QueueClientOptions
@@ -66,82 +30,68 @@ namespace Orleans.Configuration
         };
 
         /// <summary>
-        /// Shared key credentials, to be used in conjunction with <see cref="ServiceUri"/>.
-        /// </summary>
-        /// <remarks>
-        /// This property takes precedence over specifying only <see cref="ServiceUri"/> and over <see cref="ConnectionString"/>.
-        /// This property is superseded by <see cref="CreateClient"/>, <see cref="TokenCredential"/>, and <see cref="AzureSasCredential"/>.
-        /// </remarks>
-        public StorageSharedKeyCredential SharedKeyCredential { get; set; }
-
-        /// <summary>
         /// The optional delegate used to create a <see cref="QueueServiceClient"/> instance.
         /// </summary>
-        /// <remarks>
-        /// This property, if not <see langword="null"/>, takes precedence over <see cref="ConnectionString"/>, <see cref="SharedKeyCredential"/>, <see cref="AzureSasCredential"/>, <see cref="TokenCredential"/>, <see cref="ClientOptions"/>, and <see cref="ServiceUri"/>,
-        /// </remarks>
-        public Func<Task<QueueServiceClient>> CreateClient { get; set; }
+        internal Func<Task<QueueServiceClient>> CreateClient { get; private set; }
 
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
         public List<string> QueueNames { get; set; }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI.
+        /// Configures the <see cref="QueueServiceClient"/> using a connection string.
         /// </summary>
-        /// <param name="serviceUri"></param>
-        public void SetCredentials(Uri serviceUri)
+        public void ConfigureQueueServiceClient(string connectionString)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            CreateClient = () => Task.FromResult(new QueueServiceClient(connectionString, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using a connection string.
+        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI.
         /// </summary>
-        public void SetCredentials(string connectionString)
+        public void ConfigureQueueServiceClient(Uri serviceUri)
         {
-            ClearCredentials();
-            ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// Configures the <see cref="QueueServiceClient"/> using the provided callback.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, TokenCredential tokenCredential)
+        public void ConfigureQueueServiceClient(Func<Task<QueueServiceClient>> createClientCallback)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            TokenCredential = tokenCredential ?? throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, AzureSasCredential azureSasCredential)
+        public void ConfigureQueueServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            AzureSasCredential = azureSasCredential ?? throw new ArgumentNullException(nameof(azureSasCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, tokenCredential, ClientOptions));
         }
 
         /// <summary>
-        /// Sets credential properties using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
         /// </summary>
-        public void SetCredentials(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+        public void ConfigureQueueServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            ClearCredentials();
-            ServiceUri = serviceUri ?? throw new ArgumentNullException(nameof(serviceUri));
-            SharedKeyCredential = sharedKeyCredential ?? throw new ArgumentNullException(nameof(sharedKeyCredential));
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, azureSasCredential, ClientOptions));
         }
 
-        private void ClearCredentials()
+        /// <summary>
+        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// </summary>
+        public void ConfigureQueueServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
         {
-            ServiceUri = default;
-            TokenCredential = default;
-            ConnectionString = default;
-            AzureSasCredential = default;
-            SharedKeyCredential = default;
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
         }
     }
 
@@ -158,16 +108,9 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options.ServiceUri == null)
+            if (this.options.CreateClient is null)
             {
-                if (this.options.TokenCredential != null)
-                {
-                    throw new OrleansConfigurationException($"{nameof(AzureQueueOptions)} on stream provider {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
-                }
-
-                if (String.IsNullOrEmpty(options.ConnectionString))
-                    throw new OrleansConfigurationException(
-                        $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.ConnectionString)} is invalid");
+                throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureQueueOptions.ConfigureQueueServiceClient)} method to configure the Azure Queue Service client.");
             }
 
             if (options.QueueNames == null || options.QueueNames.Count == 0)

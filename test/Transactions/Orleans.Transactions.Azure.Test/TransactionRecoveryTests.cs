@@ -64,7 +64,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAzureStorageClustering(options =>
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
             }
         }
 
@@ -73,7 +73,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.UseAzureStorageClustering(options =>
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
             }
         }
     }
