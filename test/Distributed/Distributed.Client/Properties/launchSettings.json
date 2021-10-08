@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Distributed.Client": {
+      "commandName": "Project",
+      "commandLineArgs": "counter --clusterId testCluster --serviceId testService requests errors"
+    }
+  }
+}

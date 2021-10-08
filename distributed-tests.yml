@@ -48,6 +48,24 @@ scenarios:
         targetsPerRouter: 10
         doWarmup: true
         commandOptions: "--pipelineSize {{pipelineSize}} --requests {{requests}} --routers {{routers}} --targetsPerRouter {{targetsPerRouter}} --doWarmup {{doWarmup}}"
+  streaming:
+    server:
+      job: silo
+      variables:
+        instances: 10
+        configurator: EventGeneratorStreamingSilo
+        duration: 300
+        type: ExplicitGrainBasedAndImplicit
+        streamsPerQueue: 1000
+        queueCount: 8
+        wait: 20
+        configuratorOptions: "--type {{type}} --streamsPerQueue {{streamsPerQueue}} --queueCount {{queueCount}} --wait {{wait}} --duration {{duration}}"
+    client:
+      job: client
+      variables:
+        command: counter 
+        instances: 1
+        commandOptions: "requests errors"
 
 profiles:
   local:

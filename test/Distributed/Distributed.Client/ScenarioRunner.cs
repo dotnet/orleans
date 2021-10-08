@@ -17,7 +17,7 @@ namespace Distributed.Client
         public string ClusterId { get; set; }
         public int PipelineSize { get; set; }
         public int Requests { get; set; } 
-        public SecretConfiguration.SecretSource SecretSource { get;set;}
+        public SecretConfiguration.SecretSource SecretSource { get;set; }
     }
 
     public class ScenarioRunner<T>

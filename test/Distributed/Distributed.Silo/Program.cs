@@ -6,5 +6,6 @@ using Distributed.Silo.Configurator;
 var root = new RootCommand();
 
 root.Add(Silo.CreateCommand(new SimpleSilo()));
+root.Add(Silo.CreateCommand(new EventGeneratorStreamingSilo()));
 
 await root.InvokeAsync(args);
