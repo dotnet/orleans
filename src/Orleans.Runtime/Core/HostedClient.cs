@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Internal;
@@ -240,9 +239,7 @@ namespace Orleans.Runtime
 
                 // Start pumping messages.
                 this.Start();
-
-                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                return clusterClient.Connect();
+                return Task.CompletedTask;
             }
 
             async Task OnStop(CancellationToken cancellation)
@@ -253,11 +250,6 @@ namespace Orleans.Runtime
                 {
                     await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
                 }
-
-                if (cancellation.IsCancellationRequested) return;
-
-                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                await clusterClient.Close();
             }
         }
 

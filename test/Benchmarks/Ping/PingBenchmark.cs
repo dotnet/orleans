@@ -22,6 +22,7 @@ namespace Benchmarks.Ping
         private readonly List<IHost> hosts = new List<IHost>();
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
+        private readonly IHost clientHost;
 
         public PingBenchmark() : this(1, true) { }
 
@@ -53,21 +54,25 @@ namespace Benchmarks.Ping
 
             if (startClient)
             {
-                var clientBuilder = new ClientBuilder()
-                    .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
-
-                if (numSilos == 1)
+                var hostBuilder = new HostBuilder().UseOrleansClient(clientBuilder =>
                 {
-                    clientBuilder.UseLocalhostClustering();
-                }
-                else
-                {
-                    var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
-                    clientBuilder.UseStaticClustering(gateways);
-                }
+                    clientBuilder.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
 
-                this.client = clientBuilder.Build();
-                this.client.Connect().GetAwaiter().GetResult();
+                    if (numSilos == 1)
+                    {
+                        clientBuilder.UseLocalhostClustering();
+                    }
+                    else
+                    {
+                        var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
+                        clientBuilder.UseStaticClustering(gateways);
+                    }
+                });
+
+                this.clientHost = hostBuilder.Build();
+                this.clientHost.StartAsync().GetAwaiter().GetResult();
+
+                this.client = this.clientHost.Services.GetRequiredService<IClusterClient>();
                 var grainFactory = this.client;
 
                 this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
@@ -132,11 +137,9 @@ namespace Benchmarks.Ping
 
         public async Task Shutdown()
         {
-            if (this.client is IClusterClient c)
-            {
-                await c.Close();
-                c.Dispose();
-            }
+            await this.clientHost.StopAsync();
+            if (clientHost is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
+            else clientHost.Dispose();
 
             this.hosts.Reverse();
             foreach (var h in this.hosts)

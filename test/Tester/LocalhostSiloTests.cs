@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
@@ -30,13 +31,16 @@ namespace Tester
                 .UseLocalhostClustering(siloPort, gatewayPort);
             }).Build();
 
-            var client = new ClientBuilder()
-                .UseLocalhostClustering(gatewayPort)
-                .Build();
+            var clientHost = new HostBuilder().UseOrleansClient(clientBuilder =>
+            {
+                clientBuilder.UseLocalhostClustering(gatewayPort);
+            }).Build();
+
+            var client = clientHost.Services.GetRequiredService<IClusterClient>();
+
             try
             {
-                await host.StartAsync();
-                await client.Connect();
+                await Task.WhenAll(host.StartAsync(), clientHost.StartAsync());
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);
@@ -44,9 +48,9 @@ namespace Tester
             finally
             {
                 await OrleansTaskExtentions.SafeExecute(() => host.StopAsync());
-                await OrleansTaskExtentions.SafeExecute(() => client.Close());
+                await OrleansTaskExtentions.SafeExecute(() => clientHost.StopAsync());
                 Utils.SafeExecute(() => host.Dispose());
-                Utils.SafeExecute(() => client.Close());
+                Utils.SafeExecute(() => clientHost.Dispose());
             }
         }
 
@@ -72,15 +76,17 @@ namespace Tester
                 .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort));
             }).Build();
 
-            var client = new ClientBuilder()
-                .UseLocalhostClustering(new[] { baseGatewayPort, baseGatewayPort + 1})
-                .Build();
+            var clientHost = new HostBuilder().UseOrleansClient(clientBuilder =>
+            {
+                clientBuilder.UseLocalhostClustering(new[] {baseGatewayPort, baseGatewayPort + 1});
+            }).Build();
+
+            var client = clientHost.Services.GetRequiredService<IClusterClient>();
 
             try
             {
-                await Task.WhenAll(silo1.StartAsync(), silo2.StartAsync());
+                await Task.WhenAll(silo1.StartAsync(), silo2.StartAsync(), clientHost.StartAsync());
 
-                await client.Connect();
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);
@@ -91,10 +97,10 @@ namespace Tester
                 cancelled.Cancel();
                 Utils.SafeExecute(() => silo1.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo2.StopAsync(cancelled.Token));
+                Utils.SafeExecute(() => clientHost.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo1.Dispose());
                 Utils.SafeExecute(() => silo2.Dispose());
-                Utils.SafeExecute(() => client.Close());
-                Utils.SafeExecute(() => client.Dispose());
+                Utils.SafeExecute(() => clientHost.Dispose());
             }
         }
     }

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
@@ -16,7 +17,7 @@ namespace Orleans.TestingHost
         private bool isActive = true;
         
         /// <summary>Gets a reference to the silo host.</summary>
-        public ISiloHost SiloHost { get; private set; }
+        public IHost SiloHost { get; private set; }
 
         /// <inheritdoc />
         public override bool IsActive => isActive;

@@ -44,40 +44,32 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
+        private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
+
         internal static void AddDefaultServices(IServiceCollection services)
         {
+            if (services.Contains(ServiceDescriptor))
+            {
+                return;
+            }
+
+            services.Add(ServiceDescriptor);
+
             services.AddOptions();
 
-            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
-
-            // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
-            // Register system services.
+            services.AddSingleton<Silo>();
+            services.AddHostedService<SiloHostedService>();
+            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
+            services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
-            services.TryAddSingleton<ISiloHost, SiloHost>();
             services.TryAddSingleton<SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
             services.AddSingleton<SiloOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
-            services.PostConfigure<SiloMessagingOptions>(options =>
-            {
-                //
-                // Assign environment specific defaults post configuration if user did not configured otherwise.
-                //
-
-                if (options.SiloSenderQueues == 0)
-                {
-                    options.SiloSenderQueues = Environment.ProcessorCount;
-                }
-
-                if (options.GatewaySenderQueues == 0)
-                {
-                    options.GatewaySenderQueues = Environment.ProcessorCount;
-                }
-            });
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
@@ -402,5 +394,7 @@ namespace Orleans.Hosting
                 return null;
             }
         }
+
+        private class ServicesAdded { }
     }
 }

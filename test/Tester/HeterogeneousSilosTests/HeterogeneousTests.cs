@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -35,31 +36,32 @@ namespace Tester.HeterogeneousSilosTests
             cluster.Deploy();
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-                hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
-                hostBuilder.Configure<GrainTypeOptions>(options =>
-                {
-                    var cfg = hostBuilder.GetConfiguration();
-                    var siloOptions = new TestSiloSpecificOptions();
-                    cfg.Bind(siloOptions);
-
-                    // The blacklist is only intended for the primary silo in these tests.
-                    if (string.Equals(siloOptions.SiloName, Silo.PrimarySiloName))
-                    {
-                        var typeNames = cfg["BlockedGrainTypes"].Split('|').ToList();
-                        foreach (var typeName in typeNames)
-                        {
-                            var type = Type.GetType(typeName);
-                            options.Classes.Remove(type);
-                        }
-                    }
-                });
                 hostBuilder.ConfigureServices(services =>
                 {
+                    services.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+                    services.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
+                    services.Configure<GrainTypeOptions>(options =>
+                    {
+                        var cfg = hostBuilder.GetConfiguration();
+                        var siloOptions = new TestSiloSpecificOptions();
+                        cfg.Bind(siloOptions);
+
+                        // The blacklist is only intended for the primary silo in these tests.
+                        if (string.Equals(siloOptions.SiloName, Silo.PrimarySiloName))
+                        {
+                            var typeNames = cfg["BlockedGrainTypes"].Split('|').ToList();
+                            foreach (var typeName in typeNames)
+                            {
+                                var type = Type.GetType(typeName);
+                                options.Classes.Remove(type);
+                            }
+                        }
+                    });
+
                     var defaultPlacementStrategy = Type.GetType(hostBuilder.GetConfiguration()["DefaultPlacementStrategy"]);
                     services.AddSingleton(typeof(PlacementStrategy), defaultPlacementStrategy);
                 });
@@ -156,9 +158,8 @@ namespace Tester.HeterogeneousSilosTests
             if (restartClient)
             {
                 // Disconnect/Reconnect the client
-                await cluster.Client.Close();
-                cluster.Client.Dispose();
-                cluster.InitializeClient();
+                await cluster.StopClusterClientAsync();
+                await cluster.InitializeClientAsync();
             }
             else
             {
@@ -179,9 +180,8 @@ namespace Tester.HeterogeneousSilosTests
             if (restartClient)
             {
                 // Disconnect/Reconnect the client
-                await cluster.Client.Close();
-                cluster.Client.Dispose();
-                cluster.InitializeClient();
+                await cluster.StopClusterClientAsync();
+                await cluster.InitializeClientAsync();
             }
             else
             {
@@ -191,7 +191,7 @@ namespace Tester.HeterogeneousSilosTests
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
-        }        
+        }
 
         public Task InitializeAsync()
         {

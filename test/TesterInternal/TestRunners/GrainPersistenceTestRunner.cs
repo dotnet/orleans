@@ -27,10 +27,9 @@ namespace TestExtensions.Runners
             this.grainNamespace = grainNamespace;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
-            GrainFactory = fixture.GrainFactory;
         }
 
-        public IGrainFactory GrainFactory { get; }
+        public IGrainFactory GrainFactory => fixture.GrainFactory;
 
         [Fact]
         public async Task Grain_GrainStorage_Delete()
@@ -307,11 +306,13 @@ namespace TestExtensions.Runners
             {
                 await this.HostedCluster.RestartSiloAsync(silo);
             }
-            this.HostedCluster.InitializeClient();
+
+            await this.HostedCluster.InitializeClientAsync();
 
             output.WriteLine("Silos restarted");
 
             serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id, this.grainNamespace);
             output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
             Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
 

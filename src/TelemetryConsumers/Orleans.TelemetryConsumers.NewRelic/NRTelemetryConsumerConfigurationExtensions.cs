@@ -12,7 +12,7 @@ namespace Orleans.Hosting
         /// <param name="hostBuilder"></param>
         public static ISiloBuilder AddNewRelicTelemetryConsumer(this ISiloBuilder hostBuilder)
         {
-            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
+            return hostBuilder.ConfigureServices(services => ConfigureServices(services));
         }
 
         /// <summary>
@@ -21,18 +21,12 @@ namespace Orleans.Hosting
         /// <param name="clientBuilder"></param>
         public static IClientBuilder AddNewRelicTelemetryConsumer(this IClientBuilder clientBuilder)
         {
-            return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
+            return clientBuilder.ConfigureServices(services => ConfigureServices(services));
         }
 
-        private static void ConfigureServices(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection services)
+        private static void ConfigureServices(IServiceCollection services)
         {
             services.Configure<TelemetryOptions>(options => options.AddConsumer<NRTelemetryConsumer>());
         }
-
-        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
-        {
-            services.Configure<TelemetryOptions>(options => options.AddConsumer<NRTelemetryConsumer>());
-        }
-
     }
 }

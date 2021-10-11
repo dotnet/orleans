@@ -70,7 +70,7 @@ namespace NonSilo.Tests
         public void SiloBuilderTest()
         {
             var host = new HostBuilder()
-                .UseOrleans((ctx, siloBuilder) =>
+                .UseOrleans(siloBuilder =>
                 {
                     siloBuilder
                         .UseLocalhostClustering()
@@ -119,7 +119,6 @@ namespace NonSilo.Tests
                 await new HostBuilder().UseOrleans(siloBuilder =>
                 {
                     siloBuilder
-                        .ConfigureDefaults()
                         .UseLocalhostClustering()
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                         .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
@@ -151,7 +150,6 @@ namespace NonSilo.Tests
                 await new HostBuilder().UseOrleans(siloBuilder =>
                 {
                     siloBuilder
-                      .ConfigureDefaults()
                       .UseLocalhostClustering()
                       .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                       .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
@@ -184,6 +182,23 @@ namespace NonSilo.Tests
                 }).Build();
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
+        }
+
+        [Fact]
+        public void SiloBuilderThrowsDuringStartupIfClientBuildersAdded()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+            {
+                _ = new HostBuilder()
+                    .UseOrleansClient(clientBuilder =>
+                    {
+                        clientBuilder.UseLocalhostClustering();
+                    })
+                    .UseOrleans(siloBuilder =>
+                    {
+                        siloBuilder.UseLocalhostClustering();
+                    });
+            });
         }
 
         private class FakeHostEnvironmentStatistics : IHostEnvironmentStatistics

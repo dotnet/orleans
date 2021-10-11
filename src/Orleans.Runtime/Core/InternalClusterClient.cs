@@ -21,28 +21,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public bool IsInitialized => true;
-
-        /// <inheritdoc />
         public IGrainFactory GrainFactory => this.grainFactory;
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-
-        /// <inheritdoc />
-        public Task Connect(Func<Exception, Task<bool>> retryFilter = null) => Task.CompletedTask;
-
-        /// <inheritdoc />
-        public Task Close() => Task.CompletedTask;
-
-        /// <inheritdoc />
-        public Task AbortAsync() => Task.CompletedTask;
-        
-        /// <inheritdoc />
-        void IDisposable.Dispose() { }
-
-        /// <inheritdoc />
-        ValueTask IAsyncDisposable.DisposeAsync() => default;
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)

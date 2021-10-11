@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,15 +30,12 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
-
-        private ClientProviderRuntime clientProviderRuntime;
+        private bool disposed;
 
         internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
-
-        private const string BARS = "----------";
         
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
@@ -75,8 +73,10 @@ namespace Orleans
             ApplicationRequestsStatisticsGroup appRequestStatistics,
             StageAnalysisStatisticsGroup schedulerStageStatistics,
             ClientStatisticsManager clientStatisticsManager,
-            MessagingTrace messagingTrace)
+            MessagingTrace messagingTrace,
+            IServiceProvider serviceProvider)
         {
+            this.ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
             this.statisticsOptions = statisticsOptions;
             this.appRequestStatistics = appRequestStatistics;
@@ -96,17 +96,14 @@ namespace Orleans
                 this.clientMessagingOptions.ResponseTimeout);
         }
 
-        internal void ConsumeServices(IServiceProvider services)
+        internal void ConsumeServices()
         {
             try
             {
-                this.ServiceProvider = services;
-
                 var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
                 foreach (var handler in connectionLostHandlers)
                 {
                     this.ClusterConnectionLost += handler;
-
                 }
 
                 var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
@@ -120,7 +117,7 @@ namespace Orleans
 
                 var copier = this.ServiceProvider.GetRequiredService<DeepCopier>();
                 this.localObjects = new InvokableObjectManager(
-                    services.GetRequiredService<ClientGrainContext>(),
+                    ServiceProvider.GetRequiredService<ClientGrainContext>(),
                     this,
                     copier,
                     this.messagingTrace,
@@ -133,17 +130,10 @@ namespace Orleans
                 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-                this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
-
                 this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
-                logger.Info(ErrorCode.ClientInitializing, string.Format(
-                    "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
-                    BARS, Dns.GetHostName(), localAddress,  clientId));
-                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
-                    BARS, RuntimeVersion.Current, PrintAppDomainDetails());
-                logger.Info(ErrorCode.ClientStarting, startMsg);
+                logger.LogInformation((int)ErrorCode.ClientStarting, "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}", RuntimeVersion.Current, localAddress, clientId);
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
@@ -166,20 +156,25 @@ namespace Orleans
 
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public async Task Start(Func<Exception, Task<bool>> retryFilter = null)
+        public async Task Start(CancellationToken cancellationToken)
         {
+            ConsumeServices();
+
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
+            await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
+            logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), clientId);
         }
         
         // used for testing to (carefully!) allow two clients in the same process
-        private async Task StartInternal(Func<Exception, Task<bool>> retryFilter)
+        private async Task StartInternal(CancellationToken cancellationToken)
         {
+            var retryFilterInterface = ServiceProvider.GetService<IClientConnectionRetryFilter>();
+            Func<Exception, CancellationToken, Task<bool>> retryFilter = RetryFilter; 
+
             var gatewayManager = this.ServiceProvider.GetRequiredService<GatewayManager>();
-            await ExecuteWithRetries(async () => await gatewayManager.StartAsync(CancellationToken.None), retryFilter);
+            await ExecuteWithRetries(async () => await gatewayManager.StartAsync(cancellationToken), retryFilter);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
@@ -196,7 +191,7 @@ namespace Orleans
 
             ClientStatistics.Start(MessageCenter, clientId.GrainId);
 
-            async Task ExecuteWithRetries(Func<Task> task, Func<Exception, Task<bool>> shouldRetry)
+            async Task ExecuteWithRetries(Func<Task> task, Func<Exception, CancellationToken, Task<bool>> shouldRetry)
             {
                 while (true)
                 {
@@ -207,9 +202,28 @@ namespace Orleans
                     }
                     catch (Exception exception) when (shouldRetry != null)
                     {
-                        var retry = await shouldRetry(exception);
+                        var retry = await shouldRetry(exception, cancellationToken);
                         if (!retry) throw;
                     }
+                }
+            }
+
+            async Task<bool> RetryFilter(Exception exception, CancellationToken cancellationToken)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                if (retryFilterInterface is { })
+                {
+                    var result = await retryFilterInterface.ShouldRetryConnectionAttempt(exception, cancellationToken);
+                    return result && !cancellationToken.IsCancellationRequested;
+                }
+                else
+                {
+                    // Do not re-attempt connection by default, prefering to fail promptly.
+                    return false;
                 }
             }
         }
@@ -237,6 +251,7 @@ namespace Orleans
 
         public void SendResponse(Message request, Response response)
         {
+            ThrowIfDisposed();
             var message = this.messageFactory.CreateResponseMessage(request);
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
@@ -246,6 +261,7 @@ namespace Orleans
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
+            ThrowIfDisposed();
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
@@ -349,7 +365,7 @@ namespace Orleans
             callbacks.TryRemove(id, out _);
         }
 
-        public void Reset(bool cleanup)
+        public void Reset()
         {
             Utils.SafeExecute(() =>
             {
@@ -457,6 +473,7 @@ namespace Orleans
             this.GatewayCountChanged = null;
 
             GC.SuppressFinalize(this);
+            disposed = true;
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
@@ -511,6 +528,18 @@ namespace Orleans
                 if (callback.IsCompleted) continue;
                 if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                ThrowObjectDisposedException();
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            void ThrowObjectDisposedException() => throw new ObjectDisposedException(nameof(OutsideRuntimeClient));
         }
     }
 }

@@ -5,7 +5,7 @@ namespace Orleans
 {
     internal class ClusterClientLifecycle : LifecycleSubject, IClusterClientLifecycle
     {
-        public ClusterClientLifecycle(ILogger<ClusterClientLifecycle> logger) : base(logger)
+        public ClusterClientLifecycle(ILogger logger) : base(logger)
         {
         }
     }
