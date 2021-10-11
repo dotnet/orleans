@@ -1293,7 +1293,9 @@ namespace Orleans.Serialization
                         throw new SerializationException($"Specified serializer {serializerId} not configured.");
                     }
 
-                    return keyedSerializer.Deserialize(expected, context);
+                    result = keyedSerializer.Deserialize(expected, context);
+                    context.RecordObject(result);
+                    return result;
                 }
                 else
                 {

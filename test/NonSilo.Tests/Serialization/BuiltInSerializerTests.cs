@@ -1219,6 +1219,57 @@ namespace UnitTests.Serialization
         }
 
         [Serializable]
+        public class LocalClass : ISerializable
+        {
+            public LocalClass()
+            {
+            }
+
+            protected LocalClass(SerializationInfo info, StreamingContext context)
+            {
+                Foo = info.GetString("LocalClass.Foo");
+            }
+
+            public string Foo { get; set; }
+
+            public void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                info.AddValue("LocalClass.Foo", Foo);
+            }
+        }
+
+        [Serializable]
+        public class LocalException : Exception
+        {
+            public LocalClass Local { get; set; }
+
+            public LocalClass Local2 { get; set; }
+        }
+
+        [Theory, TestCategory("Functional")]
+        [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
+        [InlineData(SerializerToUse.BinaryFormatterFallbackSerializer)]
+        public void Serialize_DuplicateObjects_ISerializable(SerializerToUse serializerToUse)
+        {
+            var environment = InitializeSerializer(serializerToUse);
+
+            var local = new LocalClass
+            {
+                Foo = "bar"
+            };
+
+            var exception = new LocalException { Local = local, Local2 = local };
+
+            Assert.Same(exception.Local, exception.Local2);
+
+            var deserialized = OrleansSerializationLoop(environment.SerializationManager, exception);
+            var result = Assert.IsAssignableFrom<LocalException>(deserialized);
+            Assert.Equal(local.Foo, result.Local.Foo);
+
+            Assert.Same(result.Local, result.Local2);
+        }
+
+        [Serializable]
         private class SimpleISerializableObject : ISerializable, IDeserializationCallback
         {
             private List<string> history;
