@@ -11,6 +11,7 @@ using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
 using Hyperion;
+using System.Buffers;
 
 namespace Benchmarks.Comparison
 {
@@ -21,6 +22,8 @@ namespace Benchmarks.Comparison
     public class ClassDeserializeBenchmark
     {
         private static readonly MemoryStream ProtoInput;
+
+        private static readonly ReadOnlySequence<byte> GoogleProtoInput;
 
         private static readonly byte[] MsgPackInput = MessagePack.MessagePackSerializer.Serialize(IntClass.Create());
 
@@ -46,6 +49,9 @@ namespace Benchmarks.Comparison
         {
             ProtoInput = new MemoryStream();
             ProtoBuf.Serializer.Serialize(ProtoInput, IntClass.Create());
+
+            ProtoInput = new MemoryStream();
+            GoogleProtoInput = new ReadOnlySequence<byte>(Google.Protobuf.MessageExtensions.ToByteArray(ProtoIntClass.Create()));
 
             HyperionInput = new MemoryStream();
             HyperionSession = HyperionSerializer.GetDeserializerSession();
@@ -83,6 +89,16 @@ namespace Benchmarks.Comparison
                    result.MyProperty8 +
                    result.MyProperty9;
 
+        private static int SumResult(ProtoIntClass result) => result.MyProperty1 +
+                   result.MyProperty2 +
+                   result.MyProperty3 +
+                   result.MyProperty4 +
+                   result.MyProperty5 +
+                   result.MyProperty6 +
+                   result.MyProperty7 +
+                   result.MyProperty8 +
+                   result.MyProperty9;
+
         [Fact]
         [Benchmark(Baseline = true)]
         public int Orleans()
@@ -106,6 +122,12 @@ namespace Benchmarks.Comparison
         {
             ProtoInput.Position = 0;
             return SumResult(ProtoBuf.Serializer.Deserialize<IntClass>(ProtoInput));
+        }
+
+        [Benchmark]
+        public int GoogleProtobuf()
+        {
+            return SumResult(ProtoIntClass.Parser.ParseFrom(GoogleProtoInput));
         }
 
         [Benchmark]
