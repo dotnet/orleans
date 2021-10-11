@@ -1,12 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansZooKeeperUtils</PackageId>
-    <Title>Microsoft Orleans ZooKeeper Utilities</Title>
-    <Description>Library of utility types for ZooKeeper of Microsoft Orleans.</Description>
+    <PackageId>Microsoft.Orleans.Clustering.ZooKeeper</PackageId>
+    <Title>Microsoft Orleans clustering provider for Zookeeper</Title>
+    <Description>Microsoft Orleans clustering provider backed by Zookeeper</Description>
     <PackageTags>$(PackageTags) ZooKeeper</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Clustering.ZooKeeper</AssemblyName>
-    <RootNamespace>OrleansZooKeeperUtils</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
