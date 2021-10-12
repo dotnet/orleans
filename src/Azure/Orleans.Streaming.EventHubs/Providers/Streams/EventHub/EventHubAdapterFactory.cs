@@ -161,7 +161,7 @@ namespace Orleans.ServiceBus.Providers
                 this.ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => new DefaultEventHubReceiverMonitor(dimensions, telemetryProducer);
             }
 
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.Path}");
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.EventHubName}");
         }
 
         //should only need checkpointer on silo side, so move its init logic when it is used
@@ -256,9 +256,9 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-            this.client = ehOptions.TokenCredential != null
-                ? new EventHubProducerClient(ehOptions.FullyQualifiedNamespace, ehOptions.Path, ehOptions.TokenCredential)
-                : new EventHubProducerClient(ehOptions.ConnectionString, ehOptions.Path);
+            var connectionOptions = ehOptions.ConnectionOptions;
+            var connection = ehOptions.CreateConnection(connectionOptions);
+            this.client = new EventHubProducerClient(connection, new EventHubProducerClientOptions { ConnectionOptions = connectionOptions });
         }
 
         /// <summary>
@@ -269,7 +269,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
-            var eventHubPath = this.ehOptions.Path;
+           var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
             return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, this.SerializationManager, sharedDimensions);
         }
@@ -286,7 +286,7 @@ namespace Orleans.ServiceBus.Providers
             var receiverMonitorDimensions = new EventHubReceiverMonitorDimensions
             {
                 EventHubPartition = config.Partition,
-                EventHubPath = config.Hub.Path,
+                EventHubPath = config.Hub.EventHubName,
             };
             if (this.checkpointerFactory == null)
                 InitCheckpointerFactory();
