@@ -77,7 +77,7 @@ namespace ServiceBus.Tests.TestStreamProviders
         protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions cacheOptions)
         {
             var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
-            var eventHubPath = this.ehOptions.Path;
+            var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = (dimensions, logger, telemetryProducer) => this.cacheMonitorForTesting;
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger, telemetryProducer) => this.blockPoolMonitorForTesting;

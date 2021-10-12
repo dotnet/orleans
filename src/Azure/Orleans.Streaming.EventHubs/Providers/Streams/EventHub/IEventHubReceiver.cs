@@ -44,12 +44,10 @@ namespace Orleans.ServiceBus.Providers
                 receiverOptions.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
             }
 
-            receiverOptions.ConnectionOptions = new EventHubConnectionOptions { TransportType = partitionSettings.Hub.EventHubsTransportType };
-
             var options = partitionSettings.Hub;
-            this.client = options.TokenCredential != null
-                ? new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.FullyQualifiedNamespace, options.Path, options.TokenCredential, receiverOptions)
-                : new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.ConnectionString, options.Path, receiverOptions);
+            receiverOptions.ConnectionOptions = options.ConnectionOptions;
+            var connection = options.CreateConnection(options.ConnectionOptions);
+            this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
 
             EventPosition GetEventPosition()
             {
@@ -63,20 +61,20 @@ namespace Orleans.ServiceBus.Providers
                         throw new InvalidOperationException("Offset must be a number.");
                     }
 
-                    logger.LogInformation("Starting to read from EventHub partition {0}-{1} at offset {2}", options.Path, partitionSettings.Partition, offset);
+                    logger.LogInformation("Starting to read from EventHub partition {0}-{1} at offset {2}", options.EventHubName, partitionSettings.Partition, offset);
                     eventPosition = EventPosition.FromOffset(longOffset, true);
                 }
                 // else, if configured to start from now, start reading from most recent data
                 else if (partitionSettings.ReceiverOptions.StartFromNow)
                 {
                     eventPosition = EventPosition.Latest;
-                    logger.LogInformation("Starting to read latest messages from EventHub partition {0}-{1}.", options.Path, partitionSettings.Partition);
+                    logger.LogInformation("Starting to read latest messages from EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
                 }
                 else
                 // else, start reading from begining of the partition
                 {
                     eventPosition = EventPosition.Earliest;
-                    logger.LogInformation("Starting to read messages from begining of EventHub partition {0}-{1}.", options.Path, partitionSettings.Partition);
+                    logger.LogInformation("Starting to read messages from begining of EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
                 }
 
                 return eventPosition;
