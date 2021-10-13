@@ -106,20 +106,12 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public async Task<string> Load()
         {
-            Tuple<EventHubPartitionCheckpointEntity, string> results =
-                await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
-            if (results != null)
+            var results = await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
+            if (results.Entity != null)
             {
-                var offset = results.Item1.Offset;
-                if (long.TryParse(offset, out _))
-                {
-                    entity = results.Item1;
-                }
-                else
-                {
-                    this.logger.LogError("Wrong format for offset value, ignoring value read from storage. Value :\"{Offset}\"", offset);
-                }
+                entity = results.Entity;
             }
+
             return entity.Offset;
         }
 

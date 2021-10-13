@@ -50,7 +50,7 @@ namespace Benchmarks.GrainStorage
             {
                 hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                 });
             }
         }
@@ -61,7 +61,7 @@ namespace Benchmarks.GrainStorage
             {
                 hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
                 });
             }
         }

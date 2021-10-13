@@ -27,21 +27,6 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="faultOnFailure"></param>
         /// <param name="clusterId"></param>
-        /// <param name="tableName"></param>
-        /// <param name="storageConnectionString"></param>
-        /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
-            : this (serializationManager, loggerFactory, faultOnFailure, clusterId, new AzureStorageOperationOptions { TableName = tableName, ConnectionString = storageConnectionString }, createEntity)
-        {
-        }
-
-        /// <summary>
-        /// Delivery failure handler that writes failures to azure table storage.
-        /// </summary>
-        /// <param name="serializationManager"></param>
-        /// <param name="loggerFactory">logger factory to use</param>
-        /// <param name="faultOnFailure"></param>
-        /// <param name="clusterId"></param>
         /// <param name="azureStorageOptions"></param>
         /// <param name="createEntity"></param>
         public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity> createEntity = null)
@@ -54,10 +39,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             {
                 throw new ArgumentNullException(nameof(azureStorageOptions.TableName));
             }
-            if (string.IsNullOrEmpty(azureStorageOptions.ConnectionString))
-            {
-                throw new ArgumentNullException(nameof(azureStorageOptions.ConnectionString));
-            }
+
             this.serializationManager = serializationManager;
             this.clusterId = clusterId;
             ShouldFaultSubsriptionOnError = faultOnFailure;

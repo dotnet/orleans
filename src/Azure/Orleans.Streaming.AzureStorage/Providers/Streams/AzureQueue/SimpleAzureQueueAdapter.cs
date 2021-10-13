@@ -53,7 +53,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             if (Queue == null)
             {
                 var tmpQueue = new AzureQueueDataManager(this.loggerFactory, options.QueueName,
-                    new AzureQueueOptions { ConnectionString = options.ConnectionString, ServiceUri = options.ServiceUri, TokenCredential = options.TokenCredential });
+                    new SimpleAzureQueueStreamOptions { ConnectionString = options.ConnectionString, ServiceUri = options.ServiceUri, TokenCredential = options.TokenCredential });
                 await tmpQueue.InitQueueAsync();
                 if (Queue == null)
                 {

@@ -92,12 +92,12 @@
     <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
-    <AzureCoreVersion>1.18.0</AzureCoreVersion>
+    <AzureDataTablesVersion>12.2.0</AzureDataTablesVersion>
+    <AzureCoreVersion>1.19.0</AzureCoreVersion>
     <AzureIdentityVersion>1.4.1</AzureIdentityVersion>
     <AzureMessagingEventHubs>5.6.0</AzureMessagingEventHubs>
-    <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
-    <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
+    <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
 

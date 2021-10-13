@@ -37,7 +37,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });
@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });

@@ -13,7 +13,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     public class TestEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
-        public TestEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
+        public TestEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions,
             StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
             : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)

@@ -66,7 +66,7 @@ namespace ServiceBus.Tests.StreamingTests
                             EventHubCheckpointerFactory.CreateFactory,
                             ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                     })
@@ -103,7 +103,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName, NullLoggerFactory.Instance), true);
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
         }
     }
 }

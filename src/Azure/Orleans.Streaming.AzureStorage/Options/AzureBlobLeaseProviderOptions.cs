@@ -1,6 +1,9 @@
 using System;
+using System.Threading.Tasks;
+using Azure;
 using Azure.Core;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streaming.AzureStorage;
@@ -9,21 +12,74 @@ namespace Orleans.Configuration
 {
     public class AzureBlobLeaseProviderOptions
     {
-        [RedactConnectionString]
-        public string DataConnectionString { get; set; }
-
-        /// <summary>
-        /// The Service URI (e.g. https://x.blob.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
-        /// </summary>
-        public Uri ServiceUri { get; set; }
-
-        /// <summary>
-        /// Use AAD to access the storage account
-        /// </summary>
-        public TokenCredential TokenCredential { get; set; }
-
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
         public const string DefaultBlobContainerName = "Leases";
+
+        /// <summary>
+        /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
+        /// </summary>
+        public BlobClientOptions ClientOptions { get; set; }
+
+        /// <summary>
+        /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
+        /// </summary>
+        internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using a connection string.
+        /// </summary>
+        public void ConfigureBlobServiceClient(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(connectionString, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Uri serviceUri)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using the provided callback.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Func<Task<BlobServiceClient>> createClientCallback)
+        {
+            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, tokenCredential, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, azureSasCredential, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+        /// </summary>
+        public void ConfigureBlobServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+        }
     }
 
     /// <summary>
@@ -74,20 +130,9 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException($"Named option {nameof(AzureBlobLeaseProviderOptions)} of name {this.name} is invalid.  Name cannot be empty or whitespace.");
             }
 
-            if (this.options.ServiceUri == null)
+            if (this.options.CreateClient is null)
             {
-                if (this.options.TokenCredential != null)
-                {
-                    throw new OrleansConfigurationException($"Configuration for {nameof(AzureBlobLeaseProviderOptions)} of name {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
-                }
-
-                if (!CloudStorageAccount.TryParse(this.options.DataConnectionString, out _))
-                {
-                    var errorStr = string.IsNullOrEmpty(this.name)
-                        ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.DataConnectionString)} is not valid."
-                        : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.DataConnectionString)} is not valid.";
-                    throw new OrleansConfigurationException(errorStr);
-                }
+                throw new OrleansConfigurationException($"No credentials specified for Azure Blob Service lease provider \"{name}\". Use the {options.GetType().Name}.{nameof(AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient)} method to configure the Azure Blob Service client.");
             }
 
             try

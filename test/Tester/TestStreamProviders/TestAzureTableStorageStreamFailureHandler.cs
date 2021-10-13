@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Azure.Identity;
-using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Extensions.Logging;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
@@ -19,7 +18,7 @@ namespace Tester.TestStreamProviders
         private const string TableName = "TestStreamFailures";
         private const string DeploymentId = "TestDeployment";
         private TestAzureTableStorageStreamFailureHandler(SerializationManager serializationManager)
-            : base(serializationManager, NullLoggerFactory.Instance, false, DeploymentId, TableName, TestDefaultConfiguration.DataConnectionString)
+            : base(serializationManager, NullLoggerFactory.Instance, false, DeploymentId, GetStreamingAzureStorageOperationOptions())
         {
         }
 
@@ -30,42 +29,48 @@ namespace Tester.TestStreamProviders
             return failureHandler;
         }
 
-        public static async Task<int> GetDeliveryFailureCount(string streamProviderName, ILoggerFactory loggerFactory)
+        public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(
-                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
-                loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
+            var dataManager = GetDataManager();
             await dataManager.InitTableAsync();
-            IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
-                await
-                    dataManager.ReadAllTableEntriesForPartitionAsync(
+
+            var deliveryErrors =
+                await dataManager.ReadAllTableEntriesForPartitionAsync(
                         StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
-            return deliveryErrors.Count();
+            return deliveryErrors.Count;
         }
 
-        public static async Task DeleteAll()
+        private static AzureTableDataManager<TableEntity> GetDataManager()
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(
-                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
-                NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
-            await dataManager.InitTableAsync();
-            await dataManager.DeleteTableAsync();
+            var options = GetAzureStorageOperationOptions();
+            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }
-    }
 
-    internal static class AzureStorageOperationOptionsExtensions
-    {
-        public static AzureStorageOperationOptions ConfigureTestDefaults(this AzureStorageOperationOptions options)
+        private static AzureStorageOperationOptions GetAzureStorageOperationOptions()
         {
+            var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
-                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
-                options.TokenCredential = new DefaultAzureCredential();
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+            }
+
+            return options;
+        }
+
+        private static Orleans.Streaming.AzureStorage.AzureStorageOperationOptions GetStreamingAzureStorageOperationOptions()
+        {
+            var options = new Orleans.Streaming.AzureStorage.AzureStorageOperationOptions { TableName = TableName };
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
