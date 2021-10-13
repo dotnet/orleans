@@ -62,7 +62,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloBuilder UseAzureTableReminderService(this ISiloBuilder builder, string connectionString)
         {
-            builder.UseAzureTableReminderService(options => options.ConnectionString = connectionString);
+            builder.UseAzureTableReminderService(options => options.ConfigureTableServiceClient(connectionString));
             return builder;
         }
 
@@ -120,7 +120,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseAzureTableReminderService(this IServiceCollection services, string connectionString)
         {
-            services.UseAzureTableReminderService(options => options.ConnectionString = connectionString);
+            services.UseAzureTableReminderService(options => options.ConfigureTableServiceClient(connectionString));
             return services;
         }
     }

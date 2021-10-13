@@ -106,12 +106,12 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public async Task<string> Load()
         {
-            Tuple<EventHubPartitionCheckpointEntity, string> results =
-                await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
-            if (results != null)
+            var results = await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
+            if (results.Entity != null)
             {
-                entity = results.Item1;
+                entity = results.Entity;
             }
+
             return entity.Offset;
         }
 

@@ -34,7 +34,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
-            await DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, new AzureQueueOptions { ConnectionString = storageConnectionString });
+            var options = new AzureQueueOptions();
+            options.ConfigureQueueServiceClient(storageConnectionString);
+            await DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
         }
 
         /// <summary>
@@ -63,7 +65,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
-            await ClearAllUsedAzureQueues(loggerFactory, azureQueueNames, new AzureQueueOptions { ConnectionString = storageConnectionString });
+            var options = new AzureQueueOptions();
+            options.ConfigureQueueServiceClient(storageConnectionString);
+            await ClearAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
         }
 
         /// <summary>

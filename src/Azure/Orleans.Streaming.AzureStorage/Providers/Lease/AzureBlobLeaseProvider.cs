@@ -9,6 +9,7 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.LeaseProviders
 {
@@ -24,7 +25,6 @@ namespace Orleans.LeaseProviders
 
         private AzureBlobLeaseProvider(AzureBlobLeaseProviderOptions options)
         {
-            this.blobClient = options.ServiceUri != null ? new BlobServiceClient(options.ServiceUri, options.TokenCredential) : new BlobServiceClient(options.DataConnectionString);
             this.options = options;
         }
 
@@ -32,6 +32,7 @@ namespace Orleans.LeaseProviders
         {
             if (this.container == null)
             {
+                this.blobClient = await options.CreateClient();
                 var tmpContainer = blobClient.GetBlobContainerClient(this.options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
                 this.container = tmpContainer;

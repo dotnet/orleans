@@ -1,7 +1,9 @@
 using System;
 using System.Net;
-using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Tables.SharedFiles;
+using System.Text.RegularExpressions;
+using Azure;
+using Azure.Data.Tables;
+using Azure.Data.Tables.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -37,8 +39,8 @@ namespace Orleans.GrainDirectory.AzureStorage
     {
         public const string ANY_ETAG = "*";
 
-        public const string PKProperty = nameof(TableEntity.PartitionKey);
-        public const string RKProperty = nameof(TableEntity.RowKey);
+        public const string PKProperty = nameof(ITableEntity.PartitionKey);
+        public const string RKProperty = nameof(ITableEntity.RowKey);
 
         public const int MaxBatchSize = 100;
     }
@@ -60,17 +62,17 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns><c>True</c> if this exception means the data being read was not present in Azure table storage</returns>
         public static bool TableStorageDataNotFound(Exception exc)
         {
-            HttpStatusCode httpStatusCode;
-            string restStatus;
-            if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
+            if (EvaluateException(exc, out var httpStatusCode, out var restStatus, true))
             {
-                if (AzureTableUtils.IsNotFoundError(httpStatusCode)
-                    /* New table: Azure table schema not yet initialized, so need to do first create */)
+                if (IsNotFoundError(httpStatusCode))
                 {
                     return true;
                 }
-                return StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus);
+
+                return TableErrorCode.EntityNotFound.ToString().Equals(restStatus, StringComparison.OrdinalIgnoreCase)
+                    || TableErrorCode.ResourceNotFound.ToString().Equals(restStatus, StringComparison.OrdinalIgnoreCase);
             }
+
             return false;
         }
 
@@ -81,17 +83,12 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Returns REST error code if found, otherwise <c>null</c></returns>
         private static string ExtractRestErrorCode(Exception exc)
         {
-            while (exc != null && !(exc is StorageException))
+            while (exc != null && exc is not RequestFailedException)
             {
-                exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
+                exc = exc?.InnerException?.GetBaseException();
             }
-            if (exc is StorageException)
-            {
-                StorageException ste = exc as StorageException;
-                if(ste.RequestInformation.ExtendedErrorInformation != null)
-                    return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
-            }
-            return null;
+
+            return (exc as RequestFailedException)?.ErrorCode;
         }
 
         /// <summary>
@@ -116,12 +113,13 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 while (e != null)
                 {
-                    if (e is StorageException)
+                    if (e is RequestFailedException ste)
                     {
-                        var ste = e as StorageException;
-                        httpStatusCode = (HttpStatusCode)ste.RequestInformation.HttpStatusCode;
+                        httpStatusCode = (HttpStatusCode)ste.Status;
                         if (getRESTErrors)
+                        {
                             restStatus = ExtractRestErrorCode(ste);
+                        }
                         return true;
                     }
                     e = e.InnerException;
@@ -152,7 +150,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 || httpStatusCode == HttpStatusCode.GatewayTimeout      /* 504 */
                 || (httpStatusCode == HttpStatusCode.InternalServerError /* 500 */
                     && !String.IsNullOrEmpty(restStatusCode)
-                    && StorageErrorCodeStrings.OperationTimedOut.Equals(restStatusCode, StringComparison.OrdinalIgnoreCase))
+                    && TableErrorCode.OperationTimedOut.ToString().Equals(restStatusCode, StringComparison.OrdinalIgnoreCase))
             );
         }
 
@@ -188,22 +186,16 @@ namespace Orleans.GrainDirectory.AzureStorage
             return false;
         }
 
-        internal static CloudStorageAccount GetCloudStorageAccount(string storageConnectionString)
-        {
-            // Connection string must be specified always, even for development storage.
-            if (string.IsNullOrEmpty(storageConnectionString))
-            {
-                throw new ArgumentException("Azure storage connection string cannot be blank");
-            }
-            else
-            {
-                return CloudStorageAccount.Parse(storageConnectionString);
-            }
-        }
-
         internal static void ValidateTableName(string tableName)
         {
-            NameValidator.ValidateTableName(tableName);
+            // Regular expression from documentation: https://docs.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
+            if (!Regex.IsMatch(tableName, "^[A-Za-z][A-Za-z0-9]{2,62}$"))
+            {
+                throw new ArgumentException($"Table name \"{tableName}\" is invalid according to the following rules:"
+                    + " 1. Table names may contain only alphanumeric characters."
+                    + " 2. Table names cannot begin with a numeric character."
+                    + " 3. Table names must be from 3 to 63 characters long.");
+            }
         }
 
         /// <summary>
@@ -245,7 +237,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 string restStatus;
                 if (EvaluateException(exc, out httpStatusCode, out restStatus, true))
                 {
-                    if (StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus))
+                    if (TableErrorCode.ResourceNotFound.ToString().Equals(restStatus))
                     {
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug((int)Utilities.ErrorCode.AzureTable_DataNotFound,
                             "DataNotFound reading Azure storage table {0}:{1} HTTP status code={2} REST status code={3} Exception={4}",
@@ -279,49 +271,22 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         internal static string PrintStorageException(Exception exception)
         {
-            var storeExc = exception as StorageException;
-            if(storeExc == null)
-                throw new ArgumentException(String.Format("Unexpected exception type {0}", exception.GetType().FullName));
-
-            var result = storeExc.RequestInformation;
-            if (result == null) return storeExc.Message;
-            var extendedError = storeExc.RequestInformation.ExtendedErrorInformation;
-            if (extendedError == null)
+            if (exception is not RequestFailedException storeExc)
             {
-                return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}.",
-                        storeExc.Message,
-                        result.HttpStatusCode,
-                        result.HttpStatusMessage);
-
+                throw new ArgumentException($"Unexpected exception type {exception.GetType().FullName}");
             }
-            return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}, " +
-                                   "ExtendedErrorInformation.ErrorCode = {3}, ExtendedErrorInformation.ErrorMessage = {4}{5}.",
-                        storeExc.Message,
-                        result.HttpStatusCode,
-                        result.HttpStatusMessage,
-                        extendedError.ErrorCode,
-                        extendedError.ErrorMessage,
-                        (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
-                            String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
+
+            return $"Message = {storeExc.Message}, HTTP Status = {storeExc.Status}, HTTP Error Code = {storeExc.ErrorCode}.";
         }
 
         internal static string PointQuery(string partitionKey, string rowKey)
         {
-            return TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition(AzureTableConstants.PKProperty, QueryComparisons.Equal, partitionKey),
-                TableOperators.And,
-                TableQuery.GenerateFilterCondition(AzureTableConstants.RKProperty, QueryComparisons.Equal, rowKey));
+            return TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and (RowKey eq {rowKey})");
         }
 
         internal static string RangeQuery(string partitionKey, string minRowKey, string maxRowKey)
         {
-            return TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition(AzureTableConstants.PKProperty, QueryComparisons.Equal, partitionKey),
-                TableOperators.And,
-                TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(AzureTableConstants.RKProperty, QueryComparisons.GreaterThanOrEqual, minRowKey),
-                    TableOperators.And,
-                    TableQuery.GenerateFilterCondition(AzureTableConstants.RKProperty, QueryComparisons.LessThanOrEqual, maxRowKey)));
+            return TableClient.CreateQueryFilter($"((PartitionKey eq {partitionKey}) and (RowKey ge {minRowKey})) and (RowKey le {maxRowKey})");
         }
     }
 }

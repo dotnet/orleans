@@ -19,7 +19,7 @@ namespace Tester.Directories
             {
                 siloBuilder.AddAzureTableGrainDirectory(
                     CustomDirectoryGrain.DIRECTORY,
-                    options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                    options => options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
             }
         }
 

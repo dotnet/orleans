@@ -143,8 +143,8 @@ namespace Tester.AzureUtils
             RegisterSiloInstance();
 
             var data = await FindSiloEntry(siloAddress);
-            SiloInstanceTableEntry siloEntry = data.Item1;
-            string eTag = data.Item2;
+            SiloInstanceTableEntry siloEntry = data.Entity;
+            string eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -163,10 +163,10 @@ namespace Tester.AzureUtils
             await manager.ActivateSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
-            Assert.NotNull(data); // Data returned should not be null
+            Assert.NotNull(data.Entity); // Data returned should not be null
 
-            SiloInstanceTableEntry siloEntry = data.Item1;
-            string eTag = data.Item2;
+            SiloInstanceTableEntry siloEntry = data.Entity;
+            string eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -184,8 +184,8 @@ namespace Tester.AzureUtils
             await manager.UnregisterSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
-            SiloInstanceTableEntry siloEntry = data.Item1;
-            string eTag = data.Item2;
+            SiloInstanceTableEntry siloEntry = data.Entity;
+            string eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -269,14 +269,14 @@ namespace Tester.AzureUtils
             return myEntry;
         }
 
-        private async Task<Tuple<SiloInstanceTableEntry, string>> FindSiloEntry(SiloAddress siloAddr)
+        private async Task<(SiloInstanceTableEntry Entity, string ETag)> FindSiloEntry(SiloAddress siloAddr)
         {
             string partitionKey = this.clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
 
             output.WriteLine("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);
 
-            Tuple<SiloInstanceTableEntry, string> data = await manager.ReadSingleTableEntryAsync(partitionKey, rowKey);
+            var data = await manager.ReadSingleTableEntryAsync(partitionKey, rowKey);
 
             output.WriteLine("FindSiloEntry returning Data={0}", data);
             return data;

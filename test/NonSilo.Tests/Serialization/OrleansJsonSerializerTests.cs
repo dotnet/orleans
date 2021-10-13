@@ -11,7 +11,6 @@ namespace UnitTests.Serialization
     using System.Text;
     using FluentAssertions.Common;
     using Microsoft.Extensions.Hosting;
-    using Microsoft.OData.Json;
     using Newtonsoft.Json;
 
     using Orleans.Serialization;

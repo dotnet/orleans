@@ -64,7 +64,7 @@ namespace ServiceBus.Tests.StreamingTests
                             EventHubCheckpointerFactory.CreateFactory,
                             ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                     })
