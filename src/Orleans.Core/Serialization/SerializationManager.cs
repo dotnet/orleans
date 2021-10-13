@@ -1318,7 +1318,6 @@ namespace Orleans.Serialization
                 if (resultType.IsArray)
                 {
                     result = DeserializeArray(resultType, context);
-                    context.RecordObject(result);
                     return result;
                 }
 
@@ -1358,106 +1357,92 @@ namespace Orleans.Serialization
 
             int length1 = reader.ReadInt();
 
-            // Optimized special cases
-            if (rank == 1)
-            {
-                if (et.TypeHandle.Equals(byteTypeHandle))
-                    return reader.ReadBytes(length1);
-
-                if (et.TypeHandle.Equals(sbyteTypeHandle))
-                {
-                    var result = new sbyte[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(shortTypeHandle))
-                {
-                    var result = new short[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(intTypeHandle))
-                {
-                    var result = new int[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(longTypeHandle))
-                {
-                    var result = new long[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(ushortTypeHandle))
-                {
-                    var result = new ushort[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(uintTypeHandle))
-                {
-                    var result = new uint[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(ulongTypeHandle))
-                {
-                    var result = new ulong[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(doubleTypeHandle))
-                {
-                    var result = new double[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(floatTypeHandle))
-                {
-                    var result = new float[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(charTypeHandle))
-                {
-                    var result = new char[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-                if (et.TypeHandle.Equals(boolTypeHandle))
-                {
-                    var result = new bool[length1];
-                    var n = Buffer.ByteLength(result);
-                    reader.ReadBlockInto(result, n);
-                    return result;
-                }
-            }
-
-
-
             Array array;
 
             if (rank == 1)
             {
-                array = Array.CreateInstance(et, length1);
-                for (int i = 0; i < length1; i++)
-                    array.SetValue(DeserializeInner(et, context), i);
+                // Optimized special cases
+                if (et.TypeHandle.Equals(byteTypeHandle))
+                {
+                    array = reader.ReadBytes(length1);
+                    context.RecordObject(array);
+                }
+                else if (et.TypeHandle.Equals(sbyteTypeHandle))
+                {
+                    array = new sbyte[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(shortTypeHandle))
+                {
+                    array = new short[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(intTypeHandle))
+                {
+                    array = new int[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(longTypeHandle))
+                {
+                    array = new long[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(ushortTypeHandle))
+                {
+                    array = new ushort[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(uintTypeHandle))
+                {
+                    array = new uint[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(ulongTypeHandle))
+                {
+                    array = new ulong[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(doubleTypeHandle))
+                {
+                    array = new double[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(floatTypeHandle))
+                {
+                    array = new float[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(charTypeHandle))
+                {
+                    array = new char[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else if (et.TypeHandle.Equals(boolTypeHandle))
+                {
+                    array = new bool[length1];
+                    ReadPrimitiveArray(array, reader, context);
+                }
+                else
+                {
+                    array = Array.CreateInstance(et, length1);
+                    context.RecordObject(array);
+                    for (int i = 0; i < length1; i++)
+                        array.SetValue(DeserializeInner(et, context), i);
+                }
+
+                static void ReadPrimitiveArray(Array array, IBinaryTokenStreamReader reader, IDeserializationContext context)
+                {
+                    context.RecordObject(array);
+                    var n = Buffer.ByteLength(array);
+                    reader.ReadBlockInto(array, n);
+                }
             }
             else if (rank == 2)
             {
                 int length2 = reader.ReadInt();
 
                 array = Array.CreateInstance(et, length1, length2);
+                context.RecordObject(array);
 
                 for (int i = 0; i < length1; i++)
                     for (int j = 0; j < length2; j++)
@@ -1469,6 +1454,7 @@ namespace Orleans.Serialization
                 int length3 = reader.ReadInt();
 
                 array = Array.CreateInstance(et, length1, length2, length3);
+                context.RecordObject(array);
 
                 for (int i = 0; i < length1; i++)
                     for (int j = 0; j < length2; j++)
@@ -1477,8 +1463,6 @@ namespace Orleans.Serialization
             }
             else
             {
-
-
                 var lengths = new int[rank];
 
                 lengths[0] = length1;
@@ -1487,6 +1471,7 @@ namespace Orleans.Serialization
                     lengths[i] = reader.ReadInt();
 
                 array = Array.CreateInstance(et, lengths);
+                context.RecordObject(array);
 
                 var index = new int[rank];
                 var sizes = new int[rank];
@@ -1506,8 +1491,6 @@ namespace Orleans.Serialization
                     }
                     array.SetValue(DeserializeInner(et, context), index);
                 }
-
-
             }
 
             return array;
