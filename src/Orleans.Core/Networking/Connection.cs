@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+#if NETCOREAPP
 using Microsoft.Extensions.ObjectPool;
+#endif
 using Orleans.Configuration;
 using Orleans.Messaging;
 
@@ -116,6 +118,8 @@ namespace Orleans.Runtime.Messaging
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
             await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+
+            Context.Abort();
         }
 
         /// <summary>
@@ -198,15 +202,21 @@ namespace Orleans.Runtime.Messaging
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
 
-            var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
-            var transport = transportFeature?.Transport ?? _transport;
-            await transport.Input.CompleteAsync();
-            await transport.Output.CompleteAsync();
-
             // Try to gracefully stop the reader/writer loops, if they are running.
             try
             {
-                if (_processIncomingTask is Task task && !task.IsCompleted)
+                if (_processIncomingTask is null || !_processIncomingTask.IsCompleted)
+                {
+                    try
+                    {
+                        _transport?.Input.CancelPendingRead();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (_processIncomingTask is { } task && !task.IsCompleted)
                 {
                     await task.ConfigureAwait(false);
                 }
@@ -219,7 +229,18 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                if (_processOutgoingTask is Task task && !task.IsCompleted)
+                if (_processOutgoingTask is null || !_processOutgoingTask.IsCompleted)
+                {
+                    try
+                    {
+                        _transport?.Output.CancelPendingFlush();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (_processOutgoingTask is { } task && !task.IsCompleted)
                 {
                     await task.ConfigureAwait(false);
                 }
@@ -230,8 +251,12 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
             }
 
-            // Wait for the transport to signal that it's closed before disposing it.
-            await _transportConnectionClosed.Task;
+            // Only wait for the transport to close if the connection actually started being processed.
+            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            {
+                // Wait for the transport to signal that it's closed before disposing it.
+                await _transportConnectionClosed.Task;
+            }
 
             try
             {
@@ -353,6 +378,8 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                _transport.Input.Complete();
+                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
         }
@@ -414,6 +441,8 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                _transport.Output.Complete();
+                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
         }

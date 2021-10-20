@@ -20,7 +20,7 @@ namespace Orleans.Connections.Security
         }
 
         public DuplexPipeStreamAdapter(IDuplexPipe duplexPipe, StreamPipeReaderOptions readerOptions, StreamPipeWriterOptions writerOptions, Func<Stream, TStream> createStream) :
-            base(duplexPipe)
+            base(duplexPipe.Input, duplexPipe.Output)
         {
             var stream = createStream(this);
             Stream = stream;
