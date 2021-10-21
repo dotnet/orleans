@@ -24,6 +24,8 @@ namespace Distributed.Silo.Configurator
 
             public int QueueCount { get; set; }
 
+            public int BatchSize { get; set; }
+
             public int Wait { get; set; }
 
             public int Duration { get; set; }
@@ -36,6 +38,7 @@ namespace Distributed.Silo.Configurator
             OptionHelper.CreateOption<StreamPubSubType>("--type", defaultValue: StreamPubSubType.ExplicitGrainBasedAndImplicit),
             OptionHelper.CreateOption<int>("--streamsPerQueue", defaultValue: 1000),
             OptionHelper.CreateOption<int>("--queueCount", defaultValue: 8),
+            OptionHelper.CreateOption<int>("--batchSize", defaultValue: 5),
             OptionHelper.CreateOption<int>("--wait", "initial wait, in seconds, before starting generating events", defaultValue: 30),
             OptionHelper.CreateOption<int>("--duration", "duration, in seconds, of the run", defaultValue: 120),
         };
@@ -60,13 +63,13 @@ namespace Distributed.Silo.Configurator
                         options.Duration = parameters.Duration;
                     });
                 })
-                .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(GrainInterfaces.Streaming.Constants.StreamingProvider, (s, n) => generatorOptions))
+                .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(Constants.StreamingProvider, (s, n) => generatorOptions))
                 .AddPersistentStreams(
                     Constants.StreamingProvider,
                     GeneratorAdapterFactory.Create,
                     b =>
                     {
-                        b.ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 1; }));
+                        b.ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = parameters.BatchSize; }));
                         b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = parameters.QueueCount));
                         b.UseConsistentRingQueueBalancer();
                         b.ConfigureStreamPubSub(parameters.Type);
