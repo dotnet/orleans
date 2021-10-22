@@ -85,7 +85,7 @@
     <NewtonsoftJsonVersion>13.0.1</NewtonsoftJsonVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedisVersion>2.0.601</StackExchangeRedisVersion>
-    <KubernetesClientVersion>4.0.5</KubernetesClientVersion>
+    <KubernetesClientVersion>6.0.19</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
