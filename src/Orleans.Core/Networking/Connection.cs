@@ -118,8 +118,6 @@ namespace Orleans.Runtime.Messaging
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
             await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
-
-            Context.Abort();
         }
 
         /// <summary>
@@ -165,7 +163,6 @@ namespace Orleans.Runtime.Messaging
                 _closeTask = completion.Task;
             }
 
-
             if (this.Log.IsEnabled(LogLevel.Information))
             {
                 this.Log.LogInformation(
@@ -187,7 +184,8 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception closeException)
                 {
-                    completion.SetException(closeException);
+                    self.Log.LogError(closeException, "Exception while closing connection {ConnectionId}", self.ConnectionId);
+                    completion.SetResult(0);
                 }
             }
         }
@@ -199,9 +197,6 @@ namespace Orleans.Runtime.Messaging
         {
             NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
 
-            // Signal the outgoing message processor to exit gracefully.
-            this.outgoingMessageWriter.TryComplete();
-
             // Try to gracefully stop the reader/writer loops, if they are running.
             try
             {
@@ -209,13 +204,15 @@ namespace Orleans.Runtime.Messaging
                 {
                     try
                     {
+                        // Tell the incoming message processor to stop waiting for data and complete.
                         _transport?.Input.CancelPendingRead();
                     }
-                    catch
+                    catch (ObjectDisposedException)
                     {
                     }
                 }
 
+                // Wait for the incoming message processor to complete.
                 if (_processIncomingTask is { } task && !task.IsCompleted)
                 {
                     await task.ConfigureAwait(false);
@@ -229,17 +226,10 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                if (_processOutgoingTask is null || !_processOutgoingTask.IsCompleted)
-                {
-                    try
-                    {
-                        _transport?.Output.CancelPendingFlush();
-                    }
-                    catch
-                    {
-                    }
-                }
+                // Signal the outgoing message processor to exit gracefully.
+                this.outgoingMessageWriter.TryComplete();
 
+                // Wait for the outgoing message processor to complete.
                 if (_processOutgoingTask is { } task && !task.IsCompleted)
                 {
                     await task.ConfigureAwait(false);
@@ -251,11 +241,10 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
             }
 
-            // Only wait for the transport to close if the connection actually started being processed.
-            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            if (_transport is { } transport)
             {
-                // Wait for the transport to signal that it's closed before disposing it.
-                await _transportConnectionClosed.Task;
+                transport.Output.Complete();
+                transport.Input.Complete();
             }
 
             try
@@ -266,6 +255,13 @@ namespace Orleans.Runtime.Messaging
             {
                 // Swallow any exceptions here.
                 this.Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
+            }
+
+            // Wait for the transport to close, but only if the connection actually started being processed.
+            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            {
+                // Wait for the transport to signal that it's closed before disposing it.
+                await _transportConnectionClosed.Task;
             }
 
             // Reject in-flight messages.
@@ -378,7 +374,6 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _transport.Input.Complete();
                 (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
@@ -441,7 +436,6 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _transport.Output.Complete();
                 (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
