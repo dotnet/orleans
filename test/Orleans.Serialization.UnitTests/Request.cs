@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.Invocation
 {
-    public abstract class Request : IInvokable
+    public abstract class UnitTestRequest : IInvokable
     {
         public abstract int ArgumentCount { get; }
 
@@ -60,7 +60,7 @@ namespace Orleans.Serialization.Invocation
         public abstract MethodInfo Method { get; }
     }
 
-    public abstract class Request<TResult> : IInvokable
+    public abstract class UnitTestRequest<TResult> : IInvokable
     {
         public abstract int ArgumentCount { get; }
 
@@ -114,7 +114,7 @@ namespace Orleans.Serialization.Invocation
         public abstract MethodInfo Method { get; }
     }
 
-    public abstract class TaskRequest<TResult> : IInvokable
+    public abstract class UnitTestTaskRequest<TResult> : IInvokable
     {
         public abstract int ArgumentCount { get; }
 
@@ -169,7 +169,7 @@ namespace Orleans.Serialization.Invocation
         public abstract MethodInfo Method { get; }
     }
 
-    public abstract class TaskRequest : IInvokable
+    public abstract class UnitTestTaskRequest : IInvokable
     {
         public abstract int ArgumentCount { get; }
 
@@ -225,7 +225,7 @@ namespace Orleans.Serialization.Invocation
         public abstract MethodInfo Method { get; }
     }
 
-    public abstract class VoidRequest : IInvokable
+    public abstract class UnitTestVoidRequest : IInvokable
     {
         public abstract int ArgumentCount { get; }
 
