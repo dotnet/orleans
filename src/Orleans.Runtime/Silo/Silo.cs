@@ -37,7 +37,6 @@ namespace Orleans.Runtime
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
-        private static TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
@@ -65,6 +64,7 @@ namespace Orleans.Runtime
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private Watchdog platformWatchdog;
+        private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
@@ -133,6 +133,8 @@ namespace Orleans.Runtime
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
+            this.waitForMessageToBeQueuedForOutbound = messagingOptions.Value.WaitForMessageToBeQueuedForOutboundTime;
+
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
@@ -674,8 +676,9 @@ namespace Orleans.Runtime
                     await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
                         .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
-                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
-                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
+
+                    // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
+                    await Task.Delay(waitForMessageToBeQueuedForOutbound);
                 }
             }
             catch (Exception exc)
