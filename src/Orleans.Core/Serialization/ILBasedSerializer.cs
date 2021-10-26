@@ -7,7 +7,6 @@ namespace Orleans.Serialization
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
-    [Obsolete("Obsolete in favor of other serializers.")]
     public class ILBasedSerializer : IKeyedSerializer
     {
         private static readonly Type ExceptionType = typeof(Exception);
@@ -189,5 +188,8 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         KeyedSerializerId IKeyedSerializer.SerializerId => KeyedSerializerId.ILBasedSerializer;
+
+        /// <inheritdoc />
+        public bool IsFallbackOnly => true;
     }
 }

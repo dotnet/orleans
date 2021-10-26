@@ -16,9 +16,7 @@ namespace UnitTests.Serialization
 
         public ILBasedExceptionSerializerTests()
         {
-#pragma warning disable CS0618 // Type or member is obsolete
             this.environment = SerializationTestEnvironment.Initialize(null, typeof(ILBasedSerializer));
-#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <summary>

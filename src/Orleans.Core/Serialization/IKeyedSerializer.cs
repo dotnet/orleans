@@ -9,5 +9,10 @@ namespace Orleans.Serialization
         /// Gets the identifier for this serializer.
         /// </summary>
         KeyedSerializerId SerializerId { get; }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if is serializer should only be used for fallback scenarios, <see langword="false"/> otherwise.
+        /// </summary>
+        bool IsFallbackOnly { get; }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
@@ -34,5 +34,8 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         public KeyedSerializerId SerializerId => KeyedSerializerId.BinaryFormatterISerializable;
+
+        /// <inheritdoc />
+        public bool IsFallbackOnly => true;
     }
 }
