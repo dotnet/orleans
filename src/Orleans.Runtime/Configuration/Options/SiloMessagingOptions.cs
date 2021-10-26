@@ -109,7 +109,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// The period of time between analyzing currently executing activation workloads.
         /// </summary>
-        public TimeSpan GrainWorkloadAnalysisPeriod { get; set; } = TimeSpan.FromSeconds(5);
+        /// <remarks>
+        /// Note: A negative value disables periodic analysis.
+        /// </remarks>
+        public TimeSpan GrainWorkloadAnalysisPeriod { get; set; } = TimeSpan.FromSeconds(15);
 
         /// <summary>
         /// The period after which a currently executing request is deemed to be slow.
