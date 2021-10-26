@@ -197,13 +197,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Distributed", "Distributed", "{FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed.GrainInterfaces", "test\Distributed\Distributed.GrainInterfaces\Distributed.GrainInterfaces.csproj", "{E8FFBF2E-80FE-4D80-B79A-2097180D203A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Distributed.GrainInterfaces", "test\Distributed\Distributed.GrainInterfaces\Distributed.GrainInterfaces.csproj", "{E8FFBF2E-80FE-4D80-B79A-2097180D203A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed.Grains", "test\Distributed\Distributed.Grains\Distributed.Grains.csproj", "{7F6A75BB-72AE-4509-8E82-55C764D0C070}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Distributed.Grains", "test\Distributed\Distributed.Grains\Distributed.Grains.csproj", "{7F6A75BB-72AE-4509-8E82-55C764D0C070}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed.Client", "test\Distributed\Distributed.Client\Distributed.Client.csproj", "{25D20278-8901-47CC-AD1D-F3C4BEB845BF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Distributed.Client", "test\Distributed\Distributed.Client\Distributed.Client.csproj", "{25D20278-8901-47CC-AD1D-F3C4BEB845BF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed.Silo", "test\Distributed\Distributed.Silo\Distributed.Silo.csproj", "{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Distributed.Silo", "test\Distributed\Distributed.Silo\Distributed.Silo.csproj", "{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed.Common", "test\Distributed\Distributed.SiloCommandChannel\Distributed.Common.csproj", "{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -551,6 +553,10 @@ Global
 		{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -653,6 +659,7 @@ Global
 		{7F6A75BB-72AE-4509-8E82-55C764D0C070} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
 		{25D20278-8901-47CC-AD1D-F3C4BEB845BF} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
 		{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
+		{F9F85EFE-5217-44AC-9701-D9B9A6A9BEF1} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

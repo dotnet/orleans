@@ -9,7 +9,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-namespace Distributed.Client
+namespace Distributed.Client.Commands
 {
     public class CounterCaptureCommand : Command
     {

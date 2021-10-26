@@ -4,7 +4,7 @@ using System.CommandLine.Parsing;
 using System.Threading.Tasks;
 using Orleans;
 
-namespace Distributed.Client
+namespace Distributed.Client.Scenarios
 {
     public interface IScenario<T>
     {

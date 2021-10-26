@@ -8,12 +8,13 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Distributed.Client.Scenarios;
 using Distributed.GrainInterfaces;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-namespace Distributed.Client
+namespace Distributed.Client.Commands
 {
     public class ScenarioCommand<T> : Command
     {

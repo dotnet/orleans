@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="..\Distributed.GrainInterfaces\Distributed.GrainInterfaces.csproj" />
     <ProjectReference Include="..\Distributed.Grains\Distributed.Grains.csproj" />
+    <ProjectReference Include="..\Distributed.SiloCommandChannel\Distributed.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>

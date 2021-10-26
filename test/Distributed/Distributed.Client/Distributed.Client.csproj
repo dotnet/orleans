@@ -17,15 +17,12 @@
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Client\Orleans.Client.csproj" />
     <ProjectReference Include="..\Distributed.GrainInterfaces\Distributed.GrainInterfaces.csproj" />
+    <ProjectReference Include="..\Distributed.SiloCommandChannel\Distributed.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Crank.EventSources" Version="$(CrankVersion)" />
     <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Scenarios\" />
   </ItemGroup>
 
 </Project>
