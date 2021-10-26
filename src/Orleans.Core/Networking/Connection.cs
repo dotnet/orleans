@@ -249,6 +249,7 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
+                this.Context.Abort();
                 await this.Context.DisposeAsync();
             }
             catch (Exception abortException)
