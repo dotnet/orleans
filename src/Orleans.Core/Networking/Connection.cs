@@ -243,8 +243,8 @@ namespace Orleans.Runtime.Messaging
 
             if (_transport is { } transport)
             {
-                transport.Output.Complete();
-                transport.Input.Complete();
+                await transport.Output.CompleteAsync();
+                await transport.Input.CompleteAsync();
             }
 
             try
