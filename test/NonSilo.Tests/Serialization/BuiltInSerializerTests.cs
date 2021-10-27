@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -1215,7 +1216,7 @@ namespace UnitTests.Serialization
         }
 
         [Serializable]
-        public class LocalClass : ISerializable
+        public class LocalClass : ISerializable, IEquatable<LocalClass>
         {
             public LocalClass()
             {
@@ -1228,6 +1229,10 @@ namespace UnitTests.Serialization
 
             public string Foo { get; set; }
 
+            public bool Equals(LocalClass other) => other != null && string.Equals(Foo, other.Foo, StringComparison.Ordinal);
+
+            public override bool Equals(object obj) => obj is LocalClass other && Equals(other);
+            public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Foo);
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 info.AddValue("LocalClass.Foo", Foo);
@@ -1282,7 +1287,7 @@ namespace UnitTests.Serialization
             Assert.NotNull(result.Local.Foo);
             Assert.Equal(local.Foo, result.Local.Foo);
 
-            Assert.Same(result.Local, result.Local2);
+            Assert.Equal(result.Local, result.Local2);
         }
 
         [Serializable]
