@@ -4,6 +4,7 @@ using Orleans.Utilities;
 namespace Orleans.Serialization
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Reflection;
 
@@ -14,6 +15,22 @@ namespace Orleans.Serialization
     {
         private static readonly Type ExceptionType = typeof(Exception);
 
+        private HashSet<string> SkippedProperties { get; } = new HashSet<string>
+            {
+                "Message",
+                "StackTraceString",
+                "InnerException",
+                "ClassName",
+                "Data",
+                "HelpURL",
+                "RemoteStackTraceString",
+                "RemoteStackIndex",
+                "ExceptionMethod",
+                "HResult",
+                "Source",
+                "WatsonBuckets",
+            };
+
         /// <summary>
         /// The collection of serializers.
         /// </summary>
@@ -21,18 +38,13 @@ namespace Orleans.Serialization
             new CachedReadConcurrentDictionary<Type, SerializerMethods>();
 
         /// <summary>
-        /// The field filter used for generating serializers for subclasses of <see cref="Exception"/>.
-        /// </summary>
-        private readonly Func<FieldInfo, bool> exceptionFieldFilter;
-
-        /// <summary>
         /// The serializer used as a fallback when the concrete exception type is unavailable.
         /// </summary>
         /// <remarks>
-        /// This serializer operates on <see cref="RemoteNonDeserializableException"/> instances, however it 
+        /// This serializer operates on <see cref="ExceptionBaseProperties"/> instances, however it 
         /// includes only fields from <see cref="Exception"/> and no sub-class fields.
         /// </remarks>
-        private readonly SerializerMethods fallbackBaseExceptionSerializer;
+        private readonly SerializerMethods propsSerializer;
         
         /// <summary>
         /// The serializer generator.
@@ -40,45 +52,61 @@ namespace Orleans.Serialization
         private readonly ILSerializerGenerator generator;
 
         private readonly TypeSerializer typeSerializer;
+        private readonly StreamingContext _streamingContext;
+        private readonly FormatterConverter _formatterConverter;
+        private readonly SerializationConstructorFactory _constructorFactory;
+        private readonly Func<Type, Action<object, SerializationInfo, StreamingContext>> _createConstructorDelegate;
+        private readonly Action<object, SerializationInfo, StreamingContext> _baseExceptionConstructor;
 
         public ILBasedExceptionSerializer(ILSerializerGenerator generator, TypeSerializer typeSerializer)
         {
+            _streamingContext = new StreamingContext(StreamingContextStates.All);
+            _formatterConverter = new FormatterConverter();
+            _constructorFactory = new SerializationConstructorFactory();
+            _createConstructorDelegate = _constructorFactory.GetSerializationConstructorDelegate;
+            _baseExceptionConstructor = _createConstructorDelegate(typeof(Exception));
+
             this.generator = generator;
             this.typeSerializer = typeSerializer;
 
-            // Exceptions are a special type in .NET because of the way they are handled by the runtime.
-            // Only certain fields can be safely serialized.
-            this.exceptionFieldFilter = field =>
-            {
-                // Any field defined below Exception is acceptable.
-                if (field.DeclaringType != ExceptionType) return true;
-
-                // Certain fields from the Exception base class are acceptable.
-                return field.FieldType == typeof(string) || field.FieldType == ExceptionType;
-            };
-
             // When serializing the fallback type, only the fields declared on Exception are included.
             // Other fields are manually serialized.
-            this.fallbackBaseExceptionSerializer = this.generator.GenerateSerializer(
-                typeof(RemoteNonDeserializableException),
-                field =>
-                {
-                    // Only serialize base-class fields.
-                    if (field.DeclaringType != ExceptionType) return false;
-
-                    // Certain fields from the Exception base class are acceptable.
-                    return field.FieldType == typeof(string) || field.FieldType == ExceptionType;
-                },
-                fieldComparer: ExceptionFieldInfoComparer.Instance);
+            this.propsSerializer = this.generator.GenerateSerializer(typeof(ExceptionBaseProperties));
 
             // Ensure that the fallback serializer only ever has its base exception fields serialized.
-            this.serializers[typeof(RemoteNonDeserializableException)] = this.fallbackBaseExceptionSerializer;
+            this.serializers[typeof(ExceptionBaseProperties)] = this.propsSerializer;
         }
+
+        public SerializationInfo GetObjectData(Exception value)
+        {
+            var info = new SerializationInfo(value.GetType(), _formatterConverter);
+            value.GetObjectData(info, _streamingContext);
+            return info;
+        }
+
+        private static Dictionary<object, object> GetDataProperty(Exception exception)
+        {
+            if (exception.Data is null or { Count: 0 })
+            {
+                return null;
+            }
+
+            var tmp = new Dictionary<object, object>(exception.Data.Count);
+            var enumerator = exception.Data.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var entry = enumerator.Entry;
+                tmp[entry.Key] = entry.Value;
+            }
+
+            return tmp;
+        }
+
 
         public void Serialize(object item, ISerializationContext outerContext, Type expectedType)
         {
             var outerWriter = outerContext.StreamWriter;
-            
+
             var actualType = item.GetType();
 
             // To support loss-free serialization where possible, instances of the fallback exception type are serialized in a
@@ -86,21 +114,53 @@ namespace Orleans.Serialization
             var fallbackException = item as RemoteNonDeserializableException;
             if (fallbackException != null)
             {
-                this.ReserializeFallback(fallbackException, outerContext);
-                return;
+                // Write the type name directly.
+                var key = new TypeSerializer.TypeKey(fallbackException.OriginalTypeName);
+                TypeSerializer.WriteTypeKey(key, outerWriter);
             }
-            
-            // Write the concrete type directly.
-            this.typeSerializer.WriteNamedType(actualType, outerWriter);
+            else
+            {
+                // Write the concrete type directly.
+                this.typeSerializer.WriteNamedType(actualType, outerWriter);
+            }
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
             var innerWriter = new BinaryTokenStreamWriter();
             var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: innerWriter);
 
-            // Serialize the exception itself.
-            var methods = this.GetSerializerMethods(actualType);
-            methods.Serialize(item, innerContext, null);
+            var typedValue = (Exception)item;
+            var props = new ExceptionBaseProperties
+            {
+                Message = typedValue.Message,
+                StackTrace = typedValue.StackTrace,
+                InnerException = typedValue.InnerException,
+                HResult = typedValue.HResult,
+                Data = GetDataProperty(typedValue),
+            };
+
+            var data = GetObjectData(typedValue);
+            var serializationManager = innerContext.GetSerializationManager();
+            if (fallbackException is { })
+            {
+                props.AdditionalData = fallbackException.AdditionalData;
+            }
+            else
+            {
+                // Build up the additional data by enumerating the populated serialization info.
+                props.AdditionalData = new();
+                foreach (var pair in data)
+                {
+                    if (SkippedProperties.Contains(pair.Name)) continue;
+
+                    var bytes = serializationManager.SerializeToByteArray(pair.Value);
+                    var type = pair.Value?.GetType() ?? pair.ObjectType ?? typeof(object);
+                    var typeName = typeSerializer.GetNameFromType(type);
+                    props.AdditionalData[pair.Name] = (typeName, bytes);
+                }
+            }
+
+            innerContext.SerializeInner(props, typeof(ExceptionBaseProperties));
 
             // Write the serialized exception to the output stream.
             outerContext.StreamWriter.Write(innerWriter.CurrentOffset);
@@ -124,44 +184,80 @@ namespace Orleans.Serialization
             var innerBytes = outerReader.ReadBytes(length);
             
             var innerContext = outerContext.CreateNestedContext(position: position, reader: new BinaryTokenStreamReader(innerBytes));
-            object result;
 
             // If the concrete type is available and the exception is valid for reconstruction,
             // reconstruct the original exception type.
             var actualType = this.typeSerializer.GetTypeFromTypeKey(typeKey, throwOnError: false);
-            if (actualType != null)
+            var props = (ExceptionBaseProperties)innerContext.DeserializeInner(typeof(ExceptionBaseProperties));
+
+            var resultType = actualType ?? typeof(RemoteNonDeserializableException);
+            var result = (Exception)FormatterServices.GetUninitializedObject(resultType);
+
+            var info = new SerializationInfo(resultType, _formatterConverter);
+            info.AddValue("Message", props.Message, typeof(string));
+            info.AddValue("StackTraceString", null, typeof(string));
+            info.AddValue("InnerException", props.InnerException, typeof(Exception));
+            info.AddValue("ClassName", result.GetType().ToString(), typeof(string));
+            info.AddValue("Data", null, typeof(IDictionary));
+            info.AddValue("HelpURL", null, typeof(string));
+            info.AddValue("RemoteStackTraceString", props.StackTrace, typeof(string));
+            info.AddValue("RemoteStackIndex", 0, typeof(int));
+            info.AddValue("ExceptionMethod", null, typeof(string));
+            info.AddValue("HResult", props.HResult);
+            info.AddValue("Source", null, typeof(string));
+            info.AddValue("WatsonBuckets", null, typeof(byte[]));
+
+            var serializationManager = innerContext.GetSerializationManager();
+            if (props.AdditionalData is not null)
             {
-                // Deserialize into the concrete type.
-                var methods = this.GetSerializerMethods(actualType);
-                result = methods.Deserialize(null, innerContext);
+                foreach (var pair in props.AdditionalData)
+                {
+                    if (SkippedProperties.Contains(pair.Key)) continue;
+
+                    try
+                    {
+                        var pairTypeKey = new TypeSerializer.TypeKey(pair.Value.Item1);
+                        var valueType = this.typeSerializer.GetTypeFromTypeKey(pairTypeKey, throwOnError: false);
+                        if (valueType is not null)
+                        {
+                            var value = serializationManager.DeserializeFromByteArray(pair.Value.Item2, valueType);
+                            info.AddValue(pair.Key, value, valueType);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore and skip.
+                    }
+                }
+            }
+
+            if (resultType == typeof(RemoteNonDeserializableException))
+            {
+                info.AddValue(nameof(RemoteNonDeserializableException.OriginalTypeName), typeKey.GetTypeName());
+                info.AddValue(nameof(RemoteNonDeserializableException.AdditionalData), props.AdditionalData);
+            }
+
+            // Find the most suitable constructor
+            Action<object, SerializationInfo, StreamingContext> ctor;
+            if (SerializationConstructorFactory.HasSerializationConstructor(resultType))
+            {
+                ctor = _constructorFactory.GetSerializationConstructorDelegate(resultType);
             }
             else
             {
-                // Since the concrete type is unavailable, deserialize into the fallback type.
-
-                // Read the Exception fields.
-                var exception = (RemoteNonDeserializableException)this.fallbackBaseExceptionSerializer.Deserialize(null, innerContext);
-                exception.OriginalTypeName = typeKey.GetTypeName();
-
-                // If there is additional data, store it for later serialization.
-                var additionalDataLength = length - innerContext.StreamReader.CurrentPosition;
-                if (additionalDataLength > 0)
-                {
-                    exception.AdditionalData = innerContext.StreamReader.ReadBytes(additionalDataLength);
-                }
-
-                // If a particular type is expected, but the actual type is not available, throw an exception to avoid 
-                if (expectedType != null && !expectedType.IsAssignableFrom(typeof(RemoteNonDeserializableException)))
-                {
-                    throw new SerializationException(
-                        $"Unable to deserialize exception of unavailable type {exception.OriginalTypeName} into expected type {expectedType}. " +
-                        $" See {nameof(Exception.InnerException)} for recovered information.",
-                        exception);
-                }
-
-                result = exception;
+                ctor = _baseExceptionConstructor;
             }
-            
+
+            ctor(result, info, _streamingContext);
+
+            if (props.Data is { } data && result.Data is not null)
+            {
+                foreach (var pair in data)
+                {
+                    result.Data[pair.Key] = pair.Value;
+                }
+            }
+
             return result;
         }
 
@@ -175,71 +271,16 @@ namespace Orleans.Serialization
         {
             return original;
         }
+    }
 
-        private void ReserializeFallback(RemoteNonDeserializableException fallbackException, ISerializationContext outerContext)
-        {
-            var outerWriter = outerContext.StreamWriter;
-
-            // Write the type name directly.
-            var key = new TypeSerializer.TypeKey(fallbackException.OriginalTypeName);
-            TypeSerializer.WriteTypeKey(key, outerWriter);
-
-            // Create a nested context which will be written to the outer context at an int-length offset from the current position.
-            // This is because the inner context will be copied with a length prefix to the outer context.
-            var innerWriter = new BinaryTokenStreamWriter();
-            var innerContext = outerContext.CreateNestedContext(sizeof(int), innerWriter);
-
-            // Serialize the only accepted fields from the base Exception class.
-            this.fallbackBaseExceptionSerializer.Serialize(fallbackException, innerContext, null);
-
-            // Write the length of the serialized exception, then write the serialized bytes.
-            var additionalDataLength = fallbackException.AdditionalData?.Length ?? 0;
-            outerWriter.Write(innerWriter.CurrentOffset + additionalDataLength);
-            outerWriter.Write(innerWriter.ToBytes());
-            
-            if (additionalDataLength > 0)
-            {
-                outerWriter.Write(fallbackException.AdditionalData);
-            }
-        }
-
-        private SerializerMethods GetSerializerMethods(Type actualType)
-        {
-            SerializerMethods methods;
-            if (!this.serializers.TryGetValue(actualType, out methods))
-            {
-                methods = this.generator.GenerateSerializer(
-                    actualType,
-                    this.exceptionFieldFilter,
-                    fieldComparer: ExceptionFieldInfoComparer.Instance);
-                this.serializers.TryAdd(actualType, methods);
-            }
-
-            return methods;
-        }
-
-        /// <summary>
-        /// Field comparer which sorts fields on the Exception class higher than fields on sub classes.
-        /// </summary>
-        private class ExceptionFieldInfoComparer : IComparer<FieldInfo>
-        {
-            /// <summary>
-            /// Gets the singleton instance of this class.
-            /// </summary>
-            public static ExceptionFieldInfoComparer Instance { get; } = new ExceptionFieldInfoComparer();
-
-            public int Compare(FieldInfo left, FieldInfo right)
-            {
-                var l = left?.DeclaringType == ExceptionType ? 1 : 0;
-                var r = right?.DeclaringType == ExceptionType ? 1 : 0;
-
-                // First compare based on whether or not the field is from the Exception base class.
-                var compareBaseClass = r - l;
-                if (compareBaseClass != 0) return compareBaseClass;
-
-                // Secondarily compare the field names.
-                return string.Compare(left?.Name, right?.Name, StringComparison.Ordinal);
-            }
-        }
+    [Serializable]
+    internal sealed class ExceptionBaseProperties
+    {
+        public string Message { get; set; }
+        public string StackTrace { get; set; }
+        public Exception InnerException { get; set; }
+        public int HResult { get; set; }
+        public Dictionary<object, object> Data { get; set; }
+        public Dictionary<string, (string, byte[])> AdditionalData { get; set; }
     }
 }

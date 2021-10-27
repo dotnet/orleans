@@ -1546,6 +1546,14 @@ namespace Orleans.Serialization
             return result;
         }
 
+        public object DeserializeFromByteArray(byte[] data, Type expectedType)
+        {
+            var context = new DeserializationContext(this);
+            context.StreamReader = new BinaryTokenStreamReader(data);
+            var result = DeserializeInner(expectedType, context);
+            return result;
+        }
+
         internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
         {
             var sm = context.SerializationManager;

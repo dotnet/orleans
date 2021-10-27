@@ -1,9 +1,10 @@
-﻿using System.Runtime.Serialization;
+using System.Runtime.Serialization;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
     using System;
+    using System.Collections.Generic;
     using System.Text;
 
     /// <summary>
@@ -22,7 +23,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets or sets the additional data deserialized alongside this instance, for example, exception subclass fields.
         /// </summary>
-        public byte[] AdditionalData { get; internal set; }
+        public Dictionary<string, (string, byte[])> AdditionalData { get; internal set; }
 
         /// <summary>
         /// Returns a <see cref="string"/> representation of this instance.
@@ -55,7 +56,7 @@ namespace Orleans.Serialization
             : base(info, context)
         {
             this.OriginalTypeName = info.GetString(nameof(this.OriginalTypeName));
-            this.AdditionalData = (byte[]) info.GetValue(nameof(this.AdditionalData), typeof(byte[]));
+            this.AdditionalData = (Dictionary<string, (string, byte[])>) info.GetValue(nameof(this.AdditionalData), typeof(Dictionary<string, (string, byte[])>));
         }
 
         /// <inheritdoc />
