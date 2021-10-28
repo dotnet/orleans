@@ -90,18 +90,17 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            var key = GetKey(address.GrainId);
-            var value = JsonConvert.SerializeObject(address);
-
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = address.ActivationId });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
+                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonConvert.SerializeObject(address), (result != 0) ? "OK" : "Conflict");
             }
             catch (Exception ex)
             {
+                var value = JsonConvert.SerializeObject(address);
+
                 this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
 
                 if (IsRedisException(ex))
@@ -136,12 +135,14 @@ namespace Orleans.GrainDirectory.Redis
 
             this.deleteScript = LuaScript.Prepare(
     @"	
-local cur = redis.call('GET', @key)	
-if cur == @val  then	
-  return redis.call('DEL', @key)	
-else	
-  return 0	
-end	
+local cur = redis.call('GET', @key)
+if cur ~= false then
+    local typedCur = cjson.decode(cur)
+    if typedCur.ActivationId == @val  then	
+        return redis.call('DEL', @key)	
+    end
+end
+return 0	
                 ");
         }
 
