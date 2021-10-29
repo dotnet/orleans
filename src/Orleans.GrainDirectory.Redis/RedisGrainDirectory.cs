@@ -89,33 +89,17 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            var value = JsonSerializer.Serialize(address);
-
             try
             {
-                if (address.MembershipVersion == MembershipVersion.MinValue)
-                {
-                    // The address was not returned by the directory and must have been constructed externally.
-                    // We need to get the value stored in the directory to get the MembershipVersion to possibly
-                    // safely delete the address after.
-                    var fullAddress = await Lookup(address.GrainId);
-                    if (!fullAddress.Matches(address))
-                    {
-                        if (this.logger.IsEnabled(LogLevel.Debug))
-                            this.logger.LogDebug("Unregister {GrainId} ({Address}): Not found in storage", address.GrainId, value);
-
-                        return;
-                    }
-                    address = fullAddress;
-                }
-
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonSerializer.Serialize(address) });
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = address.ActivationId });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
+                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
             }
             catch (Exception ex)
             {
+                var value = JsonSerializer.Serialize(address);
+
                 this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
 
                 if (IsRedisException(ex))
@@ -150,12 +134,14 @@ namespace Orleans.GrainDirectory.Redis
 
             this.deleteScript = LuaScript.Prepare(
     @"	
-local cur = redis.call('GET', @key)	
-if cur == @val  then	
-  return redis.call('DEL', @key)	
-else	
-  return 0	
-end	
+local cur = redis.call('GET', @key)
+if cur ~= false then
+    local typedCur = cjson.decode(cur)
+    if typedCur.ActivationId == @val  then	
+        return redis.call('DEL', @key)	
+    end
+end
+return 0	
                 ");
         }
 
