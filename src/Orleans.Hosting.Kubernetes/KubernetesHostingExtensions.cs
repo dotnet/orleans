@@ -62,7 +62,12 @@ namespace Orleans.Hosting
                 {
                     var config = serviceProvider.GetRequiredService<KubernetesHostingOptions>().ClientConfiguration;
                     return config.CreateDefaultHttpClientHandler();
-                });
+                })
+#if NETSTANDARD2_0
+                .AddHttpMessageHandler(KubernetesClientConfiguration.CreateWatchHandler);
+#else
+                ;
+#endif
 
             return services;
         }

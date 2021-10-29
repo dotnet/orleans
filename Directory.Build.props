@@ -119,6 +119,7 @@
     <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.0.601</StackExchangeRedis>
+    <Netstandard20KubernetesClientVersion>4.0.5</Netstandard20KubernetesClientVersion>
     <KubernetesClientVersion>6.0.19</KubernetesClientVersion>
 
     <!-- Test related packages -->
