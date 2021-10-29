@@ -22,8 +22,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         private class GrainDirectoryEntity : ITableEntity
         {
             public string SiloAddress { get; set; }
-
-            public string ActivationId { get; set; }
+            public string  ActivationId { get; set; }
             public string PartitionKey { get; set; }
             public string RowKey { get; set; }
             public DateTimeOffset? Timestamp { get; set; }
@@ -34,8 +33,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 return new GrainAddress
                 {
                     GrainId = RowKeyToGrainId(this.RowKey),
-                    SiloAddress = Orleans.Runtime.SiloAddress.FromParsableString(this.SiloAddress),
-                    ActivationId = this.ActivationId,
+                    SiloAddress = Runtime.SiloAddress.FromParsableString(this.SiloAddress),
+                    ActivationId = Runtime.ActivationId.FromParsableString(this.ActivationId),
                 };
             }
 
@@ -46,7 +45,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     PartitionKey = clusterId,
                     RowKey = GrainIdToRowKey(address.GrainId),
                     SiloAddress = address.SiloAddress.ToParsableString(),
-                    ActivationId = address.ActivationId,
+                    ActivationId = address.ActivationId.ToParsableString(),
                 };
             }
 
@@ -98,7 +97,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             // Check if the entry in storage match the one we were asked to delete
             var entity = result.Item1;
-            if (entity.ActivationId == address.ActivationId)
+            if (entity.ActivationId == address.ActivationId.ToParsableString())
                 await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
         }
 
@@ -142,7 +141,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
 
                 var rowKey = GrainDirectoryEntity.GrainIdToRowKey(addr.GrainId);
-                var queryClause = TableClient.CreateQueryFilter($"((RowKey eq {rowKey}) and (ActivationId eq {addr.ActivationId}))");
+                var queryClause = TableClient.CreateQueryFilter($"((RowKey eq {rowKey}) and (ActivationId eq {addr.ActivationId.ToString()}))");
                 queryBuilder.Append(queryClause);
             }
 

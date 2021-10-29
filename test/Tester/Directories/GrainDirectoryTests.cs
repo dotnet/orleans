@@ -29,7 +29,7 @@ namespace Tester.Directories
         {
             var expected = new GrainAddress
             {
-                ActivationId = Guid.NewGuid().ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
@@ -48,14 +48,14 @@ namespace Tester.Directories
         {
             var expected = new GrainAddress
             {
-                ActivationId = Guid.NewGuid().ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             var differentActivation = new GrainAddress
             {
-                ActivationId = Guid.NewGuid().ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 GrainId = expected.GrainId,
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
@@ -79,14 +79,14 @@ namespace Tester.Directories
         {
             var expected = new GrainAddress
             {
-                ActivationId = Guid.NewGuid().ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             var otherEntry = new GrainAddress
             {
-                ActivationId = Guid.NewGuid().ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 GrainId = expected.GrainId,
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };

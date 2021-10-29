@@ -287,7 +287,7 @@ namespace UnitTests.Directory
             return new GrainAddress
             {
                 GrainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid())),
-                ActivationId = ActivationId.NewId().Key.ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 SiloAddress = siloAddress ?? GenerateSiloAddress(),
                 MembershipVersion = this.mockMembershipService.CurrentVersion,
             };

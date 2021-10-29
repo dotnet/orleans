@@ -43,6 +43,10 @@ namespace Orleans.Runtime
 
         public string ToFullString() => ToString();
 
+        public string ToParsableString() => ToFullString();
+
+        public static ActivationId FromParsableString(string activationId) => GetActivationId(Guid.Parse(activationId.Remove(0, 1)));
+
         public static bool operator ==(ActivationId left, ActivationId right) => left.Equals(right);
 
         public static bool operator !=(ActivationId left, ActivationId right) => !(left == right);
