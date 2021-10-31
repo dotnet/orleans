@@ -318,7 +318,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     try
                     {
-                        closeTasks.Add(connection.CloseAsync(exception: null));
+                        closeTasks.Add(connection.CloseAsync());
                     }
                     catch
                     {
@@ -351,7 +351,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             try
                             {
-                                closeTasks.Add(connection.CloseAsync(exception: null));
+                                closeTasks.Add(connection.CloseAsync());
                             }
                             catch
                             {

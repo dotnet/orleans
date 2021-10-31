@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override async Task RunInternal()
+        protected override async Task ProcessConnection()
         {
             var (grainId, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
 
@@ -112,7 +112,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 this.gateway.RecordOpenedConnection(this, grainId);
-                await base.RunInternal();
+                await base.ProcessConnection();
             }
             finally
             {
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessageCore(Message msg, Exception ex = null)
         {
             if (msg == null) return;
 

@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Messaging
                     closeTasks.Clear();
                     foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
-                        closeTasks.Add(connection.CloseAsync(exception: null));
+                        closeTasks.Add(connection.CloseAsync());
                     }
 
                     await Task.WhenAny(Task.WhenAll(closeTasks), cancellationTask);

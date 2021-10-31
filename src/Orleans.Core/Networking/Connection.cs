@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.ObjectPool;
 #endif
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -42,7 +44,8 @@ namespace Orleans.Runtime.Messaging
         private IDuplexPipe _transport;
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
-        private Task _closeTask;
+        private Task _beginClosingTask;
+        private Task _closedTask;
 
         protected Connection(
             ConnectionContext connection,
@@ -77,7 +80,7 @@ namespace Orleans.Runtime.Messaging
         protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
 
-        public bool IsValid => _closeTask is null;
+        public bool IsValid => _beginClosingTask is null;
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
@@ -87,19 +90,97 @@ namespace Orleans.Runtime.Messaging
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task Run()
         {
-            Exception error = default;
+            var closedTcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _closedTask = closedTcs.Task;
             try
             {
-                // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
-                await this.middleware(this.Context);
-            }
-            catch (Exception exception)
-            {
-                error = exception;
+                try
+                {
+                    // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
+                    await this.middleware(this.Context);
+                    if (this.Log.IsEnabled(LogLevel.Information))
+                    {
+                        this.Log.LogInformation("Closing connection {Connection}", this);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    this.Log.LogWarning(exception, "Error processing connection {Connection}", this);
+                }
+                finally
+                {
+                    BeginClosing();
+                }
+
+                try
+                {
+                    Debug.Assert(_beginClosingTask is not null);
+                    await _beginClosingTask;
+                }
+                catch (Exception closeException)
+                {
+                    Context.Abort(new ConnectionAbortedException("Error attempting to close connection gracefully", closeException));
+                    this.Log.LogWarning(closeException, "Error attempting to close connection {Connection}", this);
+                }
+
+                try
+                {
+                    await this.Context.DisposeAsync();
+                }
+                catch (Exception disposeException)
+                {
+                    Context.Abort(new ConnectionAbortedException("Error disposing connection gracefully", disposeException));
+                    this.Log.LogWarning(disposeException, "Error terminating connection {Connection}", this);
+                }
+
+                // Wait for the transport to close, but only if the connection actually started being processed.
+                if (_processIncomingTask is not null && _processOutgoingTask is not null)
+                {
+                    // Wait for the transport to signal that it's closed before disposing it.
+                    await _transportConnectionClosed.Task;
+                }
             }
             finally
             {
-                await this.CloseAsync(error);
+                RedirectInflightMessages();
+                closedTcs.SetResult(0);
+            }
+
+            void RedirectInflightMessages()
+            {
+                // Reject in-flight messages.
+                foreach (var message in this.inflight)
+                {
+                    this.OnSendMessageFailure(message, "Connection terminated");
+                }
+
+                this.inflight.Clear();
+
+                // Reroute enqueued messages.
+                var i = 0;
+                while (this.outgoingMessages.Reader.TryRead(out var message))
+                {
+                    if (i == 0)
+                    {
+                        if (this.Log.IsEnabled(LogLevel.Information))
+                        {
+                            this.Log.LogInformation(
+                                "Rerouting messages for remote endpoint {EndPoint}",
+                                this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                        }
+                    }
+
+                    ++i;
+                    this.RetryMessage(message);
+                }
+
+                if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
+                {
+                    this.Log.LogInformation(
+                        "Rerouted {Count} messages for remote endpoint {EndPoint}",
+                        i,
+                        this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                }
             }
         }
 
@@ -109,10 +190,10 @@ namespace Orleans.Runtime.Messaging
             context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
             NetworkingStatisticsGroup.OnOpenedSocket(connection.ConnectionDirection);
-            return connection.RunInternal();
+            return connection.ProcessConnection();
         }
 
-        protected virtual async Task RunInternal()
+        protected virtual async Task ProcessConnection()
         {
             _transport = this.Context.Transport;
             _processIncomingTask = this.ProcessIncoming();
@@ -127,176 +208,110 @@ namespace Orleans.Runtime.Messaging
         /// <returns>Whether or not to continue transporting the message.</returns>
         protected abstract bool PrepareMessageForSend(Message msg);
 
-        protected abstract void RetryMessage(Message msg, Exception ex = null);
-
-        public async Task CloseAsync(Exception exception)
+        protected void RetryMessage(Message msg, Exception ex = null)
         {
-            StartClosing(exception);
-            if (_closeTask is Task task && !task.IsCompleted)
+            try
             {
-                await _closeTask;
+                RetryMessageCore(msg, ex);
+            }
+            catch (Exception exception)
+            {
+                if (ex is not null)
+                {
+                    this.Log.LogError(exception, "Error retrying message {Message} which is being retried due to exception {Exception}", msg, ex);
+                }
+                else
+                {
+                    this.Log.LogError(exception, "Error retrying message {Message}", msg);
+                }
+            }
+        }
+
+        protected abstract void RetryMessageCore(Message msg, Exception ex = null);
+
+        public async Task CloseAsync()
+        {
+            BeginClosing();
+            if (_closedTask is Task task && !task.IsCompleted)
+            {
+                await _closedTask;
             }
         }
 
         private void OnTransportConnectionClosed()
         {
-            StartClosing(new ConnectionAbortedException("Underlying connection closed"));
+            BeginClosing();
+            NetworkingStatisticsGroup.OnClosedSocket(ConnectionDirection);
             _transportConnectionClosed.SetResult(0);
         }
 
-        private void StartClosing(Exception exception)
+        /// <summary>
+        /// Begins terminating the connection.
+        /// </summary>
+        private void BeginClosing()
         {
-            if (_closeTask is object)
+            if (_beginClosingTask is not null)
             {
                 return;
             }
 
-            TaskCompletionSource<int> completion;
             lock (_closeLock)
             {
-                if (_closeTask is object)
+                if (_beginClosingTask is not null)
                 {
                     return;
                 }
 
-                completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _closeTask = completion.Task;
+                _beginClosingTask = Task.Run(() => BeginClosingAsync());
             }
-
-            if (this.Log.IsEnabled(LogLevel.Information))
-            {
-                this.Log.LogInformation(
-                    exception,
-                    "Closing connection {Connection}",
-                    this);
-            }
-
-            _ = WrapCloseAsync(this, completion);
 
             // Propagate the result of the close method to the task completion source.
-            static async Task WrapCloseAsync(Connection self, TaskCompletionSource<int> completion)
+            async Task BeginClosingAsync()
             {
                 try
                 {
-                    await Task.Yield();
-                    await self.FinishClosing().ConfigureAwait(false);
-                    completion.SetResult(0);
-                }
-                catch (Exception closeException)
-                {
-                    self.Log.LogError(closeException, "Exception while closing connection {ConnectionId}", self.ConnectionId);
-                    completion.SetResult(0);
-                }
-            }
-        }
+                    // Signal the outgoing message processor to exit gracefully.
+                    this.outgoingMessageWriter.TryComplete();
 
-        /// <summary>
-        /// Close the connection. This method should only be called by <see cref="StartClosing(Exception)"/>.
-        /// </summary>
-        private async Task FinishClosing()
-        {
-            NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
-
-            // Try to gracefully stop the reader/writer loops, if they are running.
-            try
-            {
-                if (_processIncomingTask is null || !_processIncomingTask.IsCompleted)
-                {
-                    try
+                    // Wait for the outgoing message processor to complete.
+                    if (_processOutgoingTask is { } task)
                     {
-                        // Tell the incoming message processor to stop waiting for data and complete.
-                        _transport?.Input.CancelPendingRead();
-                    }
-                    catch (ObjectDisposedException)
-                    {
+                        await task.ConfigureAwait(false);
                     }
                 }
-
-                // Wait for the incoming message processor to complete.
-                if (_processIncomingTask is { } task && !task.IsCompleted)
+                catch (Exception processOutgoingException)
                 {
-                    await task.ConfigureAwait(false);
+                    // Swallow any exceptions here.
+                    this.Log.LogWarning(processOutgoingException, "Error processing outgoing messages on connection {Connection}", this);
                 }
-            }
-            catch (Exception processIncomingException)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
-            }
 
-            try
-            {
-                // Signal the outgoing message processor to exit gracefully.
-                this.outgoingMessageWriter.TryComplete();
-
-                // Wait for the outgoing message processor to complete.
-                if (_processOutgoingTask is { } task && !task.IsCompleted)
+                var transport = _transport;
+                if (transport is not null)
                 {
-                    await task.ConfigureAwait(false);
+                    await transport.Output.CompleteAsync().ConfigureAwait(false);
                 }
-            }
-            catch (Exception processOutgoingException)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
-            }
 
-            if (_transport is { } transport)
-            {
-                await transport.Output.CompleteAsync();
-                await transport.Input.CompleteAsync();
-            }
-
-            try
-            {
-                //this.Context.Abort();
-                await this.Context.DisposeAsync();
-            }
-            catch (Exception abortException)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
-            }
-
-            // Wait for the transport to close, but only if the connection actually started being processed.
-            if (_processIncomingTask is not null && _processOutgoingTask is not null)
-            {
-                // Wait for the transport to signal that it's closed before disposing it.
-                await _transportConnectionClosed.Task;
-            }
-
-            // Reject in-flight messages.
-            foreach (var message in this.inflight)
-            {
-                this.OnSendMessageFailure(message, "Connection terminated");
-            }
-
-            this.inflight.Clear();
-
-            // Reroute enqueued messages.
-            var i = 0;
-            while (this.outgoingMessages.Reader.TryRead(out var message))
-            {
-                if (i == 0)
+                // Try to gracefully stop the reader/writer loops, if they are running.
+                try
                 {
-                    if (this.Log.IsEnabled(LogLevel.Information))
+                    transport?.Input.CancelPendingRead();
+
+                    // Wait for the incoming message processor to complete.
+                    if (_processIncomingTask is { } task)
                     {
-                        this.Log.LogInformation(
-                            "Rerouting messages for remote endpoint {EndPoint}",
-                            this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                        await task.ConfigureAwait(false);
                     }
                 }
+                catch (Exception processIncomingException)
+                {
+                    // Swallow any exceptions here.
+                    this.Log.LogWarning(processIncomingException, "Error processing incoming messages on connection {Connection}", this);
+                }
 
-                ++i;
-                this.RetryMessage(message);
-            }
-
-            if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
-            {
-                this.Log.LogInformation(
-                    "Rerouted {Count} messages for remote endpoint {EndPoint}",
-                    i,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                if (transport is not null)
+                {
+                    await transport.Input.CompleteAsync().ConfigureAwait(false);
+                }
             }
         }
 
@@ -318,7 +333,6 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
 
-            Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
@@ -370,13 +384,11 @@ namespace Orleans.Runtime.Messaging
                         "Exception while processing messages from remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
-
-                error = exception;
             }
             finally
             {
                 (serializer as IDisposable)?.Dispose();
-                this.StartClosing(error);
+                this.BeginClosing();
             }
         }
 
@@ -384,7 +396,6 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
 
-            Exception error = default;   
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
@@ -432,13 +443,11 @@ namespace Orleans.Runtime.Messaging
                         "Exception while processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
-
-                error = exception;
             }
             finally
             {
                 (serializer as IDisposable)?.Dispose();
-                this.StartClosing(error);
+                this.BeginClosing();
             }
         }
 

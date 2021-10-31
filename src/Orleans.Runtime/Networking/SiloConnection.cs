@@ -174,7 +174,7 @@ namespace Orleans.Runtime.Messaging
             this.FailMessage(message, error);
         }
 
-        protected override async Task RunInternal()
+        protected override async Task ProcessConnection()
         {
             Exception error = default;
             try
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.Messaging
 
                 this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
                 this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
-                await base.RunInternal();
+                await base.ProcessConnection();
             }
             catch (Exception exception) when ((error = exception) is null)
             {
@@ -336,7 +336,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessageCore(Message msg, Exception ex = null)
         {
             if (msg == null) return;
 
