@@ -369,12 +369,12 @@ namespace Orleans
                 }
                 else
                 {
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
                         using (response.SetThreadActivityId())
                         {
-                            this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
+                            this.logger.LogDebug("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
                         }
                     }
                 }

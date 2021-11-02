@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class IncomingRequestMonitor : ILifecycleParticipant<ISiloLifecycle>
     {
-        private static readonly TimeSpan DefaultAnalysisPeriod = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan DisabledAnalysisRefreshPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan InactiveGrainIdleness = TimeSpan.FromMinutes(1);
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly IMessageCenter _messageCenter;
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
         {
             var options = _messagingOptions.CurrentValue;
             var optionsPeriod = options.GrainWorkloadAnalysisPeriod;
-            TimeSpan nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DefaultAnalysisPeriod;
+            TimeSpan nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DisabledAnalysisRefreshPeriod;
 
             while (await _scanPeriodTimer.NextTick(nextDelay))
             {
@@ -77,7 +77,7 @@ namespace Orleans.Runtime
                 if (optionsPeriod <= TimeSpan.Zero)
                 {
                     // Scanning is disabled. Wake up and check again soon.
-                    nextDelay = DefaultAnalysisPeriod;
+                    nextDelay = DisabledAnalysisRefreshPeriod;
                     if (_enabled)
                     {
                         _enabled = false;
