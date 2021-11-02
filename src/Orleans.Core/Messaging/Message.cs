@@ -19,10 +19,10 @@ namespace Orleans.Runtime
 
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         [NonSerialized]
-        private ActivationAddress _targetAddress;
+        private GrainAddress _targetAddress;
 
         [NonSerialized]
-        private ActivationAddress _sendingAddress;
+        private GrainAddress _sendingAddress;
 
         // For statistical measuring of time spent in queues.
         [NonSerialized]
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
         public ActivationId _sendingActivation;
         public TimeSpan? _timeToLive;
 
-        public List<ActivationAddress> _cacheInvalidationHeader;
+        public List<GrainAddress> _cacheInvalidationHeader;
         public ResponseTypes _result;
         public RejectionTypes _rejectionType;
         public string _rejectionInfo;
@@ -107,14 +107,14 @@ namespace Orleans.Runtime
 
         public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
 
-        public ActivationAddress TargetAddress
+        public GrainAddress TargetAddress
         {
             get
             {
                 if (_targetAddress is { } result) return result;
                 if (!TargetGrain.IsDefault)
                 {
-                    return _targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
+                    return _targetAddress = GrainAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
                 }
 
                 return null;
@@ -122,21 +122,21 @@ namespace Orleans.Runtime
 
             set
             {
-                TargetGrain = value.Grain;
-                TargetActivation = value.Activation;
-                TargetSilo = value.Silo;
+                TargetGrain = value.GrainId;
+                TargetActivation = value.ActivationId;
+                TargetSilo = value.SiloAddress;
                 _targetAddress = value;
             }
         }
         
-        public ActivationAddress SendingAddress
+        public GrainAddress SendingAddress
         {
-            get => _sendingAddress ??= ActivationAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation);
+            get => _sendingAddress ??= GrainAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation);
             set
             {
-                SendingGrain = value.Grain;
-                SendingActivation = value.Activation;
-                SendingSilo = value.Silo;
+                SendingGrain = value.GrainId;
+                SendingActivation = value.ActivationId;
+                SendingSilo = value.SiloAddress;
                 _sendingAddress = value;
             }
         }
@@ -284,7 +284,7 @@ namespace Orleans.Runtime
             set => _timeToLive = value;
         }
 
-        public List<ActivationAddress> CacheInvalidationHeader
+        public List<GrainAddress> CacheInvalidationHeader
         {
             get => _cacheInvalidationHeader;
             set => _cacheInvalidationHeader = value;
@@ -331,9 +331,9 @@ namespace Orleans.Runtime
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
         
-        internal void AddToCacheInvalidationHeader(ActivationAddress address)
+        internal void AddToCacheInvalidationHeader(GrainAddress address)
         {
-            var list = new List<ActivationAddress>();
+            var list = new List<GrainAddress>();
             if (CacheInvalidationHeader != null)
             {
                 list.AddRange(CacheInvalidationHeader);

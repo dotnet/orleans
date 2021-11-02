@@ -41,7 +41,7 @@ namespace UnitTests.Grains
 
         public Task<IPEndPoint> GetEndpoint()
         {
-            return Task.FromResult(Data.Address.Silo.Endpoint);
+            return Task.FromResult(Data.Address.SiloAddress.Endpoint);
         }
 
         public Task<string> GetRuntimeInstanceId()
@@ -130,7 +130,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = Data.Address.Silo;
+            SiloAddress siloAddress = Data.Address.SiloAddress;
             return Task.FromResult(siloAddress);
         }
     }

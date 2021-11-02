@@ -61,7 +61,7 @@ namespace UnitTests.Directory
             foreach (var cause in (UnregistrationCause[])Enum.GetValues(typeof(UnregistrationCause)))
             {
                 var batchn = 100;
-                var addresses = new List<ActivationAddress>();
+                var addresses = new List<GrainAddress>();
                 var tasks = new List<Task>();
 
                 for (var i = 0; i < batchn; i++)
@@ -89,10 +89,10 @@ namespace UnitTests.Directory
         public async Task MultipleMixedDeactivations()
         {
             var batchn = 12;
-            var addresses = new List<ActivationAddress>();
+            var addresses = new List<GrainAddress>();
             var tasks = new List<Task>();
 
-            var map = new Dictionary<ActivationAddress, UnregistrationCause>();
+            var map = new Dictionary<GrainAddress, UnregistrationCause>();
 
             foreach (var cause in (UnregistrationCause[])Enum.GetValues(typeof(UnregistrationCause)))
             {
@@ -114,12 +114,12 @@ namespace UnitTests.Directory
         }
 
         private int generation = 0;
-        private ActivationAddress GenerateActivationAddress()
+        private GrainAddress GenerateActivationAddress()
         {
             var grainId = LegacyGrainId.GetGrainIdForTesting(Guid.NewGuid());
             var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
-            return ActivationAddress.NewActivationAddress(siloAddr, grainId);
+            return GrainAddress.NewActivationAddress(siloAddr, grainId);
         }
     }
 }

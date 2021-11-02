@@ -42,9 +42,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new grain context for the provided grain address.
         /// </summary>
-        public IGrainContext CreateInstance(ActivationAddress address)
+        public IGrainContext CreateInstance(GrainAddress address)
         {
-            var grainId = address.Grain;
+            var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
             {
                 activator = this.CreateActivator(grainId.Type);
@@ -133,7 +133,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a grain context for the given grain address.
         /// </summary>
-        public IGrainContext CreateContext(ActivationAddress address);
+        public IGrainContext CreateContext(GrainAddress address);
     }
 
     /// <summary>

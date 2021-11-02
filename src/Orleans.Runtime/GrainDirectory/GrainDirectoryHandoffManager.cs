@@ -58,7 +58,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // at least one predcessor should exist, which is me
                 SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
-                Dictionary<SiloAddress, List<ActivationAddress>> duplicates;
+                Dictionary<SiloAddress, List<GrainAddress>> duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
                             var s = localDirectory.CalculateGrainDirectoryPartition(grain);
                             return (s != null) && !localDirectory.MyAddress.Equals(s);
                         }, false);
-                    List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations();
+                    List<GrainAddress> splitPartListSingle = splitPart.ToListOfActivations();
 
                     EnqueueOperation(
                         $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
@@ -148,7 +148,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle)
+        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<GrainAddress> splitPartListSingle)
         {
             if (!this.localDirectory.Running) return;
 
@@ -173,18 +173,18 @@ namespace Orleans.Runtime.GrainDirectory
 
                 splitPartListSingle.ForEach(
                     activationAddress =>
-                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
+                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.GrainId));
             }
         }
 
-        internal void AcceptExistingRegistrations(List<ActivationAddress> singleActivations)
+        internal void AcceptExistingRegistrations(List<GrainAddress> singleActivations)
         {
             this.EnqueueOperation(
                 nameof(AcceptExistingRegistrations),
                 () => AcceptExistingRegistrationsAsync(singleActivations));
         }
 
-        private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations)
+        private async Task AcceptExistingRegistrationsAsync(List<GrainAddress> singleActivations)
         {
             if (!this.localDirectory.Running) return;
 
@@ -209,7 +209,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 finally
                 {
-                    Dictionary<SiloAddress, List<ActivationAddress>> duplicates = new Dictionary<SiloAddress, List<ActivationAddress>>();
+                    Dictionary<SiloAddress, List<GrainAddress>> duplicates = new Dictionary<SiloAddress, List<GrainAddress>>();
                     for (var i = tasks.Length - 1; i >= 0; i--)
                     {
                         // Retry failed tasks next time.
@@ -221,9 +221,9 @@ namespace Orleans.Runtime.GrainDirectory
                         {
                             var duplicate = singleActivations[i];
 
-                            if (!duplicates.TryGetValue(duplicate.Silo, out var activations))
+                            if (!duplicates.TryGetValue(duplicate.SiloAddress, out var activations))
                             {
-                                activations = duplicates[duplicate.Silo] = new List<ActivationAddress>(1);
+                                activations = duplicates[duplicate.SiloAddress] = new List<GrainAddress>(1);
                             }
 
                             activations.Add(duplicate);
@@ -297,7 +297,7 @@ namespace Orleans.Runtime.GrainDirectory
                 .Ignore();
         }
 
-        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
+        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>> duplicates)
         {
             if (duplicates == null || duplicates.Count == 0) return;
             this.EnqueueOperation(
@@ -305,7 +305,7 @@ namespace Orleans.Runtime.GrainDirectory
                 () => DestroyDuplicateActivationsAsync(duplicates));
         }
 
-        private async Task DestroyDuplicateActivationsAsync(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
+        private async Task DestroyDuplicateActivationsAsync(Dictionary<SiloAddress, List<GrainAddress>> duplicates)
         {
             while (duplicates.Count > 0)
             {

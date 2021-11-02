@@ -40,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         public const int NO_ETAG = -1;
 
-        public ActivationAddress Activation { get; private set; }
+        public GrainAddress Activation { get; private set; }
 
         public DateTime TimeCreated { get; private set; }
 
@@ -67,7 +67,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public ActivationAddress TryAddSingleActivation(ActivationAddress address)
+        public GrainAddress TryAddSingleActivation(GrainAddress address)
         {
             if (Activation is { } existing)
             {
@@ -85,7 +85,7 @@ namespace Orleans.Runtime.GrainDirectory
         public bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out bool wasRemoved)
         {
             wasRemoved = false;
-            if (Activation is { } existing  && existing.Activation.Equals(act) && OkToRemove(cause, lazyDeregistrationDelay))
+            if (Activation is { } existing  && existing.ActivationId.Equals(act) && OkToRemove(cause, lazyDeregistrationDelay))
             {
                 wasRemoved = true;
                 Activation = null;
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.GrainDirectory
             return wasRemoved;
         }
 
-        public ActivationAddress Merge(GrainInfo other)
+        public GrainAddress Merge(GrainInfo other)
         {
             var otherActivation = other.Activation;
             if (otherActivation is not null && Activation is null)
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // Grain is supposed to be in single activation mode, but we have two activations!!
                 // Eventually we should somehow delegate handling this to the silo, but for now, we'll arbitrarily pick one value.
-                if (Activation.Activation.Key.CompareTo(otherActivation.Activation.Key) < 0)
+                if (Activation.ActivationId.Key.CompareTo(otherActivation.ActivationId.Key) < 0)
                 {
                     var activationToDrop = Activation;
                     Activation = otherActivation;
@@ -183,24 +183,24 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a new activation to the directory partition
         /// </summary>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal virtual AddressAndTag AddSingleActivation(ActivationAddress address)
+        internal virtual AddressAndTag AddSingleActivation(GrainAddress address)
         {
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding single activation for grain {0}{1}{2}", address.Silo, address.Grain, address.Activation);
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding single activation for grain {0}{1}{2}", address.SiloAddress, address.GrainId, address.ActivationId);
 
             AddressAndTag result = new AddressAndTag();
 
-            if (!IsValidSilo(address.Silo))
+            if (!IsValidSilo(address.SiloAddress))
             {
-                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(address.Silo);
-                throw new OrleansException($"Trying to register {address.Grain} on invalid silo: {address.Silo}. Known status: {siloStatus}");
+                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(address.SiloAddress);
+                throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 
             GrainInfo grainInfo;
             lock (lockable)
             {
-                if (!partitionData.TryGetValue(address.Grain, out grainInfo))
+                if (!partitionData.TryGetValue(address.GrainId, out grainInfo))
                 {
-                    partitionData[address.Grain] = grainInfo = new GrainInfo();
+                    partitionData[address.GrainId] = grainInfo = new GrainInfo();
                 }
 
                 result.Address = grainInfo.TryAddSingleActivation(address);
@@ -260,7 +260,7 @@ namespace Orleans.Runtime.GrainDirectory
                 result.VersionTag = grainInfo.VersionTag;
             }
 
-            if (!IsValidSilo(result.Address.Silo))
+            if (!IsValidSilo(result.Address.SiloAddress))
             {
                 result.Address = null;
             }
@@ -294,9 +294,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="other"></param>
         /// <returns>Activations which must be deactivated.</returns>
-        internal Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainDirectoryPartition other)
+        internal Dictionary<SiloAddress, List<GrainAddress>> Merge(GrainDirectoryPartition other)
         {
-            Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove = null;
+            Dictionary<SiloAddress, List<GrainAddress>> activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)
@@ -307,14 +307,14 @@ namespace Orleans.Runtime.GrainDirectory
                         var activationToDrop = partitionData[pair.Key].Merge(pair.Value);
                         if (activationToDrop == null) continue;
 
-                        activationsToRemove ??= new Dictionary<SiloAddress, List<ActivationAddress>>();
-                        if (activationsToRemove.TryGetValue(activationToDrop.Silo, out var activations))
+                        activationsToRemove ??= new Dictionary<SiloAddress, List<GrainAddress>>();
+                        if (activationsToRemove.TryGetValue(activationToDrop.SiloAddress, out var activations))
                         {
                             activations.Add(activationToDrop);
                         }
                         else
                         {
-                            activationsToRemove[activationToDrop.Silo] = new() { activationToDrop };
+                            activationsToRemove[activationToDrop.SiloAddress] = new() { activationToDrop };
                         }
                     }
                     else
@@ -375,14 +375,14 @@ namespace Orleans.Runtime.GrainDirectory
             return newDirectory;
         }
 
-        internal List<ActivationAddress> ToListOfActivations()
+        internal List<GrainAddress> ToListOfActivations()
         {
-            var result = new List<ActivationAddress>();
+            var result = new List<GrainAddress>();
             lock (lockable)
             {
                 foreach (var pair in partitionData)
                 {
-                    if (pair.Value.Activation is { } address && IsValidSilo(address.Silo))
+                    if (pair.Value.Activation is { } address && IsValidSilo(address.SiloAddress))
                     {
                         result.Add(address);
                     }
@@ -439,7 +439,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (grainEntry.Value.Activation is { } activation)
                     {
                         sb.Append("    ").Append(grainEntry.Key.ToString()).Append("[" + grainEntry.Value.VersionTag + "]").
-                            Append(" => ").Append(activation.Grain.ToString()).
+                            Append(" => ").Append(activation.GrainId.ToString()).
                             Append(" @ ").AppendLine(activation.ToString());
                     }
                 }

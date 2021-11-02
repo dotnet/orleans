@@ -24,7 +24,7 @@ namespace Orleans.Runtime
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
-        internal ActivationAddress ActivationAddress { get; }
+        internal GrainAddress ActivationAddress { get; }
 
         GrainId ISystemTargetBase.GrainId => id.GrainId;
         internal ActivationId ActivationId { get; set; }
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
 
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 
-        ActivationAddress IGrainContext.Address => this.ActivationAddress;
+        GrainAddress IGrainContext.Address => this.ActivationAddress;
         private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
         
         /// <summary>Only needed to make Reflection happy.</summary>
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
         {
             this.id = grainId;
             this.Silo = silo;
-            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
+            this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
             this.IsLowPriority = lowPriority;
             this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();

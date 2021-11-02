@@ -306,11 +306,11 @@ namespace Orleans.Runtime.GrainDirectory
                 if (grainInfo.Activation is { } address)
                 {
                     // Include any activations from dead silos and from predecessors.
-                    var siloIsDead = dead && address.Silo.Equals(silo);
-                    var siloIsPredecessor = address.Silo.IsPredecessorOf(silo);
+                    var siloIsDead = dead && address.SiloAddress.Equals(silo);
+                    var siloIsPredecessor = address.SiloAddress.IsPredecessorOf(silo);
                     if (siloIsDead || siloIsPredecessor)
                     {
-                        activationsToRemove.Add((grain, address.Activation));
+                        activationsToRemove.Add((grain, address.ActivationId));
                     }
                 }
             }
@@ -338,17 +338,17 @@ namespace Orleans.Runtime.GrainDirectory
                 var activationAddress = tuple.ActivationAddress;
 
                 // 2) remove entries now owned by me (they should be retrieved from my directory partition)
-                if (MyAddress.Equals(CalculateGrainDirectoryPartition(activationAddress.Grain)))
+                if (MyAddress.Equals(CalculateGrainDirectoryPartition(activationAddress.GrainId)))
                 {
-                    DirectoryCache.Remove(activationAddress.Grain);
+                    DirectoryCache.Remove(activationAddress.GrainId);
                 }
 
                 // 1) remove entries that point to activations located on the removed silo
                 // For dead silos, remove any activation registered to that silo or one of its predecessors.
                 // For new silos, remove any activation registered to one of its predecessors.
-                if (activationAddress.Silo.IsPredecessorOf(silo) || (activationAddress.Silo.Equals(silo) && dead))
+                if (activationAddress.SiloAddress.IsPredecessorOf(silo) || (activationAddress.SiloAddress.Equals(silo) && dead))
                 {
-                    DirectoryCache.Remove(activationAddress.Grain);
+                    DirectoryCache.Remove(activationAddress.GrainId);
                 }
             }
         }
@@ -514,23 +514,23 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount)
+        public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
             var counterStatistic = hopCount > 0 ? this.RegistrationsSingleActRemoteReceived : this.registrationsSingleActIssued ;
 
             counterStatistic.Increment();
 
             // see if the owner is somewhere else (returns null if we are owner)
-            var forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync");
+            var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
 
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync");
+                forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
                 if (forwardAddress is object)
                 {
-                    int hash = unchecked((int)address.Grain.GetUniformHashCode());
+                    int hash = unchecked((int)address.GrainId.GetUniformHashCode());
                     this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
                 }
             }
@@ -554,7 +554,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
                 if (result.Address == null) return result;
 
-                if (!address.Equals(result.Address) || !IsValidSilo(address.Silo)) return result;
+                if (!address.Equals(result.Address) || !IsValidSilo(address.SiloAddress)) return result;
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
                 DirectoryCache.AddOrUpdate(address, result.VersionTag);
@@ -563,7 +563,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public Task UnregisterAfterNonexistingActivation(ActivationAddress addr, SiloAddress origin)
+        public Task UnregisterAfterNonexistingActivation(GrainAddress addr, SiloAddress origin)
         {
             log.Trace("UnregisterAfterNonexistingActivation addr={0} origin={1}", addr, origin);
 
@@ -580,7 +580,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public async Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount)
+        public async Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)
         {
             (hopCount > 0 ? UnregistrationsRemoteReceived : unregistrationsIssued).Increment();
 
@@ -588,13 +588,13 @@ namespace Orleans.Runtime.GrainDirectory
                 InvalidateCacheEntry(address);
 
             // see if the owner is somewhere else (returns null if we are owner)
-            var forwardaddress = this.CheckIfShouldForward(address.Grain, hopCount, "UnregisterAsync");
+            var forwardaddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
 
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardaddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardaddress = this.CheckIfShouldForward(address.Grain, hopCount, "UnregisterAsync");
+                forwardaddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
                 this.log.LogWarning($"UnregisterAsync - It seems we are not the owner of activation {address}, trying to forward it to {forwardaddress} (hopCount={hopCount})");
             }
 
@@ -603,7 +603,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // we are the owner
                 UnregistrationsLocal.Increment();
 
-                DirectoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
+                DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
             }
             else
             {
@@ -625,13 +625,13 @@ namespace Orleans.Runtime.GrainDirectory
 
 
         // helper method to avoid code duplication inside UnregisterManyAsync
-        private void UnregisterOrPutInForwardList(IEnumerable<ActivationAddress> addresses, UnregistrationCause cause, int hopCount,
-            ref Dictionary<SiloAddress, List<ActivationAddress>> forward, List<Task> tasks, string context)
+        private void UnregisterOrPutInForwardList(IEnumerable<GrainAddress> addresses, UnregistrationCause cause, int hopCount,
+            ref Dictionary<SiloAddress, List<GrainAddress>> forward, List<Task> tasks, string context)
         {
             foreach (var address in addresses)
             {
                 // see if the owner is somewhere else (returns null if we are owner)
-                var forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, context);
+                var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, context);
 
                 if (forwardAddress != null)
                 {
@@ -642,17 +642,17 @@ namespace Orleans.Runtime.GrainDirectory
                     // we are the owner
                     UnregistrationsLocal.Increment();
 
-                    DirectoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
+                    DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
                 }
             }
         }
 
 
-        public async Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount)
+        public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
         {
             (hopCount > 0 ? UnregistrationsManyRemoteReceived : unregistrationsManyIssued).Increment();
 
-            Dictionary<SiloAddress, List<ActivationAddress>> forwardlist = null;
+            Dictionary<SiloAddress, List<GrainAddress>> forwardlist = null;
             var tasks = new List<Task>();
 
             UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist, tasks, "UnregisterManyAsync");
@@ -661,7 +661,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardlist != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                Dictionary<SiloAddress, List<ActivationAddress>> forwardlist2 = null;
+                Dictionary<SiloAddress, List<GrainAddress>> forwardlist2 = null;
                 UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, tasks, "UnregisterManyAsync");
                 forwardlist = forwardlist2;
                 if (forwardlist != null)
@@ -746,9 +746,9 @@ namespace Orleans.Runtime.GrainDirectory
             return DirectoryPartition.LookUpActivation(grain);
         }
 
-        public ActivationAddress GetLocalCacheData(GrainId grain)
+        public GrainAddress GetLocalCacheData(GrainId grain)
         {
-            if (DirectoryCache.LookUp(grain, out var cache) && IsValidSilo(cache.Silo))
+            if (DirectoryCache.LookUp(grain, out var cache) && IsValidSilo(cache.SiloAddress))
             {
                 return cache;
             }
@@ -806,7 +806,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
-                if (result.Address is { } address && IsValidSilo(address.Silo))
+                if (result.Address is { } address && IsValidSilo(address.SiloAddress))
                 {
                     DirectoryCache.AddOrUpdate(address, result.VersionTag);
                 }
@@ -848,7 +848,7 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryCache.Remove(grainId);
         }
 
-        public void InvalidateCacheEntry(ActivationAddress activationAddress)
+        public void InvalidateCacheEntry(GrainAddress activationAddress)
         {
             DirectoryCache.Remove(activationAddress);
         }
@@ -957,8 +957,8 @@ namespace Orleans.Runtime.GrainDirectory
             return this.directoryMembership.MembershipCache.Contains(silo);
         }
 
-        public void CachePlacementDecision(ActivationAddress activation) => this.DirectoryCache.AddOrUpdate(activation, 0);
-        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => (address = GetLocalCacheData(grainId)) is not null;
+        public void CachePlacementDecision(GrainAddress activation) => this.DirectoryCache.AddOrUpdate(activation, 0);
+        public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => (address = GetLocalCacheData(grainId)) is not null;
 
         private class DirectoryMembership
         {

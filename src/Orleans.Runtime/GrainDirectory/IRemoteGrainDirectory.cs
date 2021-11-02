@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="addresses">The addresses of the grains to register</param>
         /// <returns></returns>
-        Task RegisterMany(List<ActivationAddress> addresses);
+        Task RegisterMany(List<GrainAddress> addresses);
 
         /// <summary>
         /// Fetch the updated information on the given list of grains.
@@ -40,6 +40,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="singleActivations">The single-activation registrations from the split partition.</param>
         /// <returns></returns>
-        Task AcceptSplitPartition(List<ActivationAddress> singleActivations);
+        Task AcceptSplitPartition(List<GrainAddress> singleActivations);
     }
 }

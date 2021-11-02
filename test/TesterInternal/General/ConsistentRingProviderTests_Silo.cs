@@ -286,7 +286,7 @@ namespace UnitTests.General
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
             var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
-            ActivationAddress reminderGrainActivation = address;
+            GrainAddress reminderGrainActivation = address;
 
             SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
@@ -297,7 +297,7 @@ namespace UnitTests.General
                     continue;
                 }
                 // Don't fail primary directory partition and the silo hosting the ReminderTableGrain.
-                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.Silo))
+                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.SiloAddress))
                 {
                     continue;
                 }

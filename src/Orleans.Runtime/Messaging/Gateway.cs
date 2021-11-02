@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Messaging
             this.sender = new GatewaySender(this, msgCtr, messageFactory, loggerFactory.CreateLogger<GatewaySender>());
         }
 
-        public static ActivationAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
+        public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
@@ -55,7 +55,7 @@ namespace Orleans.Runtime.Messaging
             string stringToHash = clientId.ToString() + siloAddress.Endpoint + siloAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
             var activationId = ActivationId.GetActivationId(hash);
-            return ActivationAddress.GetAddress(siloAddress, clientId, activationId);
+            return GrainAddress.GetAddress(siloAddress, clientId, activationId);
         }
 
         internal void Start()

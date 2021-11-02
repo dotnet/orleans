@@ -12,7 +12,8 @@ namespace UnitTests.Directory
         private readonly TimeSpan singleOperationDelay;
         private readonly TimeSpan batchOperationDelay;
 
-        public List<(ActivationAddress activationAddress, UnregistrationCause cause)> UnregistrationReceived { get; private set; }
+        public List<(GrainAddress activationAddress, UnregistrationCause cause)> UnregistrationReceived { get; private set; }
+
         public int UnregistrationCounter { get; private set; }
 
         public MockLocalGrainDirectory(TimeSpan singleOperationDelay, TimeSpan batchOperationDelay)
@@ -25,17 +26,17 @@ namespace UnitTests.Directory
         public void Reset()
         {
             this.UnregistrationCounter = 0;
-            this.UnregistrationReceived = new List<(ActivationAddress activationAddress, UnregistrationCause cause)>();
+            this.UnregistrationReceived = new List<(GrainAddress activationAddress, UnregistrationCause cause)>();
         }
 
-        public async Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount = 0)
+        public async Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0)
         {
             this.UnregistrationCounter++;
             await Task.Delay(singleOperationDelay);
             this.UnregistrationReceived.Add((address, cause));
         }
 
-        public async Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount = 0)
+        public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0)
         {
             this.UnregistrationCounter++;
             await Task.Delay(batchOperationDelay);
@@ -55,7 +56,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public ActivationAddress GetLocalCacheData(GrainId grain)
+        public GrainAddress GetLocalCacheData(GrainId grain)
         {
             throw new NotImplementedException();
         }
@@ -70,7 +71,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void InvalidateCacheEntry(ActivationAddress activation)
+        public void InvalidateCacheEntry(GrainAddress activation)
         {
             throw new NotImplementedException();
         }
@@ -90,7 +91,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount = 0)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0)
         {
             throw new NotImplementedException();
         }
@@ -110,15 +111,15 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public Task UnregisterAfterNonexistingActivation(ActivationAddress address, SiloAddress origin)
+        public Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin)
         {
             throw new NotImplementedException();
         }
 
-        public void CachePlacementDecision(ActivationAddress activation) => throw new NotImplementedException();
+        public void CachePlacementDecision(GrainAddress activation) => throw new NotImplementedException();
 
         public void InvalidateCacheEntry(GrainId grainId) => throw new NotImplementedException();
-        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => throw new NotImplementedException();
+        public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => throw new NotImplementedException();
         #endregion
     }
 }

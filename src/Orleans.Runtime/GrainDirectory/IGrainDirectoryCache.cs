@@ -11,7 +11,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="value">value to add</param>
         /// <param name="version">version for the value</param>
-        void AddOrUpdate(ActivationAddress value, int version);
+        void AddOrUpdate(GrainAddress value, int version);
 
         /// <summary>
         /// Removes an entry from the cache given its key
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="key">key to remove</param>
         /// <returns>True if the entry was in the cache and the removal was successful</returns>
-        bool Remove(ActivationAddress key);
+        bool Remove(GrainAddress key);
         
         /// <summary>
         /// Clear the cache, deleting all entries.
@@ -39,12 +39,12 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <param name="version">version of cached value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        bool LookUp(GrainId key, out ActivationAddress result, out int version);
+        bool LookUp(GrainId key, out GrainAddress result, out int version);
 
         /// <summary>
         /// Returns list of key-value-version tuples stored currently in the cache.
         /// </summary>
-        IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues { get; }
+        IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues { get; }
     }
 
     internal static class GrainDirectoryCacheExtensions
@@ -56,7 +56,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key for the lookup</param>
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out ActivationAddress result)
+        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out GrainAddress result)
         {
             return cache.LookUp(key, out result, out _);
         }

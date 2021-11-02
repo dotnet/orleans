@@ -16,7 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly IGrainContext grainContext;
-        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)> unregistrationQueue = new();
+        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, GrainAddress address, UnregistrationCause cause)> unregistrationQueue = new();
         private int isWorking = 0;
 
         public DhtGrainLocator(
@@ -27,11 +27,11 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainContext = grainContext;
         }
 
-        public async ValueTask<ActivationAddress> Lookup(GrainId grainId) => (await this.localGrainDirectory.LookupAsync(grainId)).Address;
+        public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await this.localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public async Task<ActivationAddress> Register(ActivationAddress address) => (await this.localGrainDirectory.RegisterAsync(address)).Address;
+        public async Task<GrainAddress> Register(GrainAddress address) => (await this.localGrainDirectory.RegisterAsync(address)).Address;
 
-        public Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
             var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.unregistrationQueue.Enqueue((tcs, address, cause));
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
                     return;
                 }
 
-                var operations = new List<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)>();
+                var operations = new List<(TaskCompletionSource<object> tcs, GrainAddress address, UnregistrationCause cause)>();
                 UnregistrationCause? cause = default;
 
                 try
@@ -96,9 +96,9 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public void CachePlacementDecision(ActivationAddress address) => this.localGrainDirectory.CachePlacementDecision(address);
+        public void CachePlacementDecision(GrainAddress address) => this.localGrainDirectory.CachePlacementDecision(address);
         public void InvalidateCache(GrainId grainId) => this.localGrainDirectory.InvalidateCacheEntry(grainId);
-        public void InvalidateCache(ActivationAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
-        public bool TryLookupInCache(GrainId grainId, out ActivationAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
+        public void InvalidateCache(GrainAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
+        public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
     }
 }

@@ -21,14 +21,14 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
-        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount)
+        public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
             router.RegistrationsSingleActRemoteReceived.Increment();
             
             return await router.RegisterAsync(address, hopCount);
         }
 
-        public Task RegisterMany(List<ActivationAddress> addresses)
+        public Task RegisterMany(List<GrainAddress> addresses)
         {
             if (addresses == null || addresses.Count == 0)
                 throw new ArgumentException("addresses cannot be an empty list or null");
@@ -42,12 +42,12 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
         }
 
-        public Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount)
+        public Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)
         {
             return router.UnregisterAsync(address, cause, hopCount);
         }
 
-        public Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount)
+        public Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
         {
             return router.UnregisterManyAsync(addresses, cause, hopCount);
         }
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // the grain entry either does not exist in the local partition (curGen = -1) or has not been updated
 
-                    result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, default), VersionTag = curGen });
+                    result.Add(new AddressAndTag { Address = GrainAddress.GetAddress(null, tuple.GrainId, default), VersionTag = curGen });
                 }
                 else
                 {
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     else
                     {
-                        result.Add(new AddressAndTag { Address = ActivationAddress.GetAddress(null, tuple.GrainId, default), VersionTag = GrainInfo.NO_ETAG });
+                        result.Add(new AddressAndTag { Address = GrainAddress.GetAddress(null, tuple.GrainId, default), VersionTag = GrainInfo.NO_ETAG });
                     }
                 }
             }
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.CompletedTask;
         }
 
-        public Task AcceptSplitPartition(List<ActivationAddress> singleActivations)
+        public Task AcceptSplitPartition(List<GrainAddress> singleActivations)
         {
             router.HandoffManager.AcceptExistingRegistrations(singleActivations);
             return Task.CompletedTask;

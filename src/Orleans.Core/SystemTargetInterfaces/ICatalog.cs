@@ -14,6 +14,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="activationAddresses"></param>
         /// <returns></returns>
-        Task DeleteActivations(List<ActivationAddress> activationAddresses);
+        Task DeleteActivations(List<GrainAddress> activationAddresses);
     }
 }

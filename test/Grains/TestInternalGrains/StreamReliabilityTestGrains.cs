@@ -261,7 +261,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = Data.Address.Silo;
+            SiloAddress siloAddress = Data.Address.SiloAddress;
             logger.Info("GetLocation SiloAddress={0}", siloAddress);
             return Task.FromResult(siloAddress);
         }

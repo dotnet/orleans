@@ -234,11 +234,11 @@ namespace Orleans.Runtime
 
         /// <summary>activation addresses in the local directory cache</summary>
         [Id(4)]
-        public ActivationAddress LocalCacheActivationAddress { get; set; }
+        public GrainAddress LocalCacheActivationAddress { get; set; }
 
         /// <summary>activation addresses in the local directory.</summary>
         [Id(5)]
-        public ActivationAddress LocalDirectoryActivationAddress { get; set; }
+        public GrainAddress LocalDirectoryActivationAddress { get; set; }
 
         /// <summary>primary silo for this grain</summary>
         [Id(6)]

@@ -6,24 +6,24 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
     {
-        private static readonly Func<ActivationAddress, (ActivationAddress Address, int Version), bool> ActivationAddressEqual = (a, b) => a.Equals(b.Address);
-        private readonly LRU<GrainId, (ActivationAddress ActivationAddress, int Version)> cache;
+        private static readonly Func<GrainAddress, (GrainAddress Address, int Version), bool> ActivationAddressEqual = (a, b) => a.Equals(b.Address);
+        private readonly LRU<GrainId, (GrainAddress ActivationAddress, int Version)> cache;
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
 
-        public void AddOrUpdate(ActivationAddress activationAddress, int version)
+        public void AddOrUpdate(GrainAddress activationAddress, int version)
         {
             // ignore the version number
-            cache.Add(activationAddress.Grain, (activationAddress, version));
+            cache.Add(activationAddress.GrainId, (activationAddress, version));
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 
-        public bool Remove(ActivationAddress grainAddress) => cache.TryRemove(grainAddress.Grain, ActivationAddressEqual, grainAddress);
+        public bool Remove(GrainAddress grainAddress) => cache.TryRemove(grainAddress.GrainId, ActivationAddressEqual, grainAddress);
 
         public void Clear() => cache.Clear();
 
-        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
+        public bool LookUp(GrainId key, out GrainAddress result, out int version)
         {
             if (cache.TryGetValue(key, out var entry))
             {
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
+        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
         {
             get
             {

@@ -21,13 +21,13 @@ namespace Orleans
 
         public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain(this.GrainId);
 
-        public GrainId GrainId => _runtimeClient.CurrentActivationAddress.Grain;
+        public GrainId GrainId => _runtimeClient.CurrentActivationAddress.GrainId;
 
         public IAddressable GrainInstance => null;
 
-        public ActivationId ActivationId => _runtimeClient.CurrentActivationAddress.Activation;
+        public ActivationId ActivationId => _runtimeClient.CurrentActivationAddress.ActivationId;
 
-        public ActivationAddress Address => _runtimeClient.CurrentActivationAddress;
+        public GrainAddress Address => _runtimeClient.CurrentActivationAddress;
 
         public IServiceProvider ActivationServices => _runtimeClient.ServiceProvider;
 

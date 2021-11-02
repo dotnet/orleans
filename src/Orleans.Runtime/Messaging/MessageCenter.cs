@@ -262,8 +262,8 @@ namespace Orleans.Runtime.Messaging
 
         internal void ProcessRequestsToInvalidActivation(
             List<Message> messages,
-            ActivationAddress oldAddress,
-            ActivationAddress forwardingAddress,
+            GrainAddress oldAddress,
+            GrainAddress forwardingAddress,
             string failedOperation = null,
             Exception exc = null,
             bool rejectMessages = false)
@@ -292,8 +292,8 @@ namespace Orleans.Runtime.Messaging
 
         internal void ProcessRequestToInvalidActivation(
             Message message,
-            ActivationAddress oldAddress,
-            ActivationAddress forwardingAddress,
+            GrainAddress oldAddress,
+            GrainAddress forwardingAddress,
             string failedOperation,
             Exception exc = null,
             bool rejectMessages = false)
@@ -315,7 +315,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void TryForwardRequest(Message message, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation = null, Exception exc = null)
+        internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
             bool forwardingSucceded = false;
             try
@@ -370,7 +370,7 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
-        internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
+        internal bool TryForwardMessage(Message message, GrainAddress forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
@@ -380,7 +380,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
+        private void ResendMessageImpl(Message message, GrainAddress forwardingAddress = null)
         {
             if (log.IsEnabled(LogLevel.Debug)) log.Debug("Resend {0}", message);
 
