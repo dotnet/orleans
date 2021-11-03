@@ -212,25 +212,4 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
     }
-
-    internal static class AddressHelpers
-    {
-        public static ActivationAddress ToActivationAddress(this GrainAddress addr)
-        {
-            return ActivationAddress.GetAddress(
-                    addr.SiloAddress,
-                    addr.GrainId,
-                    addr.ActivationId);
-        }
-
-        public static GrainAddress ToGrainAddress(this ActivationAddress addr)
-        {
-            return new GrainAddress
-            {
-                SiloAddress = addr.Silo,
-                GrainId = addr.Grain,
-                ActivationId = addr.Activation
-            };
-        }
-    }
 }
