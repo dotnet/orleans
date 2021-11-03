@@ -291,10 +291,14 @@ namespace Orleans.Runtime.Messaging
                     await transport.Output.CompleteAsync().ConfigureAwait(false);
                 }
 
-                // Try to gracefully stop the reader/writer loops, if they are running.
                 try
                 {
                     transport?.Input.CancelPendingRead();
+
+#if !NETCOREAPP3_1_OR_GREATER
+                    // Some implementations do not terminate internally after CancelPendingRead
+                    Context.Abort();
+#endif
 
                     // Wait for the incoming message processor to complete.
                     if (_processIncomingTask is { } task)
