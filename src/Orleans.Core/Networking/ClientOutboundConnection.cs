@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter.OnReceivedMessage(message);
         }
 
-        protected override async Task RunInternal()
+        protected override async Task ProcessConnection()
         {
             Exception error = default;
             try
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
                         protocolVersion.ToString());
                 }
 
-                await base.RunInternal();
+                await base.ProcessConnection();
             }
             catch (Exception exception) when ((error = exception) is null)
             {
@@ -99,7 +99,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessageCore(Message msg, Exception ex = null)
         {
             if (msg == null) return;
 

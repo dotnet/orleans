@@ -10,8 +10,10 @@ namespace Orleans.Connections.Security
 {
     internal class DuplexPipeStream : Stream
     {
-        private readonly PipeReader _reader;
-        private readonly PipeWriter _writer;
+        private readonly PipeReader _input;
+        private readonly PipeWriter _output;
+        private readonly bool _throwOnCancelled;
+        private volatile bool _cancelReadCalled;
 
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -19,27 +21,41 @@ namespace Orleans.Connections.Security
         public override long Length => throw new NotSupportedException();
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-        public DuplexPipeStream(IDuplexPipe pipe)
+        public DuplexPipeStream(PipeReader input, PipeWriter output, bool throwOnCancelled = false)
         {
-            _reader = pipe.Input;
-            _writer = pipe.Output;
+            _input = input;
+            _output = output;
+            _throwOnCancelled = throwOnCancelled;
+        }
+
+        public virtual void CancelPendingRead()
+        {
+            _cancelReadCalled = true;
+            try
+            {
+                _input.CancelPendingRead();
+            }
+            catch
+            {
+            }
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                _reader.Complete();
-                _writer.Complete();
+                _input.Complete();
+                _output.Complete();
             }
+
             base.Dispose(disposing);
         }
 
 #if NETCOREAPP
         public override async ValueTask DisposeAsync()
         {
-            await _reader.CompleteAsync().ConfigureAwait(false);
-            await _writer.CompleteAsync().ConfigureAwait(false);
+            await _input.CompleteAsync().ConfigureAwait(false);
+            await _output.CompleteAsync().ConfigureAwait(false);
         }
 #endif
 
@@ -50,7 +66,7 @@ namespace Orleans.Connections.Security
 
         public override async Task FlushAsync(CancellationToken cancellationToken)
         {
-            FlushResult r = await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            FlushResult r = await _output.FlushAsync(cancellationToken).ConfigureAwait(false);
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
         }
 
@@ -68,52 +84,52 @@ namespace Orleans.Connections.Security
         {
             ValidateBufferArguments(buffer, offset, count);
 
-            return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+            return ReadAsyncInternal(buffer.AsMemory(offset, count), cancellationToken).AsTask();
         }
 
         public
 #if NETCOREAPP
         override
 #endif
-        async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        ValueTask<int> ReadAsync(Memory<byte> destination, CancellationToken cancellationToken = default)
         {
-            ReadResult result = await _reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            return ReadAsyncInternal(destination, cancellationToken);
+        }
 
-            if (result.IsCanceled)
+        private async ValueTask<int> ReadAsyncInternal(Memory<byte> destination, CancellationToken cancellationToken = default)
+        {
+            while (true)
             {
-                throw new OperationCanceledException();
-            }
-
-            ReadOnlySequence<byte> sequence = result.Buffer;
-            long bufferLength = sequence.Length;
-            SequencePosition consumed = sequence.Start;
-
-            try
-            {
-                if (bufferLength != 0)
+                var result = await _input.ReadAsync(cancellationToken);
+                var readableBuffer = result.Buffer;
+                try
                 {
-                    int actual = (int)Math.Min(bufferLength, buffer.Length);
+                    if (_throwOnCancelled && result.IsCanceled && _cancelReadCalled)
+                    {
+                        // Reset the bool
+                        _cancelReadCalled = false;
+                        throw new OperationCanceledException();
+                    }
 
-                    ReadOnlySequence<byte> slice = actual == bufferLength ? sequence : sequence.Slice(0, actual);
-                    consumed = slice.End;
-                    slice.CopyTo(buffer.Span);
+                    if (!readableBuffer.IsEmpty)
+                    {
+                        // buffer.Count is int
+                        var count = (int)Math.Min(readableBuffer.Length, destination.Length);
+                        readableBuffer = readableBuffer.Slice(0, count);
+                        readableBuffer.CopyTo(destination.Span);
+                        return count;
+                    }
 
-                    return actual;
+                    if (result.IsCompleted)
+                    {
+                        return 0;
+                    }
                 }
-
-                if (result.IsCompleted)
+                finally
                 {
-                    return 0;
+                    _input.AdvanceTo(readableBuffer.End, readableBuffer.End);
                 }
             }
-            finally
-            {
-                _reader.AdvanceTo(consumed);
-            }
-
-            // This is a buggy PipeReader implementation that returns 0 byte reads even though the PipeReader
-            // isn't completed or canceled.
-            throw new InvalidOperationException("Read zero bytes unexpectedly");
         }
 
         public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
@@ -145,17 +161,16 @@ namespace Orleans.Connections.Security
         {
             ValidateBufferArguments(buffer, offset, count);
 
-            return WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+            return _output.WriteAsync(buffer.AsMemory(offset, count), cancellationToken).GetAsTask();
         }
 
         public
 #if NETCOREAPP
             override
 #endif
-        async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            FlushResult r = await _writer.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
+            return _output.WriteAsync(buffer, cancellationToken).GetAsValueTask();
         }
 
         public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
@@ -170,7 +185,7 @@ namespace Orleans.Connections.Security
 
         public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
         {
-            return _reader.CopyToAsync(destination, cancellationToken);
+            return _input.CopyToAsync(destination, cancellationToken);
         }
 
         private static void ValidateBufferArguments(byte[] buffer, int offset, int size)

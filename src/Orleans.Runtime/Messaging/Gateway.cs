@@ -190,7 +190,7 @@ namespace Orleans.Runtime.Messaging
                 client.RecordDisconnection();
                 clientConnections.TryRemove(oldConnection, out _);
 
-                oldConnection.CloseAsync(exception: null).Ignore();
+                oldConnection.CloseAsync().Ignore();
             }
             
             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
@@ -455,7 +455,8 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception exception)
                 {
                     gateway.RecordClosedConnection(connection);
-                    connection.CloseAsync(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception)).Ignore();
+                    this.log.LogError(exception, "Error posting message to connection {Connection}", connection);
+                    connection.CloseAsync().Ignore();
                     return false;
                 }
             }
