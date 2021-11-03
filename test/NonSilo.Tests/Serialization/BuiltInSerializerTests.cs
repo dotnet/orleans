@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -76,9 +77,7 @@ namespace UnitTests.Serialization
                     switch (serializerToUse)
                     {
                         case SerializerToUse.IlBasedFallbackSerializer:
-#pragma warning disable CS0618 // Type or member is obsolete
                             fallback = typeof(ILBasedSerializer);
-#pragma warning restore CS0618 // Type or member is obsolete
                             break;
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
                             fallback = typeof(BinaryFormatterSerializer);
@@ -822,11 +821,9 @@ namespace UnitTests.Serialization
             Assert.Contains("is not marked as serializable", exc.Message);
         }
 
-        [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.NoFallback)]
-        public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
+        [Fact, TestCategory("Functional")]
+        public void Serialize_ValidateBuildSegmentListWithLengthLimit()
         {
-            var environment = InitializeSerializer(serializerToUse);
             byte[] array1 = { 1 };
             byte[] array2 = { 2, 3 };
             byte[] array3 = { 4, 5, 6 };
@@ -1132,7 +1129,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT")]
         public void ISerializable_CallbackOrder_Class()
         {
-            var environment = InitializeSerializer(SerializerToUse.Default);
+            var environment = InitializeSerializer(SerializerToUse.BinaryFormatterFallbackSerializer);
             var input = new SimpleISerializableObject
             {
                 Payload = "pyjamas"
@@ -1184,7 +1181,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT")]
         public void ISerializable_CallbackOrder_Struct()
         {
-            var environment = InitializeSerializer(SerializerToUse.Default);
+            var environment = InitializeSerializer(SerializerToUse.BinaryFormatterFallbackSerializer);
             var input = new SimpleISerializableStruct
             {
                 Payload = "pyjamas"
@@ -1219,7 +1216,7 @@ namespace UnitTests.Serialization
         }
 
         [Serializable]
-        public class LocalClass : ISerializable
+        public class LocalClass : ISerializable, IEquatable<LocalClass>
         {
             public LocalClass()
             {
@@ -1232,6 +1229,10 @@ namespace UnitTests.Serialization
 
             public string Foo { get; set; }
 
+            public bool Equals(LocalClass other) => other != null && string.Equals(Foo, other.Foo, StringComparison.Ordinal);
+
+            public override bool Equals(object obj) => obj is LocalClass other && Equals(other);
+            public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Foo);
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 info.AddValue("LocalClass.Foo", Foo);
@@ -1244,6 +1245,23 @@ namespace UnitTests.Serialization
             public LocalClass Local { get; set; }
 
             public LocalClass Local2 { get; set; }
+
+            public LocalException()
+            {
+            }
+
+            protected LocalException(SerializationInfo info, StreamingContext context) : base(info, context)
+            {
+                Local = (LocalClass)info.GetValue("Local", typeof(LocalClass));
+                Local2 = (LocalClass)info.GetValue("Local2", typeof(LocalClass));
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                base.GetObjectData(info, context);
+                info.AddValue("Local", Local);
+                info.AddValue("Local2", Local2);
+            }
         }
 
         [Theory, TestCategory("Functional")]
@@ -1260,19 +1278,25 @@ namespace UnitTests.Serialization
 
             var exception = new LocalException { Local = local, Local2 = local };
 
+            Assert.NotNull(exception.Local);
             Assert.Same(exception.Local, exception.Local2);
 
             var deserialized = OrleansSerializationLoop(environment.SerializationManager, exception);
             var result = Assert.IsAssignableFrom<LocalException>(deserialized);
+            Assert.NotNull(result.Local);
+            Assert.NotNull(result.Local.Foo);
             Assert.Equal(local.Foo, result.Local.Foo);
 
-            Assert.Same(result.Local, result.Local2);
+            Assert.Equal(result.Local, result.Local2);
         }
 
         [Serializable]
         private class SimpleISerializableObject : ISerializable, IDeserializationCallback
         {
+            [NonSerialized]
             private List<string> history;
+
+            [NonSerialized]
             private List<StreamingContext> contexts;
 
             public SimpleISerializableObject()
@@ -1335,7 +1359,10 @@ namespace UnitTests.Serialization
         [Serializable]
         private struct SimpleISerializableStruct : ISerializable, IDeserializationCallback
         {
+            [NonSerialized]
             private List<string> history;
+
+            [NonSerialized]
             private List<StreamingContext> contexts;
 
             public SimpleISerializableStruct(SerializationInfo info, StreamingContext context)
@@ -1348,6 +1375,7 @@ namespace UnitTests.Serialization
             }
 
             public List<string> History => this.history ?? (this.history = new List<string>());
+
             public List<StreamingContext> Contexts => this.contexts ?? (this.contexts = new List<StreamingContext>());
 
             public string Payload { get; set; }

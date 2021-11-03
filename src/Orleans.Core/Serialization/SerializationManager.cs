@@ -744,13 +744,20 @@ namespace Orleans.Serialization
             }
 
             IKeyedSerializer keyedSerializer;
-            if (this.TryLookupKeyedSerializer(t, out keyedSerializer))
+            if (this.TryLookupKeyedSerializer(t, fallback: false, out keyedSerializer))
             {
                 return keyedSerializer.DeepCopy(original, context);
             }
 
             if (fallbackSerializer.IsSupportedType(t))
+            {
                 return FallbackSerializationDeepCopy(original, context);
+            }
+
+            if (this.TryLookupKeyedSerializer(t, fallback: true, out keyedSerializer))
+            {
+                return keyedSerializer.DeepCopy(original, context);
+            }
 
             throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() +
                 ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
@@ -915,7 +922,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (sm.TryLookupKeyedSerializer(t, out var keyedSerializer))
+            if (sm.TryLookupKeyedSerializer(t, fallback: false, out var keyedSerializer))
             {
                 writer.Write((byte)SerializationTokenType.KeyedSerializer);
                 writer.Write((byte)keyedSerializer.SerializerId);
@@ -926,6 +933,14 @@ namespace Orleans.Serialization
             if (sm.fallbackSerializer.IsSupportedType(t))
             {
                 sm.FallbackSerializer(obj, context, expected);
+                return;
+            }
+
+            if (sm.TryLookupKeyedSerializer(t, fallback: true, out keyedSerializer))
+            {
+                writer.Write((byte)SerializationTokenType.KeyedSerializer);
+                writer.Write((byte)keyedSerializer.SerializerId);
+                keyedSerializer.Serialize(obj, context, expected);
                 return;
             }
 
@@ -1199,15 +1214,14 @@ namespace Orleans.Serialization
                 timer.Start();
                 context.SerializationManager.serializationStatistics.Deserializations.Increment();
             }
-            object result = null;
 
-            result = DeserializeInner(t, context);
-
+            var result = DeserializeInner(t, context);
             if (timer != null)
             {
                 timer.Stop();
                 context.SerializationManager.serializationStatistics.DeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
+
             return result;
         }
 
@@ -1532,6 +1546,14 @@ namespace Orleans.Serialization
             return result;
         }
 
+        public object DeserializeFromByteArray(byte[] data, Type expectedType)
+        {
+            var context = new DeserializationContext(this);
+            context.StreamReader = new BinaryTokenStreamReader(data);
+            var result = DeserializeInner(expectedType, context);
+            return result;
+        }
+
         internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
         {
             var sm = context.SerializationManager;
@@ -1611,7 +1633,7 @@ namespace Orleans.Serialization
             return serializer != null;
         }
 
-        private bool TryLookupKeyedSerializer(Type type, out IKeyedSerializer serializer)
+        private bool TryLookupKeyedSerializer(Type type, bool fallback, out IKeyedSerializer serializer)
         {
             if (this.orderedKeyedSerializers.Count == 0)
             {
@@ -1623,7 +1645,8 @@ namespace Orleans.Serialization
 
             foreach (var keyedSerializer in this.orderedKeyedSerializers)
             {
-                if (keyedSerializer.IsSupportedType(type))
+                var canUseSerializer = !keyedSerializer.IsFallbackOnly || fallback;
+                if (canUseSerializer && keyedSerializer.IsSupportedType(type))
                 {
                     this.typeToKeyedSerializer[type] = keyedSerializer;
                     serializer = keyedSerializer;
@@ -1694,9 +1717,7 @@ namespace Orleans.Serialization
                 }
                 else
                 {
-#pragma warning disable CS0618 // Type or member is obsolete
                     serializer = new ILBasedSerializer(serviceProvider.GetRequiredService<ITypeResolver>());
-#pragma warning restore CS0618 // Type or member is obsolete
                 }
             }
 

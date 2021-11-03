@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -8,8 +8,10 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    public class BinaryFormatterSerializer : IExternalSerializer
+    public class BinaryFormatterSerializer : IExternalSerializer, ISurrogateSelector
     {
+        private ISurrogateSelector _nextSurrogateSelector;
+
         public bool IsSupportedType(Type itemType)
         {
             return itemType.IsSerializable;
@@ -24,7 +26,8 @@ namespace Orleans.Serialization
 
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context)
+                Context = new StreamingContext(StreamingContextStates.All, context),
+                SurrogateSelector = this
             };
             object ret = null;
             using (var memoryStream = new MemoryStream())
@@ -55,7 +58,8 @@ namespace Orleans.Serialization
 
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context)
+                Context = new StreamingContext(StreamingContextStates.All, context),
+                SurrogateSelector = this
             };
             byte[] bytes;
             using (var memoryStream = new MemoryStream())
@@ -81,7 +85,8 @@ namespace Orleans.Serialization
             var bytes = reader.ReadBytes(n);
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context)
+                Context = new StreamingContext(StreamingContextStates.All, context),
+                SurrogateSelector = this
             };
 
             object retVal = null;
@@ -93,6 +98,19 @@ namespace Orleans.Serialization
             return retVal;
         }
 
+        public void ChainSelector(ISurrogateSelector selector) => _nextSurrogateSelector = selector;
+        public ISurrogateSelector GetNextSelector() => _nextSurrogateSelector;
+        public ISerializationSurrogate GetSurrogate(Type type, StreamingContext context, out ISurrogateSelector selector)
+        {
+            if (typeof(Type).IsAssignableFrom(type))
+            {
+                selector = this;
+                return TypeSerializationSurrogate.Instance;
+            }
+
+            selector = default;
+            return null;
+        }
 
         /// <summary>
         /// This appears necessary because the BinaryFormatter by default will not see types
@@ -127,6 +145,42 @@ namespace Orleans.Serialization
                     }
 
                     return result.GetType(typeName);
+                }
+            }
+        }
+
+        public sealed class TypeSerializationSurrogate : ISerializationSurrogate
+        {
+            public static TypeSerializationSurrogate Instance { get; } = new();
+
+            public void GetObjectData(object obj, SerializationInfo info, StreamingContext context)
+            {
+                var type = (Type)obj;
+                info.SetType(typeof(TypeReference));
+                info.AddValue("AssemblyName", type.Assembly.FullName);
+                info.AddValue("FullName", type.FullName);
+            }
+
+            public object SetObjectData(object obj, SerializationInfo info, StreamingContext context, ISurrogateSelector selector) => throw new NotSupportedException();
+
+            [Serializable]
+            internal sealed class TypeReference : IObjectReference
+            {
+                private readonly string AssemblyName;
+
+                private readonly string FullName;
+
+                public TypeReference(Type type)
+                {
+                    if (type == null) throw new ArgumentNullException(nameof(type));
+                    AssemblyName = type.Assembly.FullName;
+                    FullName = type.FullName;
+                }
+
+                public object GetRealObject(StreamingContext context)
+                {
+                    var assembly = Assembly.Load(AssemblyName);
+                    return assembly.GetType(FullName, true);
                 }
             }
         }
