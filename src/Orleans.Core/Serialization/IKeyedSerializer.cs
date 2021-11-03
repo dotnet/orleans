@@ -11,7 +11,7 @@ namespace Orleans.Serialization
         KeyedSerializerId SerializerId { get; }
 
         /// <summary>
-        /// Returns <see langword="true"/> if is serializer should only be used for fallback scenarios, <see langword="false"/> otherwise.
+        /// Returns <see langword="true"/> if this serializer should only be used for fallback scenarios, <see langword="false"/> otherwise.
         /// </summary>
         bool IsFallbackOnly { get; }
     }
