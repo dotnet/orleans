@@ -1,7 +1,10 @@
 param(
     [string[]] $directories,
-    [string] $testFilter = $null,
-    [string] $dotnet)
+    [string] $testFilter = $null)
+
+. .\common.ps1
+
+Install-Dotnet
 
 $maxDegreeOfParallelism = [math]::min($env:NUMBER_OF_PROCESSORS, 4)
 Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
@@ -47,11 +50,11 @@ function Receive-CompletedJobs {
 
 $ExecuteCmd =
 {
-    param([string] $dotnet1, [string] $args1, [string] $path)
+    param([string] $args1, [string] $path)
 
     Set-Location -Path $path
 
-    $cmdline = "& `"" + $dotnet1 + "`" " + $args1
+    $cmdline = "& dotnet " + $args1
 
     Invoke-Expression $cmdline;
     $cmdExitCode = $LASTEXITCODE;
@@ -79,8 +82,8 @@ foreach ($d in $directories)
 
     $jobName = $([System.IO.Path]::GetFileName($d))
     $cmdLine = 'test --blame-hang-timeout 10m --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
-    Write-Host $jobName $dotnet $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $jobName | Out-Null
+    Write-Host $jobName dotnet $cmdLine
+    Start-Job $ExecuteCmd -ArgumentList @($cmdLine, $d) -Name $jobName | Out-Null
     Write-Host ''
 }
 
