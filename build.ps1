@@ -8,13 +8,13 @@ $scriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 $solution = Join-Path $scriptDir "Orleans.sln"
 
 # Define build flags & config
-if ($null -eq $BUILD_FLAGS)
+if ($null -eq $env:BUILD_FLAGS)
 {
-    $BUILD_FLAGS = "/m /v:m"
+    $env:BUILD_FLAGS = "/m /v:m"
 }
-if ($null -eq $BuildConfiguration)
+if ($null -eq $env:BuildConfiguration)
 {
-    $BuildConfiguration = "Debug"
+    $env:BuildConfiguration = "Debug"
 }
 
 # Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
@@ -37,12 +37,12 @@ Install-Dotnet
 
 if ($args[0] -ne "Pack")
 {
-    Write-Output "Build $BuildConfiguration =============================="
-    Invoke-Dotnet -Command "restore" -Arguments "$BUILD_FLAGS /bl:${BuildConfiguration}-Restore.binlog /p:Configuration=${BuildConfiguration}${AdditionalConfigurationProperties} $solution"
-    Invoke-Dotnet -Command "build" -Arguments "$BUILD_FLAGS /bl:${BuildConfiguration}-Build.binlog /p:Configuration=${BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+    Write-Output "Build $env:BuildConfiguration =============================="
+    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
 }
 
-Write-Output "Package $BuildConfiguration ============================"
-Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${BuildConfiguration}-Pack.binlog /p:Configuration=${BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+Write-Output "Package $env:BuildConfiguration ============================"
+Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
 
 Write-Output "===== Build succeeded for $solution ====="
