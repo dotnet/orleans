@@ -55,7 +55,7 @@ namespace Orleans.AzureUtils
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger logger;
         private readonly TimeSpan? messageVisibilityTimeout;
-        private readonly AzureQueueOptions options;
+        private readonly Func<Task<QueueServiceClient>> createQueueClient;
         private QueueClient _queueClient;
 
         /// <summary>
@@ -64,20 +64,17 @@ namespace Orleans.AzureUtils
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">Name of the queue to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
+        /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval.</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string storageConnectionString, TimeSpan? visibilityTimeout = null)
-            : this (loggerFactory, queueName, ConfigureOptions(storageConnectionString, visibilityTimeout))
+            : this (loggerFactory, queueName, visibilityTimeout, ConfigureOptions(storageConnectionString))
         {
         }
 
-        private static AzureQueueOptions ConfigureOptions(string storageConnectionString, TimeSpan? visibilityTimeout)
+        private static Func<Task<QueueServiceClient>> ConfigureOptions(string storageConnectionString)
         {
-            var options = new AzureQueueOptions
-            {
-                MessageVisibilityTimeout = visibilityTimeout
-            };
+            var options = new AzureQueueOptions();
             options.ConfigureQueueServiceClient(storageConnectionString);
-            return options;
+            return options.CreateClient;
         }
 
         /// <summary>
@@ -85,16 +82,28 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">Name of the queue to be connected to.</param>
-        /// <param name="options">Queue connection options.</param>
+        /// <param name="options">Azure Queue provider options</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, AzureQueueOptions options)
+            : this(loggerFactory, queueName, options.MessageVisibilityTimeout, options.CreateClient)
+        {
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="queueName">Name of the queue to be connected to.</param>
+        /// <param name="messageVisibilityTimeout">A TimeSpan specifying the visibility timeout interval.</param>
+        /// <param name="createQueueClient">Function used to create the queue service client.</param>
+        public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, TimeSpan? messageVisibilityTimeout, Func<Task<QueueServiceClient>> createQueueClient)
         {
             queueName = SanitizeQueueName(queueName);
             ValidateQueueName(queueName);
 
             logger = loggerFactory.CreateLogger<AzureQueueDataManager>();
             QueueName = queueName;
-            messageVisibilityTimeout = options.MessageVisibilityTimeout;
-            this.options = options;
+            this.messageVisibilityTimeout = messageVisibilityTimeout;
+            this.createQueueClient = createQueueClient;
         }
 
         private ValueTask<QueueClient> GetQueueClient()
@@ -105,7 +114,21 @@ namespace Orleans.AzureUtils
             }
 
             return GetQueueClientAsync();
-            async ValueTask<QueueClient> GetQueueClientAsync() => _queueClient ??= await GetCloudQueueClient(options, logger);
+
+            async ValueTask<QueueClient> GetQueueClientAsync() => _queueClient ??= await CreateQueueClientAsync();
+            async Task<QueueClient> CreateQueueClientAsync()
+            {
+                try
+                {
+                    var client = await this.createQueueClient();
+                    return client.GetQueueClient(QueueName);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, "Error creating Azure Storage Queues client");
+                    throw;
+                }
+            }
         }
 
         /// <summary>
@@ -366,20 +389,6 @@ namespace Orleans.AzureUtils
                 + "Exception = {2}", operation, QueueName, exc);
             logger.Error((int)errorCode, errMsg, exc);
             throw new AggregateException(errMsg, exc);
-        }
-
-        private async Task<QueueClient> GetCloudQueueClient(AzureQueueOptions options, ILogger logger)
-        {
-            try
-            {
-                var client = await options.CreateClient();
-                return client.GetQueueClient(QueueName);
-            }
-            catch (Exception exc)
-            {
-                logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, "Error creating Azure Storage Queues client");
-                throw;
-            }
         }
 
         private string SanitizeQueueName(string queueName)

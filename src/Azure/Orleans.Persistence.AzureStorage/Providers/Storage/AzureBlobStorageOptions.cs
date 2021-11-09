@@ -12,6 +12,8 @@ namespace Orleans.Configuration
 {
     public class AzureBlobStorageOptions
     {
+        private const string DeprecationMessage = "Use ConfigureBlobServiceClient instead. This property is deprecated.";
+
         /// <summary>
         /// Container name where grain stage is stored
         /// </summary>
@@ -39,6 +41,24 @@ namespace Orleans.Configuration
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
         public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public string ConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri ServiceUri { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using a connection string.

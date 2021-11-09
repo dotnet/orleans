@@ -15,6 +15,8 @@ namespace Orleans.Configuration
     /// </summary>
     public class AzureQueueOptions
     {
+        private const string DeprecationMessage = "Use ConfigureQueueServiceClient instead. This property is deprecated.";
+
         /// <summary>
         /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
         /// </summary>
@@ -34,9 +36,33 @@ namespace Orleans.Configuration
         /// </summary>
         internal Func<Task<QueueServiceClient>> CreateClient { get; private set; }
 
+        /// <summary>
+        /// The message visibility timeout.
+        /// </summary>
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
+        /// <summary>
+        /// The queue names.
+        /// </summary>
         public List<string> QueueNames { get; set; }
+
+        /// <summary>
+        /// Deprecated: use ConfigureQueueServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public string ConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureQueueServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureQueueServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri ServiceUri { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
         /// Configures the <see cref="QueueServiceClient"/> using a connection string.

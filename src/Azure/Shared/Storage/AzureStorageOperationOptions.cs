@@ -29,6 +29,44 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public class AzureStorageOperationOptions
     {
+        private const string DeprecationMessage = "Use ConfigureTableServiceClient instead. This property is deprecated.";
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public string ConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri TableEndpoint { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public string TableResourceId { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public object TokenCredentialTableKey { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri TokenCredentialManagementUri { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>

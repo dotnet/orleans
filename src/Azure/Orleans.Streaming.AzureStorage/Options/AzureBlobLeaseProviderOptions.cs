@@ -12,6 +12,7 @@ namespace Orleans.Configuration
 {
     public class AzureBlobLeaseProviderOptions
     {
+        private const string DeprecationMessage = "Use ConfigureBlobServiceClient instead. This property is deprecated.";
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
         public const string DefaultBlobContainerName = "Leases";
 
@@ -24,6 +25,25 @@ namespace Orleans.Configuration
         /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
         /// </summary>
         internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public string DataConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureBlobServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri ServiceUri { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using a connection string.
