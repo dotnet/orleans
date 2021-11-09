@@ -23,6 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Crank.EventSources" Version="$(CrankVersion)" />
     <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
   </ItemGroup>
 
 </Project>

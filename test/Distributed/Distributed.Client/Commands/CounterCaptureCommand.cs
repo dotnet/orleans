@@ -5,6 +5,8 @@ using System.CommandLine.Invocation;
 using System.Threading.Tasks;
 using Distributed.GrainInterfaces.Streaming;
 using Microsoft.Crank.EventSources;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -38,11 +40,16 @@ namespace Distributed.Client.Commands
         {
             WriteLog("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(parameters.SecretSource);
-            var clientBuilder = new ClientBuilder()
-                .Configure<ClusterOptions>(options => { options.ClusterId = parameters.ClusterId; options.ServiceId = parameters.ServiceId; })
-                .UseAzureStorageClustering(options => options.ConnectionString = secrets.ClusteringConnectionString);
-            var client = clientBuilder.Build();
-            await client.Connect();
+            var hostBuilder = new HostBuilder()
+                .UseOrleansClient(builder => {
+                    builder
+                        .Configure<ClusterOptions>(options => { options.ClusterId = parameters.ClusterId; options.ServiceId = parameters.ServiceId; })
+                        .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(secrets.ClusteringConnectionString));
+                });
+            using var host = hostBuilder.Build();
+            await host.StartAsync();
+
+            var client = host.Services.GetService<IClusterClient>();
 
             var counterGrain = client.GetGrain<ICounterGrain>(parameters.CounterKey);
 
@@ -69,6 +76,8 @@ namespace Distributed.Client.Commands
                     BenchmarksEventSource.Measure("rps", rps);
                 }
             }
+
+            await host.StopAsync();
         }
 
         private static void WriteLog(string log) => Console.WriteLine(log);

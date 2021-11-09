@@ -77,11 +77,10 @@ namespace Distributed.Silo
         private void ConfigureOrleans(ISiloBuilder siloBuilder, CommonParameters commonParameters, T configuratorParameters)
         {
             siloBuilder
-                .ConfigureDefaults()
                 .Configure<SiloOptions>(options => options.SiloName = _siloName)
                 .Configure<ClusterOptions>(options => { options.ClusterId = commonParameters.ClusterId; options.ServiceId = commonParameters.ServiceId; })
                 .ConfigureEndpoints(siloPort: commonParameters.SiloPort, gatewayPort: commonParameters.GatewayPort)
-                .UseAzureStorageClustering(options => options.ConnectionString = _secrets.ClusteringConnectionString);
+                .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(_secrets.ClusteringConnectionString));
 
             _siloConfigurator.Configure(siloBuilder, configuratorParameters);
         }

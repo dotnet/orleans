@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Distributed.GrainInterfaces;
 using Microsoft.Crank.EventSources;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -39,11 +41,16 @@ namespace Distributed.Client.Scenarios
         {
             WriteLog("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(commonParameters.SecretSource);
-            var clientBuilder = new ClientBuilder()
-                .Configure<ClusterOptions>(options => { options.ClusterId = commonParameters.ClusterId; options.ServiceId = commonParameters.ServiceId; })
-                .UseAzureStorageClustering(options => options.ConnectionString = secrets.ClusteringConnectionString);
-            var client = clientBuilder.Build();
-            await client.Connect();
+            var hostBuilder = new HostBuilder()
+                .UseOrleansClient(builder => {
+                    builder
+                        .Configure<ClusterOptions>(options => { options.ClusterId = commonParameters.ClusterId; options.ServiceId = commonParameters.ServiceId; })
+                        .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(secrets.ClusteringConnectionString));
+                });
+            using var host = hostBuilder.Build();
+            await host.StartAsync();
+
+            var client = host.Services.GetService<IClusterClient>();
 
             WriteLog("Initializing...");
             await _scenario.Initialize(client, scenarioParameters);
@@ -76,6 +83,8 @@ namespace Distributed.Client.Scenarios
             BenchmarksEventSource.Measure("rps", rps);
 
             await _scenario.Cleanup();
+
+            await host.StopAsync();
         }
 
         private async Task IssueRequest(int request)
