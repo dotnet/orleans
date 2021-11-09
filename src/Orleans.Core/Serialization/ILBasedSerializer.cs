@@ -2,7 +2,19 @@ namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
+    using Microsoft.Extensions.Options;
     using Orleans.Runtime;
+
+    /// <summary>
+    /// Options for <see cref="ILBasedSerializer"/>.
+    /// </summary>
+    public class ILBasedSerializerOptions
+    {
+        /// <summary>
+        /// Whether to use the <see cref="ILBasedSerializer"/> serializer only as a fallback
+        /// </summary>
+        public bool IsFallbackOnly { get; set; } = true;
+    }
 
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
@@ -22,7 +34,7 @@ namespace Orleans.Serialization
         /// </summary>
         private readonly ConcurrentDictionary<Type, SerializerBundle> serializers =
             new ConcurrentDictionary<Type, SerializerBundle>();
-
+        private readonly ILBasedSerializerOptions options;
         private readonly TypeSerializer typeSerializer;
 
         /// <summary>
@@ -39,8 +51,9 @@ namespace Orleans.Serialization
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
-        public ILBasedSerializer(ITypeResolver typeResolver)
+        public ILBasedSerializer(ITypeResolver typeResolver, IOptions<ILBasedSerializerOptions> options)
         {
+            this.options = options.Value;
             this.typeSerializer = new TypeSerializer(typeResolver);
             var fallbackExceptionSerializer = new ILBasedExceptionSerializer(this.generator, this.typeSerializer);
             this.exceptionSerializer = new SerializerBundle(
@@ -190,6 +203,7 @@ namespace Orleans.Serialization
         KeyedSerializerId IKeyedSerializer.SerializerId => KeyedSerializerId.ILBasedSerializer;
 
         /// <inheritdoc />
-        public bool IsFallbackOnly => true;
+        public bool IsFallbackOnly => options.IsFallbackOnly;
     }
+
 }

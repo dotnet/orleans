@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.Serialization;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using TestExtensions;
@@ -210,7 +211,7 @@ namespace UnitTests.Serialization
 
         private T SerializerLoop<T>(T input)
         {
-            var serializer = new ILBasedSerializer(new CachedTypeResolver());
+            var serializer = new ILBasedSerializer(new CachedTypeResolver(), Options.Create(new ILBasedSerializerOptions()));
             Assert.True(serializer.IsSupportedType(input.GetType()));
 
             var writer = new BinaryTokenStreamWriter();

@@ -1717,7 +1717,7 @@ namespace Orleans.Serialization
                 }
                 else
                 {
-                    serializer = new ILBasedSerializer(serviceProvider.GetRequiredService<ITypeResolver>());
+                    serializer = new ILBasedSerializer(serviceProvider.GetRequiredService<ITypeResolver>(), serviceProvider.GetRequiredService<IOptions<ILBasedSerializerOptions>>());
                 }
             }
 
