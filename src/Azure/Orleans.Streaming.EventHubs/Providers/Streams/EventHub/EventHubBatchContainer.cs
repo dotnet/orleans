@@ -47,7 +47,7 @@ namespace Orleans.ServiceBus.Providers
         private Body GetPayload() => payload ?? (payload = this.serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
 
         [Serializable]
-        private class Body
+        internal class Body
         {
             public List<object> Events { get; set; }
             public Dictionary<string, object> RequestContext { get; set; }
