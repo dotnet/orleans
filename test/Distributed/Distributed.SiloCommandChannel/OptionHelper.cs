@@ -25,7 +25,7 @@ namespace Distributed
             var value = result.GetValueOrDefault<T>();
             if (!validator(value))
             {
-                return $"Option {result.Token.Value} cannot be set to {value}";
+                return $"Option {result.Token?.Value} cannot be set to {value}";
             }
             return string.Empty;
         }

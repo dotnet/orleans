@@ -28,7 +28,8 @@ namespace Distributed.Client.Commands
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
             AddOption(OptionHelper.CreateOption<string>("--clusterId", isRequired: true));
             AddOption(OptionHelper.CreateOption<int>("--pipelineSize", defaultValue: 10000, validator: OptionHelper.OnlyStrictlyPositive));
-            AddOption(OptionHelper.CreateOption<int>("--requests", defaultValue: 1000000, validator: OptionHelper.OnlyStrictlyPositive));
+            AddOption(OptionHelper.CreateOption<int>("--requests", defaultValue: 0, validator: OptionHelper.OnlyPositiveOrZero));
+            AddOption(OptionHelper.CreateOption<int>("--duration", defaultValue: 0, validator: OptionHelper.OnlyPositiveOrZero));
             AddOption(OptionHelper.CreateOption("--secretSource", defaultValue: SecretConfiguration.SecretSource.File));
 
             foreach (var opt in scenario.Options)

@@ -19,6 +19,7 @@ namespace Distributed.Client.Scenarios
         public string ClusterId { get; set; }
         public int PipelineSize { get; set; }
         public int Requests { get; set; } 
+        public int Duration { get; set; }
         public SecretConfiguration.SecretSource SecretSource { get;set; }
     }
 
@@ -39,6 +40,9 @@ namespace Distributed.Client.Scenarios
 
         public async Task Run(CommonParameters commonParameters, T scenarioParameters)
         {
+            var requests = commonParameters.Requests != 0 ? commonParameters.Requests : int.MaxValue;
+            var duration = commonParameters.Duration != 0 ? TimeSpan.FromSeconds(commonParameters.Duration) : TimeSpan.MaxValue;
+
             WriteLog("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(commonParameters.SecretSource);
             var hostBuilder = new HostBuilder()
@@ -57,28 +61,33 @@ namespace Distributed.Client.Scenarios
             _concurrencyGuard = new SemaphoreSlim(commonParameters.PipelineSize);
 
             WriteLog("Starting load");
+            var cts = new CancellationTokenSource(duration);
             var stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < commonParameters.Requests; i++)
+            for (var i = 0; i < requests; i++)
             {
                 var request = i;
                 await _concurrencyGuard.WaitAsync();
                 _ = IssueRequest(request);
+                if (cts.IsCancellationRequested)
+                {
+                    break;
+                }
             }
             while (_concurrencyGuard.CurrentCount != commonParameters.PipelineSize)
             {
                 await Task.Delay(100);
             }
             stopwatch.Stop();
-            WriteLog($"Done {commonParameters.Requests,10:N0} requests in {stopwatch.Elapsed}");
+            WriteLog($"Done {_requestCounter,10:N0} requests in {stopwatch.Elapsed}");
 
-            var rps = commonParameters.Requests / (stopwatch.ElapsedMilliseconds / 1000.0f);
-            WriteLog($"RESULTS: requests={commonParameters.Requests} rps={rps} errors={_errorCounter}");
+            var rps = _requestCounter / (stopwatch.ElapsedMilliseconds / 1000.0f);
+            WriteLog($"RESULTS: requests={_requestCounter} rps={rps} errors={_errorCounter}");
 
             BenchmarksEventSource.Register("requests", Operations.First, Operations.Sum, "Requests", "Number of requests", "n0");
             BenchmarksEventSource.Register("errors", Operations.First, Operations.Sum, "Errors", "Number of errors", "n0");
             BenchmarksEventSource.Register("rps", Operations.First, Operations.Sum, "RPS", "Requests per seconds", "n0");
 
-            BenchmarksEventSource.Measure("requests", commonParameters.Requests);
+            BenchmarksEventSource.Measure("requests", _requestCounter);
             BenchmarksEventSource.Measure("errors", _errorCounter);
             BenchmarksEventSource.Measure("rps", rps);
 
