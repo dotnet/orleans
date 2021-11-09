@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -21,12 +22,20 @@ namespace Orleans.TelemetryConsumers.AI
         /// <param name="options">The instrumentation key for ApplicationInsights.</param>
         public AITelemetryConsumer(IOptions<ApplicationInsightsTelemetryConsumerOptions> options)
         {
+            var telemetryConfiguration = options.Value.TelemetryConfiguration;
             var instrumentationKey = options.Value.InstrumentationKey;
-            this._client = instrumentationKey != null
-                ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
+            if (telemetryConfiguration != null)
+            {
+                this._client = new TelemetryClient(telemetryConfiguration);
+            }
+            else
+            {
+                this._client = instrumentationKey != null
+                    ? new TelemetryClient(new TelemetryConfiguration { InstrumentationKey = instrumentationKey })
 #pragma warning disable CS0618 // Type or member is obsolete
                 : new TelemetryClient(Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration.Active);
 #pragma warning restore CS0618 // Type or member is obsolete
+            }
         }
 
         /// <inheritdoc />

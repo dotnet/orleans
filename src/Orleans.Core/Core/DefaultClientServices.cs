@@ -1,3 +1,4 @@
+using System;
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,13 +19,23 @@ using Orleans.Statistics;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans
 {
     internal static class DefaultClientServices
     {
+        private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
+
         public static void AddDefaultServices(IServiceCollection services)
         {
+            if (services.Contains(ServiceDescriptor))
+            {
+                return;
+            }
+
+            services.Add(ServiceDescriptor);
+
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -61,8 +72,10 @@ namespace Orleans
             services.TryAddSingleton<ClientProviderRuntime>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
-            services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+            services.TryAddSingleton<ClusterClient>();
+            services.TryAddFromExisting<IClusterClient, ClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, ClusterClient>();
+            services.AddFromExisting<IHostedService, ClusterClient>();
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
@@ -137,5 +150,7 @@ namespace Orleans
                 return null;
             }
         }
+
+        private class ServicesAdded { }
     }
 }

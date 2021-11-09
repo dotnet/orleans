@@ -13,6 +13,8 @@ using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
 using Hyperion;
 using ZeroFormatter;
+using System.Buffers;
+using Google.Protobuf;
 
 namespace Benchmarks.Comparison
 {
@@ -23,8 +25,9 @@ namespace Benchmarks.Comparison
     {
         private static readonly IntClass Input = IntClass.Create();
         private static readonly VirtualIntsClass ZeroFormatterInput = VirtualIntsClass.Create();
+        private static readonly IBufferMessage ProtoInput = ProtoIntClass.Create();
 
-        private static readonly Hyperion.Serializer HyperionSerializer = new(new SerializerOptions(knownTypes: new[] { typeof(IntClass) }));
+        private static readonly Hyperion.Serializer HyperionSerializer = new(SerializerOptions.Default.WithKnownTypes(new[] { typeof(IntClass) }));
         private static readonly Hyperion.SerializerSession HyperionSession;
         private static readonly MemoryStream HyperionBuffer = new();
 
@@ -33,6 +36,8 @@ namespace Benchmarks.Comparison
         private static readonly SerializerSession Session;
 
         private static readonly MemoryStream ProtoBuffer = new();
+
+        private static readonly ClassSingleSegmentBuffer ProtoSegmentBuffer;
 
         private static readonly MemoryStream Utf8JsonOutput = new();
         private static readonly Utf8JsonNS.IJsonFormatterResolver Utf8JsonResolver = Utf8JsonNS.Resolvers.StandardResolver.Default;
@@ -53,6 +58,8 @@ namespace Benchmarks.Comparison
             HyperionSession = HyperionSerializer.GetSerializerSession();
 
             SystemTextJsonWriter = new Utf8JsonWriter(SystemTextJsonOutput);
+
+            ProtoSegmentBuffer = new ClassSingleSegmentBuffer(Data);
         }
 
         [Fact]
@@ -93,6 +100,14 @@ namespace Benchmarks.Comparison
             ProtoBuffer.Position = 0;
             ProtoBuf.Serializer.Serialize(ProtoBuffer, Input);
             return ProtoBuffer.Length;
+        }
+
+        [Benchmark]
+        public long GoogleProtobuf()
+        {
+            ProtoSegmentBuffer.Reset();
+            ProtoInput.WriteTo(ProtoSegmentBuffer);
+            return ProtoSegmentBuffer.Length;
         }
 
         [Benchmark]

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Serialization;
 
 namespace TestExtensions
@@ -11,12 +13,16 @@ namespace TestExtensions
     {
         public SerializationTestEnvironment(Action<IClientBuilder> configureClientBuilder = null)
         {
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .UseLocalhostClustering();
-            configureClientBuilder?.Invoke(builder);
-            this.Client = builder.Build();
+            var host = new HostBuilder()
+                .UseOrleansClient(clientBuilder =>
+                {
+                    clientBuilder.UseLocalhostClustering();
+                    configureClientBuilder?.Invoke(clientBuilder);
+                }).Build();
+
+            this.Client = host.Services.GetRequiredService<IClusterClient>();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            RuntimeClient.ConsumeServices();
         }
 
         public IClusterClient Client { get; set; }

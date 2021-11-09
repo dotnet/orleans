@@ -19,7 +19,9 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
         public static ISiloBuilder ConfigureServices(this ISiloBuilder builder, Action<IServiceCollection> configureDelegate)
         {
-            return builder.ConfigureServices((context, collection) => configureDelegate(collection));
+            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            configureDelegate(builder.Services);
+            return builder;
         }
 
         /// <summary>
@@ -44,17 +46,6 @@ namespace Orleans.Hosting
         public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, IConfiguration configuration) where TOptions : class
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
-        }
-
-        /// <summary>
-        /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
-        /// </summary>
-        /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
-        /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
-        /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
-        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<Microsoft.Extensions.Hosting.HostBuilderContext, ILoggingBuilder> configureLogging)
-        {
-            return builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
         }
 
         /// <summary>

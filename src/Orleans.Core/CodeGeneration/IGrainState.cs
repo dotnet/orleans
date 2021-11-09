@@ -1,15 +1,11 @@
-﻿using System;
+using System;
 
 namespace Orleans
 {
     /// <summary>Defines the state of a grain</summary>
-    public interface IGrainState
+    public interface IGrainState<T>
     {
-        /// <summary>The application level payload that is the actual state.</summary>
-        object State { get; set; }
-
-        /// <summary>Type of the grain state</summary>
-        Type Type { get; }
+        T State { get; set; }
 
         /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
@@ -18,24 +14,15 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Typed default implementation of <see cref="IGrainState"/>.
+    /// Default implementation of <see cref="IGrainState{T}"/>.
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainState<T> : IGrainState
+    public class GrainState<T> : IGrainState<T>
     {
         [Id(1)]
-        public T State;
-
-        object IGrainState.State
-        {
-            get => State;
-            set => State = (T)value;
-        }
-
-        /// <inheritdoc />
-        public Type Type => typeof(T);
+        public T State { get; set; }
 
         /// <inheritdoc />
         [Id(2)]

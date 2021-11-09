@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -47,7 +49,7 @@ namespace Tester.ClientConnectionTests
             var gwEndpoint = this.HostedCluster.Primary.GatewayAddress.Endpoint;
 
             // Close current client connection
-            await this.Client.Close();
+            await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();
 
             // Stall connection to GW
             using (stalledSocket = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
@@ -56,7 +58,7 @@ namespace Tester.ClientConnectionTests
 
                 // Try to reconnect to GW
                 var stopwatch = Stopwatch.StartNew();
-                this.HostedCluster.InitializeClient();
+                await this.HostedCluster.InitializeClientAsync();
                 stopwatch.Stop();
 
                 // Check that we were able to connect before the first connection timeout

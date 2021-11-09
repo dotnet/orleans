@@ -45,7 +45,7 @@ namespace ServiceBus.Tests.StreamingTests
                         ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
                         (AzureBlobStorageOptions options) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
                         })
                     .AddEventHubStreams(StreamProviderName, b=>
                     {
@@ -61,7 +61,7 @@ namespace ServiceBus.Tests.StreamingTests
                             }));
                         b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                             options.PersistInterval = TimeSpan.FromSeconds(1);
                         }));
                     });

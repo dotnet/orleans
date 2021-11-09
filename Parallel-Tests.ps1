@@ -8,14 +8,14 @@ Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
 
 $failed = $false
 
-if( 
-    [Console]::InputEncoding -is [Text.UTF8Encoding] -and 
-    [Console]::InputEncoding.GetPreamble().Length -ne 0 
-) { 
+if(
+    [Console]::InputEncoding -is [Text.UTF8Encoding] -and
+    [Console]::InputEncoding.GetPreamble().Length -ne 0
+) {
     Write-Host Setting [Console]::InputEncoding
-    [Console]::InputEncoding = New-Object Text.UTF8Encoding $false 
-} 
-else 
+    [Console]::InputEncoding = New-Object Text.UTF8Encoding $false
+}
+else
 {
     Write-Host Not changing [Console]::InputEncoding
 }
@@ -36,11 +36,11 @@ function Receive-CompletedJobs {
     {
         Receive-Job $job -AutoRemoveJob -Wait | Write-Host
 
-        if ($job.State -eq 'Failed') { 
+        if ($job.State -eq 'Failed') {
             $succeeded = $false
             Write-Host -ForegroundColor Red 'Failed: ' $job.Name '('$job.State')'
         }
-        Write-Host ''  
+        Write-Host ''
     }
     return $succeeded
 }
@@ -73,12 +73,12 @@ foreach ($d in $directories)
     }
 
     if (-not (Receive-CompletedJobs)) { $failed = $true }
-    
+
     if (-not $testFilter.StartsWith('"')) { $testFilter = "`"$testFilter"; }
     if (-not $testFilter.EndsWith('"')) { $testFilter = "$testFilter`""; }
 
     $jobName = $([System.IO.Path]::GetFileName($d))
-    $cmdLine = 'test --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
+    $cmdLine = 'test --blame-hang-timeout 10m --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
     Write-Host $jobName $dotnet $cmdLine
     Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $jobName | Out-Null
     Write-Host ''

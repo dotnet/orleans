@@ -1,6 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.TypeSystem;
 using System;
 
 namespace Orleans.Serialization.Session
@@ -9,9 +10,9 @@ namespace Orleans.Serialization.Session
     {
         private readonly ObjectPool<SerializerSession> _sessionPool;
 
-        public SerializerSessionPool(IServiceProvider serviceProvider)
+        public SerializerSessionPool(TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, CodecProvider codecProvider)
         {
-            var sessionPoolPolicy = new SerializerSessionPoolPolicy(serviceProvider, ReturnSession);
+            var sessionPoolPolicy = new SerializerSessionPoolPolicy(typeCodec, wellKnownTypes, codecProvider, ReturnSession);
             _sessionPool = new ConcurrentObjectPool<SerializerSession, SerializerSessionPoolPolicy>(sessionPoolPolicy);
         }
 
@@ -21,22 +22,25 @@ namespace Orleans.Serialization.Session
 
         private readonly struct SerializerSessionPoolPolicy : IPooledObjectPolicy<SerializerSession>
         {
-            private readonly IServiceProvider _serviceProvider;
-            private readonly ObjectFactory _factory;
+            private readonly TypeCodec _typeCodec;
+            private readonly WellKnownTypeCollection _wellKnownTypes;
+            private readonly CodecProvider _codecProvider;
             private readonly Action<SerializerSession> _onSessionDisposed;
 
-            public SerializerSessionPoolPolicy(IServiceProvider serviceProvider, Action<SerializerSession> onSessionDisposed)
+            public SerializerSessionPoolPolicy(TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, CodecProvider codecProvider, Action<SerializerSession> onSessionDisposed)
             {
-                _serviceProvider = serviceProvider;
+                _typeCodec = typeCodec;
+                _wellKnownTypes = wellKnownTypes;
+                _codecProvider = codecProvider;
                 _onSessionDisposed = onSessionDisposed;
-                _factory = ActivatorUtilities.CreateFactory(typeof(SerializerSession), Array.Empty<Type>());
             }
 
             public SerializerSession Create()
             {
-                var result = (SerializerSession)_factory(_serviceProvider, null);
-                result.OnDisposed = _onSessionDisposed;
-                return result;
+                return new SerializerSession(_typeCodec, _wellKnownTypes, _codecProvider)
+                {
+                    OnDisposed = _onSessionDisposed
+                };
             }
 
             public bool Return(SerializerSession obj)

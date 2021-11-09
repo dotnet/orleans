@@ -117,7 +117,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ReadOnlyMemoryOfByteCopier : IDeepCopier<ReadOnlyMemory<byte>>
     {
-        public ReadOnlyMemory<byte> DeepCopy(ReadOnlyMemory<byte> input, CopyContext _)
+        ReadOnlyMemory<byte> IDeepCopier<ReadOnlyMemory<byte>>.DeepCopy(ReadOnlyMemory<byte> input, CopyContext _) => DeepCopy(input, _);
+
+        public static ReadOnlyMemory<byte> DeepCopy(ReadOnlyMemory<byte> input, CopyContext _)
         {
             if (input.IsEmpty)
             {
@@ -133,7 +135,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ArraySegmentOfByteCopier : IDeepCopier<ArraySegment<byte>>
     {
-        public ArraySegment<byte> DeepCopy(ArraySegment<byte> input, CopyContext _)
+        ArraySegment<byte> IDeepCopier<ArraySegment<byte>>.DeepCopy(ArraySegment<byte> input, CopyContext _) => DeepCopy(input, _);
+
+        public static ArraySegment<byte> DeepCopy(ArraySegment<byte> input, CopyContext _)
         {
             if (input.Array is null)
             {
@@ -153,7 +157,7 @@ namespace Orleans.Serialization.Codecs
 
         Memory<byte> IFieldCodec<Memory<byte>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
-        public static byte[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        public static Memory<byte> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {
@@ -193,7 +197,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class MemoryOfByteCopier : IDeepCopier<Memory<byte>>
     {
-        public Memory<byte> DeepCopy(Memory<byte> input, CopyContext _)
+        Memory<byte> IDeepCopier<Memory<byte>>.DeepCopy(Memory<byte> input, CopyContext _) => DeepCopy(input, _);
+
+        public static Memory<byte> DeepCopy(Memory<byte> input, CopyContext _)
         {
             if (input.IsEmpty)
             {

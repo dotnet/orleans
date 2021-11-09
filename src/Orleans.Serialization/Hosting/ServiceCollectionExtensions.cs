@@ -3,7 +3,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
-using Orleans.Serialization.ISerializableSupport;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -26,7 +27,7 @@ namespace Orleans.Connections.Security.Tests
             Assert.Equal(original, decoded);
         }
         
-        private class TlsConfigurator : ISiloConfigurator, IClientBuilderConfigurator
+        private class TlsClientConfigurator : IClientBuilderConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
@@ -49,8 +50,11 @@ namespace Orleans.Connections.Security.Tests
                     };
                 });
             }
+        }
 
-            public void Configure(ISiloBuilder hostBuilder)
+        private class TlsServerConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
                 var encodedCertificate = config[CertificateConfigKey];
@@ -59,16 +63,19 @@ namespace Orleans.Connections.Security.Tests
                 var certificateModeString = config[ClientCertificateModeKey];
                 var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
 
-                hostBuilder.UseTls(localCertificate, options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
-                    options.AllowAnyRemoteCertificate();
-                    options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
-                    options.ClientCertificateMode = certificateMode;
-                    options.OnAuthenticateAsClient = (connection, sslOptions) =>
+                    siloBuilder.UseTls(localCertificate, options =>
                     {
-                        sslOptions.TargetHost = CertificateSubjectName;
-                    };
+                        options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+                        options.AllowAnyRemoteCertificate();
+                        options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
+                        options.ClientCertificateMode = certificateMode;
+                        options.OnAuthenticateAsClient = (connection, sslOptions) =>
+                        {
+                            sslOptions.TargetHost = CertificateSubjectName;
+                        };
+                    });
                 });
             }
         }
@@ -87,8 +94,8 @@ namespace Orleans.Connections.Security.Tests
             try
             {
                 var builder = new TestClusterBuilder()
-                    .AddSiloBuilderConfigurator<TlsConfigurator>()
-                    .AddClientBuilderConfigurator<TlsConfigurator>();
+                    .AddSiloBuilderConfigurator<TlsServerConfigurator>()
+                    .AddClientBuilderConfigurator<TlsClientConfigurator>();
 
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);

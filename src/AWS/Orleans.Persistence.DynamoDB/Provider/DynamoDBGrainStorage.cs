@@ -117,7 +117,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -148,9 +148,9 @@ namespace Orleans.Storage
 
             if (record != null)
             {
-                var loadedState = ConvertFromStorageFormat(record, grainState.Type);
+                var loadedState = ConvertFromStorageFormat<T>(record);
                 grainState.RecordExists = loadedState != null;
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                grainState.State = loadedState ?? Activator.CreateInstance<T>();
                 grainState.ETag = record.ETag.ToString();
             }
 
@@ -159,7 +159,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -186,7 +186,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateInternal(IGrainState grainState, GrainStateRecord record, bool clear = false)
+        private async Task WriteStateInternal<T>(IGrainState<T> grainState, GrainStateRecord record, bool clear = false)
         {
             var fields = new Dictionary<string, AttributeValue>();
             if (this.options.TimeToLive.HasValue)
@@ -253,7 +253,7 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -308,22 +308,22 @@ namespace Orleans.Storage
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 
-        internal object ConvertFromStorageFormat(GrainStateRecord entity, Type stateType)
+        internal T ConvertFromStorageFormat<T>(GrainStateRecord entity)
         {
             var binaryData = entity.BinaryState;
             var stringData = entity.StringState;
 
-            object dataValue = null;
+            T dataValue = default;
             try
             {
                 if (binaryData?.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = this.serializer.Deserialize<object>(binaryData);
+                    dataValue = this.serializer.Deserialize<T>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = JsonConvert.DeserializeObject(stringData, stateType, this.jsonSettings);
+                    dataValue = JsonConvert.DeserializeObject<T>(stringData, this.jsonSettings);
                 }
 
                 // Else, no data found

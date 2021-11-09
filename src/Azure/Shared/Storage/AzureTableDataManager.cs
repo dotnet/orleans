@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
-using Azure.Core.Pipeline;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
@@ -56,13 +53,10 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get; }
 
-        public CloudTable Table { get; private set; }
-
-        private readonly SemaphoreSlim tokenLock;
-        private string accountKey;
+        public TableClient Table { get; private set; }
 
         /// <summary>
-        /// Constructor
+        /// Creates a new <see cref="AzureTableDataManager{T}"/> instance.
         /// </summary>
         /// <param name="options">Storage configuration.</param>
         /// <param name="logger">Logger to use.</param>
@@ -75,11 +69,6 @@ namespace Orleans.GrainDirectory.AzureStorage
             StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentNullException(nameof(options.StoragePolicyOptions));
 
             AzureTableUtils.ValidateTableName(TableName);
-
-            if (options.TokenCredential != null)
-            {
-                tokenLock = new SemaphoreSlim(1, 1);
-            }
         }
 
         /// <summary>
@@ -93,15 +82,14 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                CloudTableClient tableCreationClient = await GetCloudTableCreationClientAsync();
-                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-                bool didCreate = await tableRef.CreateIfNotExistsAsync();
-
+                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                var table = tableCreationClient.GetTableClient(TableName);
+                var tableItem = await table.CreateIfNotExistsAsync();
+                var didCreate = tableItem is not null;
 
                 Logger.Info((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
-                CloudTableClient tableOperationsClient = await GetCloudTableOperationsClientAsync();
-                Table = tableOperationsClient.GetTableReference(TableName);
+                Table = table;
             }
             catch (TimeoutException te)
             {
@@ -131,12 +119,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                CloudTableClient tableCreationClient = await GetCloudTableCreationClientAsync();
-                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-
-                bool didDelete = await tableRef.DeleteIfExistsAsync();
-
-                if (didDelete)
+                var tableCreationClient = await GetCloudTableCreationClientAsync();
+                var response = await tableCreationClient.DeleteTableAsync(TableName);
+                if (response.Status == 204)
                 {
                     Logger.Info((int)Utilities.ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
                 }
@@ -158,7 +143,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Completion promise for this operation.</returns>
         public async Task ClearTableAsync()
         {
-            IEnumerable<Tuple<T, string>> items = await ReadAllTableEntriesAsync();
+            var items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
                                           .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
@@ -180,17 +165,11 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                // WAS:
-                // svc.AddObject(TableName, data);
-                // SaveChangesOptions.None
-
                 try
                 {
                     // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
-                    var opResult = await Table.ExecuteAsync(TableOperation.Insert(data));
-
-
-                    return opResult.Etag;
+                    var opResult = await Table.AddEntityAsync(data);
+                    return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
                 {
@@ -219,12 +198,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    // WAS:
-                    // svc.AttachTo(TableName, data, null);
-                    // svc.UpdateObject(data);
-                    // SaveChangesOptions.ReplaceOnUpdate,
-                    var opResult = await Table.ExecuteAsync(TableOperation.InsertOrReplace(data));
-                    return opResult.Etag;
+                    var opResult = await Table.UpsertEntityAsync(data);
+                    return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
                 {
@@ -254,10 +229,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await Table.ExecuteAsync(TableOperation.Insert(data));
-                    return (true, opResult.Etag);
+                    var opResult = await Table.AddEntityAsync(data);
+                    return (true, opResult.Headers.ETag.GetValueOrDefault().ToString());
                 }
-                catch (StorageException storageException) when (storageException.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict)
+                catch (RequestFailedException storageException) when (storageException.Status == (int)HttpStatusCode.Conflict)
                 {
                     return (false, null);
                 }
@@ -274,6 +249,13 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        /// <summary>
+        /// Merges a data entry in the Azure table.
+        /// </summary>
+        /// <param name="data">Data to be merged in the table.</param>
+        /// <param name="eTag">ETag to apply.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        internal Task<string> MergeTableEntryAsync(T data, string eTag) => MergeTableEntryAsync(data, new ETag(eTag));
 
         /// <summary>
         /// Merges a data entry in the Azure table.
@@ -281,7 +263,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="data">Data to be merged in the table.</param>
         /// <param name="eTag">ETag to apply.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        internal async Task<string> MergeTableEntryAsync(T data, string eTag)
+        internal async Task<string> MergeTableEntryAsync(T data, ETag eTag)
         {
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
@@ -292,14 +274,10 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    // WAS:
-                    // svc.AttachTo(TableName, data, ANY_ETAG);
-                    // svc.UpdateObject(data);
-
-                    data.ETag = eTag;
                     // Merge requires an ETag (which may be the '*' wildcard).
-                    var opResult = await Table.ExecuteAsync(TableOperation.Merge(data));
-                    return opResult.Etag;
+                    data.ETag = eTag;
+                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Merge);
+                    return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
                 {
@@ -321,7 +299,16 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="data">Data to be updated into the table.</param>
         /// /// <param name="dataEtag">ETag to use.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> UpdateTableEntryAsync(T data, string dataEtag)
+        public Task<string> UpdateTableEntryAsync(T data, string dataEtag) => UpdateTableEntryAsync(data, new ETag(dataEtag));
+
+        /// <summary>
+        /// Updates a data entry in the Azure table: updates an already existing data in the table, by using eTag.
+        /// Fails if the data does not already exist or of eTag does not match.
+        /// </summary>
+        /// <param name="data">Data to be updated into the table.</param>
+        /// /// <param name="dataEtag">ETag to use.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        public async Task<string> UpdateTableEntryAsync(T data, ETag dataEtag)
         {
             const string operation = "UpdateTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -332,10 +319,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data.ETag = dataEtag;
-                    var opResult = await Table.ExecuteAsync(TableOperation.Replace(data));
+                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Replace);
 
                     //The ETag of data is needed in further operations.
-                    return opResult.Etag;
+                    return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
                 {
@@ -356,7 +343,16 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="data">Data entry to be deleted from the table.</param>
         /// <param name="eTag">ETag to use.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntryAsync(T data, string eTag)
+        public Task DeleteTableEntryAsync(T data, string eTag) => DeleteTableEntryAsync(data, new ETag(eTag));
+
+        /// <summary>
+        /// Deletes an already existing data in the table, by using eTag.
+        /// Fails if the data does not already exist or if eTag does not match.
+        /// </summary>
+        /// <param name="data">Data entry to be deleted from the table.</param>
+        /// <param name="eTag">ETag to use.</param>
+        /// <returns>Completion promise for this storage operation.</returns>
+        public async Task DeleteTableEntryAsync(T data, ETag eTag)
         {
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -368,8 +364,11 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    await Table.ExecuteAsync(TableOperation.Delete(data));
-
+                    var response = await Table.DeleteEntityAsync(data.PartitionKey, data.RowKey, data.ETag);
+                    if (response is { Status: 404 })
+                    {
+                        throw new RequestFailedException(response.Status, "Resource not found", response.ReasonPhrase, null);
+                    }
                 }
                 catch (Exception exc)
                 {
@@ -390,7 +389,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="partitionKey">The partition key for the entry.</param>
         /// <param name="rowKey">The row key for the entry.</param>
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
-        public async Task<Tuple<T, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        public async Task<(T Entity, string ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -401,20 +400,20 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    string queryString = TableQueryFilterBuilder.MatchPartitionKeyAndRowKeyFilter(partitionKey, rowKey);
-                    var query = new TableQuery<T>().Where(queryString);
-                    TableQuerySegment<T> segment = await Table.ExecuteQuerySegmentedAsync(query, null);
-                    retrievedResult = segment.Results.SingleOrDefault();
+                    retrievedResult = await Table.GetEntityAsync<T>(partitionKey, rowKey);
                 }
-                catch (StorageException exception)
+                catch (RequestFailedException exception)
                 {
                     if (!AzureTableUtils.TableStorageDataNotFound(exception))
+                    {
                         throw;
+                    }
                 }
+
                 //The ETag of data is needed in further operations.
-                if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag);
+                if (retrievedResult != null) return (retrievedResult, retrievedResult.ETag.ToString());
                 if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
-                return null;  // No data
+                return (default, default);  // No data
             }
             finally
             {
@@ -428,10 +427,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="partitionKey">The key for the partition to be searched.</param>
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
-        public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
         {
-            string query = TableQuery.GenerateFilterCondition(nameof(ITableEntity.PartitionKey), QueryComparisons.Equal, partitionKey);
-
+            string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
             return ReadTableEntriesAndEtagsAsync(query);
         }
 
@@ -440,7 +438,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
         /// <returns>Enumeration of all entries in the table.</returns>
-        public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync()
         {
             return ReadTableEntriesAndEtagsAsync(null);
         }
@@ -451,7 +449,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="collection">Data entries and their corresponding etags to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> collection)
+        public async Task DeleteTableEntriesAsync(List<(T Entity, string ETag)> collection)
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
@@ -472,21 +470,17 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                var entityBatch = new TableBatchOperation();
+                var entityBatch = new List<TableTransactionAction>();
                 foreach (var tuple in collection)
                 {
-                    // WAS:
-                    // svc.AttachTo(TableName, tuple.Item1, tuple.Item2);
-                    // svc.DeleteObject(tuple.Item1);
-                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
                     T item = tuple.Item1;
-                    item.ETag = tuple.Item2;
-                    entityBatch.Delete(item);
+                    item.ETag = new ETag(tuple.Item2);
+                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.Delete, item, item.ETag));
                 }
 
                 try
                 {
-                    await Table.ExecuteBatchAsync(entityBatch);
+                    _ = await Table.SubmitTransactionAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -506,28 +500,23 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="filter">Filter string to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(string filter)
+        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string filter)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
 
             try
             {
-                TableQuery<T> cloudTableQuery = filter == null
-                    ? new TableQuery<T>()
-                    : new TableQuery<T>().Where(filter);
 
                 try
                 {
-                    Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
+                    Func<Task<List<(T Entity, string ETag)>>> executeQueryHandleContinuations = async () =>
                     {
-                        TableQuerySegment<T> querySegment = null;
-                        var list = new List<T>();
-                        //ExecuteSegmentedAsync not supported in "WindowsAzure.Storage": "7.2.1" yet
-                        while (querySegment == null || querySegment.ContinuationToken != null)
+                        var list = new List<(T, string)>();
+                        var results = Table.QueryAsync<T>(filter);
+                        await foreach (var value in results)
                         {
-                            querySegment = await Table.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
-                            list.AddRange(querySegment);
+                            list.Add((value, value.ETag.ToString()));
                         }
 
                         return list;
@@ -536,17 +525,17 @@ namespace Orleans.GrainDirectory.AzureStorage
 #if !ORLEANS_TRANSACTIONS
                     IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);
 
-                    List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    List<(T, string)> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         counter => executeQueryHandleContinuations(),
                         this.StoragePolicyOptions.MaxOperationRetries,
                         (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
                         this.StoragePolicyOptions.OperationTimeout,
                         backoff);
 #else
-                    List<T> results = await executeQueryHandleContinuations();
+                    List<(T, string)> results = await executeQueryHandleContinuations();
 #endif
                     // Data was read successfully if we got to here
-                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
+                    return results;
 
                 }
                 catch (Exception exc)
@@ -557,6 +546,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     {
                         Logger.Warn((int)Utilities.ErrorCode.AzureTable_09, errorMsg, exc);
                     }
+
                     throw new OrleansException(errorMsg, exc);
                 }
             }
@@ -593,23 +583,15 @@ namespace Orleans.GrainDirectory.AzureStorage
             try
             {
 
-                // WAS:
-                // svc.AttachTo(TableName, entry);
-                // svc.UpdateObject(entry);
-                // SaveChangesOptions.None | SaveChangesOptions.Batch,
-                // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
-                // http://msdn.microsoft.com/en-us/library/hh452241.aspx
-
-                var entityBatch = new TableBatchOperation();
+                var entityBatch = new List<TableTransactionAction>(collection.Count);
                 foreach (T entry in collection)
                 {
-                    entityBatch.Insert(entry);
+                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.Add, entry));
                 }
 
                 try
                 {
-                    // http://msdn.microsoft.com/en-us/library/hh452241.aspx
-                    await Table.ExecuteBatchAsync(entityBatch);
+                    await Table.SubmitTransactionAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -623,7 +605,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
+        internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
@@ -635,27 +617,19 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    // WAS:
-                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
-                    // svc.AddObject(TableName, data);
-                    // ---
-                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
-                    // svc.UpdateObject(tableVersion);
-                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
-                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
-                    // return dataResult.ETag;
-
-                    var entityBatch = new TableBatchOperation();
-                    entityBatch.Add(TableOperation.Insert(data1));
-                    data2.ETag = data2Etag;
-                    entityBatch.Add(TableOperation.Replace(data2));
-
-                    var opResults = await Table.ExecuteBatchAsync(entityBatch);
+                    data2.ETag = new ETag(data2Etag);
+                    var opResults = await Table.SubmitTransactionAsync(new TableTransactionAction[]
+                    {
+                        new TableTransactionAction(TableTransactionActionType.Add, data1),
+                        new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag)
+                    });
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
                     //The ETag of data is needed in further operations.
-                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);
+                    var resultETag1 = opResults.Value[0].Headers.ETag.GetValueOrDefault().ToString();
+                    var resultETag2 = opResults.Value[1].Headers.ETag.GetValueOrDefault().ToString();
+                    return (resultETag1, resultETag2);
                 }
                 catch (Exception exc)
                 {
@@ -669,7 +643,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<Tuple<string, string>> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
+        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
         {
             const string operation = "UpdateTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
@@ -680,33 +654,24 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    // WAS:
-                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
-                    // svc.AttachTo(TableName, data, dataEtag);
-                    // svc.UpdateObject(data);
-                    // ----
-                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
-                    // svc.UpdateObject(tableVersion);
-                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
-                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
-                    // return dataResult.ETag;
+                    data1.ETag = new ETag(data1Etag);
+                    var entityBatch = new List<TableTransactionAction>(2);
+                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag));
 
-                    var entityBatch = new TableBatchOperation();
-                    data1.ETag = data1Etag;
-                    entityBatch.Add(TableOperation.Replace(data1));
                     if (data2 != null && data2Etag != null)
                     {
-                        data2.ETag = data2Etag;
-                        entityBatch.Add(TableOperation.Replace(data2));
+                        data2.ETag = new ETag(data2Etag);
+                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag));
                     }
 
-                    var opResults = await Table.ExecuteBatchAsync(entityBatch);
-
+                    var opResults = await Table.SubmitTransactionAsync(entityBatch);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
                     //The ETag of data is needed in further operations.
-                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);
+                    var resultETag1 = opResults.Value[0].Headers.ETag.GetValueOrDefault().ToString();
+                    var resultETag2 = opResults.Value[1].Headers.ETag.GetValueOrDefault().ToString();
+                    return (resultETag1, resultETag2);
                 }
                 catch (Exception exc)
                 {
@@ -720,104 +685,16 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        // Utility methods
-
-        private async ValueTask<CloudTableClient> GetCloudTableOperationsClientAsync()
+        private async ValueTask<TableServiceClient> GetCloudTableCreationClientAsync()
         {
             try
             {
-                CloudTableClient operationsClient = await GetCloudTableClientAsync();
-                operationsClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.OperationRetryPolicy;
-                operationsClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.OperationTimeout;
-                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
-                operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-                return operationsClient;
+                return await options.CreateClient();
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_18, exc, "Error creating CloudTableCreationClient.");
                 throw;
-            }
-        }
-
-        private async ValueTask<CloudTableClient> GetCloudTableCreationClientAsync()
-        {
-            try
-            {
-                CloudTableClient creationClient = await GetCloudTableClientAsync();
-                creationClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.CreationRetryPolicy;
-                creationClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.CreationTimeout;
-                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
-                creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-                return creationClient;
-            }
-            catch (Exception exc)
-            {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
-                throw;
-            }
-        }
-
-        private async ValueTask<CloudTableClient> GetCloudTableClientAsync()
-        {
-            CloudStorageAccount storageAccount = options.TokenCredential != null
-                ? new CloudStorageAccount(new StorageCredentials(accountName: "ignored", await GetAccountKeyUsingAad()), options.TableEndpoint)
-                : AzureTableUtils.GetCloudStorageAccount(options.ConnectionString);
-
-            CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
-            return creationClient;
-        }
-
-        /// <summary>
-        /// Cosmos DB does not support AAD auth directly. This method uses the Azure ARM API to fetch the key.
-        /// See https://docs.microsoft.com/en-us/azure/cosmos-db/managed-identity-based-authentication
-        /// </summary>
-        private async ValueTask<string> GetAccountKeyUsingAad()
-        {
-            if (accountKey != null)
-            {
-                return accountKey;
-            }
-
-            await tokenLock.WaitAsync();
-            try
-            {
-                // use HttpPipeline since it supports TokenCredential from the new Azure SDK (ARM API still not available in the new SDK)
-                var pipeline = HttpPipelineBuilder.Build(new TableClientOptions(), new BearerTokenAuthenticationPolicy(options.TokenCredential, options.TokenCredentialManagementUri.ToString() + "/.default"));
-                var message = pipeline.CreateMessage();
-                var request = message.Request;
-                request.Method = RequestMethod.Post;
-                request.Uri.Reset(options.TokenCredentialManagementUri);
-                request.Uri.AppendPath(options.TableResourceId, escape: false);
-                request.Uri.AppendPath("/listKeys", escape: false);
-                request.Uri.AppendQuery("api-version", "2020-04-01");
-                await pipeline.SendAsync(message, default);
-                if (message.Response.Status != (int)HttpStatusCode.OK)
-                {
-                    using var reader = new StreamReader(message.Response.ContentStream);
-                    var error = await reader.ReadToEndAsync();
-                    throw new RequestFailedException(message.Response.Status, $"Request failed: {request.Uri} {error}");
-                }
-
-                var keys = await JsonSerializer.DeserializeAsync<DatabaseAccountListKeysResult>(message.Response.ContentStream);
-
-                accountKey = options.TokenCredentialTableKey switch
-                {
-                    TokenCredentialTableKey.Primary => keys.PrimaryMasterKey,
-                    TokenCredentialTableKey.Secondary => keys.SecondaryMasterKey,
-                    _ => throw new ArgumentOutOfRangeException(nameof(TokenCredentialTableKey))
-                };
-
-                return accountKey;
-            }
-            catch (Exception exc)
-            {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_19, $"Unable to retrieve table keys for resource {options.TableResourceId}", exc);
-                throw;
-            }
-            finally
-            {
-                tokenLock.Release();
             }
         }
 
@@ -843,65 +720,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
             {
-                Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
+                Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {TableName} for {Operation}, which took {Duration}", TableName, operation, timeSpan);
             }
-        }
-
-        /// <summary>
-        /// Helper functions for building table queries.
-        /// </summary>
-        private class TableQueryFilterBuilder
-        {
-            /// <summary>
-            /// Builds query string to match partitionkey
-            /// </summary>
-            /// <param name="partitionKey"></param>
-            /// <returns></returns>
-            public static string MatchPartitionKeyFilter(string partitionKey)
-            {
-                return TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey);
-            }
-
-            /// <summary>
-            /// Builds query string to match rowkey
-            /// </summary>
-            /// <param name="rowKey"></param>
-            /// <returns></returns>
-            public static string MatchRowKeyFilter(string rowKey)
-            {
-                return TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey);
-            }
-
-            /// <summary>
-            /// Builds a query string that matches a specific partitionkey and rowkey.
-            /// </summary>
-            /// <param name="partitionKey"></param>
-            /// <param name="rowKey"></param>
-            /// <returns></returns>
-            public static string MatchPartitionKeyAndRowKeyFilter(string partitionKey, string rowKey)
-            {
-                return TableQuery.CombineFilters(MatchPartitionKeyFilter(partitionKey), TableOperators.And,
-                                          MatchRowKeyFilter(rowKey));
-            }
-        }
-
-        /// <summary>
-        /// Used to deserialize the response of the <c>listKeys</c> operation.
-        /// https://docs.microsoft.com/en-us/rest/api/cosmos-db-resource-provider/databaseaccounts/listkeys
-        /// </summary>
-        private class DatabaseAccountListKeysResult
-        {
-            [JsonPropertyName("primaryMasterKey")]
-            public string PrimaryMasterKey { get; set; }
-            [JsonPropertyName("secondaryMasterKey")]
-            public string SecondaryMasterKey { get; set; }
-        }
-
-        /// <summary>
-        /// Required since ClientOptions is abstract
-        /// </summary>
-        private class TableClientOptions : ClientOptions
-        {
         }
     }
 

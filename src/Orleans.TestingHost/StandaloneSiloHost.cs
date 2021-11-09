@@ -29,24 +29,38 @@ namespace Orleans.TestingHost
             var serializedConfiguration = args[1];
             var configuration = TestClusterHostFactory.DeserializeConfiguration(serializedConfiguration);
             var name = configuration["SiloName"];
-            var host = TestClusterHostFactory.CreateSiloHost(name, configuration);
-            var cts = new CancellationTokenSource();
-            Console.CancelKeyPress += (sender, eventArgs) => cts.Cancel();
+            using var host = TestClusterHostFactory.CreateSiloHost(name, configuration);
+            try
+            {
+                var cts = new CancellationTokenSource();
+                Console.CancelKeyPress += (sender, eventArgs) => cts.Cancel();
 
-            ListenForShutdownCommand(cts);
-            MonitorParentProcess(monitorProcessId);
+                ListenForShutdownCommand(cts);
+                MonitorParentProcess(monitorProcessId);
 
-            await host.StartAsync(cts.Token);
+                await host.StartAsync(cts.Token);
 
-            // This is a special marker line.
-            var localSiloDetails = (ILocalSiloDetails)host.Services.GetService(typeof(ILocalSiloDetails));
-            Console.WriteLine($"{SiloAddressLog}{localSiloDetails.SiloAddress.ToParsableString()}");
-            Console.WriteLine($"{GatewayAddressLog}{localSiloDetails.GatewayAddress.ToParsableString()}");
-            Console.WriteLine(StartedLog);
+                // This is a special marker line.
+                var localSiloDetails = (ILocalSiloDetails)host.Services.GetService(typeof(ILocalSiloDetails));
+                Console.WriteLine($"{SiloAddressLog}{localSiloDetails.SiloAddress.ToParsableString()}");
+                Console.WriteLine($"{GatewayAddressLog}{localSiloDetails.GatewayAddress.ToParsableString()}");
+                Console.WriteLine(StartedLog);
 
-            await cts.Token.WhenCancelled();
+                await cts.Token.WhenCancelled();
 
-            await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(CancellationToken.None);
+            }
+            finally
+            {
+                if (host is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    host.Dispose();
+                }
+            }
         }
 
         private static void MonitorParentProcess(int monitorProcessId)
@@ -100,6 +114,7 @@ namespace Orleans.TestingHost
                         {
                             Console.WriteLine("Shutdown requested");
                             cts.Cancel();
+                            return;
                         }
                     }
                 }

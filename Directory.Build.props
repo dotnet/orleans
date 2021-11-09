@@ -66,11 +66,11 @@
     <MicrosoftExtensionsHostingVersion>5.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.16.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
-    <AzureCoreVersion>1.9.0</AzureCoreVersion>
-    <AzureMessagingEventHubs>5.3.0</AzureMessagingEventHubs>
-    <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
-    <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
+    <AzureDataTablesVersion>12.2.0</AzureDataTablesVersion>
+    <AzureCoreVersion>1.19.0</AzureCoreVersion>
+    <AzureMessagingEventHubs>5.6.1</AzureMessagingEventHubs>
+    <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
     <MicrosoftServiceFabricServicesVersion>4.1.456</MicrosoftServiceFabricServicesVersion>
 
     <!-- 3rd party packages -->
@@ -85,7 +85,7 @@
     <NewtonsoftJsonVersion>13.0.1</NewtonsoftJsonVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedisVersion>2.0.601</StackExchangeRedisVersion>
-    <KubernetesClientVersion>4.0.5</KubernetesClientVersion>
+    <KubernetesClientVersion>6.0.19</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>

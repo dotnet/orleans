@@ -33,7 +33,6 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{" + nameof(name) + "}")]
     public class MemoryGrainStorage : IGrainStorage, IDisposable
     {
-        private const string STATE_STORE_NAME = "MemoryStorage";
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private readonly ILogger logger;
 
@@ -59,7 +58,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync"/>
-        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
 
@@ -67,18 +66,18 @@ namespace Orleans.Storage
 
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
-            var state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
+            var state = await storageGrain.ReadStateAsync<T>(id);
             if (state != null)
             {
                 grainState.ETag = state.ETag;
-                grainState.State = state.State;
+                grainState.State = (T)state.State;
                 grainState.RecordExists = true;
             }
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync"/>
-        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
@@ -86,7 +85,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
+                grainState.ETag = await storageGrain.WriteStateAsync(key, grainState);
                 grainState.RecordExists = true;
             }
             catch (MemoryStorageEtagMismatchException e)
@@ -97,7 +96,7 @@ namespace Orleans.Storage
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync"/>
-        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Delete Keys={Keys} Etag={Etag}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
@@ -105,7 +104,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<T>(key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
             }

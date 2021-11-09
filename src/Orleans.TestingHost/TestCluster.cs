@@ -8,12 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -87,7 +87,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IInternalClusterClient InternalClient { get; private set; }
+        internal IHost ClientHost { get; private set; }
+
+        /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
         /// <summary>
         /// The client.
@@ -380,14 +385,14 @@ namespace Orleans.TestingHost
             await StopSiloAsync(Primary);
         }
 
-        private async Task StopClusterClientAsync()
+        public async Task StopClusterClientAsync()
         {
-            var client = this.InternalClient;
+            var client = this.ClientHost;
             try
             {
-                if (client != null)
+                if (client is not null)
                 {
-                    await client.Close().ConfigureAwait(false);
+                    await client.StopAsync().ConfigureAwait(false);
                 }                
             }
             catch (Exception exc)
@@ -396,12 +401,8 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                if (client is object)
-                {
-                    await client.DisposeAsync().ConfigureAwait(false);
-                }
-
-                this.InternalClient = null;
+                await DisposeAsync(client).ConfigureAwait(false);
+                ClientHost = null;
             }
         }
 
@@ -479,10 +480,20 @@ namespace Orleans.TestingHost
         /// </summary>
         public async Task KillClientAsync()
         {
-            if (InternalClient != null)
+            var client = ClientHost;
+            if (client != null)
             {
-                await this.InternalClient.AbortAsync();
-                this.InternalClient = null;
+                var cancelled = new CancellationTokenSource();
+                cancelled.Cancel();
+                try
+                {
+                    await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DisposeAsync(client);
+                    ClientHost = null;
+                }
             }
         }
 
@@ -536,12 +547,17 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
         /// </summary>
-        public void InitializeClient()
+        public async Task InitializeClientAsync()
         {
             WriteLog("Initializing Cluster Client");
 
-            this.InternalClient = (IInternalClusterClient)TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
-            this.InternalClient.Connect().GetAwaiter().GetResult();
+            if (ClientHost is not null)
+            {
+                await StopClusterClientAsync();
+            }
+
+            this.ClientHost = TestClusterHostFactory.CreateClusterClient("MainClient", this.ConfigurationSources);
+            await this.ClientHost.StartAsync();
         }
 
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }
@@ -565,7 +581,7 @@ namespace Orleans.TestingHost
 
             if (this.options.InitializeClientOnDeploy)
             {
-                InitializeClient();
+                await InitializeClientAsync();
             }
         }
         
@@ -624,7 +640,7 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                await instance.DisposeAsync().ConfigureAwait(false);
+                await DisposeAsync(instance).ConfigureAwait(false);
 
                 Interlocked.Decrement(ref this.startedInstances);
             }
@@ -662,23 +678,18 @@ namespace Orleans.TestingHost
             {
                 foreach (var handle in this.SecondarySilos)
                 {
-                    await handle.DisposeAsync().ConfigureAwait(false);
+                    await DisposeAsync(handle).ConfigureAwait(false);
                 }
 
                 if (this.Primary is object)
                 {
-                    await this.Primary.DisposeAsync().ConfigureAwait(false);
+                    await DisposeAsync(Primary).ConfigureAwait(false);
                 }
 
-                if (this.Client is object)
-                {
-                    await this.Client.DisposeAsync().ConfigureAwait(false);
-                }
+                await DisposeAsync(ClientHost).ConfigureAwait(false);
+                ClientHost = null;
 
-                if (this.PortAllocator is object)
-                {
-                    this.PortAllocator.Dispose();
-                }
+                this.PortAllocator?.Dispose();
             });
 
             _disposed = true;
@@ -697,14 +708,22 @@ namespace Orleans.TestingHost
             }
 
             this.Primary?.Dispose();
-            this.Client?.Dispose();
-
-            if (this.PortAllocator is object)
-            {
-                this.PortAllocator.Dispose();
-            }
+            this.ClientHost?.Dispose();
+            this.PortAllocator?.Dispose();
 
             _disposed = true;
+        }
+
+        private static async Task DisposeAsync(IDisposable value)
+        {
+            if (value is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            }
+            else if (value is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
     }
 }

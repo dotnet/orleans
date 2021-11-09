@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
@@ -11,21 +11,24 @@ using UnitTests.Grains;
 
 namespace TestVersionGrains
 {
-    public class VersionGrainsSiloBuilderConfigurator : ISiloConfigurator
+    public class VersionGrainsSiloBuilderConfigurator : IHostConfigurator
     {
-        public void Configure(ISiloBuilder hostBuilder)
+        public void Configure(IHostBuilder hostBuilder)
         {
             var cfg = hostBuilder.GetConfiguration();
             var siloCount = int.Parse(cfg["SiloCount"]);
-            hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-            hostBuilder.Configure<GrainVersioningOptions>(options =>
+            hostBuilder.UseOrleans(siloBuilder =>
             {
-                options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
-                options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
-            });
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+                siloBuilder.Configure<GrainVersioningOptions>(options =>
+                {
+                    options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
+                    options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
+                });
 
-            hostBuilder.ConfigureServices(ConfigureServices)
-                .AddMemoryGrainStorageAsDefault();
+                siloBuilder.ConfigureServices(ConfigureServices)
+                    .AddMemoryGrainStorageAsDefault();
+            });
         }
 
         private void ConfigureServices(IServiceCollection services)

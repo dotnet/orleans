@@ -31,7 +31,7 @@ namespace UnitTests.StreamingTests
                     .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
-                               options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                               options.ConfigureQueueServiceClient(TestDefaultConfiguration.DataConnectionString);
                                options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
                            })));
 

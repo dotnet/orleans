@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package Benchmarks.Models;
+
+message ProtoIntClass {
+  int32 my_property_1 = 1;
+  int32 my_property_2 = 2;
+  int32 my_property_3 = 3;
+  int32 my_property_4 = 4;
+  int32 my_property_5 = 5;
+  int32 my_property_6 = 6;
+  int32 my_property_7 = 7;
+  int32 my_property_8 = 8;
+  int32 my_property_9 = 9;
+}

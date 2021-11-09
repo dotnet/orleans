@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
@@ -39,26 +40,28 @@ namespace UnitTests.ActivationsLifeCycleTests
             this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
                 var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
                 var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
-                hostBuilder
-                    .ConfigureDefaults()
-                    .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));
-                hostBuilder.Configure<GrainCollectionOptions>(options =>
+                hostBuilder.UseOrleans(siloBuilder =>
                 {
-                    options.CollectionAge = collectionAgeLimit;
-                    options.CollectionQuantum = quantum;
-                    options.ClassSpecificCollectionAge = new Dictionary<string, TimeSpan>
+                    siloBuilder
+                        .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));
+                    siloBuilder.Configure<GrainCollectionOptions>(options =>
                     {
-                        [typeof(IdleActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                        [typeof(BusyActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                        [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName] = TimeSpan.FromSeconds(12),
-                    };
+                        options.CollectionAge = collectionAgeLimit;
+                        options.CollectionQuantum = quantum;
+                        options.ClassSpecificCollectionAge = new Dictionary<string, TimeSpan>
+                        {
+                            [typeof(IdleActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(BusyActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName] = TimeSpan.FromSeconds(12),
+                        };
+                    });
                 });
             }
         }

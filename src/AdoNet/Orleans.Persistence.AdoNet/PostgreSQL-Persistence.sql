@@ -85,7 +85,7 @@ AS $function$
     END IF;
 
     -- The grain state has not been read. The following locks rather pessimistically
-    -- to ensure only on INSERT succeeds.
+    -- to ensure only one INSERT succeeds.
     IF _GrainStateVersion IS NULL
     THEN
         INSERT INTO OrleansStorage

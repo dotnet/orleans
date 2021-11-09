@@ -156,7 +156,7 @@ namespace AWSUtils.Tests.StorageTests
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity, initialState.GetType());
+            var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainState>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);

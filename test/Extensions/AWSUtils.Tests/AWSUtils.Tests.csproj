@@ -21,9 +21,4 @@
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <None Update="Config_AWS_DynamoDB_Storage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>

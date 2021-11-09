@@ -30,31 +30,8 @@ namespace Orleans.Hosting
             }
 
             return builder
-            .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
-            .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
-        }
-
-        /// <summary>
-        /// Configure the container to use Orleans.
-        /// </summary>
-        /// <param name="builder">The silo builder.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder ConfigureDefaults(this ISiloBuilder builder)
-        {
-            return builder.ConfigureServices((context, services) =>
-            {
-                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
-                {
-                    services.PostConfigure<SiloOptions>(
-                        options => options.SiloName =
-                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
-
-                    services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(services);
-
-                    context.Properties.Add("OrleansServicesAdded", true);
-                }
-            });
+                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
+                .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
         }
 
         /// <summary>

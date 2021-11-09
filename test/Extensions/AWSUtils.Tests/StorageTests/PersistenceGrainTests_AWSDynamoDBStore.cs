@@ -139,7 +139,7 @@ namespace AWSUtils.Tests.StorageTests
             var storage = await InitDynamoDBTableStorageProvider(
                 this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
-            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity, initialState.GetType());
+            var convertedState = storage.ConvertFromStorageFormat<GrainStateContainingGrainReferences>(entity);
             Assert.NotNull(convertedState); // Converted state
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
         }
@@ -165,7 +165,7 @@ namespace AWSUtils.Tests.StorageTests
                 await InitDynamoDBTableStorageProvider(
                     this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
-            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity, initialState.GetType());
+            var convertedState = storage.ConvertFromStorageFormat<GrainStateContainingGrainReferences>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.GrainList.Count, convertedState.GrainList.Count);  // "GrainList size"
             Assert.Equal(initialState.GrainDict.Count, convertedState.GrainDict.Count);  // "GrainDict size"

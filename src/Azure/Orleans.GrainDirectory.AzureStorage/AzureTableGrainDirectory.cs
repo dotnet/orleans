@@ -5,7 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
-using Microsoft.Azure.Cosmos.Table;
+using Azure;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -18,11 +19,15 @@ namespace Orleans.GrainDirectory.AzureStorage
         private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
         private readonly string clusterId;
 
-        private class GrainDirectoryEntity : TableEntity
+        private class GrainDirectoryEntity : ITableEntity
         {
             public string SiloAddress { get; set; }
 
             public string ActivationId { get; set; }
+            public string PartitionKey { get; set; }
+            public string RowKey { get; set; }
+            public DateTimeOffset? Timestamp { get; set; }
+            public ETag ETag { get; set; }
 
             public GrainAddress ToGrainAddress()
             {
@@ -65,8 +70,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
 
-            if (result == null)
+            if (result.Entity is null)
+            {
                 return null;
+            }
 
             return result.Item1.ToGrainAddress();
         }
@@ -84,13 +91,15 @@ namespace Orleans.GrainDirectory.AzureStorage
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
 
             // No entry found
-            if (result == null)
+            if (result.Entity is null)
+            {
                 return;
+            }
 
             // Check if the entry in storage match the one we were asked to delete
             var entity = result.Item1;
             if (entity.ActivationId == address.ActivationId)
-                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag);
+                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
         }
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
@@ -118,25 +127,28 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         private async Task UnregisterManyBlock(List<GrainAddress> addresses)
         {
-            var pkFilter = TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.PartitionKey), QueryComparisons.Equal, this.clusterId);
-            string rkFilter = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, GrainDirectoryEntity.GrainIdToRowKey(addresses[0].GrainId)),
-                    TableOperators.And,
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.ActivationId), QueryComparisons.Equal, addresses[0].ActivationId)
-                    );
-
-            foreach (var addr in addresses.Skip(1))
+            var queryBuilder = new StringBuilder();
+            queryBuilder.Append(TableClient.CreateQueryFilter($"(PartitionKey eq {clusterId}) and ("));
+            var first = true;
+            foreach (var addr in addresses)
             {
-                var tmp = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, GrainDirectoryEntity.GrainIdToRowKey(addr.GrainId)),
-                    TableOperators.And,
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.ActivationId), QueryComparisons.Equal, addr.ActivationId)
-                    );
-                rkFilter = TableQuery.CombineFilters(rkFilter, TableOperators.Or, tmp);
+                if (!first)
+                {
+                    queryBuilder.Append(" or ");
+                }
+                else
+                {
+                    first = false;
+                }
+
+                var rowKey = GrainDirectoryEntity.GrainIdToRowKey(addr.GrainId);
+                var queryClause = TableClient.CreateQueryFilter($"((RowKey eq {rowKey}) and (ActivationId eq {addr.ActivationId}))");
+                queryBuilder.Append(queryClause);
             }
 
-            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(TableQuery.CombineFilters(pkFilter, TableOperators.And, rkFilter));
-            await this.tableDataManager.DeleteTableEntriesAsync(entities.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList());
+            queryBuilder.Append(')');
+            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
+            await this.tableDataManager.DeleteTableEntriesAsync(entities);
         }
 
         // Called by lifecycle, should not be called explicitely, except for tests

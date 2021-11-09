@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
@@ -187,11 +187,11 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(useJson);
             var initialState = state.State;
 
-            var entity = new DynamicTableEntity();
+            var entity = new TableEntity();
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainState));
+            var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainState>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);
@@ -207,11 +207,11 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(useJson: true, typeNameHandling: TypeNameHandling.None);
             var initialState = state.State;
 
-            var entity = new DynamicTableEntity();
+            var entity = new TableEntity();
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainStateWithCustomJsonProperties)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainStateWithCustomJsonProperties));
+            var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainStateWithCustomJsonProperties>(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.String, convertedState.String);
         }

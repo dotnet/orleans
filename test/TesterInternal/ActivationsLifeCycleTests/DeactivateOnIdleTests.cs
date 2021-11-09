@@ -16,6 +16,7 @@ using Orleans.Hosting;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -204,13 +205,16 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : IHostConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
+                hostBuilder.ConfigureServices(services =>
+                {
+                    services.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
+                });
             }
         }
 

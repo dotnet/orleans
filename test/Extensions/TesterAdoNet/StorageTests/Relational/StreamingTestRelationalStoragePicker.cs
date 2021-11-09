@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using System;
@@ -47,7 +47,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// Picks a deserializer using the given parameters.
         /// <see cref="IStorageSerializationPicker.PickDeserializer"/>
         /// </summary>
-        public SerializationChoice PickDeserializer(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null)
+        public SerializationChoice PickDeserializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {
             //If the tag has been given, try to pick that one and if not found, take the first on the list. This arrangement allows one to switch storage format more easily.
             var deserializer = Deserializers.FirstOrDefault(i => i.Tag == tag);
@@ -59,7 +59,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// Picks a serializer using the given parameters.
         /// <see cref="IStorageSerializationPicker.PickSerializer"/>
         /// </summary>
-        public SerializationChoice PickSerializer(string servideId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null)
+        public SerializationChoice PickSerializer<T>(string servideId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {
             var serializer = Serializers.FirstOrDefault(i => i.Tag == tag);
             return new SerializationChoice(true, null, serializer ?? Serializers.FirstOrDefault());

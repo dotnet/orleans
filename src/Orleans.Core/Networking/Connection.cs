@@ -170,11 +170,12 @@ namespace Orleans.Runtime.Messaging
 
             var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
             var transport = transportFeature?.Transport ?? _transport;
-            await transport.Input.CompleteAsync();
-            await transport.Output.CompleteAsync();
+            transport.Input.CancelPendingRead();
+            transport.Output.CancelPendingFlush();
 
             // Try to gracefully stop the reader/writer loops, if they are running.
             if (_processIncomingTask is { IsCompleted: false } incoming)
+            {
                 try
                 {
                     await incoming;
@@ -184,8 +185,10 @@ namespace Orleans.Runtime.Messaging
                     // Swallow any exceptions here.
                     this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
                 }
+            }
 
             if (_processOutgoingTask is { IsCompleted: false } outgoing)
+            {
                 try
                 {
                     await outgoing;
@@ -195,9 +198,14 @@ namespace Orleans.Runtime.Messaging
                     // Swallow any exceptions here.
                     this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
                 }
+            }
 
-            // Wait for the transport to signal that it's closed before disposing it.
-            await _transportConnectionClosed.Task;
+            // Only wait for the transport to close if the connection actually started being processed.
+            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            {
+                // Wait for the transport to signal that it's closed before disposing it.
+                await _transportConnectionClosed.Task;
+            }
 
             try
             {
@@ -294,7 +302,11 @@ namespace Orleans.Runtime.Messaging
                         } while (requiredBytes == 0);
                     }
 
-                    if (readResult.IsCanceled || readResult.IsCompleted) break;
+                    if (readResult.IsCanceled || readResult.IsCompleted)
+                    {
+                        break;
+                    }
+
                     input.AdvanceTo(buffer.Start, buffer.End);
                 }
             }
@@ -312,8 +324,9 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.StartClosing(error);
+                _transport.Input.Complete();
                 (serializer as IDisposable)?.Dispose();
+                this.StartClosing(error);
             }
         }
 
@@ -368,13 +381,14 @@ namespace Orleans.Runtime.Messaging
                         exception,
                         "Exception while processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
-                    (serializer as IDisposable)?.Dispose();
                 }
 
                 error = exception;
             }
             finally
             {
+                _transport.Output.Complete();
+                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
         }

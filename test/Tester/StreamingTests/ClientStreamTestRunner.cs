@@ -37,7 +37,7 @@ namespace Tester.StreamingTests
             await Task.Delay(Constants.DEFAULT_CLIENT_DROP_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // initialize new client
-            testHost.InitializeClient();
+            await testHost.InitializeClientAsync();
 
             // run test again.
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
@@ -73,7 +73,7 @@ namespace Tester.StreamingTests
             await Task.Delay(Constants.DEFAULT_CLIENT_DROP_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // initialize new client
-            testHost.InitializeClient();
+            await testHost.InitializeClientAsync();
 
             eventCount[0] = 0;
 

@@ -171,7 +171,7 @@ namespace UnitTests.StorageTests
             return (T) LastState;
         }
 
-        private object GetLastState(string grainType, GrainReference grainReference, IGrainState grainState)
+        private object GetLastState<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             lock (StateStore)
             {
@@ -197,7 +197,7 @@ namespace UnitTests.StorageTests
             return Task.CompletedTask;
         }
 
-        public virtual Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             logger.Info(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref readCount);
@@ -205,12 +205,12 @@ namespace UnitTests.StorageTests
             {
                 var storedState = GetLastState(grainType, grainReference, grainState);
                 grainState.RecordExists = storedState != null;
-                grainState.State = this.copier.Copy(storedState); // Read current state data
+                grainState.State = (T)this.copier.Copy(storedState); // Read current state data
             }
             return Task.CompletedTask;
         }
 
-        public virtual Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             logger.Info(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref writeCount);
@@ -227,7 +227,7 @@ namespace UnitTests.StorageTests
             return Task.CompletedTask;
         }
 
-        public virtual Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             logger.Info(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref deleteCount);

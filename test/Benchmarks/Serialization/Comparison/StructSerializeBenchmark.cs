@@ -23,7 +23,7 @@ namespace Benchmarks.Comparison
     {
         private static readonly IntStruct Input = IntStruct.Create();
 
-        private static readonly Hyperion.Serializer HyperionSerializer = new(new SerializerOptions(knownTypes: new[] { typeof(IntStruct) }));
+        private static readonly Hyperion.Serializer HyperionSerializer = new(SerializerOptions.Default.WithKnownTypes(new[] { typeof(IntStruct) }));
         private static readonly Hyperion.SerializerSession HyperionSession;
 
         private static readonly Serializer<IntStruct> Serializer;

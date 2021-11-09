@@ -9,7 +9,7 @@ using System.Collections.Concurrent;
 using System.Runtime.Serialization;
 using System.Security;
 
-namespace Orleans.Serialization.ISerializableSupport
+namespace Orleans.Serialization
 {
     [WellKnownAlias("ISerializable")]
     public class DotNetSerializableCodec : IGeneralizedCodec

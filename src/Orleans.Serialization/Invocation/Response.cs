@@ -26,7 +26,7 @@ namespace Orleans.Serialization.Invocation
 
         public abstract void Dispose();
 
-        public virtual object GetResultOrDefault() => Exception is { } ? Result : default;
+        public virtual object GetResultOrDefault() => Exception switch { null => Result, _ => default };
 
         public override string ToString()
         {

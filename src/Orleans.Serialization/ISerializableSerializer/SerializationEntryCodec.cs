@@ -5,7 +5,7 @@ using System;
 using System.Buffers;
 using System.Security;
 
-namespace Orleans.Serialization.ISerializableSupport
+namespace Orleans.Serialization
 {
     internal sealed class SerializationEntryCodec : IFieldCodec<SerializationEntrySurrogate>
     {

@@ -78,7 +78,7 @@ namespace Orleans.Storage
         /// <param name="grainState">The grain state.</param>
         /// <param name="tag">An optional tag parameter that might be used by the storage parameter for "out-of-band" contracts.</param>
         /// <returns>A serializer or <em>null</em> if not match was found.</returns>
-        SerializationChoice PickDeserializer(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null);
+        SerializationChoice PickDeserializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null);
 
         /// <summary>Picks a serializer using the given parameters.</summary>
         /// <param name="serviceId">The ID of the current service.</param>
@@ -88,6 +88,6 @@ namespace Orleans.Storage
         /// <param name="grainState">The grain state.</param>
         /// <param name="tag">An optional tag parameter that might be used by the storage parameter for "out-of-band" contracts.</param>
         /// <returns>A deserializer or <em>null</em> if not match was found.</returns>
-        SerializationChoice PickSerializer(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState grainState, string tag = null);
+        SerializationChoice PickSerializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null);
     }
 }

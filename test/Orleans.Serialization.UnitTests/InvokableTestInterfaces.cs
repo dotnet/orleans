@@ -11,11 +11,11 @@ public interface IHasNoNamespace : IMyInvokableBaseType
 
 namespace Orleans.Serialization.UnitTests
 {
-    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
-    [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
-    [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
-    [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
-    [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
+    [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
+    [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
+    [DefaultInvokableBaseType(typeof(Task), typeof(UnitTestTaskRequest))]
+    [DefaultInvokableBaseType(typeof(void), typeof(UnitTestVoidRequest))]
     public abstract class MyInvokableProxyBase
     {
         protected void SendRequest(IResponseCompletionSource callback, IInvokable body)
@@ -29,11 +29,11 @@ namespace Orleans.Serialization.UnitTests
         protected ValueTask InvokeAsync(IInvokable body) => default;
     }
 
-    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
-    [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
-    [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
-    [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
-    [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+    [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
+    [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
+    [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
+    [DefaultInvokableBaseType(typeof(Task), typeof(UnitTestTaskRequest))]
+    [DefaultInvokableBaseType(typeof(void), typeof(UnitTestVoidRequest))]
     public abstract class AltInvokableProxyBase
     {
         protected void InvokeVoid(IInvokable body)
