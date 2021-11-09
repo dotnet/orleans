@@ -161,6 +161,14 @@ namespace Orleans.ServiceBus.Providers
                 this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
                     "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.Path,
                     this.settings.Partition, ex);
+
+                if (ex is ArgumentException ae)
+                {
+                    
+                    // if the cause was stale offset information, reset
+                    await this.checkpointer.Reset();
+                }
+
                 throw;
             }
 

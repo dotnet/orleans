@@ -116,6 +116,11 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
+        /// Resets/deletes the saved checkpoint offset
+        /// </summary>
+        public async Task Reset() => await dataManager.DeleteTableEntryAsync(entity, entity.ETag);
+
+        /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
         /// </summary>
         /// <param name="offset"></param>

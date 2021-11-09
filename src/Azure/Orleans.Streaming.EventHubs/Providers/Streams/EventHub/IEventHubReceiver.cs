@@ -51,6 +51,7 @@ namespace Orleans.ServiceBus.Providers
                 ? new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.FullyQualifiedNamespace, options.Path, options.TokenCredential, receiverOptions)
                 : new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.ConnectionString, options.Path, receiverOptions);
 
+
             EventPosition GetEventPosition()
             {
                 EventPosition eventPosition;
