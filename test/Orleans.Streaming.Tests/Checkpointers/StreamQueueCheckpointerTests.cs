@@ -61,6 +61,20 @@ public abstract class StreamQueueCheckpointerTests
     }
 
     [Fact]
+    public async Task Reset_ClearsPersistedCheckpoint()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+
+        await checkpointer.Reset(CancellationToken.None);
+
+        Assert.False(checkpointer.CheckpointExists);
+        Assert.Equal(NoCheckpoint, await checkpointer.Load(CancellationToken.None));
+        Assert.Equal(NoCheckpoint, store.PersistedCheckpoint);
+        Assert.Equal([NoCheckpoint], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint], store.CompletedWrites);
+    }
+
+    [Fact]
     public async Task Update_PersistsCheckpoint()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");

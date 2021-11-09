@@ -58,6 +58,22 @@ namespace Orleans.Streams
 #pragma warning restore CS0618
 
         /// <summary>
+        /// Clears the persisted checkpoint.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        Task Reset() => throw new NotSupportedException("This checkpointer does not support resetting checkpoints.");
+
+        /// <summary>
+        /// Clears the persisted checkpoint.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+#pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
+        Task Reset(CancellationToken cancellationToken) => Reset();
+#pragma warning restore CS0618
+
+        /// <summary>
         /// Updates the checkpoint.
         /// </summary>
         /// <param name="offset">The offset.</param>

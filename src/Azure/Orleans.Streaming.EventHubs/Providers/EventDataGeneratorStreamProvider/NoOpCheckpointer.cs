@@ -1,5 +1,6 @@
 using Orleans.Streams;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs.Testing
@@ -22,7 +23,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     }
     /// <summary>
     /// NoOpCheckpointer is used in EventDataGeneratorStreamProvider ecosystem to replace the default Checkpointer which requires a back end storage. In EventHubDataGeneratorStreamProvider,
-    /// it is generating EventData on the fly when receiver pull messages from the queue, which means it doesn't support recoverable stream, hence check pointing won't bring much value there. 
+    /// it is generating EventData on the fly when receiver pull messages from the queue, which means it doesn't support recoverable stream, hence check pointing won't bring much value there.
     /// So a checkpointer with no ops should be enough.
     /// </summary>
     public class NoOpCheckpointer : IStreamQueueCheckpointer<string>
@@ -40,6 +41,16 @@ namespace Orleans.Streaming.EventHubs.Testing
         {
             return Task.FromResult(EventHubConstants.StartOfStream);
         }
+        /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public Task Reset() => Task.CompletedTask;
+
+        /// <inheritdoc />
+        public Task Reset(CancellationToken cancellationToken)
+            => cancellationToken.IsCancellationRequested
+                ? Task.FromCanceled(cancellationToken)
+                : Task.CompletedTask;
+
         /// <summary>
         /// Ignores a checkpoint update because generated-event streams do not persist checkpoints.
         /// </summary>
