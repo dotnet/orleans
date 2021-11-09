@@ -53,6 +53,13 @@ namespace Orleans.Streaming.Kinesis
 
         /// <inheritdoc />
         [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public Task Reset() => Reset(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task Reset(CancellationToken cancellationToken) => _inner.Reset(cancellationToken);
+
+        /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public void Update(string offset, DateTime utcNow)
             => Update(offset, utcNow, CancellationToken.None);
 

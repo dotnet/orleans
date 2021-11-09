@@ -208,6 +208,11 @@ namespace Orleans.Streaming.EventHubs
                 watch.Stop();
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
                 LogWarningFailedToReadFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition, ex);
+
+                if (ex is ArgumentException && this.checkpointer?.CheckpointExists == true)
+                {
+                    await ResetReceiver(cancellationToken);
+                }
                 throw;
             }
 
@@ -232,6 +237,32 @@ namespace Orleans.Streaming.EventHubs
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
             return batches;
+        }
+
+        private async Task ResetReceiver(CancellationToken cancellationToken)
+        {
+            var checkpointer = Interlocked.Exchange(ref this.checkpointer, null);
+            var receiver = Interlocked.Exchange(ref this.receiver, null);
+            var cache = Interlocked.Exchange(ref this.cache, null);
+
+            try
+            {
+                await checkpointer!.Reset(cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    cache?.Dispose();
+                }
+                finally
+                {
+                    if (receiver is not null)
+                    {
+                        await receiver.CloseAsync(cancellationToken);
+                    }
+                }
+            }
         }
 
         public void AddToCache(IList<IBatchContainer> messages)
