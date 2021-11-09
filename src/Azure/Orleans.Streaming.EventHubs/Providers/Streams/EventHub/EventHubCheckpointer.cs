@@ -110,6 +110,13 @@ namespace Orleans.Streaming.EventHubs
             return CheckpointExists ? checkpoint : EventHubConstants.StartOfStream;
         }
 
+        /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public Task Reset() => Reset(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task Reset(CancellationToken cancellationToken) => _inner.Reset(cancellationToken);
+
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
         /// The latest offset is always tracked in memory so that <see cref="FlushAsync(CancellationToken)"/> can persist it on shutdown.

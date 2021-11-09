@@ -377,6 +377,11 @@ namespace Orleans.Streaming.EventHubs
 
         public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task Reset() { throw null; }
+
+        public System.Threading.Tasks.Task Reset(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
 
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
@@ -727,6 +732,11 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task Reset() { throw null; }
+
+        public System.Threading.Tasks.Task Reset(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Update(string offset, System.DateTime utcNow) { }
     }
 
@@ -765,6 +775,11 @@ namespace Orleans.Streams
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task Reset() { throw null; }
+
+        public System.Threading.Tasks.Task Reset(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Update(string offset, System.DateTime utcNow) { }
     }
