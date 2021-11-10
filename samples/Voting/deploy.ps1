@@ -1,7 +1,7 @@
 $resourceGroup = "votingapp"
 $location = "westus"
 $clusterName = "votingapp"
-$containerRegistry = "votingapp2acr"
+$containerRegistry = "dncvotingapp"
 
 $acrLoginServer = $(az acr show --name $containerRegistry --resource-group $resourceGroup --query loginServer).Trim('"')
 az acr login --name $containerRegistry
