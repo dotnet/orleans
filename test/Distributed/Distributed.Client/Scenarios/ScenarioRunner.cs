@@ -7,6 +7,7 @@ using Distributed.GrainInterfaces;
 using Microsoft.Crank.EventSources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -28,14 +29,15 @@ namespace Distributed.Client.Scenarios
         const int REPORT_BLOCK_SIZE = 100000;
 
         private readonly IScenario<T> _scenario;
-
+        private readonly ILogger _logger;
         private SemaphoreSlim _concurrencyGuard;
         private volatile int _errorCounter;
         private volatile int _requestCounter;
 
-        public ScenarioRunner(IScenario<T> scenario)
+        public ScenarioRunner(IScenario<T> scenario, ILoggerFactory loggerFactory)
         {
             _scenario = scenario;
+            _logger = loggerFactory.CreateLogger(scenario.Name);
         }
 
         public async Task Run(CommonParameters commonParameters, T scenarioParameters)
@@ -43,7 +45,7 @@ namespace Distributed.Client.Scenarios
             var requests = commonParameters.Requests != 0 ? commonParameters.Requests : int.MaxValue;
             var duration = commonParameters.Duration != 0 ? TimeSpan.FromSeconds(commonParameters.Duration) : TimeSpan.MaxValue;
 
-            WriteLog("Connecting to cluster...");
+            _logger.LogInformation("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(commonParameters.SecretSource);
             var hostBuilder = new HostBuilder()
                 .UseOrleansClient(builder => {
@@ -56,11 +58,11 @@ namespace Distributed.Client.Scenarios
 
             var client = host.Services.GetService<IClusterClient>();
 
-            WriteLog("Initializing...");
-            await _scenario.Initialize(client, scenarioParameters);
+            _logger.LogInformation("Initializing...");
+            await _scenario.Initialize(client, scenarioParameters, _logger);
             _concurrencyGuard = new SemaphoreSlim(commonParameters.PipelineSize);
 
-            WriteLog("Starting load");
+            _logger.LogInformation("Starting load");
             var cts = new CancellationTokenSource(duration);
             var stopwatch = Stopwatch.StartNew();
             for (var i = 0; i < requests; i++)
@@ -78,10 +80,10 @@ namespace Distributed.Client.Scenarios
                 await Task.Delay(100);
             }
             stopwatch.Stop();
-            WriteLog($"Done {_requestCounter,10:N0} requests in {stopwatch.Elapsed}");
+            _logger.LogInformation($"Done {_requestCounter,10:N0} requests in {stopwatch.Elapsed}");
 
             var rps = _requestCounter / (stopwatch.ElapsedMilliseconds / 1000.0f);
-            WriteLog($"RESULTS: requests={_requestCounter} rps={rps} errors={_errorCounter}");
+            _logger.LogInformation($"RESULTS: requests={_requestCounter} rps={rps} errors={_errorCounter}");
 
             BenchmarksEventSource.Register("requests", Operations.First, Operations.Sum, "Requests", "Number of requests", "n0");
             BenchmarksEventSource.Register("errors", Operations.First, Operations.Sum, "Errors", "Number of errors", "n0");
@@ -112,11 +114,9 @@ namespace Distributed.Client.Scenarios
                 var requests = Interlocked.Increment(ref _requestCounter);
                 if (requests % REPORT_BLOCK_SIZE == 0)
                 {
-                    WriteLog($"Done {requests,10:N0} requests ({_errorCounter,4:N0} errors)");
+                    _logger.LogInformation($"Done {requests,10:N0} requests ({_errorCounter,4:N0} errors)");
                 }
             }
         }
-
-        private static void WriteLog(string log) => Console.WriteLine(log);
     }
 }

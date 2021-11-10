@@ -7,6 +7,7 @@ using Distributed.GrainInterfaces.Streaming;
 using Microsoft.Crank.EventSources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -15,6 +16,8 @@ namespace Distributed.Client.Commands
 {
     public class CounterCaptureCommand : Command
     {
+        private readonly ILogger _logger;
+
         private class Parameters
         {
             public string ServiceId { get; set; }
@@ -24,7 +27,7 @@ namespace Distributed.Client.Commands
             public List<string> Counters { get; set; }
         }
 
-        public CounterCaptureCommand()
+        public CounterCaptureCommand(ILogger logger)
             : base("counter", "capture the counters in parameter")
         {
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
@@ -34,11 +37,12 @@ namespace Distributed.Client.Commands
             AddArgument(new Argument<List<string>>("Counters") { Arity = ArgumentArity.OneOrMore });
 
             Handler = CommandHandler.Create<Parameters>(RunAsync);
+            _logger = logger;
         }
 
         private async Task RunAsync(Parameters parameters)
         {
-            WriteLog("Connecting to cluster...");
+            _logger.LogInformation("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(parameters.SecretSource);
             var hostBuilder = new HostBuilder()
                 .UseOrleansClient(builder => {
@@ -59,14 +63,14 @@ namespace Distributed.Client.Commands
 
             var initialWait = await counterGrain.WaitTimeForReport();
 
-            WriteLog($"Counters should be ready in {initialWait}");
+            _logger.LogInformation($"Counters should be ready in {initialWait}");
             await Task.Delay(initialWait);
 
-            WriteLog($"Counters ready");
+            _logger.LogInformation($"Counters ready");
             foreach (var counter in parameters.Counters)
             {
                 var value = await counterGrain.GetTotalCounterValue(counter);
-                WriteLog($"{counter}: {value}");
+                _logger.LogInformation($"{counter}: {value}");
                 BenchmarksEventSource.Register(counter, Operations.First, Operations.Sum, counter, counter, "n0");
                 BenchmarksEventSource.Measure(counter, value);
                 if (string.Compare(counter, "requests", StringComparison.InvariantCultureIgnoreCase) == 0)
@@ -79,7 +83,5 @@ namespace Distributed.Client.Commands
 
             await host.StopAsync();
         }
-
-        private static void WriteLog(string log) => Console.WriteLine(log);
     }
 }

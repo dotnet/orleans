@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Distributed.Client.Scenarios;
 using Distributed.GrainInterfaces;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -20,10 +21,10 @@ namespace Distributed.Client.Commands
     {
         private readonly ScenarioRunner<T> _runner;
 
-        public ScenarioCommand(IScenario<T> scenario)
+        public ScenarioCommand(IScenario<T> scenario, ILoggerFactory loggerFactory)
             : base(scenario.Name)
         {
-            _runner = new ScenarioRunner<T>(scenario);
+            _runner = new ScenarioRunner<T>(scenario, loggerFactory);
 
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
             AddOption(OptionHelper.CreateOption<string>("--clusterId", isRequired: true));
@@ -43,6 +44,6 @@ namespace Distributed.Client.Commands
 
     public static class Scenario
     {
-        public static Command CreateCommand<T>(IScenario<T> scenario) => new ScenarioCommand<T>(scenario);
+        public static Command CreateCommand<T>(IScenario<T> scenario, ILoggerFactory loggerFactory) => new ScenarioCommand<T>(scenario, loggerFactory);
     }
 }

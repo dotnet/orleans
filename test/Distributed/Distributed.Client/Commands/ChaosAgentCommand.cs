@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Distributed.Common;
 using Distributed.GrainInterfaces.Streaming;
 using Microsoft.Crank.EventSources;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -16,6 +17,8 @@ namespace Distributed.Client.Commands
 {
     public class ChaosAgentCommand : Command
     {
+        private readonly ILogger _logger;
+
         private class Parameters
         {
             public string ServiceId { get; set; }
@@ -29,7 +32,7 @@ namespace Distributed.Client.Commands
             public bool Restart { get; set; }
         }
 
-        public ChaosAgentCommand()
+        public ChaosAgentCommand(ILogger logger)
             : base("chaosagent", "Shutdown/restart servers gracefully or not")
         {
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
@@ -43,6 +46,7 @@ namespace Distributed.Client.Commands
             AddOption(OptionHelper.CreateOption<bool>("--restart", defaultValue: false));
 
             Handler = CommandHandler.Create<Parameters>(RunAsync);
+            _logger = logger;
         }
 
         private async Task RunAsync(Parameters parameters)
@@ -50,17 +54,17 @@ namespace Distributed.Client.Commands
             var secrets = SecretConfiguration.Load(parameters.SecretSource);
             var channel = await Channels.CreateSendChannel(parameters.ClusterId, secrets);
 
-            WriteLog($"Waiting {parameters.Wait} seconds before starting...");
+            _logger.LogInformation($"Waiting {parameters.Wait} seconds before starting...");
             await Task.Delay(TimeSpan.FromSeconds(parameters.Wait));
 
             for (var i=0; i<parameters.Rounds; i++)
             {
-                WriteLog($"Round #{i + 1}: sending {parameters.ServersPerRound} orders [Restart: {parameters.Restart}, Graceful: {parameters.Graceful}]");
+                _logger.LogInformation($"Round #{i + 1}: sending {parameters.ServersPerRound} orders [Restart: {parameters.Restart}, Graceful: {parameters.Graceful}]");
                 var responses = await channel.SendMessages(
                     GetMessages(),
                     new CancellationTokenSource(TimeSpan.FromSeconds(parameters.RoundDelay)).Token);
-                WriteLog($"Round #{i + 1}: silos {string.Join(",", responses.Select(r => r.SiloName))} acked");
-                WriteLog($"Round #{i + 1}: waiting {parameters.RoundDelay}");
+                _logger.LogInformation($"Round #{i + 1}: silos {string.Join(",", responses.Select(r => r.SiloName))} acked");
+                _logger.LogInformation($"Round #{i + 1}: waiting {parameters.RoundDelay}");
                 await Task.Delay(TimeSpan.FromSeconds(parameters.RoundDelay));
             }
 
@@ -74,7 +78,5 @@ namespace Distributed.Client.Commands
                 return msgs;
             }
         }
-
-        private static void WriteLog(string log) => Console.WriteLine(log);
     }
 }

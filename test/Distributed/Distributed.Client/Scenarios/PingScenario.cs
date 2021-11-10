@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Distributed.GrainInterfaces;
 using Distributed.GrainInterfaces.Ping;
+using Microsoft.Extensions.Logging;
 using Orleans;
 
 namespace Distributed.Client.Scenarios
@@ -25,7 +26,7 @@ namespace Distributed.Client.Scenarios
             OptionHelper.CreateOption<bool>("--doWarmup", defaultValue: true),
         };
 
-        public async Task Initialize(IClusterClient clusterClient, Parameters p)
+        public async Task Initialize(IClusterClient clusterClient, Parameters p, ILogger logger)
         {
             _clusterClient = clusterClient;
             _requestList = new List<(IPingRouterGrain Router, Guid[] Targets)>(p.Routers);
@@ -42,7 +43,14 @@ namespace Distributed.Client.Scenarios
 
                 if (p.DoWarmup)
                 {
-                    await routerGrain.Ping(targetIds);
+                    try
+                    {
+                        await routerGrain.Ping(targetIds);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Error during warmup. Ignoring.");
+                    }
                 }
 
                 _requestList.Add((routerGrain, targetIds));
