@@ -30,7 +30,9 @@ namespace Orleans.Runtime
 
         private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
 
+#if !NET5_0_OR_GREATER
         private static readonly CachedReflectionOnlyTypeResolver ReflectionOnlyTypeResolver = new CachedReflectionOnlyTypeResolver();
+#endif
 
         public static string GetSimpleTypeName(Type type, Predicate<Type> fullName = null)
         {
@@ -398,8 +400,7 @@ namespace Orleans.Runtime
 
         public static bool IsConcreteGrainClass(Type type)
         {
-            IEnumerable<string> complaints;
-            return IsConcreteGrainClass(type, out complaints, complain: false);
+            return IsConcreteGrainClass(type, out _, complain: false);
         }
 
         public static bool IsGeneratedType(Type type)
@@ -481,7 +482,7 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {
-#if NETCOREAPP
+#if NET5_0_OR_GREATER
             return false;
 #else
             try
@@ -505,11 +506,18 @@ namespace Orleans.Runtime
 
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
         {
+#if NET5_0_OR_GREATER
+            throw new PlatformNotSupportedException();
+#else
             return ReflectionOnlyTypeResolver.ResolveType(assemblyQualifiedName);
+#endif
         }
 
         public static Type ToReflectionOnlyType(Type type)
         {
+#if NET5_0_OR_GREATER
+            return type;
+#else
             if (CanUseReflectionOnly)
             {
                 return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
@@ -518,6 +526,7 @@ namespace Orleans.Runtime
             {
                 return type;
             }
+#endif
         }
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, ILogger logger)

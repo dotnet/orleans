@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,14 +21,14 @@ namespace Orleans.Transactions.TestKit
 
             await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
             Func<Task> task = () => coordinator.AddAndThrow(grain, expected);
-            task.ShouldThrow<OrleansTransactionAbortedException>();
+            await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
 
             await TestAfterDustSettles(async () =>
             {
                 int[] actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             });
         }
@@ -51,7 +51,7 @@ namespace Orleans.Transactions.TestKit
             {
                 throwGrain
             }, grains, expected);
-            task.ShouldThrow<OrleansTransactionAbortedException>();
+            await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
             grains.Add(throwGrain);
 
             await TestAfterDustSettles(async () =>
@@ -61,7 +61,7 @@ namespace Orleans.Transactions.TestKit
                     int[] actualValues = await grain.Get();
                     foreach (var actual in actualValues)
                     {
-                        actual.ShouldBeEquivalentTo(expected);
+                        actual.Should().Be(expected);
                     }
                 }
             });
@@ -99,7 +99,7 @@ namespace Orleans.Transactions.TestKit
             }
 
             Func<Task> task = () => InnerExceptionCheck();
-            task.ShouldThrow<OrleansTransactionAbortedException>();
+            await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
 
             grains.AddRange(throwGrains);
 
@@ -110,7 +110,7 @@ namespace Orleans.Transactions.TestKit
                     int[] actualValues = await grain.Get();
                     foreach (var actual in actualValues)
                     {
-                        actual.ShouldBeEquivalentTo(expected);
+                        actual.Should().Be(expected);
                     }
                 }
             });
@@ -125,7 +125,7 @@ namespace Orleans.Transactions.TestKit
 
             await grain.Set(expected);
             Func<Task> task = () => coordinator.OrphanCallTransaction(grain);
-            task.ShouldThrow<OrleansOrphanCallException>();
+            await task.Should().ThrowAsync<OrleansOrphanCallException>();
 
             //await Task.Delay(20000); // give time for GC
 
@@ -134,7 +134,7 @@ namespace Orleans.Transactions.TestKit
                 int[] actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             });
         }

@@ -1,4 +1,5 @@
-﻿using Xunit;
+using System.Threading.Tasks;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
@@ -10,16 +11,16 @@ namespace Orleans.Transactions.TestKit.xUnit
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
+        public override async Task TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
-             base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
+             await base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
         }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
+        public override async Task MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
-            base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
+            await base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
         }
     }
 }

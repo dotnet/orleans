@@ -18,5 +18,5 @@
     <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
-  
+
 </Project>

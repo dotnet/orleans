@@ -8,6 +8,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
     public class BinaryFormatterSerializer : IExternalSerializer, ISurrogateSelector
     {
         private ISurrogateSelector _nextSurrogateSelector;
@@ -186,3 +187,4 @@ namespace Orleans.Serialization
         }
     }
 }
+#pragma warning restore SYSLIB0011 // Type or member is obsolete

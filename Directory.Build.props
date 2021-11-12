@@ -10,15 +10,25 @@
     <Product>Microsoft Orleans</Product>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnet/orleans</PackageProjectUrl>
     <PackageIcon>logo_128.png</PackageIcon>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
-    <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
+    <RepositoryUrl>https://github.com/dotnet/orleans</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PrivateRepositoryUrl>$(RepositoryUrl)</PrivateRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
     <LangVersion>latest</LangVersion>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>embedded</DebugType>
+    <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,8 +40,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);1591;2003</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <!-- We use full (Windows PDBs) until cross platform support for source link will get better -->
-    <DebugType>full</DebugType>
   </PropertyGroup>
 
   <!-- FSharp SDK overrides -->
@@ -44,95 +52,102 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
-    <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
+    <SystemDataSqlClientVersion>4.8.3</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
-    <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
-    <SystemConfigurationConfigurationManagerVersion>5.0.0</SystemConfigurationConfigurationManagerVersion>
-    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
-    <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
-    <SystemManagementVersion>4.7.0</SystemManagementVersion>
-    <SystemDiagnosticsPerformanceCounterVersion>4.7.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemDiagnosticsEventLogVersion>6.0.0</SystemDiagnosticsEventLogVersion>
+    <SystemConfigurationConfigurationManagerVersion>6.0.0</SystemConfigurationConfigurationManagerVersion>
+    <SystemCollectionsImmutableVersion>6.0.0</SystemCollectionsImmutableVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>6.0.0</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemManagementVersion>6.0.0</SystemManagementVersion>
+    <SystemDiagnosticsPerformanceCounterVersion>6.0.0</SystemDiagnosticsPerformanceCounterVersion>
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
-    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemReflectionMetadataVersion>6.0.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.7.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
     <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.4</SystemThreadingTasksExtensionsVersion>
-    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
+    <SystemThreadingChannelsVersion>6.0.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.1</SystemBuffersVersion>
-    <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
-    <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
-    <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
-    <SystemSecurityPermissionsVersion>5.0.0</SystemSecurityPermissionsVersion>
-    <SystemSecurityCryptographyProtectedDataVersion>4.7.0</SystemSecurityCryptographyProtectedDataVersion>
-    <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
-    <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
+    <SystemMemoryVersion>4.5.4</SystemMemoryVersion>
+    <SystemIOPipelinesVersion>6.0.0</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>6.0.0</SystemCodeDomVersion>
+    <SystemSecurityPermissionsVersion>6.0.0</SystemSecurityPermissionsVersion>
+    <SystemSecurityCryptographyProtectedDataVersion>6.0.0</SystemSecurityCryptographyProtectedDataVersion>
+    <SystemDiagnosticsDiagnosticsSourceVersion>6.0.0</SystemDiagnosticsDiagnosticsSourceVersion>
+    <SystemSecurityCryptographyCngVersion>5.0.0</SystemSecurityCryptographyCngVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>3.11.0</MicrosoftCodeAnalysisVersion>
-    <MicrosoftWin32RegistryVersion>4.7.0</MicrosoftWin32RegistryVersion>
-    <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
-    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <MicrosoftBuildVersion>17.0.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
+    <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
+    <MicrosoftBclAsyncInterfacesVersion>6.0.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.2</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
-    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
-    <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>3.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>3.0.0</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>3.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
-    <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>3.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsHttpVersion>3.0.0</MicrosoftExtensionsHttpVersion>
-    <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
-    <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>6.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>6.0.0</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>6.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>6.0.0</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>6.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>6.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsDependencyModelVersion>6.0.0</MicrosoftExtensionsDependencyModelVersion>
+    <MicrosoftExtensionsLoggingVersion>6.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsObjectPoolVersion>6.0.0</MicrosoftExtensionsObjectPoolVersion>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>6.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
+    <MicrosoftExtensionsOptionsVersion>6.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>6.0.0</MicrosoftExtensionsHttpVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>6.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>6.0.0</MicrosoftExtensionsHostingVersion>
 
-    <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <AzureDataTablesVersion>12.2.0</AzureDataTablesVersion>
-    <AzureCoreVersion>1.19.0</AzureCoreVersion>
-    <AzureIdentityVersion>1.4.1</AzureIdentityVersion>
-    <AzureMessagingEventHubs>5.6.0</AzureMessagingEventHubs>
+    <MicrosoftApplicationInsightsVersion>2.19.0</MicrosoftApplicationInsightsVersion>
+    <AzureDataTablesVersion>12.3.0</AzureDataTablesVersion>
+    <AzureCoreVersion>1.21.0</AzureCoreVersion>
+    <AzureIdentityVersion>1.5.0</AzureIdentityVersion>
+    <AzureMessagingEventHubs>5.6.2</AzureMessagingEventHubs>
     <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
-    <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
+    <MicrosoftDataSQLiteVersion>6.0.0</MicrosoftDataSQLiteVersion>
+    <MicrosoftDataSqlClientVersion>4.0.0</MicrosoftDataSqlClientVersion>
+    <MicrosoftServiceFabricServicesVersion>5.2.1235</MicrosoftServiceFabricServicesVersion>
 
-    <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
+    <FSharpCoreVersion>6.0.1</FSharpCoreVersion>
 
     <!-- 3rd party packages -->
-    <AWSSDKDynamoDBv2Version>3.5.0.7</AWSSDKDynamoDBv2Version>
-    <AWSSDKSQSVersion>3.5.0.7</AWSSDKSQSVersion>
-    <BondCoreCSharpVersion>5.3.1</BondCoreCSharpVersion>
+    <AWSSDKDynamoDBv2Version>3.7.0.97</AWSSDKDynamoDBv2Version>
+    <AWSSDKSQSVersion>3.7.1.39</AWSSDKSQSVersion>
+    <BondCoreCSharpVersion>9.0.5</BondCoreCSharpVersion>
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
-    <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
-    <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
-    <MySqlDataVersion>8.0.18</MySqlDataVersion>
+    <GoogleProtobufVersion>3.19.1</GoogleProtobufVersion>
+    <ProtobufNetVersion>3.0.101</ProtobufNetVersion>
+    <MySqlDataVersion>8.0.27</MySqlDataVersion>
+    <MySqlConnectorVersion>2.0.0</MySqlConnectorVersion>
+    <MoqVersion>4.16.1</MoqVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
-    <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>4.2.0</NSubstituteVersion>
-    <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
-    <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
-    <StackExchangeRedis>2.0.601</StackExchangeRedis>
+    <NewtonsoftJsonVersion>13.0.1</NewtonsoftJsonVersion>
+    <NpgsqlVersion>6.0.0</NpgsqlVersion>
+    <NSubstituteVersion>4.2.2</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
+    <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
+    <StackExchangeRedis>2.2.88</StackExchangeRedis>
     <Netstandard20KubernetesClientVersion>4.0.5</Netstandard20KubernetesClientVersion>
-    <KubernetesClientVersion>6.0.19</KubernetesClientVersion>
+    <KubernetesClientVersion>6.0.23</KubernetesClientVersion>
 
     <!-- Test related packages -->
-    <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <MicrosoftTestSdkVersion>16.4.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.12.0</BenchmarkDotNetVersion>
-    <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
+    <FluentAssertionsVersion>6.2.0</FluentAssertionsVersion>
+    <MicrosoftTestSdkVersion>17.0.0</MicrosoftTestSdkVersion>
+    <BenchmarkDotNetVersion>0.13.1</BenchmarkDotNetVersion>
+    <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
-    <NodaTimeVersion>2.4.7</NodaTimeVersion>
+    <xUnitRunnerVersion>2.4.3</xUnitRunnerVersion>
+    <NodaTimeVersion>3.0.9</NodaTimeVersion>
+    <AutofacExtensionsDependencyInjectionVersion>7.2.0</AutofacExtensionsDependencyInjectionVersion>
+    <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
 
     <!-- Tooling related packages -->
-    <SourceLinkVersion>2.8.3</SourceLinkVersion>
+    <SourceLinkVersion>1.1.1</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->

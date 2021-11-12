@@ -83,11 +83,11 @@ namespace TestServiceFabric
 
             var siloAddress = publishedEndpoints.SiloAddress;
             siloAddress.Generation.Should().NotBe(0);
-            siloAddress.Endpoint.Port.ShouldBeEquivalentTo(9082);
+            siloAddress.Endpoint.Port.Should().Be(9082);
 
             var gatewayAddress = publishedEndpoints.GatewayAddress;
             gatewayAddress.Generation.Should().Be(0);
-            gatewayAddress.Endpoint.Port.ShouldBeEquivalentTo(8888);
+            gatewayAddress.Endpoint.Port.Should().Be(8888);
 
             await siloHost.ReceivedWithAnyArgs(1).StartAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));
             await siloHost.DidNotReceive().StopAsync(Arg.Any<CancellationToken>());

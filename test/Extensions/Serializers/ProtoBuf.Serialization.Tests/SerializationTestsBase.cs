@@ -92,7 +92,7 @@ namespace ProtoBuf.Serialization.Tests
             var input = new OrleansType();
             var output = this._environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
-            input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
+            input.Should().BeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
@@ -101,7 +101,7 @@ namespace ProtoBuf.Serialization.Tests
             var input = CreatePerson();
             var output = this._environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
-            input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
+            input.Should().BeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
@@ -110,7 +110,7 @@ namespace ProtoBuf.Serialization.Tests
             var input = CreateCounter();
             var output = this._environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
-            input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
+            input.Should().BeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
@@ -119,7 +119,7 @@ namespace ProtoBuf.Serialization.Tests
             var input = CreatePerson();
             var output = this._environment.SerializationManager.DeepCopy(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
-            input.ShouldBeEquivalentTo(output); ; //The serialization didn't preserve the proper value
+            input.Should().BeEquivalentTo(output); ; //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
@@ -136,7 +136,7 @@ namespace ProtoBuf.Serialization.Tests
             var input = CreateDefaultCounter();
             var output = this._environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
-            input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
+            input.Should().BeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
     }
 }

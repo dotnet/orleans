@@ -37,7 +37,7 @@ namespace ProtoBuf.Serialization.Tests
             }
 
             Assert.NotSame(person, person2); //The serializer returned an instance of the same object
-            person.ShouldBeEquivalentTo(person2);
+            person.Should().BeEquivalentTo(person2);
         }
     }
 }

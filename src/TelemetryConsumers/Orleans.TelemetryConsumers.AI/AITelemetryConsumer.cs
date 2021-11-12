@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.ApplicationInsights;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -13,18 +14,21 @@ namespace Orleans.TelemetryConsumers.AI
     public class AITelemetryConsumer : ITraceTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer,
         IDependencyTelemetryConsumer, IMetricTelemetryConsumer, IRequestTelemetryConsumer
     {
+        private const string DependencyTypeName = "Microsoft.Orleans";
         private readonly TelemetryClient _client;
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="options">The instrumentation key for ApplicationInsights.</param>
-        public AITelemetryConsumer(IOptions<ApplicationInsightsTelemetryConsumerOptions> options)
+        public AITelemetryConsumer(IOptions<ApplicationInsightsTelemetryConsumerOptions> options, IServiceProvider serviceProvider)
         {
             var instrumentationKey = options.Value.InstrumentationKey;
             this._client = instrumentationKey != null
                 ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
-                : new TelemetryClient();
+                : serviceProvider.GetService<TelemetryClient>()
+#pragma warning disable CS0618 // Type or member is obsolete
+                ?? new TelemetryClient();
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <inheritdoc />
@@ -45,7 +49,7 @@ namespace Orleans.TelemetryConsumers.AI
 
         /// <inheritdoc />
         public virtual void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success) =>
-            this._client.TrackDependency(dependencyName, commandName, startTime, duration, success);
+            this._client.TrackDependency(DependencyTypeName, dependencyName, commandName, startTime, duration, success);
 
         /// <inheritdoc />
         public virtual void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null) =>

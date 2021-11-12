@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,7 +21,7 @@ namespace Orleans.Transactions.TestKit
             //each transaction state should all be 0 since no operation was applied yet
             foreach (var actual in actualResults)
             {
-                actual.ShouldBeEquivalentTo(expected);
+                actual.Should().Be(expected);
             }
         }
 
@@ -33,7 +33,7 @@ namespace Orleans.Transactions.TestKit
             await grain.Add(delta);
             var expected = original.Select(value => value + delta).ToArray();
             var actual = await grain.Get();
-            actual.ShouldBeEquivalentTo(expected);
+            actual.Should().BeEquivalentTo(expected);
         }
 
         public virtual async Task MultiGrainWriteTransaction(string grainStates, int grainCount)
@@ -54,7 +54,7 @@ namespace Orleans.Transactions.TestKit
                 var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
         }
@@ -80,7 +80,7 @@ namespace Orleans.Transactions.TestKit
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) this.testOutput($"{grain} - failed");
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
         }
@@ -112,7 +112,7 @@ namespace Orleans.Transactions.TestKit
                     foreach (var actual in actualValues)
                     {
                         if (expected != actual) this.testOutput($"{grain} - failed");
-                        actual.ShouldBeEquivalentTo(expected);
+                        actual.Should().Be(expected);
                     }
                 }
             }
@@ -134,7 +134,7 @@ namespace Orleans.Transactions.TestKit
             int[] actualValues = await grains[0].Get();
             foreach (var actual in actualValues)
             {
-                actual.ShouldBeEquivalentTo(expected);
+                actual.Should().Be(expected);
             }
         }
 
@@ -158,7 +158,7 @@ namespace Orleans.Transactions.TestKit
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) this.testOutput($"{grain} - failed");
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
         }
@@ -183,7 +183,7 @@ namespace Orleans.Transactions.TestKit
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) this.testOutput($"{grain} - failed");
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
         }

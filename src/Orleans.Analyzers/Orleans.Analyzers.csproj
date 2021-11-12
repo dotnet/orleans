@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Analyzers</PackageId>
     <Title>Microsoft Orleans Analyzers</Title>
@@ -7,6 +7,9 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
+
+    <!-- Workaround for https://github.com/NuGet/Home/issues/10372 -->
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

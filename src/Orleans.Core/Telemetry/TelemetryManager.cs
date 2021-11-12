@@ -37,9 +37,8 @@ namespace Orleans.Runtime
 
         private static ITelemetryConsumer GetTelemetryConsumer(IServiceProvider serviceProvider, Type consumerType)
         {
-            ITelemetryConsumer consumer = null;
             // first check whether it is registered in the container already
-            consumer = (ITelemetryConsumer)serviceProvider.GetService(consumerType);
+            var consumer = (ITelemetryConsumer)serviceProvider.GetService(consumerType);
             if (consumer == null)
             {
                 consumer = (ITelemetryConsumer)ActivatorUtilities.CreateInstance(serviceProvider, consumerType);

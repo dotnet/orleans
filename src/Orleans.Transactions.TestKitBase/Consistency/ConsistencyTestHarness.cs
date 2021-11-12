@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
@@ -97,7 +97,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
                         foreach (var tuple in result)
                         {
-                            tuple.ExecutingTx.ShouldBeEquivalentTo(id); // all effects of this transaction must have same id
+                            tuple.ExecutingTx.Should().BeEquivalentTo(id); // all effects of this transaction must have same id
                             lock (tuples)
                             {
                                 if (!tuples.TryGetValue(tuple.Grain, out var versions))

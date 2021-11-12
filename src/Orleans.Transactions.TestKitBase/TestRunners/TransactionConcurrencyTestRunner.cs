@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,11 +33,11 @@ namespace Orleans.Transactions.TestKit
                 coordinator2.MultiGrainAdd(transaction2Members, expected));
 
             int[] actual = await grain1.Get();
-            expected.ShouldBeEquivalentTo(actual.FirstOrDefault());
+            expected.Should().Be(actual.FirstOrDefault());
             actual = await grain2.Get();
-            expected.ShouldBeEquivalentTo(actual.FirstOrDefault());
+            expected.Should().Be(actual.FirstOrDefault());
             actual = await sharedGrain.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected * 2);
+            actual.FirstOrDefault().Should().Be(expected * 2);
         }
 
         /// <summary>
@@ -70,15 +70,15 @@ namespace Orleans.Transactions.TestKit
                 coordinator4.MultiGrainAdd(transaction4Members, expected));
 
             int[] actual = await grain1.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected);
+            actual.FirstOrDefault().Should().Be(expected);
             actual = await grain2.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected*2);
+            actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain3.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected*2);
+            actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain4.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected*2);
+            actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain5.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected);
+            actual.FirstOrDefault().Should().Be(expected);
         }
 
         /// <summary>
@@ -107,13 +107,13 @@ namespace Orleans.Transactions.TestKit
                 coordinator3.MultiGrainAdd(transaction3Members, expected));
 
             int[] actual = await grain1.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected);
+            actual.FirstOrDefault().Should().Be(expected);
             actual = await grain2.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected*2);
+            actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain3.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected*2);
+            actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain4.Get();
-            actual.FirstOrDefault().ShouldBeEquivalentTo(expected);
+            actual.FirstOrDefault().Should().Be(expected);
         }
     }
 }
