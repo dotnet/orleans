@@ -4,6 +4,8 @@
 
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+![Discord](https://discordapp.com/api/guilds/333727978460676096/widget.png?style=shield)
+[![Follow on Twitter](https://img.shields.io/twitter/follow/msftorleans.svg?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=msftorleans)
 
 ### Orleans is a cross-platform framework for building robust, scalable distributed applications
 
@@ -204,7 +206,9 @@ or
 </details>
 
 ## Community
-
+    
+![Discord](https://discordapp.com/api/guilds/333727978460676096/widget.png?style=banner3)
+    
 * Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
 * [Chat on Gitter](https://gitter.im/dotnet/orleans)
 * [Orleans Blog](https://dotnet.github.io/orleans/blog/)
