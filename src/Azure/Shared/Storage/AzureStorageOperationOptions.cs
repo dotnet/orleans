@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
+using Azure;
 using Azure.Core;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Orleans.Runtime;
 
 #if ORLEANS_CLUSTERING
@@ -27,47 +29,139 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public class AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Azure Storage Policy Options
-        /// </summary>
-        public AzureStoragePolicyOptions StoragePolicyOptions { get; } = new AzureStoragePolicyOptions();
-        
-        /// <summary>
-        /// Connection string for Azure Cosmos DB Table
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
+        private const string DeprecationMessage = "Use ConfigureTableServiceClient instead. This property is deprecated.";
 
         /// <summary>
-        /// Use AAD to retrieve the account key
+        /// Deprecated: use ConfigureTableServiceClient instead.
         /// </summary>
-        public TokenCredential TokenCredential { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public string ConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
-        /// The table endpoint (e.g. https://x.table.cosmos.azure.com.) Required for specifying <see cref="TokenCredential"/>.
+        /// Deprecated: use ConfigureTableServiceClient instead.
         /// </summary>
-        public Uri TableEndpoint { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines, sets the ID of the table storage account
-        /// (e.g. <c>/subscriptions/88e5ceb6-26bd-4bf5-8933-f4e05fd9efa6/resourceGroups/rg1/providers/Microsoft.DocumentDB/databaseAccounts/ac1</c>)
+        /// Deprecated: use ConfigureTableServiceClient instead.
         /// </summary>
-        public string TableResourceId { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri TableEndpoint { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines the type of key.
+        /// Deprecated: use ConfigureTableServiceClient instead.
         /// </summary>
-        public TokenCredentialTableKey TokenCredentialTableKey { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public string TableResourceId { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
-        /// If <see cref="TokenCredential"/> is used, determines the management endpoint.
+        /// Deprecated: use ConfigureTableServiceClient instead.
         /// </summary>
-        public Uri TokenCredentialManagementUri { get; set; } = new Uri("https://management.azure.com/");
+        [Obsolete(DeprecationMessage, error: true)]
+        public object TokenCredentialTableKey { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
+        /// <summary>
+        /// Deprecated: use ConfigureTableServiceClient instead.
+        /// </summary>
+        [Obsolete(DeprecationMessage, error: true)]
+        public Uri TokenCredentialManagementUri { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
 
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
         public virtual string TableName { get; set; }
+
+        /// <summary>
+        /// Azure Storage Policy Options
+        /// </summary>
+        public AzureStoragePolicyOptions StoragePolicyOptions { get; } = new AzureStoragePolicyOptions();
+
+        /// <summary>
+        /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
+        /// </summary>
+        public TableClientOptions ClientOptions { get; set; }
+
+        /// <summary>
+        /// The delegate used to create a <see cref="TableServiceClient"/> instance.
+        /// </summary>
+        internal Func<Task<TableServiceClient>> CreateClient { get; private set; }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using a connection string.
+        /// </summary>
+        public void ConfigureTableServiceClient(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            CreateClient = () => Task.FromResult(new TableServiceClient(connectionString, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI.
+        /// </summary>
+        public void ConfigureTableServiceClient(Uri serviceUri)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using the provided callback.
+        /// </summary>
+        public void ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)
+        {
+            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+        /// </summary>
+        public void ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, tokenCredential, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+        /// </summary>
+        public void ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, azureSasCredential, ClientOptions));
+        }
+
+        /// <summary>
+        /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="TableSharedKeyCredential"/>.
+        /// </summary>
+        public void ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+        }
+
+        internal void Validate(string name)
+        {
+            if (CreateClient is null)
+            {
+                throw new OrleansConfigurationException($"No credentials specified. Use the {GetType().Name}.{nameof(AzureStorageOperationOptions.ConfigureTableServiceClient)} method to configure the Azure Table Service client.");
+            }
+
+            try
+            {
+                AzureTableUtils.ValidateTableName(TableName);
+            }
+            catch (Exception ex)
+            {
+                throw GetException($"{nameof(TableName)} is not valid.", ex);
+            }
+
+            Exception GetException(string message, Exception inner = null) =>
+                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner);
+        }
     }
 
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
@@ -83,40 +177,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public virtual void ValidateConfiguration()
         {
-            if (Options.TokenCredential != null)
-            {
-                if (Options.TableEndpoint == null)
-                    throw GetException($"{nameof(Options.TableEndpoint)} is required.");
-
-                if (string.IsNullOrEmpty(Options.TableResourceId))
-                    throw GetException($"{nameof(Options.TableResourceId)} is required.");
-
-                if (Options.TokenCredentialManagementUri == null)
-                    throw GetException($"{nameof(Options.TokenCredentialManagementUri)} is required.");
-            }
-            else
-            {
-                if (!CloudStorageAccount.TryParse(Options.ConnectionString, out _))
-                    throw GetException($"{nameof(Options.ConnectionString)} is not valid.");
-            }
-
-            try
-            {
-                AzureTableUtils.ValidateTableName(this.Options.TableName);
-            }
-            catch (Exception ex)
-            {
-                throw GetException($"{nameof(Options.TableName)} is not valid.", ex);
-            }
-
-            Exception GetException(string message, Exception inner = null) =>
-                new OrleansConfigurationException($"Configuration for {GetType().Name} {Name} is invalid. {message}", inner);
+            Options.Validate(Name);
         }
-    }
-
-    public enum TokenCredentialTableKey
-    {
-        Primary,
-        Secondary
     }
 }

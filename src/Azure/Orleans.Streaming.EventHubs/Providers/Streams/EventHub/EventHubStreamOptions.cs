@@ -1,4 +1,6 @@
-﻿using Azure.Core;
+using Azure;
+using Azure.Core;
+using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -10,28 +12,191 @@ namespace Orleans.Configuration
     /// </summary>
     public class EventHubOptions
     {
+        private const string DeprecationMessage = "Use ConfigureEventHubConnection instead. This property is deprecated.";
+
         /// <summary>
-        /// EventHub connection string.
+        /// Deprecated: use ConfigureEventHubConnection instead.
         /// </summary>
-        [Redact]
-        public string ConnectionString { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public string ConnectionString { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
         /// <summary>
-        /// EventHub consumer group.
+        /// Deprecated: use ConfigureEventHubConnection instead.
         /// </summary>
-        public string ConsumerGroup { get; set; }
+        [Obsolete(DeprecationMessage, error: false)]
+        public string Path { get => EventHubName; set => throw new NotSupportedException(DeprecationMessage); }
+
         /// <summary>
-        /// Hub path.
+        /// Deprecated: use ConfigureEventHubConnection instead.
         /// </summary>
-        public string Path { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public TokenCredential TokenCredential { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
         /// <summary>
-        /// The token credential.
+        /// Deprecated: use ConfigureEventHubConnection instead.
         /// </summary>
-        public TokenCredential TokenCredential { get; set; }
+        [Obsolete(DeprecationMessage, error: true)]
+        public string FullyQualifiedNamespace { get => throw new NotSupportedException(DeprecationMessage); set => throw new NotSupportedException(DeprecationMessage); }
+
         /// <summary>
-        /// The fully qualified Event Hubs namespace to connect to. This is likely to be similar to {yournamespace}.servicebus.windows.net.
-        /// Required when <see cref="TokenCredential"/> is specified.
+        /// Gets the delegate used to create connections to Azure Event Hub.
         /// </summary>
-        public string FullyQualifiedNamespace { get; set; }
+        internal CreateConnectionDelegate CreateConnection { get; private set; }
+
+        /// <summary>
+        /// Event Hub consumer group.
+        /// </summary>
+        internal string ConsumerGroup { get; [Obsolete(DeprecationMessage, error: false)] private set; }
+
+        /// <summary>
+        /// Event Hub name.
+        /// </summary>
+        internal string EventHubName { get; private set; }
+
+        /// <summary>
+        /// Connection options used when creating a connection to an Azure Event Hub.
+        /// </summary>
+        public EventHubConnectionOptions ConnectionOptions { get; set; } = new EventHubConnectionOptions { TransportType = EventHubsTransportType.AmqpTcp };
+
+        /// <summary>
+        /// Creates an Azure Event Hub connection.
+        /// </summary>
+        /// <param name="connectionOptions">The connection options.</param>
+        /// <returns>An Azure Event Hub connection.</returns>
+        public delegate EventHubConnection CreateConnectionDelegate(EventHubConnectionOptions connectionOptions);
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided connection string.
+        /// </summary>
+        public void ConfigureEventHubConnection(string connectionString, string eventHubName, string consumerGroup)
+        {
+            EventHubName = eventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(connectionString));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            CreateConnection = connectionOptions => new EventHubConnection(connectionString, EventHubName, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureNamedKeyCredential credential)
+        {
+            EventHubName = eventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureSasCredential credential)
+        {
+            EventHubName = eventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, TokenCredential credential)
+        {
+            EventHubName = eventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+            
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided connection instance.
+        /// </summary>
+        public void ConfigureEventHubConnection(EventHubConnection connection, string consumerGroup)
+        {
+            EventHubName = connection.EventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+            ValidateValues(connection.EventHubName, consumerGroup);
+            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            CreateConnection = _ => connection;
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided delegate.
+        /// </summary>
+        public void ConfigureEventHubConnection(CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup)
+        {
+            EventHubName = eventHubName;
+#pragma warning disable CS0618 // Type or member is obsolete
+            ConsumerGroup = consumerGroup;
+#pragma warning restore CS0618 // Type or member is obsolete
+            ValidateValues(eventHubName, consumerGroup);
+            CreateConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
+        }
+
+        private void ValidateValues(string eventHubName, string consumerGroup)
+        {
+            if (string.IsNullOrWhiteSpace(eventHubName))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(eventHubName));
+            }
+
+            if (string.IsNullOrWhiteSpace(consumerGroup))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(consumerGroup));
+            }
+        }
     }
 
     public class EventHubOptionsValidator : IConfigurationValidator
@@ -45,21 +210,20 @@ namespace Orleans.Configuration
         }
         public void ValidateConfiguration()
         {
-            if (options.TokenCredential != null)
+            if (options.CreateConnection is null)
             {
-                if (String.IsNullOrEmpty(options.FullyQualifiedNamespace))
-                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.FullyQualifiedNamespace)} is invalid");
-            }
-            else
-            {
-                if (String.IsNullOrEmpty(options.ConnectionString))
-                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConnectionString)} is invalid");
+                throw new OrleansConfigurationException($"Azure Event Hub connection not configured for stream provider options {nameof(EventHubOptions)} with name \"{name}\". Use the {options.GetType().Name}.{nameof(EventHubOptions.ConfigureEventHubConnection)} method to configure the connection.");
             }
 
-            if (String.IsNullOrEmpty(options.ConsumerGroup))
+            if (string.IsNullOrEmpty(options.ConsumerGroup))
+            {
                 throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
-            if (String.IsNullOrEmpty(options.Path))
-                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.Path)} is invalid");
+            }
+
+            if (string.IsNullOrEmpty(options.EventHubName))
+            {
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.EventHubName)} is invalid");
+            }
         }
     }
 
@@ -75,7 +239,7 @@ namespace Orleans.Configuration
         public void ValidateConfiguration()
         {
             var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(this.name);
-            if(checkpointerFactory == null)
+            if (checkpointerFactory == null)
                 throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
         }
     }
@@ -106,7 +270,7 @@ namespace Orleans.Configuration
         public TimeSpan? SlowConsumingMonitorPressureWindowSize { get; set; }
 
         /// <summary>
-        /// AveragingCachePressureMonitorFlowControlThreshold, AveragingCachePressureMonitor is turn on by default.
+        /// AveragingCachePressureMonitorFlowControlThreshold, AveragingCachePressureMonitor is turn on by default. 
         /// User can turn it off by setting this value to null
         /// </summary>
         public double? AveragingCachePressureMonitorFlowControlThreshold { get; set; } = DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD;

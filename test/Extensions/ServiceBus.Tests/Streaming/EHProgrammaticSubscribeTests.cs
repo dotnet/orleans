@@ -31,13 +31,11 @@ namespace ServiceBus.Tests.Streaming
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConfigureTestDefaults();
-                                options.ConsumerGroup = EHConsumerGroup;
-                                options.Path = EHPath;
+                                options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });
@@ -47,14 +45,12 @@ namespace ServiceBus.Tests.Streaming
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConfigureTestDefaults();
-                                options.ConsumerGroup = EHConsumerGroup;
-                                options.Path = EHPath2;
+                                options.ConfigureTestDefaults(EHPath2, EHConsumerGroup);
 
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });

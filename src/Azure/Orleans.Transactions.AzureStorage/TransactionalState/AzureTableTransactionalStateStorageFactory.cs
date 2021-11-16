@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +19,7 @@ namespace Orleans.Transactions.AzureStorage
         private readonly ClusterOptions clusterOptions;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILoggerFactory loggerFactory;
-        private CloudTable table;
+        private TableClient table;
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {

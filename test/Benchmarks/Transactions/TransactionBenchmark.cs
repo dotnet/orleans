@@ -82,7 +82,7 @@ namespace Benchmarks.Transactions
             {
                 hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                 });
             }
         }

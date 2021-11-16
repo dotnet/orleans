@@ -68,7 +68,7 @@ namespace Tester.AzureUtils
             Stopwatch sw = Stopwatch.StartNew();
 
             var data = manager.ReadAllTableEntriesForPartitionAsync(PartitionKey)
-                .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Item1);
+                .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
             int count = data.Count();
@@ -89,7 +89,7 @@ namespace Tester.AzureUtils
             Stopwatch sw = Stopwatch.StartNew();
 
             var data = manager.ReadAllTableEntriesAsync()
-                .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Item1);
+                .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
             int count = data.Count();

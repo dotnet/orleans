@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Core.Pipeline;
+using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -45,14 +46,14 @@ namespace Orleans.Transactions.Azure.Tests
             return stateStorage;
         }
 
-        private static async Task<CloudTable> InitTableAsync(ILogger logger)
+        private static async Task<TableClient> InitTableAsync(ILogger logger)
         {
             try
             {
-                CloudTableClient tableCreationClient = GetCloudTableCreationClient(logger);
-                CloudTable tableRef = tableCreationClient.GetTableReference(tableName);
-                bool didCreate = await tableRef.CreateIfNotExistsAsync();
-
+                var tableCreationClient = GetCloudTableCreationClient(logger);
+                TableClient tableRef = tableCreationClient.GetTableClient(tableName);
+                var tableItem = await tableRef.CreateIfNotExistsAsync();
+                var didCreate = tableItem is not null;
 
                 logger.Info($"{(didCreate ? "Created" : "Attached to")} Azure storage table {tableName}", (didCreate ? "Created" : "Attached to"));
                 return tableRef;
@@ -64,14 +65,11 @@ namespace Orleans.Transactions.Azure.Tests
             }
         }
 
-        private static CloudTableClient GetCloudTableCreationClient(ILogger logger)
+        private static TableServiceClient GetCloudTableCreationClient(ILogger logger)
         {
             try
             {
-                CloudStorageAccount storageAccount = CloudStorageAccount.Parse(TestDefaultConfiguration.DataConnectionString);
-                CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
-                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
-                creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
+                var creationClient = new TableServiceClient(TestDefaultConfiguration.DataConnectionString);
                 return creationClient;
             }
             catch (Exception exc)

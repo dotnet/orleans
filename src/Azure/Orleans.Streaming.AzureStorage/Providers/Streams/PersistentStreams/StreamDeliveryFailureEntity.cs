@@ -1,5 +1,6 @@
 using System;
-using Microsoft.Azure.Cosmos.Table;
+using Azure;
+using Azure.Data.Tables;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -8,8 +9,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
     /// <summary>
     /// Delivery failure table storage entity.
     /// </summary>
-    public class StreamDeliveryFailureEntity : TableEntity
+    public class StreamDeliveryFailureEntity : ITableEntity
     {
+        public string PartitionKey { get; set; }
+        public string RowKey { get; set; }
+        public DateTimeOffset? Timestamp { get; set; }
+        public ETag ETag { get; set; }
+
         /// <summary>
         /// Id of the subscription on which this delivery failure occurred.
         /// </summary>

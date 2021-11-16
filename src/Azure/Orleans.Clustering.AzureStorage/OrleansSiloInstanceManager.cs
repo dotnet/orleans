@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos.Table;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
@@ -121,17 +121,12 @@ namespace Orleans.AzureUtils
         private async Task<IEnumerable<SiloInstanceTableEntry>> FindAllGatewaySilos()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
-            const string zeroPort = "0";
 
             try
             {
-                string filterOnPartitionKey = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.PartitionKey), QueryComparisons.Equal,
-                    this.DeploymentId);
-                string filterOnStatus = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.Status), QueryComparisons.Equal,
-                    INSTANCE_STATUS_ACTIVE);
-                string filterOnProxyPort = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.ProxyPort), QueryComparisons.NotEqual, zeroPort);
-                string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
+                const string Active = nameof(SiloStatus.Active);
+                const string Zero = "0";
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {Active} and ProxyPort ne {Zero}"));
 
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
@@ -176,7 +171,7 @@ namespace Orleans.AzureUtils
             return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
         }
 
-        internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<(SiloInstanceTableEntry, string)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -186,11 +181,10 @@ namespace Orleans.AzureUtils
             if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
-            var entriesList = new List<Tuple<SiloInstanceTableEntry, string>>(entries);
 
-            await DeleteEntriesBatch(entriesList);
+            await DeleteEntriesBatch(entries);
 
-            return entriesList.Count;
+            return entries.Count;
         }
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
@@ -204,7 +198,7 @@ namespace Orleans.AzureUtils
             await DeleteEntriesBatch(entriesList);
         }
 
-        private async Task DeleteEntriesBatch(List<Tuple<SiloInstanceTableEntry, string>> entriesList)
+        private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList)
         {
             if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
             {
@@ -221,18 +215,12 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal async Task<List<Tuple<SiloInstanceTableEntry, string>>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
+        internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
         {
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
-            string filterOnPartitionKey = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.PartitionKey), QueryComparisons.Equal,
-                    this.DeploymentId);
-            string filterOnRowKey1 = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.RowKey), QueryComparisons.Equal,
-                rowKey);
-            string filterOnRowKey2 = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.RowKey), QueryComparisons.Equal, SiloInstanceTableEntry.TABLE_VERSION_ROW);
-            string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnRowKey1, TableOperators.Or, filterOnRowKey2));
-
-            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
+            var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
+            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter);
 
             var asList = queryResults.ToList();
             if (asList.Count < 1 || asList.Count > 2)
@@ -248,7 +236,7 @@ namespace Orleans.AzureUtils
             return asList;
         }
 
-        internal async Task<List<Tuple<SiloInstanceTableEntry, string>>> FindAllSiloEntries()
+        internal async Task<List<(SiloInstanceTableEntry, string)>> FindAllSiloEntries()
         {
             var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
 
@@ -273,10 +261,11 @@ namespace Orleans.AzureUtils
             try
             {
                 var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
-                if (versionRow != null && versionRow.Item1 != null)
+                if (versionRow.Entity != null)
                 {
                     return false;
                 }
+
                 SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
                 await storage.CreateTableEntryAsync(entry);
                 return true;
