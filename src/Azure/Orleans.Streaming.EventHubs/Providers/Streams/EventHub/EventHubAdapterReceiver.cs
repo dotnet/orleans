@@ -25,6 +25,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubOptions Hub { get; set; }
 
         public EventHubReceiverOptions ReceiverOptions { get; set; }
+
         /// <summary>
         /// Partition name
         /// </summary>
@@ -78,7 +79,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
             this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
+            this.logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
@@ -88,12 +89,14 @@ namespace Orleans.ServiceBus.Providers
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
+            this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.EventHubName, this.settings.Partition);
+
             // if receiver was already running, do nothing
             return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
                 ? Task.CompletedTask
                 : Initialize();
         }
+
         /// <summary>
         /// Initialization of EventHub receiver is performed at adapter receiver initialization, but if it fails,
         ///  it will be retried when messages are requested
@@ -136,7 +139,7 @@ namespace Orleans.ServiceBus.Providers
             if (this.receiver == null)
             {
                 this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
-                    "Retrying initialization of EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
+                    "Retrying initialization of EventHub partition {0}-{1}.", this.settings.Hub.EventHubName, this.settings.Partition);
                 await Initialize();
                 if (this.receiver == null)
                 {
@@ -159,7 +162,7 @@ namespace Orleans.ServiceBus.Providers
                 watch.Stop();
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
                 this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
-                    "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.Path,
+                    "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.EventHubName,
                     this.settings.Partition, ex);
                 throw;
             }
@@ -235,7 +238,7 @@ namespace Orleans.ServiceBus.Providers
                     return;
                 }
 
-                this.logger.Info("Stopping reading from EventHub partition {0}-{1}", this.settings.Hub.Path, this.settings.Partition);
+                this.logger.Info("Stopping reading from EventHub partition {0}-{1}", this.settings.Hub.EventHubName, this.settings.Partition);
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);

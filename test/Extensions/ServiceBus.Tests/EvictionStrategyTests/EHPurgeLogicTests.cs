@@ -200,7 +200,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var monitorDimensions = new EventHubReceiverMonitorDimensions
             {
                 EventHubPartition = this.ehSettings.Partition,
-                EventHubPath = this.ehSettings.Hub.Path,
+                EventHubPath = this.ehSettings.Hub.EventHubName,
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 

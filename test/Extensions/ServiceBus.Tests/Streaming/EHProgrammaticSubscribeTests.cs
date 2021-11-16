@@ -33,9 +33,7 @@ namespace ServiceBus.Tests.Streaming
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConfigureTestDefaults();
-                                options.ConsumerGroup = EHConsumerGroup;
-                                options.Path = EHPath;
+                                options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
@@ -49,9 +47,7 @@ namespace ServiceBus.Tests.Streaming
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConfigureTestDefaults();
-                                options.ConsumerGroup = EHConsumerGroup;
-                                options.Path = EHPath2;
+                                options.ConfigureTestDefaults(EHPath2, EHConsumerGroup);
 
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>

@@ -1,3 +1,4 @@
+using Azure;
 using Azure.Core;
 using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
@@ -12,36 +13,152 @@ namespace Orleans.Configuration
     public class EventHubOptions
     {
         /// <summary>
-        /// EventHub connection string.
+        /// Gets the delegate used to create connections to Azure Event Hub.
         /// </summary>
-        [Redact]
-        public string ConnectionString { get; set; }
-        /// <summary>
-        /// EventHub consumer group.
-        /// </summary>
-        public string ConsumerGroup { get; set; }
-        /// <summary>
-        /// Hub path.
-        /// </summary>
-        public string Path { get; set; }
-        /// <summary>
-        /// The token credential.
-        /// </summary>
-        public TokenCredential TokenCredential { get; set; }
-        /// <summary>
-        /// The fully qualified Event Hubs namespace to connect to. This is likely to be similar to {yournamespace}.servicebus.windows.net.
-        /// Required when <see cref="TokenCredential"/> is specified.
-        /// </summary>
-        public string FullyQualifiedNamespace { get; set; }
+        internal CreateConnectionDelegate CreateConnection { get; private set; }
 
         /// <summary>
-        /// Gets or sets the type of the event hubs transport.
+        /// Event Hub consumer group.
         /// </summary>
-        ///
-        /// <value>
-        /// The type of the event hubs transport.
-        /// </value>
-        public EventHubsTransportType EventHubsTransportType { get; set; } = EventHubsTransportType.AmqpTcp;
+        internal string ConsumerGroup { get; private set; }
+
+        /// <summary>
+        /// Event Hub name.
+        /// </summary>
+        internal string EventHubName { get; private set; }
+
+        /// <summary>
+        /// Connection options used when creating a connection to an Azure Event Hub.
+        /// </summary>
+        public EventHubConnectionOptions ConnectionOptions { get; set; } = new EventHubConnectionOptions { TransportType = EventHubsTransportType.AmqpTcp };
+
+        /// <summary>
+        /// Creates an Azure Event Hub connection.
+        /// </summary>
+        /// <param name="connectionOptions">The connection options.</param>
+        /// <returns>An Azure Event Hub connection.</returns>
+        public delegate EventHubConnection CreateConnectionDelegate(EventHubConnectionOptions connectionOptions);
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided connection string.
+        /// </summary>
+        public void ConfigureEventHubConnection(string connectionString, string eventHubName, string consumerGroup)
+        {
+            EventHubName = eventHubName;
+            ConsumerGroup = consumerGroup;
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(connectionString));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            CreateConnection = connectionOptions => new EventHubConnection(connectionString, EventHubName, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureNamedKeyCredential credential)
+        {
+            EventHubName = eventHubName;
+            ConsumerGroup = consumerGroup;
+
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureSasCredential credential)
+        {
+            EventHubName = eventHubName;
+            ConsumerGroup = consumerGroup;
+
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
+        /// </summary>
+        public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, TokenCredential credential)
+        {
+            EventHubName = eventHubName;
+            ConsumerGroup = consumerGroup;
+            if (string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(fullyQualifiedNamespace));
+            }
+
+            ValidateValues(eventHubName, consumerGroup);
+            if (credential is null)
+            {
+                throw new ArgumentNullException(nameof(credential));
+            }
+            
+            CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided connection instance.
+        /// </summary>
+        public void ConfigureEventHubConnection(EventHubConnection connection, string consumerGroup)
+        {
+            EventHubName = connection.EventHubName;
+            ConsumerGroup = consumerGroup;
+            ValidateValues(connection.EventHubName, consumerGroup);
+            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            CreateConnection = _ => connection;
+        }
+
+        /// <summary>
+        /// Configures the Azure Event Hub connection using the provided delegate.
+        /// </summary>
+        public void ConfigureEventHubConnection(CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup)
+        {
+            EventHubName = eventHubName;
+            ConsumerGroup = consumerGroup;
+            ValidateValues(eventHubName, consumerGroup);
+            CreateConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
+        }
+
+        private void ValidateValues(string eventHubName, string consumerGroup)
+        {
+            if (string.IsNullOrWhiteSpace(eventHubName))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(eventHubName));
+            }
+
+            if (string.IsNullOrWhiteSpace(consumerGroup))
+            {
+                throw new ArgumentException("A non-null, non-empty value must be provided.", nameof(consumerGroup));
+            }
+        }
     }
 
     public class EventHubOptionsValidator : IConfigurationValidator
@@ -55,21 +172,20 @@ namespace Orleans.Configuration
         }
         public void ValidateConfiguration()
         {
-            if (options.TokenCredential != null)
+            if (options.CreateConnection is null)
             {
-                if (String.IsNullOrEmpty(options.FullyQualifiedNamespace))
-                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.FullyQualifiedNamespace)} is invalid");
-            }
-            else
-            {
-                if (String.IsNullOrEmpty(options.ConnectionString))
-                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConnectionString)} is invalid");
+                throw new OrleansConfigurationException($"Azure Event Hub connection not configured for stream provider options {nameof(EventHubOptions)} with name \"{name}\". Use the {options.GetType().Name}.{nameof(EventHubOptions.ConfigureEventHubConnection)} method to configure the connection.");
             }
 
-            if (String.IsNullOrEmpty(options.ConsumerGroup))
+            if (string.IsNullOrEmpty(options.ConsumerGroup))
+            {
                 throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
-            if (String.IsNullOrEmpty(options.Path))
-                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.Path)} is invalid");
+            }
+
+            if (string.IsNullOrEmpty(options.EventHubName))
+            {
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.EventHubName)} is invalid");
+            }
         }
     }
 
