@@ -174,6 +174,11 @@ namespace Orleans.Runtime
             asyncCallback = null;
         }
 
+        public void Change(TimeSpan dueTime, TimeSpan period)
+        {
+            this.timer.Change(dueTime, period);
+        }
+
         private void DisposeTimer()
         {
             var tmp = timer;

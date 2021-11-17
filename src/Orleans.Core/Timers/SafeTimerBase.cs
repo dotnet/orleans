@@ -170,7 +170,7 @@ namespace Orleans.Runtime
         /// <param name="period">The time interval between invocations of the callback method specified when the Timer was constructed. Specify negative one (-1) milliseconds to disable periodic signaling.</param>
         /// <returns><c>true</c> if the timer was successfully updated; otherwise, <c>false</c>.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private bool Change(TimeSpan newDueTime, TimeSpan period)
+        public bool Change(TimeSpan newDueTime, TimeSpan period)
         {
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, string.Format("Cannot use TimeSpan.Zero for timer {0} period", GetFullName()));
 

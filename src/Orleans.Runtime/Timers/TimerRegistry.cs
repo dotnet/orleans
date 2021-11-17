@@ -13,7 +13,7 @@ namespace Orleans.Timers
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
         }
 
-        public IDisposable RegisterTimer(Grain grain, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public IGrainTimer RegisterTimer(Grain grain, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, activationData: grain?.Data);
             grain?.Data.GetComponent<IGrainTimerRegistry>().OnTimerCreated(timer);

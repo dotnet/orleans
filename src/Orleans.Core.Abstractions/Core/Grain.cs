@@ -119,7 +119,7 @@ namespace Orleans
         /// <param name="period">Period of subsequent timer ticks.</param>
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
-        protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        protected IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             if (asyncCallback == null) 
                 throw new ArgumentNullException(nameof(asyncCallback));
