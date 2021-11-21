@@ -272,6 +272,9 @@ namespace Orleans.CodeGeneration
                 // same name?
                 if (!string.Equals(openMethod.Name, methodName, StringComparison.Ordinal)) continue;
 
+                // same parameter count?
+                if (openMethod.GetParameters().Length != parameterTypes.Length) continue;
+
                 var genericArgs = openMethod.GetGenericArguments();
 
                 // same generic type parameter count?
@@ -280,13 +283,15 @@ namespace Orleans.CodeGeneration
                 // check constraints
                 bool constraintViolated = false;
 
-                foreach (var genericArg in genericArgs)
+                for (var index = 0; index < genericArgs.Length; index ++)
                 {
-                    var constrainingTypes = genericArg.GetGenericParameterConstraints();
-                    for (var index = 0; index < constrainingTypes.Length; index++)
+                    var genericArg = genericArgs[index];
+                    var typeParameter = typeParameters[index];
+
+                    // Check that all constraints of the generic argument are satisfied by the provided type parameter
+                    foreach (var constrain in genericArg.GetGenericParameterConstraints())
                     {
-                        var constrainingType = constrainingTypes[index];
-                        if (!constrainingType.IsAssignableFrom(typeParameters[index]))
+                        if (!constrain.IsAssignableFrom(typeParameter))
                         {
                             constraintViolated = true;
                             break;
@@ -305,10 +310,6 @@ namespace Orleans.CodeGeneration
                     // skip to next overload, if any
                     continue;
                 }
-
-                // same parameter count?
-                if (openMethod.GetParameters().Length != parameterTypes.Length) continue;
-
 
                 // close the definition
                 MethodInfo closedMethod = openMethod.MakeGenericMethod(typeParameters);
