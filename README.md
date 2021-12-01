@@ -207,7 +207,7 @@ or
 
 ## Community
     
-![Discord](https://discordapp.com/api/guilds/333727978460676096/widget.png?style=banner3)
+[![Discord](https://discordapp.com/api/guilds/333727978460676096/widget.png?style=banner3)](https://discord.com/invite/XWudFv94F9)
     
 * Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
 * [Chat on Gitter](https://gitter.im/dotnet/orleans)
