@@ -2,9 +2,8 @@ using k8s;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting.Clustering;
 using Orleans.Hosting.Kubernetes;
-using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using System;
 
 namespace Orleans.Hosting
@@ -43,14 +42,13 @@ namespace Orleans.Hosting
             configureOptions?.Invoke(services.AddOptions<KubernetesHostingOptions>());
 
             // Configure defaults based on the current environment.
-            services.AddClusterMonitoring();
+            services.UseClusterMonitoring();
             services.AddSingleton<IConfigureOptions<ClusterOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IConfigureOptions<SiloOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IPostConfigureOptions<EndpointOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IConfigureOptions<KubernetesHostingOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IValidateOptions<KubernetesHostingOptions>, KubernetesHostingOptionsValidator>();
             services.AddSingleton<IClusterProvider, KubernetesClusterProvider>();
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ClusterAgent>();
 
             // Configure the Kubernetes client.
             services.AddHttpClient("Orleans.Kubernetes.Agent")
