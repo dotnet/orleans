@@ -1,61 +1,49 @@
-using k8s;
-using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting.Clustering;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Hosting.Kubernetes
+namespace Orleans.Hosting.Clustering
 {
     /// <summary>
-    /// Reflects cluster configuration changes between Orleans and Kubernetes.
+    /// Reflects cluster configuration changes between Orleans and a cluster like kubernetes.
     /// </summary>
-    public sealed class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
+    public sealed class ClusterAgent : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly IOptionsMonitor<KubernetesHostingOptions> _options;
-        private readonly ClusterOptions _clusterOptions;
+        private readonly IOptionsMonitor<ClusterMonitoringOptions> _options;
+        private readonly IClusterProvider _clusterProvider;
         private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly KubernetesClientConfiguration _config;
-        private readonly k8s.Kubernetes _client;
-        private readonly string _podLabelSelector;
-        private readonly string _podNamespace;
-        private readonly string _podName;
         private readonly ILocalSiloDetails _localSiloDetails;
-        private readonly ILogger<KubernetesClusterAgent> _logger;
+        private readonly ILogger<ClusterAgent> _logger;
         private readonly CancellationTokenSource _shutdownToken;
         private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0);
         private volatile bool _enableMonitoring;
         private Task _runTask;
 
-        public KubernetesClusterAgent(
+        public ClusterAgent(
             IClusterMembershipService clusterMembershipService,
-            ILogger<KubernetesClusterAgent> logger,
-            IOptionsMonitor<KubernetesHostingOptions> options,
-            IOptions<ClusterOptions> clusterOptions,
+            ILogger<ClusterAgent> logger,
+            IOptionsMonitor<ClusterMonitoringOptions> options,
+            IClusterProvider clusterProvider,
             ILocalSiloDetails localSiloDetails)
         {
             _localSiloDetails = localSiloDetails;
             _logger = logger;
             _shutdownToken = new CancellationTokenSource();
             _options = options;
-            _clusterOptions = clusterOptions.Value;
+            _clusterProvider = clusterProvider;
             _clusterMembershipService = clusterMembershipService;
-            _config = _options.CurrentValue.GetClientConfiguration?.Invoke() ?? throw new ArgumentNullException(nameof(KubernetesHostingOptions) + "." + nameof(KubernetesHostingOptions.GetClientConfiguration));
-            _client = new k8s.Kubernetes(_config);
-            _podLabelSelector = $"{KubernetesHostingOptions.ServiceIdLabel}={_clusterOptions.ServiceId},{KubernetesHostingOptions.ClusterIdLabel}={_clusterOptions.ClusterId}";
-            _podNamespace = _options.CurrentValue.Namespace;
-            _podName = _options.CurrentValue.PodName;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(
-                nameof(KubernetesClusterAgent),
+                nameof(ClusterAgent),
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
                 OnRuntimeInitializeStart,
                 OnRuntimeInitializeStop);
@@ -68,20 +56,19 @@ namespace Orleans.Hosting.Kubernetes
             var snapshot = _clusterMembershipService.CurrentSnapshot.Members;
 
             // Find the pods which correspond to this cluster
-            var pods = await _client.ListNamespacedPodAsync(
-                namespaceParameter: _podNamespace,
-                labelSelector: _podLabelSelector,
-                cancellationToken: cancellation);
-            var clusterPods = new HashSet<string>();
-            clusterPods.Add(_podName);
-            foreach (var pod in pods.Items)
-            {
-                clusterPods.Add(pod.Metadata.Name);
-            }
+            var members = await _clusterProvider.ListMembersAsync(cancellation);
+            var memberNames = members.Select(x => x.Name);
 
             HashSet<string> known = new HashSet<string>();
             var knownMap = new Dictionary<string, ClusterMember>();
-            known.Add(_podName);
+
+            foreach (var member in members)
+            {
+                if (member.IsCurrent)
+                {
+                    known.Add(member.Name);
+                }
+            }
             foreach (var member in snapshot.Values)
             {
                 if (member.Status == SiloStatus.Dead)
@@ -93,7 +80,7 @@ namespace Orleans.Hosting.Kubernetes
                 knownMap[member.Name] = member;
             }
 
-            var unknown = new List<string>(clusterPods.Except(known));
+            var unknown = new List<string>(memberNames.Except(known));
             unknown.Sort();
             foreach (var pod in unknown)
             {
@@ -102,7 +89,7 @@ namespace Orleans.Hosting.Kubernetes
                 // Delete the pod once it has been active long enough?
             }
 
-            var unmatched = new List<string>(known.Except(clusterPods));
+            var unmatched = new List<string>(known.Except(memberNames));
             unmatched.Sort();
             foreach (var pod in unmatched)
             {
@@ -166,18 +153,19 @@ namespace Orleans.Hosting.Kubernetes
 
                                 if (change.Status == SiloStatus.Dead)
                                 {
+                                    var member = _clusterProvider.Describe(change.Name);
                                     try
                                     {
                                         if (_logger.IsEnabled(LogLevel.Information))
                                         {
-                                            _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}", change.SiloAddress, change.Name, _podNamespace);
+                                            _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding '{member'}", member);
                                         }
 
-                                        await _client.DeleteNamespacedPodAsync(change.Name, _podNamespace);
+                                        await _clusterProvider.DeleteAsync(change.Name);
                                     }
                                     catch (Exception exception)
                                     {
-                                        _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}", change.Name, _podNamespace, change.SiloAddress);
+                                        _logger.LogError(exception, "Error deleting '{member}' corresponding to defunct silo {SiloAddress}", member, change.SiloAddress);
                                     }
                                 }
                             }
@@ -215,37 +203,26 @@ namespace Orleans.Hosting.Kubernetes
                         break;
                     }
 
-                    var pods = await _client.ListNamespacedPodWithHttpMessagesAsync(
-                        namespaceParameter: _podNamespace,
-                        labelSelector: _podLabelSelector,
-                        watch: true,
-                        cancellationToken: _shutdownToken.Token);
-
-                    await foreach (var (eventType, pod) in pods.WatchAsync<V1PodList, V1Pod>(_shutdownToken.Token))
+                    await foreach (var @event in _clusterProvider.MonitorChangesAsync(_shutdownToken.Token))
                     {
                         if (!_enableMonitoring || _shutdownToken.IsCancellationRequested)
                         {
                             break;
                         }
 
-                        if (string.Equals(pod.Metadata.Name, _podName, StringComparison.Ordinal))
+                        if (@event.Member.IsCurrent)
                         {
                             // Never declare ourselves dead this way.
                             continue;
                         }
 
-                        if (eventType == WatchEventType.Modified)
+                        if (@event is ClusterMemberDeleted)
                         {
-                            // TODO: Remember silo addresses for pods are restarting/terminating
-                        }
-
-                        if (eventType == WatchEventType.Deleted)
-                        {
-                            if (this.TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
+                            if (this.TryMatchSilo(@event.Member, out var member) && member.Status != SiloStatus.Dead)
                             {
                                 if (_logger.IsEnabled(LogLevel.Information))
                                 {
-                                    _logger.LogInformation("Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted", member.SiloAddress, pod.Metadata.Name);
+                                    _logger.LogInformation("Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted", member.SiloAddress, @event.Member.Name);
                                 }
 
                                 await _clusterMembershipService.TryKill(member.SiloAddress);
@@ -274,12 +251,12 @@ namespace Orleans.Hosting.Kubernetes
             }
         }
 
-        private bool TryMatchSilo(V1Pod pod, out ClusterMember server)
+        private bool TryMatchSilo(ExternalClusterMember clusterMember, out ClusterMember server)
         {
             var snapshot = _clusterMembershipService.CurrentSnapshot;
             foreach (var member in snapshot.Members)
             {
-                if (string.Equals(member.Value.Name, pod.Metadata.Name, StringComparison.Ordinal))
+                if (string.Equals(member.Value.Name, clusterMember.Name, StringComparison.Ordinal))
                 {
                     server = member.Value;
                     return true;
