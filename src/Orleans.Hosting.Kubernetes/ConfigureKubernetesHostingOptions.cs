@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,6 +16,7 @@ namespace Orleans.Hosting.Kubernetes
         IConfigureOptions<ClusterOptions>,
         IConfigureOptions<SiloOptions>,
         IPostConfigureOptions<EndpointOptions>,
+        IConfigureOptions<ClusterMonitoringOptions>,
         IConfigureOptions<KubernetesHostingOptions>
     {
         private readonly IServiceProvider _serviceProvider;
@@ -29,6 +31,14 @@ namespace Orleans.Hosting.Kubernetes
             options.Namespace ??= Environment.GetEnvironmentVariable(KubernetesHostingOptions.PodNamespaceEnvironmentVariable) ?? ReadNamespaceFromServiceAccount();
             options.PodName ??= Environment.GetEnvironmentVariable(KubernetesHostingOptions.PodNameEnvironmentVariable) ?? Environment.MachineName;
             options.PodIP ??= Environment.GetEnvironmentVariable(KubernetesHostingOptions.PodIPEnvironmentVariable);
+        }
+
+        public void Configure(ClusterMonitoringOptions options)
+        {
+            var hostingOptions = _serviceProvider.GetRequiredService<IOptions<KubernetesHostingOptions>>().Value;
+            options.MaxAgents = hostingOptions.MaxAgents;
+            options.MaxInitializationAttempts = hostingOptions.MaxKubernetesApiRetryAttempts;
+            options.DeleteDefunctClusterMembers = hostingOptions.DeleteDefunctSiloPods;
         }
 
         public void Configure(ClusterOptions options)
