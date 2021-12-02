@@ -18,7 +18,11 @@ namespace CodeGenerator.Tests
     {
     }
 
-    public class Toyota : ICar
+    public interface ICommodity
+    {
+    }
+
+    public class Toyota : ICar, ICommodity
     {
     }
 
@@ -34,7 +38,7 @@ namespace CodeGenerator.Tests
         ValueTask<int> Method<T>(string s);
         ValueTask<object> Method<T>(int x, int y);
         Task<int> ConstrainedMethod<T>(int a) where T : IAnimal;
-        Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar;
+        Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar, ICommodity;
     }
 
     public class FooGrain : IDummyGrain
@@ -59,7 +63,7 @@ namespace CodeGenerator.Tests
 
         public Task<int> ConstrainedMethod<T>(int a) where T : IAnimal => Task.FromResult(1);
 
-        public Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar => Task.FromResult(2);
+        public Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar, ICommodity => Task.FromResult(2);
     }
 
     public class GenericMethodInvokerTests
