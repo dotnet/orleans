@@ -243,7 +243,7 @@ namespace Orleans.Providers
         /// <returns></returns>
         private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
         {
-            return queueGrains.GetOrAdd(queueId, id => grainFactory.GetGrain<IMemoryStreamQueueGrain>(GenerateDeterministicGuid(id)));
+            return queueGrains.GetOrAdd(queueId, (id, arg) => arg.grainFactory.GetGrain<IMemoryStreamQueueGrain>(arg.instance.GenerateDeterministicGuid(id)), (instance: this, grainFactory));
         }
 
         public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)

@@ -16,7 +16,7 @@ namespace Orleans.Streams
 
         internal IAsyncStream<T> GetOrAddStream<T>(InternalStreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {
-            var stream = allStreams.GetOrAdd(streamId, _ => streamCreator());
+            var stream = allStreams.GetOrAdd(streamId, (_, streamCreator) => streamCreator(), streamCreator);
             var streamOfT = stream as IAsyncStream<T>;
             if (streamOfT == null)
             {

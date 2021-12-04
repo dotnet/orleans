@@ -243,7 +243,7 @@ namespace Orleans.ServiceBus.Providers
 
         private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
-            return this.receivers.GetOrAdd(queueId, q => MakeReceiver(queueId));
+            return this.receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
         }
 
         protected virtual void InitEventHubClient()
