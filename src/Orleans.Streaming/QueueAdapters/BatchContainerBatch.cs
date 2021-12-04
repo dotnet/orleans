@@ -41,7 +41,7 @@ namespace Orleans.Streams
 
             this.BatchContainers = batchContainers;
 
-            var containerDelegate = this.BatchContainers.First();
+            var containerDelegate = this.BatchContainers[0];
             this.SequenceToken = containerDelegate.SequenceToken;
             this.StreamId = containerDelegate.StreamId;
         }
@@ -53,7 +53,7 @@ namespace Orleans.Streams
 
         public bool ImportRequestContext()
         {
-            return this.BatchContainers.First().ImportRequestContext();
+            return this.BatchContainers[0].ImportRequestContext();
         }
     }
 }
