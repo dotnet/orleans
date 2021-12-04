@@ -25,12 +25,12 @@ namespace Orleans.Runtime.Configuration
                 unitSize = 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 2).Trim();
             }
-            else if (trimmedInput.EndsWith("s", StringComparison.Ordinal))
+            else if (trimmedInput.EndsWith('s'))
             {
                 unitSize = 1000 * 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();
             }
-            else if (trimmedInput.EndsWith("m", StringComparison.Ordinal))
+            else if (trimmedInput.EndsWith('m'))
             {
                 unitSize = 60 * 1000 * 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();

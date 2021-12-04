@@ -73,15 +73,15 @@ namespace Orleans.TestingHost
                     // Read standard output from the process for status updates.
                     if (!_startedEvent.Task.IsCompleted)
                     {
-                        if (e.Data.StartsWith(StandaloneSiloHost.SiloAddressLog))
+                        if (e.Data.StartsWith(StandaloneSiloHost.SiloAddressLog, StringComparison.Ordinal))
                         {
                             SiloAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data.Substring(StandaloneSiloHost.SiloAddressLog.Length));
                         }
-                        else if (e.Data.StartsWith(StandaloneSiloHost.GatewayAddressLog))
+                        else if (e.Data.StartsWith(StandaloneSiloHost.GatewayAddressLog, StringComparison.Ordinal))
                         {
                             GatewayAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data.Substring(StandaloneSiloHost.GatewayAddressLog.Length));
                         }
-                        else if (e.Data.StartsWith(StandaloneSiloHost.StartedLog))
+                        else if (e.Data.StartsWith(StandaloneSiloHost.StartedLog, StringComparison.Ordinal))
                         {
                             _startedEvent.TrySetResult(true);
                         }
