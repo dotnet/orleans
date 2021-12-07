@@ -548,7 +548,7 @@ namespace Orleans.CodeGenerator
                         AttributeList()
                             .AddAttributes(
                                 Attribute(
-                                    libraryTypes.IdAttributeTypes.First().ToNameSyntax(),
+                                    libraryTypes.IdAttributeTypes[0].ToNameSyntax(),
                                     AttributeArgumentList()
                                         .AddArguments(
                                             AttributeArgument(

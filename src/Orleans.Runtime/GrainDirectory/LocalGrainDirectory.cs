@@ -908,7 +908,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                SiloAddress successor = successorList.First();
+                SiloAddress successor = successorList[0];
                 distance = successor == null ? 0 : CalcRingDistance(MyAddress, successor);
             }
             return distance;

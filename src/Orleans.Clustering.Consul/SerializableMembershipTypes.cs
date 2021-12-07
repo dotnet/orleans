@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Host
             var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value));
 
             var keyParts = siloKV.Key.Split(KeySeparator);
-            ret.Address = SiloAddress.FromParsableString(keyParts.Last());
+            ret.Address = SiloAddress.FromParsableString(keyParts[^1]);
             ret.DeploymentId = deploymentId;
             ret.LastIndex = siloKV.ModifyIndex;
 
