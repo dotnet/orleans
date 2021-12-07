@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -18,7 +18,7 @@ namespace Orleans.Analyzers
         {
             var name = attributeSyntax.GetTypeName();
             return string.Equals(name, attributeName, StringComparison.Ordinal)
-                || (name.StartsWith(attributeName) && name.EndsWith(nameof(Attribute)) && name.Length == attributeName.Length + nameof(Attribute).Length);
+                || (name.StartsWith(attributeName, StringComparison.Ordinal) && name.EndsWith(nameof(Attribute), StringComparison.Ordinal) && name.Length == attributeName.Length + nameof(Attribute).Length);
         }
 
         public static bool HasAttribute(this MemberDeclarationSyntax member, string attributeName)

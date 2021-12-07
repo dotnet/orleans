@@ -201,7 +201,7 @@ namespace Orleans.Serialization
                 return false;
             }
 
-            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns && (ns.StartsWith("System") || ns.StartsWith("Microsoft")))
+            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns && (ns.StartsWith("System", StringComparison.Ordinal) || ns.StartsWith("Microsoft", StringComparison.Ordinal)))
             {
                 return true;
             }

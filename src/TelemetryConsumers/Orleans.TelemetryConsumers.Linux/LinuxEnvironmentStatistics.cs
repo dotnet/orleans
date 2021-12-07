@@ -264,7 +264,7 @@ namespace Orleans.Statistics
                 string line;
                 while ((line = await r.ReadLineAsync()) != null)
                 {
-                    if (line.StartsWith(lineStartsWith))
+                    if (line.StartsWith(lineStartsWith, StringComparison.Ordinal))
                         return line;
                 }
             }

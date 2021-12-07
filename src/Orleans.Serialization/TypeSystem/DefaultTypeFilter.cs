@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -9,29 +9,29 @@ namespace Orleans.Serialization.TypeSystem
     {
         public bool? IsTypeNameAllowed(string typeName, string assemblyName)
         {
-            if (assemblyName is { } && assemblyName.Contains("Orleans.Serialization"))
+            if (assemblyName is { } && assemblyName.Contains("Orleans.Serialization", StringComparison.Ordinal))
             {
                 return true;
             }
 
-            if (typeName.EndsWith(nameof(Exception)))
+            if (typeName.EndsWith(nameof(Exception), StringComparison.Ordinal))
             {
                 return true;
             }
 
-            if (typeName.StartsWith("System."))
+            if (typeName.StartsWith("System.", StringComparison.Ordinal))
             {
-                if (typeName.EndsWith("Comparer"))
+                if (typeName.EndsWith("Comparer", StringComparison.Ordinal))
                 {
                     return true;
                 }
 
-                if (typeName.StartsWith("System.Collections."))
+                if (typeName.StartsWith("System.Collections.", StringComparison.Ordinal))
                 {
                     return true;
                 }
 
-                if (typeName.StartsWith("System.Net.IP"))
+                if (typeName.StartsWith("System.Net.IP", StringComparison.Ordinal))
                 {
                     return true;
                 }

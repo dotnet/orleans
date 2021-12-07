@@ -107,7 +107,7 @@ namespace Orleans.CodeGenerator
                 List<IPropertySymbol> dataMembers = new();
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
-                    if (!property.Name.StartsWith("Item"))
+                    if (!property.Name.StartsWith("Item", System.StringComparison.Ordinal))
                     {
                         continue;
                     }

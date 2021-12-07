@@ -175,7 +175,7 @@ namespace Orleans.Runtime.Host
         private void Initialize()
         {
             assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(
-                a => a.FullName.StartsWith("Microsoft.WindowsAzure.ServiceRuntime"));
+                a => a.FullName.StartsWith("Microsoft.WindowsAzure.ServiceRuntime", StringComparison.Ordinal));
 
             // If we are runing within a worker role Microsoft.WindowsAzure.ServiceRuntime should already be loaded
             if (assembly == null)
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.Host
 
         private static string ExtractInstanceName(string instanceId, string deploymentId)
         {
-            return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId)
+            return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId, StringComparison.Ordinal)
                 ? instanceId.Substring(deploymentId.Length + 1)
                 : instanceId;
         }
