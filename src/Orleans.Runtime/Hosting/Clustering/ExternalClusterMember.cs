@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Hosting.Clustering
 
         public string Description { get; }
 
-        public bool IsCurrent { get; set; }
+        public bool IsCurrentSilo { get; set; }
 
         public ExternalClusterMember(string name, string description)
         {

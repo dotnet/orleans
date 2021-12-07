@@ -48,8 +48,10 @@ namespace Orleans.Hosting.Kubernetes
                 labelSelector: _podLabelSelector,
                 cancellationToken: cancellation);
 
-            var clusterPods = new HashSet<string>();
-            clusterPods.Add(_podName);
+            var clusterPods = new HashSet<string>
+            {
+                _podName
+            };
             foreach (var pod in pods.Items)
             {
                 clusterPods.Add(pod.Metadata.Name);
@@ -93,7 +95,7 @@ namespace Orleans.Hosting.Kubernetes
 
             return new ExternalClusterMember(name, description)
             {
-                IsCurrent = name == _podName
+                IsCurrentSilo = name == _podName
             };
         }
     }

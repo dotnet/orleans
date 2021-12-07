@@ -64,7 +64,7 @@ namespace Orleans.Hosting.Clustering
 
             foreach (var member in members)
             {
-                if (member.IsCurrent)
+                if (member.IsCurrentSilo)
                 {
                     known.Add(member.Name);
                 }
@@ -210,7 +210,7 @@ namespace Orleans.Hosting.Clustering
                             break;
                         }
 
-                        if (@event.Member.IsCurrent)
+                        if (@event.Member.IsCurrentSilo)
                         {
                             // Never declare ourselves dead this way.
                             continue;
