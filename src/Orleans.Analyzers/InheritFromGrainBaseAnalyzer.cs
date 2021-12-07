@@ -36,7 +36,7 @@ namespace Orleans.Analyzers
             if (namedSymbol == null || namedSymbol.IsAbstract) return;
 
             // continue only if there is no issue inside the class.
-            var diagnostics = context.Compilation.GetDeclarationDiagnostics();
+            var diagnostics = context.Compilation.GetDeclarationDiagnostics(context.CancellationToken);
             if (diagnostics.Any()) return;
 
             // continue only if the class implements IGrain

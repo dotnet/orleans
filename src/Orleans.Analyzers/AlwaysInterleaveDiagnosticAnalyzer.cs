@@ -34,7 +34,7 @@ namespace Orleans.Analyzers
             var alwaysInterleaveAttribute = context.Compilation.GetTypeByMetadataName(AlwaysInterleaveAttributeName);
 
             var syntax = (MethodDeclarationSyntax)context.Node;
-            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax);
+            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
 
             if (symbol.ContainingType.TypeKind == TypeKind.Interface)
             {
