@@ -7,7 +7,7 @@ variables:
 jobs:
   silo:
     source:
-      localFolder: Artifacts/Distributed/Distributed.Silo/{{framework}}
+      localFolder: Artifacts/DistributedTests/Distributed.Silo/{{framework}}
     executable: Distributed.Silo.exe
     readyStateText: Orleans Silo started.
     framework: net5.0
@@ -19,7 +19,7 @@ jobs:
         }
   client:
     source:
-      localFolder: Artifacts/Distributed/Distributed.Client/{{framework}}
+      localFolder: Artifacts/DistributedTests/Distributed.Client/{{framework}}
     executable: Distributed.Client.exe
     waitForExit: true
     framework: net5.0

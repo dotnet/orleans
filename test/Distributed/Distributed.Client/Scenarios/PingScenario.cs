@@ -57,10 +57,10 @@ namespace Distributed.Client.Scenarios
             }
         }
 
-        public async Task IssueRequest(int request)
+        public Task IssueRequest(int request)
         {
             var (router, targets) = _requestList[request % _requestList.Count];
-            await router.Ping(targets);
+            return router.Ping(targets);
         }
 
         public Task Cleanup() => Task.CompletedTask;

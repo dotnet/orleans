@@ -73,7 +73,7 @@ namespace Distributed.Client.Commands
                 _logger.LogInformation($"{counter}: {value}");
                 BenchmarksEventSource.Register(counter, Operations.First, Operations.Sum, counter, counter, "n0");
                 BenchmarksEventSource.Measure(counter, value);
-                if (string.Compare(counter, "requests", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Equals(counter, "requests", StringComparison.InvariantCultureIgnoreCase))
                 {
                     var rps = (float) value / duration.TotalSeconds;
                     BenchmarksEventSource.Register("rps", Operations.First, Operations.Last, "rps", "Requests per second", "n0");

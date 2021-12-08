@@ -135,7 +135,7 @@
 
   <!-- Set output folder for distributed test apps -->
   <PropertyGroup>
-    <DistributedOutputPath Condition=" '$(DistributedOutputPath)'=='' ">$(SourceRoot)/Artifacts/Distributed</DistributedOutputPath>
+    <DistributedTestsOutputPath Condition=" '$(DistributedODistributedTestsOutputPathutputPath)'=='' ">$(SourceRoot)/Artifacts/DistributedTests</DistributedTestsOutputPath>
   </PropertyGroup>
 
   <Choose>

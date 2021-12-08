@@ -22,7 +22,6 @@ namespace Distributed.Grains.Streaming
 
         public CounterGrain(IOptions<ReportingOptions> options)
         {
-            Debugger.Break();
             _options = options.Value;
         }
 

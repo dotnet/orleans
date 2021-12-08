@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <OutputPath Condition=" '$(DistributedOutputPath)'!='' ">$(DistributedOutputPath)/Distributed.Client</OutputPath>
+    <OutputPath Condition=" '$(DistributedTestsOutputPath)'!='' ">$(DistributedTestsOutputPath)/Distributed.Client</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
