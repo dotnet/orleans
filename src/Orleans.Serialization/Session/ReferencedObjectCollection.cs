@@ -123,6 +123,7 @@ namespace Orleans.Serialization.Session
             return -1;
         }
 
+
         private void AddToReferenceToIdMap(object value, uint reference)
         {
             if (_objectToReferenceOverflow is { } overflow)
