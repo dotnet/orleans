@@ -1,3 +1,5 @@
+using System;
+
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -11,8 +13,11 @@ namespace Orleans.Serialization
         KeyedSerializerId SerializerId { get; }
 
         /// <summary>
-        /// Returns <see langword="true"/> if this serializer should only be used for fallback scenarios, <see langword="false"/> otherwise.
+        /// Returns true if the provided type should be serialized by this serializer.
         /// </summary>
-        bool IsFallbackOnly { get; }
+        /// <param name="type">The type.</param>
+        /// <param name="isFallback">Whether this is the last chance for this serializer to opt-in to serializing the provided type.</param>
+        /// <returns><see langword="true"/> if the provided type should be serialized by this serializer, <see langword="false"/> otherwise.</returns>
+        bool IsSupportedType(Type type, bool isFallback);
     }
 }

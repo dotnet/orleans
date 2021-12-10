@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Options;
 
@@ -32,10 +33,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public bool IsSupportedType(Type itemType)
-        {
-            return itemType.IsSerializable && SerializableType.IsAssignableFrom(itemType) && DotNetSerializableUtilities.HasSerializationConstructor(itemType);
-        }
+        public bool IsSupportedType(Type itemType) => IsSupportedType(itemType, isFallback: false);
 
         /// <inheritdoc />
         public object DeepCopy(object source, ICopyContext context) => this.serializer.DeepCopy(source, context);
@@ -48,6 +46,23 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         public KeyedSerializerId SerializerId => KeyedSerializerId.BinaryFormatterISerializable;
+
+        /// <inheritdoc />
+        public bool IsSupportedType(Type type, bool isFallback)
+        {
+            // Either the type has opted-in to using this serializer, or this is fallback serialization and this serializer thinks it can serialize this type.
+            var optIn = type.GetCustomAttribute<EnableKeyedSerializerAttribute>() is { } attr && typeof(BinaryFormatterISerializableSerializer).Equals(attr.SerializerType);
+            if (optIn) return true;
+
+            // If this isn't being called in the context of fallback serialization, then only allow serialization if this is not configured as a fallback-only serializer.
+            if (!isFallback && IsFallbackOnly)
+            {
+                return false;
+            }
+
+            var isSupported = type.IsSerializable && SerializableType.IsAssignableFrom(type) && DotNetSerializableUtilities.HasSerializationConstructor(type);
+            return isSupported;
+        }
 
         /// <inheritdoc />
         public bool IsFallbackOnly => options.IsFallbackOnly;

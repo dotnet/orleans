@@ -3,6 +3,7 @@ namespace Orleans.Serialization
     using System;
     using System.Collections.Concurrent;
     using Microsoft.Extensions.Options;
+    using System.Reflection;
     using Orleans.Runtime;
 
     /// <summary>
@@ -89,10 +90,26 @@ namespace Orleans.Serialization
         /// <summary>
         /// Informs the serialization manager whether this serializer supports the type for serialization.
         /// </summary>
-        /// <param name="t">The type of the item to be serialized</param>
+        /// <param name="type">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
-        public bool IsSupportedType(Type t)
-            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t);
+        public bool IsSupportedType(Type type) => IsSupportedType(type, isFallback: false);
+
+        /// <inheritdoc />
+        public bool IsSupportedType(Type type, bool isFallback)
+        {
+            // Either the type has opted-in to using this serializer, or this is fallback serialization and this serializer thinks it can serialize this type.
+            var optIn = type.GetCustomAttribute<EnableKeyedSerializerAttribute>() is { } attr && typeof(ILBasedSerializer).Equals(attr.SerializerType);
+            if (optIn) return true;
+
+            // If this isn't being called in the context of fallback serialization, then only allow serialization if this is not configured as a fallback-only serializer.
+            if (!isFallback && IsFallbackOnly)
+            {
+                return false;
+            }
+
+            var isSupported = this.serializers.ContainsKey(type) || ILSerializerGenerator.IsSupportedType(type);
+            return isSupported;
+        }
 
         /// <inheritdoc />
         public object DeepCopy(object source, ICopyContext context)
@@ -177,7 +194,7 @@ namespace Orleans.Serialization
 
             return new SerializerBundle(this.generator.GenerateSerializer(type));
         }
-        
+
         private enum ILSerializerTypeToken : byte
         {
             Null,
