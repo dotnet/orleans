@@ -148,7 +148,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
-        public int GetMaxAddCount() { return 100; }
+        public int GetMaxAddCount() { return 200; }
 
         /// <summary>
         /// Add messages to the cache

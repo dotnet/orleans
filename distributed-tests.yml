@@ -5,10 +5,10 @@ variables:
   framework: net5.0
 
 jobs:
-  silo:
+  server:
     source:
-      localFolder: Artifacts/DistributedTests/Distributed.Silo/{{framework}}
-    executable: Distributed.Silo.exe
+      localFolder: Artifacts/DistributedTests/DistributedTests.Server/{{framework}}
+    executable: DistributedTests.Server.exe
     readyStateText: Orleans Silo started.
     framework: net5.0
     arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
@@ -19,8 +19,8 @@ jobs:
         }
   client:
     source:
-      localFolder: Artifacts/DistributedTests/Distributed.Client/{{framework}}
-    executable: Distributed.Client.exe
+      localFolder: Artifacts/DistributedTests/DistributedTests.Client/{{framework}}
+    executable: DistributedTests.Client.exe
     waitForExit: true
     framework: net5.0
     arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{commandOptions}}"
@@ -33,7 +33,7 @@ jobs:
 scenarios:
   ping:
     server:
-      job: silo
+      job: server
       variables:
         instances: 10
         configurator: SimpleSilo
@@ -42,15 +42,14 @@ scenarios:
       variables:
         command: ping
         instances: 1
-        pipelineSize: 10000
-        duration: 900
-        routers: 10000
-        targetsPerRouter: 10
-        doWarmup: true
-        commandOptions: "--pipelineSize {{pipelineSize}} --duration {{duration}} --routers {{routers}} --targetsPerRouter {{targetsPerRouter}} --doWarmup {{doWarmup}}"
+        numWorkers: 250
+        blocksPerWorker: 0
+        requestsPerBlock: 500
+        duration: 120
+        commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
   streaming:
     server:
-      job: silo
+      job: server
       variables:
         instances: 10
         configurator: EventGeneratorStreamingSilo
@@ -68,7 +67,7 @@ scenarios:
         commandOptions: "requests errors"
   reliability:
     server:
-      job: silo
+      job: server
       variables:
         instances: 10
         configurator: SimpleSilo
@@ -91,12 +90,11 @@ scenarios:
       variables:
         command: ping
         instances: 1
-        pipelineSize: 10000
+        numWorkers: 250
+        blocksPerWorker: 0
+        requestsPerBlock: 500
         duration: 180
-        routers: 10000
-        targetsPerRouter: 10
-        doWarmup: true
-        commandOptions: "--pipelineSize {{pipelineSize}} --duration {{duration}} --routers {{routers}} --targetsPerRouter {{targetsPerRouter}} --doWarmup {{doWarmup}}"
+        commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
 
 profiles:
   local:
