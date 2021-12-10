@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider _serviceProvider;
         private readonly MessageFactory _messageFactory;
         private readonly IOptionsMonitor<SiloMessagingOptions> _messagingOptions;
-        private readonly ConcurrentDictionary<ActivationData, bool> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, bool>(ReferenceEqualsComparer<ActivationData>.Instance);
+        private readonly ConcurrentDictionary<ActivationData, bool> _recentlyUsedActivations = new ConcurrentDictionary<ActivationData, bool>(ReferenceEqualsComparer<ActivationData>.Default);
         private bool _enabled = true;
         private Task _runTask;
 
