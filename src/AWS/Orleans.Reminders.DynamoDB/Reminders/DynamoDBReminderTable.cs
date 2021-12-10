@@ -146,31 +146,48 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>
         /// Reads reminder table data for a given hash range.
         /// </summary>
-        /// <param name="beginHash"></param>
-        /// <param name="endHash"></param>
+        /// <param name="begin"></param>
+        /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            var expressionValues = new Dictionary<string, AttributeValue>
-                {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
-                    { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = beginHash.ToString() } },
-                    { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = endHash.ToString() } }
-                };
+            Dictionary<string, AttributeValue> expressionValues = null;
 
             try
             {
                 string expression = string.Empty;
-                if (beginHash < endHash)
+                List<ReminderEntry> records;
+
+                if (begin < end)
                 {
-                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } },
+                        { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false);
                 }
                 else
                 {
-                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND ({GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME} OR {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME})";
-                }
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false);
 
-                var records = await this.storage.ScanAsync(this.options.TableName, expressionValues, expression, this.Resolve).ConfigureAwait(false);
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME}";
+                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false));
+
+                }
 
                 return new ReminderTableData(records);
             }
