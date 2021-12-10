@@ -206,7 +206,6 @@ namespace Orleans.Runtime
         private readonly List<SingleRange> ranges;
         [Id(2)]
         private readonly long rangeSize;
-        [Id(3)]
 
         internal List<SingleRange> Ranges => ranges;
 

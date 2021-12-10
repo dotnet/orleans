@@ -231,6 +231,36 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.Uri, result.Uri);
         }
 
+        [Fact]
+        public void ClassWithManualSerializablePropertyRoundTrip()
+        {
+            var original = new ClassWithManualSerializableProperty
+            {
+                GuidProperty = Guid.NewGuid(),
+            };
+
+            var result = RoundTripThroughCodec(original);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+            Assert.Equal(original.StringProperty, result.StringProperty);
+
+            var guidValue = Guid.NewGuid();
+            original.StringProperty = guidValue.ToString("N");
+            result = RoundTripThroughCodec(original);
+
+            Assert.Equal(guidValue, result.GuidProperty);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+
+            Assert.Equal(guidValue.ToString("N"), result.StringProperty);
+            Assert.Equal(original.StringProperty, result.StringProperty);
+
+            original.StringProperty = "bananas";
+            result = RoundTripThroughCodec(original);
+ 
+            Assert.Equal(default(Guid), result.GuidProperty);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+            Assert.Equal("bananas", result.StringProperty);
+        }
+
         public void Dispose() => _serviceProvider?.Dispose();
 
         private T RoundTripThroughCodec<T>(T original)

@@ -13,16 +13,13 @@ namespace Orleans.Streams
     [GenerateSerializer]
     public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
     {
-        [Id(1)]
         public abstract StreamId StreamId { get; }
 
-        [Id(2)]
         public abstract string ProviderName { get; }
 
         /// <summary>
         /// Unique identifier for this StreamSubscriptionHandle
         /// </summary>
-        [Id(3)]
         public abstract Guid HandleId { get; }
 
         /// <summary>

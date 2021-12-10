@@ -6,7 +6,11 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal class PropertyDescription : IMemberDescription
+    internal interface IPropertyDescription : IMemberDescription 
+    {
+    }
+
+    internal class PropertyDescription : IPropertyDescription
     {
         public PropertyDescription(ushort fieldId, IPropertySymbol property)
         {
@@ -23,8 +27,9 @@ namespace Orleans.CodeGenerator
         }
 
         public ushort FieldId { get; }
-        public ISymbol Member => Property;
+        public ISymbol Symbol => Property;
         public ITypeSymbol Type => Property.Type;
+        public INamedTypeSymbol ContainingType => Property.ContainingType;
         public IPropertySymbol Property { get; }
 
         public TypeSyntax TypeSyntax { get; }

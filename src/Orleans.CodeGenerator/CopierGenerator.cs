@@ -30,9 +30,9 @@ namespace Orleans.CodeGenerator
                 {
                     members.Add(serializable);
                 }
-                else if (member is IFieldDescription field)
+                else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(libraryTypes, type, field, members.Count));
+                    members.Add(new SerializableMember(libraryTypes, type, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {

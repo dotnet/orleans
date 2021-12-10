@@ -8,7 +8,9 @@ namespace Orleans.CodeGenerator
     internal interface IMemberDescription
     {
         ushort FieldId { get; }
+        ISymbol Symbol { get; }
         ITypeSymbol Type { get; }
+        INamedTypeSymbol ContainingType { get; }
         string AssemblyName { get; }
         string TypeName { get; }
         TypeSyntax TypeSyntax { get; }

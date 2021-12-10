@@ -17,7 +17,6 @@
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
-    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
 
   <ItemGroup>

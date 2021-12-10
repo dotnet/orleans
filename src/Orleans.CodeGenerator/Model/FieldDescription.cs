@@ -8,11 +8,12 @@ namespace Orleans.CodeGenerator
 {
     internal class FieldDescription : IFieldDescription
     {
-        public FieldDescription(ushort fieldId, IFieldSymbol member, ITypeSymbol type)
+        public FieldDescription(ushort fieldId, IFieldSymbol member)
         {
             FieldId = fieldId;
             Field = member;
-            Type = type;
+            Type = member.Type;
+            ContainingType = member.ContainingType;
 
             if (Type.TypeKind == TypeKind.Dynamic)
             {
@@ -24,9 +25,11 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        public ISymbol Symbol => Field;
         public IFieldSymbol Field { get; }
         public ushort FieldId { get; }
         public ITypeSymbol Type { get; }
+        public INamedTypeSymbol ContainingType { get; }
         public TypeSyntax TypeSyntax { get; }
 
         public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
