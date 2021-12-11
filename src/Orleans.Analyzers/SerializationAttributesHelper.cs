@@ -1,26 +1,29 @@
-﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Orleans.Analyzers
 {
     internal static class SerializationAttributesHelper
     {
-        public static (List<MemberDeclarationSyntax> UnannotatedMembers, uint NextAvailableId) AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
+        public static bool ShouldGenerateSerializer(TypeDeclarationSyntax declaration)
+        {
+            if (!declaration.Modifiers.Any(m => m.Kind() == SyntaxKind.StaticKeyword) && declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static (List<MemberDeclarationSyntax> UnannotatedMembers, List<MemberDeclarationSyntax> AnnotatedMembers, uint NextAvailableId) AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
         {
             uint nextId = 0;
-            var serializableMembers = new List<MemberDeclarationSyntax>();
+            var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
+            var annotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             foreach (var member in declaration.Members)
             {
-                if (!member.IsInstanceMember())
-                {
-                    continue;
-                }
-
-                if (!member.IsFieldOrAutoProperty())
-                {
-                    continue;
-                }
-
                 // Skip members with existing [Id(x)] attributes, but record the highest value of x so that newly added attributes can begin from that value.
                 if (member.TryGetAttribute(Constants.IdAttributeName, out var attribute))
                 {
@@ -39,19 +42,20 @@ namespace Orleans.Analyzers
                         }
                     }
 
+                    annotatedSerializableMembers.Add(member);
                     continue;
                 }
 
-                if (member.HasAttribute(Constants.NonSerializedAttribute))
+                if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(Constants.NonSerializedAttribute) || member.IsAbstract())
                 {
                     // No need to add any attribute.
                     continue;
                 }
 
-                serializableMembers.Add(member);
+                unannotatedSerializableMembers.Add(member);
             }
 
-            return (serializableMembers, nextId);
+            return (unannotatedSerializableMembers, annotatedSerializableMembers, nextId);
         }
     }
 }

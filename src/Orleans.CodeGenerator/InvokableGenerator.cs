@@ -695,13 +695,16 @@ namespace Orleans.CodeGenerator
                 }
 
                 FieldTypeSyntax = TypeSyntax;
+                Symbol = parameter;
             }
 
+            public ISymbol Symbol { get; }
             public MethodDescription Method { get; }
             public int ParameterOrdinal => Parameter.Ordinal;
             public ushort FieldId { get; }
             public ISymbol Member => Parameter;
             public ITypeSymbol Type => FieldType;
+            public INamedTypeSymbol ContainingType => Parameter.ContainingType;
             public TypeSyntax TypeSyntax { get; }
             public IParameterSymbol Parameter { get; }
             public override bool IsSerializable => true;

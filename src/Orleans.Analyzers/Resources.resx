@@ -117,6 +117,12 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="AbstractOrStaticMembersCannotBeSerializedMessageFormat" xml:space="preserve">
+    <value>The member "{0}" is marked as {1} and therefore cannot be serialized.</value>
+  </data>
+  <data name="AbstractOrStaticMembersCannotBeSerializedTitle" xml:space="preserve">
+    <value>Members which are static or abstract cannot be serialized.</value>
+  </data>
   <data name="AddGenerateSerializerAttributeDescription" xml:space="preserve">
     <value>Add the [GenerateSerializer] attribute.</value>
   </data>

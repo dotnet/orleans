@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
@@ -52,6 +53,38 @@ namespace Orleans.Analyzers
             }
 
             attribute = default;
+            return false;
+        }
+
+        public static string GetMemberNameOrDefault(this MemberDeclarationSyntax member)
+        {
+            if (member is PropertyDeclarationSyntax property)
+            {
+                return property.ChildTokens().FirstOrDefault(token => token.Kind() == SyntaxKind.IdentifierToken).ValueText;
+            }
+            else if (member is FieldDeclarationSyntax field)
+            {
+                return field.ChildNodes().OfType<VariableDeclarationSyntax>().FirstOrDefault()?.ChildNodes().OfType<VariableDeclaratorSyntax>().FirstOrDefault()?.Identifier.ValueText;
+            }
+
+            return null;
+        }
+        
+        public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
+
+        public static bool IsStatic(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.StaticKeyword);
+
+        public static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
+        {
+            foreach (var modifier in member.Modifiers)
+            {
+                var kind = modifier.Kind();
+                if (kind == modifierKind) 
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 

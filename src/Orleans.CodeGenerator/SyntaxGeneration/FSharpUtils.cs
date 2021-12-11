@@ -171,6 +171,8 @@ namespace Orleans.CodeGenerator
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
 
+                public ISymbol Symbol => _property;
+
                 public string FieldName => _property.Name.ToLowerInvariant(); 
 
                 /// <summary>
@@ -302,6 +304,8 @@ namespace Orleans.CodeGenerator
                 public IMemberDescription Member => this;
 
                 public ITypeSymbol Type => _property.Type;
+
+                public ISymbol Symbol => _property;
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
 
