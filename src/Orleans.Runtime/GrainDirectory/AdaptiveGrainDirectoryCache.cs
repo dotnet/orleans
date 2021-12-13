@@ -9,7 +9,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         internal class GrainDirectoryCacheEntry
         {
-            internal ActivationAddress Address { get; }
+            internal GrainAddress Address { get; }
             private CoarseStopwatch LastRefreshed { get; set; }
             internal TimeSpan ExpirationTimer { get; private set; }
             internal int ETag { get; }
@@ -20,7 +20,7 @@ namespace Orleans.Runtime.GrainDirectory
             /// </summary>
             internal int NumAccesses { get; set; }
 
-            internal GrainDirectoryCacheEntry(ActivationAddress value, int etag, TimeSpan expirationTimer)
+            internal GrainDirectoryCacheEntry(GrainAddress value, int etag, TimeSpan expirationTimer)
             {
                 Address = value;
                 ETag = etag;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static readonly Func<ActivationAddress, GrainDirectoryCacheEntry, bool> ActivationAddressEqual = (addr, entry) => addr.Equals(entry.Address);
+        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressEqual = (addr, entry) => addr.Equals(entry.Address);
 
         private readonly LRU<GrainId, GrainDirectoryCacheEntry> cache;
         /// controls the time the new entry is considered "fresh" (unit: ms)
@@ -68,21 +68,21 @@ namespace Orleans.Runtime.GrainDirectory
             IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_CACHE_SIZE, () => cache.Count);
         }
 
-        public void AddOrUpdate(ActivationAddress value, int version)
+        public void AddOrUpdate(GrainAddress value, int version)
         {            
             var entry = new GrainDirectoryCacheEntry(value, version, initialExpirationTimer);
 
             // Notice that LRU should know how to throw the oldest entry if the cache is full
-            cache.Add(value.Grain, entry);
+            cache.Add(value.GrainId, entry);
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 
-        public bool Remove(ActivationAddress key) => cache.TryRemove(key.Grain, ActivationAddressEqual, key);
+        public bool Remove(GrainAddress key) => cache.TryRemove(key.GrainId, ActivationAddressEqual, key);
 
         public void Clear() => cache.Clear();
 
-        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
+        public bool LookUp(GrainId key, out GrainAddress result, out int version)
         {
             NumAccesses++;      // for stats
 
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
             return true;
         }
 
-        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
+        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
         {
             get
             {

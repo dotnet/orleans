@@ -103,7 +103,7 @@ namespace Orleans
 
             ActivationId IGrainContext.ActivationId => throw new NotImplementedException();
 
-            ActivationAddress IGrainContext.Address => throw new NotImplementedException();
+            GrainAddress IGrainContext.Address => throw new NotImplementedException();
 
             IServiceProvider IGrainContext.ActivationServices => throw new NotSupportedException();
 

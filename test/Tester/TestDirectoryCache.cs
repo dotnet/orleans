@@ -19,9 +19,9 @@ namespace UnitTests.General
 
         public ConcurrentQueue<CacheOperation> Operations { get; } = new();
 
-        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues => InnerCache.KeyValues;
+        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues => InnerCache.KeyValues;
 
-        public void AddOrUpdate(ActivationAddress value, int version)
+        public void AddOrUpdate(GrainAddress value, int version)
         {
             InnerCache.AddOrUpdate(value, version);
             Operations.Enqueue(new CacheOperation.AddOrUpdate(value, version));
@@ -33,7 +33,7 @@ namespace UnitTests.General
             Operations.Enqueue(new CacheOperation.Clear());
         }
 
-        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
+        public bool LookUp(GrainId key, out GrainAddress result, out int version)
         {
             var exists = InnerCache.LookUp(key, out result, out version);
             Operations.Enqueue(new CacheOperation.Lookup(key, (exists, result, version)));
@@ -52,7 +52,7 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="key">key to remove</param>
         /// <returns>True if the entry was in the cache and the removal was successful</returns>
-        public bool Remove(ActivationAddress key)
+        public bool Remove(GrainAddress key)
         {
             var exists = InnerCache.Remove(key);
             Operations.Enqueue(new CacheOperation.RemoveActivation(key, exists));
@@ -61,10 +61,10 @@ namespace UnitTests.General
 
         public record CacheOperation()
         {
-            public record RemoveActivation(ActivationAddress Key, bool Result) : CacheOperation;
+            public record RemoveActivation(GrainAddress Key, bool Result) : CacheOperation;
             public record Remove(GrainId Key, bool Result) : CacheOperation;
-            public record Lookup(GrainId Key, (bool Exists, ActivationAddress Address, int Version) Result) : CacheOperation;
-            public record AddOrUpdate(ActivationAddress Value, int Version) : CacheOperation;
+            public record Lookup(GrainId Key, (bool Exists, GrainAddress Address, int Version) Result) : CacheOperation;
+            public record AddOrUpdate(GrainAddress Value, int Version) : CacheOperation;
             public record Clear() : CacheOperation;
         }
     }

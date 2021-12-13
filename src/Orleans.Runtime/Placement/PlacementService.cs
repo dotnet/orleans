@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Placement
             var grainId = message.TargetGrain;
             if (_grainLocator.TryLookupInCache(grainId, out var result))
             {
-                SetMessageTargetPlacement(message, result.Activation, result.Silo);
+                SetMessageTargetPlacement(message, result.ActivationId, result.SiloAddress);
                 return Task.CompletedTask;
             }
 
@@ -269,7 +269,7 @@ namespace Orleans.Runtime.Placement
                     foreach (var message in messages)
                     {
                         var result = resultTask.Result;
-                        _placementService.SetMessageTargetPlacement(message.Message, result.Activation, result.Silo);
+                        _placementService.SetMessageTargetPlacement(message.Message, result.ActivationId, result.SiloAddress);
                         message.Completion.TrySetResult(true);
                     }
 
@@ -286,7 +286,7 @@ namespace Orleans.Runtime.Placement
                 }
             }
 
-            private async Task<ActivationAddress> GetOrPlaceActivationAsync(Message firstMessage)
+            private async Task<GrainAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
                 var target = new PlacementTarget(
@@ -323,7 +323,7 @@ namespace Orleans.Runtime.Placement
                     activationId = ActivationId.NewId();
                 }
 
-                result = ActivationAddress.GetAddress(siloAddress, targetGrain, activationId);
+                result = GrainAddress.GetAddress(siloAddress, targetGrain, activationId);
                 _placementService._grainLocator.InvalidateCache(targetGrain);
                 _placementService._grainLocator.CachePlacementDecision(result);
                 return result;
@@ -333,7 +333,7 @@ namespace Orleans.Runtime.Placement
             {
                 public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = new();
 
-                public Task<ActivationAddress> Result { get; set; }
+                public Task<GrainAddress> Result { get; set; }
             }
         }
     }

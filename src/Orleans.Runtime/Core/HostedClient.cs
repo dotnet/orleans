@@ -77,9 +77,9 @@ namespace Orleans.Runtime
 
         public IAddressable GrainInstance => null;
 
-        public ActivationId ActivationId => this.Address.Activation;
+        public ActivationId ActivationId => this.Address.ActivationId;
 
-        public ActivationAddress Address { get; }
+        public GrainAddress Address { get; }
 
         public IServiceProvider ActivationServices => this.runtimeClient.ServiceProvider;
 

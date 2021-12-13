@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the activation address.
         /// </summary>
-        ActivationAddress Address { get; }
+        GrainAddress Address { get; }
 
         /// <summary>Gets the <see cref="IServiceProvider"/> that provides access to the grain activation's service container.</summary>
         IServiceProvider ActivationServices { get; }

@@ -75,14 +75,14 @@ namespace UnitTests.Directory
 
             this.grainDirectory.Register(expected).Returns(expected);
 
-            var actual = await this.grainLocator.Register(expected.ToActivationAddress());
-            Assert.Equal(expected.ToActivationAddress(), actual);
+            var actual = await this.grainLocator.Register(expected);
+            Assert.Equal(expected, actual);
             await this.grainDirectory.Received(1).Register(expected);
 
             // Now should be in cache
             Assert.True(this.grainLocator.TryLookupInCache(expected.GrainId, out var result));
             Assert.NotNull(result);
-            Assert.Equal(expected.ToActivationAddress(), result);
+            Assert.Equal(expected, result);
         }
 
         [Fact]
@@ -101,14 +101,14 @@ namespace UnitTests.Directory
 
             this.grainDirectory.Register(otherAddr).Returns(expectedAddr);
 
-            var actual = await this.grainLocator.Register(otherAddr.ToActivationAddress());
-            Assert.Equal(expectedAddr.ToActivationAddress(), actual);
+            var actual = await this.grainLocator.Register(otherAddr);
+            Assert.Equal(expectedAddr, actual);
             await this.grainDirectory.Received(1).Register(otherAddr);
 
             // Now should be in cache
             Assert.True(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out var result));
             Assert.NotNull(result);
-            Assert.Equal(expectedAddr.ToActivationAddress(), result);
+            Assert.Equal(expectedAddr, result);
         }
 
         [Fact]
@@ -129,15 +129,15 @@ namespace UnitTests.Directory
             // First returns the outdated entry, then the new one
             this.grainDirectory.Register(expectedAddr).Returns(outdatedAddr, expectedAddr);
 
-            var actual = await this.grainLocator.Register(expectedAddr.ToActivationAddress());
-            Assert.Equal(expectedAddr.ToActivationAddress(), actual);
+            var actual = await this.grainLocator.Register(expectedAddr);
+            Assert.Equal(expectedAddr, actual);
             await this.grainDirectory.Received(2).Register(expectedAddr);
             await this.grainDirectory.Received(1).Unregister(outdatedAddr);
 
             // Now should be in cache
             Assert.True(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out var result));
             Assert.NotNull(result);
-            Assert.Equal(expectedAddr.ToActivationAddress(), result);
+            Assert.Equal(expectedAddr, result);
 
             await this.lifecycle.OnStop();
         }
@@ -162,12 +162,12 @@ namespace UnitTests.Directory
             // Do a remote lookup
             var result = await this.grainLocator.Lookup(grainAddress.GrainId);
             Assert.NotNull(result);
-            Assert.Equal(grainAddress.ToActivationAddress(), result);
+            Assert.Equal(grainAddress, result);
 
             // Now cache should be populated
             Assert.True(this.grainLocator.TryLookupInCache(grainAddress.GrainId, out var cachedValue));
             Assert.NotNull(cachedValue);
-            Assert.Equal(grainAddress.ToActivationAddress(), cachedValue);
+            Assert.Equal(grainAddress, cachedValue);
         }
 
         [Fact]
@@ -235,8 +235,8 @@ namespace UnitTests.Directory
             this.grainDirectory.Register(expectedAddr).Returns(expectedAddr);
             this.grainDirectory.Register(outdatedAddr).Returns(outdatedAddr);
 
-            await this.grainLocator.Register(expectedAddr.ToActivationAddress());
-            await this.grainLocator.Register(outdatedAddr.ToActivationAddress());
+            await this.grainLocator.Register(expectedAddr);
+            await this.grainLocator.Register(outdatedAddr);
 
             // Simulate a dead silo
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.SiloAddress, SiloStatus.Dead, "old");
@@ -255,7 +255,7 @@ namespace UnitTests.Directory
 
             var result = await this.grainLocator.Lookup(expectedAddr.GrainId);
             Assert.NotNull(result);
-            Assert.Equal(expectedAddr.ToActivationAddress(), result);
+            Assert.Equal(expectedAddr, result);
 
             await this.lifecycle.OnStop();
         }
@@ -275,10 +275,10 @@ namespace UnitTests.Directory
             this.grainDirectory.Register(expectedAddr).Returns(expectedAddr);
 
             // Register to populate cache
-            await this.grainLocator.Register(expectedAddr.ToActivationAddress());
+            await this.grainLocator.Register(expectedAddr);
 
             // Unregister and check if cache was cleaned
-            await this.grainLocator.Unregister(expectedAddr.ToActivationAddress(), UnregistrationCause.Force);
+            await this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
             Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
         }
 
@@ -287,7 +287,7 @@ namespace UnitTests.Directory
             return new GrainAddress
             {
                 GrainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid())),
-                ActivationId = ActivationId.NewId().Key.ToString("N"),
+                ActivationId = ActivationId.NewId(),
                 SiloAddress = siloAddress ?? GenerateSiloAddress(),
                 MembershipVersion = this.mockMembershipService.CurrentVersion,
             };

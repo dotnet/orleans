@@ -38,7 +38,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
         }
 
-        public async ValueTask<ActivationAddress> Lookup(GrainId grainId)
+        public async ValueTask<GrainAddress> Lookup(GrainId grainId)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -60,64 +60,57 @@ namespace Orleans.Runtime.GrainDirectory
                 return null;
             }
 
-            var entryAddress = entry.ToActivationAddress();
-            ActivationAddress result;
-
             // Check if the entry is pointing to a dead silo
             if (IsKnownDeadSilo(entry))
             {
                 // Remove it from the directory
                 await GetGrainDirectory(grainId.Type).Unregister(entry);
-                result = null;
+                entry = null;
             }
             else
             {
                 // Add to the local cache and return it
-                this.cache.AddOrUpdate(entryAddress, 0);
-                result = entryAddress;
+                this.cache.AddOrUpdate(entry, 0);
             }
 
-            return result;
+            return entry;
         }
 
-        public async Task<ActivationAddress> Register(ActivationAddress address)
+        public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var grainType = address.Grain.Type;
+            var grainType = address.GrainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
             {
-                ThrowUnsupportedGrainType(address.Grain);
+                ThrowUnsupportedGrainType(address.GrainId);
             }
 
-            var grainAddress = address.ToGrainAddress();
-            grainAddress.MembershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
+            address.MembershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
 
-            var result = await GetGrainDirectory(grainType).Register(grainAddress);
-            var activationAddress = result.ToActivationAddress();
+            var result = await GetGrainDirectory(grainType).Register(address);
 
             // Check if the entry point to a dead silo
             if (IsKnownDeadSilo(result))
             {
                 // Remove outdated entry and retry to register
                 await GetGrainDirectory(grainType).Unregister(result);
-                result = await GetGrainDirectory(grainType).Register(grainAddress);
-                activationAddress = result.ToActivationAddress();
+                result = await GetGrainDirectory(grainType).Register(address);
             }
 
             // Cache update
-            this.cache.AddOrUpdate(activationAddress, (int) result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result, (int) result.MembershipVersion.Value);
 
-            return activationAddress;
+            return result;
         }
 
-        public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public async Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
             try
             {
-                await GetGrainDirectory(address.Grain.Type).Unregister(address.ToGrainAddress());
+                await GetGrainDirectory(address.GrainId.Type).Unregister(address);
             }
             finally
             {
-                this.cache.Remove(address.Grain);
+                this.cache.Remove(address.GrainId);
             }
         }
 
@@ -190,10 +183,10 @@ namespace Orleans.Runtime.GrainDirectory
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
 
-        public void CachePlacementDecision(ActivationAddress address) => cache.AddOrUpdate(address, 0);
+        public void CachePlacementDecision(GrainAddress address) => cache.AddOrUpdate(address, 0);
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
-        public void InvalidateCache(ActivationAddress address) => cache.Remove(address);
-        public bool TryLookupInCache(GrainId grainId, out ActivationAddress address)
+        public void InvalidateCache(GrainAddress address) => cache.Remove(address);
+        public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -204,7 +197,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (this.cache.LookUp(grainId, out address, out var version))
             {
                 // If the silo is dead, remove the entry
-                if (IsKnownDeadSilo(address.Silo, new MembershipVersion(version)))
+                if (IsKnownDeadSilo(address.SiloAddress, new MembershipVersion(version)))
                 {
                     address = default;
                     this.cache.Remove(grainId);
@@ -217,27 +210,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             return false;
-        }
-    }
-
-    internal static class AddressHelpers
-    {
-        public static ActivationAddress ToActivationAddress(this GrainAddress addr)
-        {
-            return ActivationAddress.GetAddress(
-                    addr.SiloAddress,
-                    addr.GrainId,
-                    ActivationId.GetActivationId(Guid.Parse(addr.ActivationId.AsSpan())));
-        }
-
-        public static GrainAddress ToGrainAddress(this ActivationAddress addr)
-        {
-            return new GrainAddress
-            {
-                SiloAddress = addr.Silo,
-                GrainId = addr.Grain,
-                ActivationId = (addr.Activation.Key.ToString("N"))
-            };
         }
     }
 }

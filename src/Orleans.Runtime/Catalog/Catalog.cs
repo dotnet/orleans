@@ -257,10 +257,10 @@ namespace Orleans.Runtime
         /// <param name="requestContextData">Request context data.</param>
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
-            ActivationAddress address,
+            GrainAddress address,
             Dictionary<string, object> requestContextData)
         {
-            if (TryGetActivationData(address.Grain, out var result))
+            if (TryGetActivationData(address.GrainId, out var result))
             {
                 return result;
             }
@@ -268,7 +268,7 @@ namespace Orleans.Runtime
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
             lock (activations)
             {
-                if (TryGetActivationData(address.Grain, out result))
+                if (TryGetActivationData(address.GrainId, out result))
                 {
                     return result;
                 }
@@ -308,7 +308,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task UnregisterNonExistentActivation(ActivationAddress address)
+        private async Task UnregisterNonExistentActivation(GrainAddress address)
         {
             try
             {
@@ -376,15 +376,15 @@ namespace Orleans.Runtime
             }
         }
 
-        public Task DeleteActivations(List<ActivationAddress> addresses)
+        public Task DeleteActivations(List<GrainAddress> addresses)
         {
-            List<IGrainContext> TryGetActivationDatas(List<ActivationAddress> addresses)
+            List<IGrainContext> TryGetActivationDatas(List<GrainAddress> addresses)
             {
                 var datas = new List<IGrainContext>(addresses.Count);
                 foreach (var activationAddress in addresses)
                 {
                     IGrainContext data;
-                    if (TryGetActivationData(activationAddress.Grain, out data))
+                    if (TryGetActivationData(activationAddress.GrainId, out data))
                     {
                         datas.Add(data);
                     }

@@ -142,7 +142,7 @@ namespace UnitTests.Grains
         public Task PingLocalSiloAsync()
         {
             logger.Info("IEchoGrainAsync.PingLocal");
-            SiloAddress mySilo = Data.Address.Silo;
+            SiloAddress mySilo = Data.Address.SiloAddress;
             return GetSiloControlReference(mySilo).Ping("PingLocal");
         }
 
@@ -155,7 +155,7 @@ namespace UnitTests.Grains
         public async Task PingOtherSiloAsync()
         {
             logger.Info("IEchoGrainAsync.PingOtherSilo");
-            SiloAddress mySilo = Data.Address.Silo;
+            SiloAddress mySilo = Data.Address.SiloAddress;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
@@ -170,7 +170,7 @@ namespace UnitTests.Grains
         public async Task PingClusterMemberAsync()
         {
             logger.Info("IEchoGrainAsync.PingClusterMemberAsync");
-            SiloAddress mySilo = Data.Address.Silo;
+            SiloAddress mySilo = Data.Address.SiloAddress;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
