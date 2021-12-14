@@ -795,7 +795,7 @@ namespace Orleans.Streams
             catch (Exception e)
             {
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
-                throw e;
+                throw;
             }
         }
 

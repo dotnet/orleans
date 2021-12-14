@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -48,7 +48,7 @@ namespace Orleans.Transactions.TestKit
                 && avoidDeadlocks
                 && (readwrite == ReadWriteDetermination.PerGrain || readwrite == ReadWriteDetermination.PerTransaction))
             {
-                harness.NumAborted.ShouldBeEquivalentTo(0);
+                harness.NumAborted.Should().Be(0);
             }
 
             // then, analyze the history results

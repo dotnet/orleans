@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
-    public class SubscriptionObserverWithImplicitSubscribingTestRunner: OrleansTestingBase
+    public abstract class SubscriptionObserverWithImplicitSubscribingTestRunner : OrleansTestingBase
     {
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
         //test utilities and statics
@@ -25,15 +25,13 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             this.fixture = fixture;
         }
 
-        [SkippableFact]
-        public async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
+        public virtual async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
         {
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.False(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
 
-        [SkippableFact]
-        public async Task StreamingTests_Consumer_Producer_Subscribe()
+        public virtual async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
@@ -54,8 +52,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await implicitConsumer.StopConsuming();
         }
 
-        [SkippableFact]
-        public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
+        public virtual async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
 
@@ -84,8 +81,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await implicitConsumer.StopConsuming();
         }
 
-        [SkippableFact]
-        public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
+        public virtual async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
 

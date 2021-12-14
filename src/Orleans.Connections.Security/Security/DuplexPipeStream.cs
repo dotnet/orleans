@@ -188,6 +188,7 @@ namespace Orleans.Connections.Security
             return _input.CopyToAsync(destination, cancellationToken);
         }
 
+#if !NET5_0_OR_GREATER
         private static void ValidateBufferArguments(byte[] buffer, int offset, int size)
         {
             if (buffer == null)
@@ -203,6 +204,7 @@ namespace Orleans.Connections.Security
                 throw new ArgumentOutOfRangeException(nameof(size));
             }
         }
+#endif
 
         /// <summary>
         /// Provides support for efficiently using Tasks to implement the APM (Begin/End) pattern.

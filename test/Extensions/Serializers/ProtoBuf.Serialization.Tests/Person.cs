@@ -1,4 +1,4 @@
-﻿using Orleans.Concurrency;
+using Orleans.Concurrency;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -43,7 +43,7 @@ namespace ProtoBuf.Serialization.Tests
         public string Line1 { get; set; }
         [ProtoMember(2)]
         public string Line2 { get; set; }
-        [ProtoMember(3, DataFormat = DataFormat.WellKnown)]
+        [ProtoMember(3)]
         public DateTime Created { get; set; }
     }
 }

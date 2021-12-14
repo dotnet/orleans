@@ -20,6 +20,9 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <DevelopmentDependency>true</DevelopmentDependency>
+
+    <!-- Workaround for https://github.com/NuGet/Home/issues/10372 -->
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   
   <ItemGroup>

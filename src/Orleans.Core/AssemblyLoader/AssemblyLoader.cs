@@ -145,14 +145,18 @@ namespace Orleans.Runtime
                 if (dirEnumArgs.Count == 0)
                     throw new InvalidOperationException("Please specify a directory to search using the AddDirectory or AddRoot methods.");
 
+#if !NET5_0_OR_GREATER
                 AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve += CachedReflectionOnlyTypeResolver.OnReflectionOnlyAssemblyResolve;
+#endif
                 // the following explicit loop ensures that the finally clause is invoked
                 // after we're done enumerating.
                 return EnumerateApprovedAssemblies();
             }
             finally
             {
+#if !NET5_0_OR_GREATER
                 AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve -= CachedReflectionOnlyTypeResolver.OnReflectionOnlyAssemblyResolve;
+#endif
             }
         }
 
@@ -223,10 +227,12 @@ namespace Orleans.Runtime
 
         private Assembly TryReflectionOnlyLoadFromOrFallback(string assembly)
         {
+#if !NET5_0_OR_GREATER
             if (TypeUtils.CanUseReflectionOnly)
             {
                 return Assembly.ReflectionOnlyLoadFrom(assembly);
             }
+#endif
 
             return this.LoadAssemblyFromProbingPath(assembly);
         }
@@ -287,8 +293,7 @@ namespace Orleans.Runtime
 
         private static bool InterpretFileLoadException(string asmPathName, out string[] complaints)
         {
-            var matched = default(Assembly);
-
+            Assembly matched;
             try
             {
                 matched = MatchWithLoadedAssembly(AssemblyName.GetAssemblyName(asmPathName));

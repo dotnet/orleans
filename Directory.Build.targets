@@ -14,24 +14,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(OrleansBootstrapBuildProject)" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-      <Project>{CB36EF45-6E90-443F-AEE4-394677068147}</Project>
-      <Name>Orleans.CodeGenerator.MSBuild.Bootstrap</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <AssetTargetFallback>net5.0</AssetTargetFallback>
-      <Visible>false</Visible>
-      <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
-      <!-- This causes the 'Dependency' node in VS to show a warning icon. See https://github.com/dotnet/project-system/issues/2928 -->
-      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
-      <UndefineProperties>TargetFramework;RuntimeIdentifier;TargetFrameworks;RuntimeIdentifiers</UndefineProperties>
-      <!-- /Workaround -->
-    </ProjectReference>
+    <ProjectReference Include="$(OrleansBootstrapBuildProject)" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "
+      ReferenceOutputAssembly="false"
+      SetTargetFramework="TargetFramework=net6.0"
+      UndefineProperties="TargetFramework"/>
   </ItemGroup>
 
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator.MSBuild/build/Microsoft.Orleans.CodeGenerator.MSBuild.targets" /><!--End Orleans -->
 
-  <!-- Set InformationVersion here, since $(Version) is already set at this point. -->
-  <PropertyGroup>
-    <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
-  </PropertyGroup>
 </Project>

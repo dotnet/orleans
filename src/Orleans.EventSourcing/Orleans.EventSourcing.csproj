@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.EventSourcing</PackageId>
     <Title>Microsoft Orleans Event-Sourcing</Title>
@@ -11,4 +11,8 @@
     <AssemblyName>Orleans.EventSourcing</AssemblyName>
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CSharp" Version="$(MicrosoftCSharpVersion)" />
+  </ItemGroup>
 </Project>

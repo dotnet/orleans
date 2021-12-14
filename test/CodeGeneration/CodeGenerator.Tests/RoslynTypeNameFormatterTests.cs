@@ -112,7 +112,7 @@ namespace CodeGenerator.Tests
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")),
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")),
 
-#if NET461
+#if NETFRAMEWORK
                     MetadataReference.CreateFromFile(typeof(ValueTask).Assembly.Location),
 #endif
 

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <NoPackageAnalysis>true</NoPackageAnalysis>
@@ -16,6 +16,7 @@
     <PublishDir>$(PublishRoot)</PublishDir>
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
   </PropertyGroup>
 
   <ItemGroup>

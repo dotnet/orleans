@@ -7,25 +7,29 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
     <AssemblyName>Orleans.CodeGenerator.MSBuild</AssemblyName>
     <RootNamespace>Orleans.CodeGenerator.MSBuild</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
-    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <PublishDir>$(PublishRoot)</PublishDir>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <DevelopmentDependency>true</DevelopmentDependency>
+
+    <!-- Workaround for https://github.com/NuGet/Home/issues/10372 -->
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
     <None Remove="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <Content Include="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets">
       <Pack>true</Pack>
@@ -58,12 +62,12 @@
     <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
     <PackageReference Include="System.CodeDom" Version="$(SystemCodeDomVersion)" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <!-- This must come after all other PackageReference elements -->
     <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" Publish="true" />
     <ProjectReference Include="..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" Publish="true" />
@@ -74,17 +78,14 @@
     <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
     <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
   </Target>
-  
+
   <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
-   <!-- 
+   <!--
     The include needs to happen after output has been copied to build output folder
     but before NuGet generates a nuspec. See https://github.com/NuGet/Home/issues/4704.
    -->
     <ItemGroup>
-      <PublishedFiles Include="$(PublishRoot)**/*" Exclude="$(PublishRoot)**/$(AssemblyName).*;$(PublishRoot)*/refs/**/*" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).deps.json" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" Exclude="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
+      <PublishedFiles Include="$(PublishRoot)**/*" Exclude="$(PublishRoot)*/refs/**/*" />
       <_PackageFiles Include="@(PublishedFiles)">
         <PackagePath>tasks/$(RecursiveDir)</PackagePath>
         <Visible>false</Visible>

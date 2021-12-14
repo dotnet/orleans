@@ -4,6 +4,7 @@ using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading.Tasks;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -34,6 +35,30 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public SubscriptionObserverWithImplicitSubscribingTestsUsingSMS(ITestOutputHelper output, Fixture fixture)
             :base(fixture)
         {
+        }
+
+        [SkippableFact]
+        public override async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
+        {
+            await base.StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager();
+        }
+
+        [SkippableFact]
+        public override async Task StreamingTests_Consumer_Producer_Subscribe()
+        {
+            await base.StreamingTests_Consumer_Producer_Subscribe();
+        }
+
+        [SkippableFact]
+        public override async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
+        {
+            await base.StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism();
+        }
+
+        [SkippableFact]
+        public override async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
+        {
+            await base.StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider();
         }
     }
 }

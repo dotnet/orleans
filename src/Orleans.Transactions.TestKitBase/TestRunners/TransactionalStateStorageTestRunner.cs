@@ -143,9 +143,9 @@ namespace Orleans.Transactions.TestKit
         private void AssertTState(TState actual, TState expected)
         {
             if(assertConfig == null)
-                actual.ShouldBeEquivalentTo(expected);
+                actual.Should().BeEquivalentTo(expected);
             else
-                actual.ShouldBeEquivalentTo(expected, assertConfig);
+                actual.Should().BeEquivalentTo(expected, assertConfig);
         }
 
         private PendingTransactionState<TState> MakePendingState(long seqno, TState val, bool tm)
