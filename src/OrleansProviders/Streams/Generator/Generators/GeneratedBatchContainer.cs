@@ -6,7 +6,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
 {
-    internal class GeneratedBatchContainer : IBatchContainer
+    public class GeneratedBatchContainer : IBatchContainer
     {
         public Guid StreamGuid { get; }
         public string StreamNamespace { get; }

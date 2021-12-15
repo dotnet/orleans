@@ -145,6 +145,9 @@
     <NodaTimeVersion>3.0.9</NodaTimeVersion>
     <AutofacExtensionsDependencyInjectionVersion>7.2.0</AutofacExtensionsDependencyInjectionVersion>
     <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
+    <CrankVersion>0.2.0-alpha.21457.1</CrankVersion>
+    <AzureKeyVaultVersion>4.2.0</AzureKeyVaultVersion>
+    <SystemCommandLineVersion>2.0.0-beta1.21308.1</SystemCommandLineVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>1.1.1</SourceLinkVersion>
@@ -230,6 +233,11 @@
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>
     <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(Configuration)</PackageOutputPath>
+  </PropertyGroup>
+
+  <!-- Set output folder for distributed test apps -->
+  <PropertyGroup>
+    <DistributedTestsOutputPath Condition=" '$(DistributedTestsOutputPath)'=='' ">$(SourceRoot)/Artifacts/DistributedTests</DistributedTestsOutputPath>
   </PropertyGroup>
 
   <Choose>
