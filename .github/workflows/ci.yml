@@ -7,8 +7,8 @@ on:
   pull_request:
     branches:
       - main
-env: 
-  BUILD_CONFIGURATION: release
+env:
+  BUILD_CONFIGURATION: Release
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_NOLOGO: true
@@ -16,57 +16,26 @@ env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
-  CodeQL-Build:
-    runs-on: ${{ matrix.os }}
-    permissions:
-      security-events: write
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-latest ]
-        dotnet: ['2.1.x', '3.1.x', '5.x']
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
-      with:
-        queries: security-and-quality
-        languages: csharp
-
-    - name: Install dependencies
-      run: dotnet restore --locked-mode
-
-    - name: Build
-      run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
-      timeout-minutes: 100
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v1
-      timeout-minutes: 100
-
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        dotnet: ['2.1.x', '3.1.x', '5.x']
-    
-    steps:    
+        os: [ubuntu-latest]
+        dotnet: ['6.*']
+
+    steps:
     - uses: actions/checkout@v2
 
     # Orleans does not use lock files, yet.
     # - name: Cache Nuget packages '${{ matrix.dotnet }}' on '${{ matrix.os }}'
-    #  uses: actions/cache@v2.1.6 
+    #  uses: actions/cache@v2.1.6
     #  with:
     #    path: ${{ env.NUGET_PACKAGES }}
     #    key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
     #    restore-keys: |
     #      ${{runner.os}}-nuget-
-    
+
     - name: Setup .NET ${{ matrix.dotnet }} on ${{ matrix.os }}
       uses: actions/checkout@v2.3.4
       with:
@@ -80,7 +49,31 @@ jobs:
       run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
       # run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore -property:ContinuousIntegrationBuild=true
       timeout-minutes: 100
-            
+
+    - name: Run Infer#
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      uses: microsoft/infersharpaction@v1.2.1
+      with:
+        binary-path: ${{ github.workspace }}/src/Orleans.Core/bin/${{ env.BUILD_CONFIGURATION }}/net5.0
+
+    - name: Show Infer# analysis results
+      id: runinfersharp
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: echo ${{ github.workspace }}/infer-out/report.txt
+
+    - name: Upload Infer# report
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: Infer# report
+        path: ${{ github.workspace }}/infer-out/report.txt
+
+    - name: Upload SARIF output to GitHub Security Center
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      uses: github/codeql-action/upload-sarif@v1
+      with:
+        sarif_file: ${{ github.workspace }}/infer-out/report.sarif
+
     - name: Test ${{ matrix.dotnet }} on ${{ matrix.os }}
       run: dotnet test --verbosity normal --no-restore --no-build --configuration ${{ env.BUILD_CONFIGURATION }} --filter "TestCategory != BVT & TestCategory != SlowBVT & TestCategory != Functional"
       timeout-minutes: 100
