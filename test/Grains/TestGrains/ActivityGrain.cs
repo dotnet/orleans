@@ -16,7 +16,7 @@ namespace UnitTests.Grains
             var activity = Activity.Current;
             if (activity == null)
             {
-                return null;
+                return Task.FromResult(default(ActivityData));
             }
 
             var result = new ActivityData() { Id = activity.Id, TraceState = activity.TraceStateString };
