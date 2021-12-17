@@ -1,8 +1,20 @@
 using System;
 using System.Runtime.Serialization;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Options for <see cref="BinaryFormatterISerializableSerializer"/>.
+    /// </summary>
+    public class BinaryFormatterISerializableSerializerOptions
+    {
+        /// <summary>
+        /// Whether to use the <see cref="BinaryFormatterISerializableSerializer"/> serializer only as a fallback
+        /// </summary>
+        public bool IsFallbackOnly { get; set; } = true;
+    }
+
     /// <summary>
     /// A wrapper around <see cref="BinaryFormatterSerializer"/> which only serializes ISerializable types.
     /// </summary>
@@ -11,10 +23,12 @@ namespace Orleans.Serialization
         private static readonly Type SerializableType = typeof(ISerializable);
         
         private readonly BinaryFormatterSerializer serializer;
+        private readonly BinaryFormatterISerializableSerializerOptions options;
 
-        public BinaryFormatterISerializableSerializer(BinaryFormatterSerializer serializer)
+        public BinaryFormatterISerializableSerializer(BinaryFormatterSerializer serializer, IOptions<BinaryFormatterISerializableSerializerOptions> options)
         {
             this.serializer = serializer;
+            this.options = options.Value;
         }
 
         /// <inheritdoc />
@@ -36,6 +50,6 @@ namespace Orleans.Serialization
         public KeyedSerializerId SerializerId => KeyedSerializerId.BinaryFormatterISerializable;
 
         /// <inheritdoc />
-        public bool IsFallbackOnly => true;
+        public bool IsFallbackOnly => options.IsFallbackOnly;
     }
 }
