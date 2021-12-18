@@ -96,6 +96,7 @@ namespace UnitTests.General
 
             var activity = new Activity("SomeName");
             activity.TraceStateString = "traceState";
+            activity.AddBaggage("foo", "bar");
             activity.Start();
 
             try
@@ -117,7 +118,8 @@ namespace UnitTests.General
                 Assert.NotNull(result);
                 Assert.NotNull(result.Id);
                 Assert.Contains(activity.TraceId.ToHexString(), result.Id); // ensure, that trace id is persisted.
-                Assert.Equal(result.TraceState, activity.TraceStateString);
+                Assert.Equal(activity.TraceStateString, result.TraceState);
+                Assert.Equal(activity.Baggage, result.Baggage);
             }
         }
 
@@ -127,6 +129,7 @@ namespace UnitTests.General
             Activity.DefaultIdFormat = ActivityIdFormat.Hierarchical;
 
             var activity = new Activity("SomeName");
+            activity.AddBaggage("foo", "bar");
             activity.Start();
 
             try
@@ -148,8 +151,9 @@ namespace UnitTests.General
                 Assert.NotNull(result);
                 Assert.NotNull(result.Id);
                 Assert.StartsWith(activity.Id, result.Id);
+                Assert.Equal(activity.Baggage, result.Baggage);
             }
-
         }
+
     }
 }

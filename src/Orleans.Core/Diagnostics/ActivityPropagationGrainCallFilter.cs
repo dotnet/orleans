@@ -110,6 +110,18 @@ namespace Orleans.Runtime
                     {
                         activity.TraceStateString = traceState;
                     }
+                    var baggage = propagator.ExtractBaggage(null, static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
+                    {
+                        fieldValues = default;
+                        fieldValue = RequestContext.Get(fieldName) as string;
+                    });
+                    if (baggage is not null)
+                    {
+                        foreach (var baggageItem in baggage)
+                        {
+                            activity.AddBaggage(baggageItem.Key, baggageItem.Value);
+                        }
+                    }
                 }
                 activity.Start();
             }

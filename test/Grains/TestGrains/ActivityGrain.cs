@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -19,7 +16,12 @@ namespace UnitTests.Grains
                 return Task.FromResult(default(ActivityData));
             }
 
-            var result = new ActivityData() { Id = activity.Id, TraceState = activity.TraceStateString };
+            var result = new ActivityData()
+            {
+                Id = activity.Id,
+                TraceState = activity.TraceStateString,
+                Baggage = activity.Baggage.ToList(),
+            };
 
             return Task.FromResult(result);
         }
