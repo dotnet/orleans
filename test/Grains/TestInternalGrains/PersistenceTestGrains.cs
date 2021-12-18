@@ -824,7 +824,7 @@ namespace UnitTests.Grains
 
         public async Task Task_Delay(bool doStart)
         {
-            var wrapper = new Task(async () =>
+            var wrapper = new Task<Task>(async () =>
             {
                 logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(1);
@@ -838,7 +838,7 @@ namespace UnitTests.Grains
                 wrapper.Start(); // THIS IS THE KEY STEP!
             }
 
-            await wrapper;
+            await wrapper.Unwrap();
         }
 
         private async Task DoDelay(int i)
@@ -958,7 +958,7 @@ namespace UnitTests.Grains
 
         public async Task Task_Delay(bool doStart)
         {
-            var wrapper = new Task(async () =>
+            var wrapper = new Task<Task>(async () =>
             {
                 logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
                 await DoDelay(1);
@@ -972,7 +972,7 @@ namespace UnitTests.Grains
                 wrapper.Start(); // THIS IS THE KEY STEP!
             }
 
-            await wrapper;
+            await wrapper.Unwrap();
         }
 
         private async Task DoDelay(int i)
