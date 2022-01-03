@@ -5,6 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -42,6 +44,7 @@ namespace Orleans.Runtime
             _maxWorkers = ((StatelessWorkerPlacement)_sharedContext.PlacementStrategy).MaxLocal;
             _messageLoopTask = Task.Run(RunMessageLoop);
             _sharedContext.OnCreateActivation(this);
+
         }
 
         public GrainReference GrainReference => _grainReference ??= _sharedContext.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -180,7 +183,8 @@ namespace Orleans.Runtime
 
                     // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
                     var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-                    newWorker.Activate(requestContext);
+                    var cancellation = new CancellationTokenSource(_sharedContext.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                    newWorker.Activate(requestContext, cancellation.Token);
 
                     _workers.Add(newWorker);
                 }

@@ -1099,7 +1099,7 @@ namespace Orleans.Runtime
         {
             if (!cancellationToken.HasValue)
             {
-                cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
+                cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout).Token;
             }
 
             ScheduleOperation(new Command.Activate(requestContext, cancellationToken.Value));
