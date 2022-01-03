@@ -53,7 +53,7 @@ namespace Tester.AzureUtils
             {
                 var addr = new GrainAddress
                 {
-                    ActivationId = Guid.NewGuid().ToString("N"),
+                    ActivationId = ActivationId.NewId(),
                     GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
                     SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
                 };
@@ -63,7 +63,7 @@ namespace Tester.AzureUtils
 
             // Modify the Rth entry locally, to simulate another activation tentative by another silo
             var oldActivation = addresses[R].ActivationId;
-            addresses[R].ActivationId = Guid.NewGuid().ToString("N");
+            addresses[R].ActivationId = ActivationId.NewId();
 
             // Batch unregister
             await this.grainDirectory.UnregisterMany(addresses);

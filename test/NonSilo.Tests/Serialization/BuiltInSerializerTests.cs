@@ -150,23 +150,6 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("Functional")]
-        public void Serialize_ActivationAddress()
-        {
-            GrainId grain = LegacyGrainId.NewId();
-            var addr = ActivationAddress.GetAddress(null, grain, default);
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, addr, false);
-            Assert.IsAssignableFrom<ActivationAddress>(deserialized);
-            Assert.True(((ActivationAddress)deserialized).Activation.IsDefault); //Activation no longer null after copy
-            Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after copy
-            Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
-            deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, addr);
-            Assert.IsAssignableFrom<ActivationAddress>(deserialized); //ActivationAddress full serialization loop as wrong type
-            Assert.True(((ActivationAddress)deserialized).Activation.IsDefault); //Activation no longer null after full serialization loop
-            Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after full serialization loop
-            Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
-        }
-
-        [Fact, TestCategory("Functional")]
         public void Serialize_EmptyList()
         {
             var list = new List<int>();

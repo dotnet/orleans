@@ -107,7 +107,7 @@ namespace Orleans.CodeGenerator
                 List<IPropertySymbol> dataMembers = new();
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
-                    if (!property.Name.StartsWith("Item"))
+                    if (!property.Name.StartsWith("Item", System.StringComparison.Ordinal))
                     {
                         continue;
                     }
@@ -170,6 +170,8 @@ namespace Orleans.CodeGenerator
                 public ITypeSymbol Type => _property.Type;
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
+
+                public ISymbol Symbol => _property;
 
                 public string FieldName => _property.Name.ToLowerInvariant(); 
 
@@ -302,6 +304,8 @@ namespace Orleans.CodeGenerator
                 public IMemberDescription Member => this;
 
                 public ITypeSymbol Type => _property.Type;
+
+                public ISymbol Symbol => _property;
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
 

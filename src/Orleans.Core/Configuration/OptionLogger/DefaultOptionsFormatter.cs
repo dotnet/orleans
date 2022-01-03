@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -5,100 +6,119 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans
 {
-    internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T>
-         where T : class, new()
+    internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T> where T : class, new()
     {
-        public string Name { get; }
-
-        private readonly T options;
+        private readonly T _options;
 
         public DefaultOptionsFormatter(IOptions<T> options)
         {
-            this.options = options.Value;
-            this.Name = OptionFormattingUtilities.Name<T>();
+            _options = options.Value;
+            Name = OptionFormattingUtilities.Name<T>();
         }
 
         internal DefaultOptionsFormatter(string name, T options)
         {
-            this.options = options;
-            this.Name = OptionFormattingUtilities.Name<T>(name);
+            _options = options;
+            Name = OptionFormattingUtilities.Name<T>(name);
         }
+
+        public string Name { get; }
 
         public IEnumerable<string> Format()
         {
-            var result = new List<string>();
-            foreach (var prop in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            foreach (var prop in typeof(T).GetProperties())
             {
-                if (prop.GetGetMethod() is object && prop.GetSetMethod() is object)
+                if (!IsFormattableProperty(prop))
                 {
-                    FormatProperty(prop, result);
+                    continue;
+                }
+
+                foreach (var formattedValue in FormatProperty(_options, prop))
+                {
+                    yield return formattedValue;
                 }
             }
-
-            return result;
         }
 
-        private void FormatProperty(PropertyInfo property, List<string> result)
+        private static bool IsFormattableProperty(PropertyInfo prop)
+        {
+            if (prop is null) return false;
+            if (!IsFormattableType(prop.PropertyType)) return false;
+            if (prop.GetCustomAttribute<ObsoleteAttribute>() is not null) return false;
+            if (!IsAccessibleMethod(prop.GetSetMethod())) return false;
+            if (!IsAccessibleMethod(prop.GetGetMethod())) return false;
+            return true;
+        }
+
+        private static bool IsAccessibleMethod(MethodInfo accessor)
+        {
+            if (accessor is null) return false;
+            if (!accessor.IsPublic) return false;
+            if (accessor.GetCustomAttribute<ObsoleteAttribute>() is not null) return false;
+            return true;
+        }
+
+        private static bool IsFormattableType(Type type)
+        {
+            if (type is null) return false;
+            if (typeof(Delegate).IsAssignableFrom(type)) return false;
+            return true;
+        }
+
+        private static IEnumerable<string> FormatProperty(object options, PropertyInfo property)
         {
             var name = property.Name;
-            var value = property.GetValue(this.options);
+            var value = property.GetValue(options);
             var redactAttribute = property.GetCustomAttribute<RedactAttribute>(inherit: true);
 
             // If redact specified, let the attribute implementation do the work
             if (redactAttribute != null)
             {
-                result.Add(
-                   OptionFormattingUtilities.Format(
-                       name,
-                       redactAttribute.Redact(value)));
+                yield return OptionFormattingUtilities.Format(name, redactAttribute.Redact(value));
             }
             else
             {
-                // If it is a dictionary -> one line per item
                 if (value is IDictionary dict)
                 {
+                    // If it is a dictionary -> one line per item
                     var enumerator = dict.GetEnumerator();
                     while (enumerator.MoveNext())
                     {
                         var kvp = enumerator.Entry;
-                        result.Add($"{name}.{kvp.Key}: {kvp.Value}");
+                        yield return $"{name}.{kvp.Key}: {kvp.Value}";
                     }
                 }
-                // If it is a simple collection -> one line per item
                 else if (value is ICollection coll)
                 {
+                    // If it is a simple collection -> one line per item
                     if (coll.Count > 0)
                     {
                         var index = 0;
                         foreach (var item in coll)
                         {
-                            result.Add($"{name}.{index}: {item}");
+                            yield return $"{name}.{index}: {item}";
                             index++;
                         }
                     }
                 }
-                // Simple case
                 else
                 {
-                    result.Add(OptionFormattingUtilities.Format(name, value));
+                    // Simple case
+                    yield return OptionFormattingUtilities.Format(name, value);
                 }
             }
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
-        where T: class, new()
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T: class, new()
     {
-        private readonly IOptionsMonitor<T> optionsMonitor;
+        private readonly IOptionsMonitor<T> _optionsMonitor;
 
         public DefaultOptionsFormatterResolver(IOptionsMonitor<T> optionsMonitor)
         {
-            this.optionsMonitor = optionsMonitor;
+            _optionsMonitor = optionsMonitor;
         }
 
-        public IOptionFormatter<T> Resolve(string name)
-        {
-            return new DefaultOptionsFormatter<T>(name, this.optionsMonitor.Get(name));
-        }
+        public IOptionFormatter<T> Resolve(string name) => new DefaultOptionsFormatter<T>(name, _optionsMonitor.Get(name));
     }
 }

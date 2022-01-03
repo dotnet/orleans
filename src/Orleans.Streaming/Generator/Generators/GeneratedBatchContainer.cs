@@ -8,7 +8,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Generator
 {
     [GenerateSerializer]
-    internal class GeneratedBatchContainer : IBatchContainer
+    public class GeneratedBatchContainer : IBatchContainer
     {
         [Id(0)]
         public StreamId StreamId { get; }

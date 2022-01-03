@@ -205,7 +205,6 @@ namespace UnitTests.GrainInterfaces
         [NonSerialized]
         private int nonSerializedIntField;
 
-        [Id(0)]
         public abstract int Int { get; set; }
 
         [Id(1)]

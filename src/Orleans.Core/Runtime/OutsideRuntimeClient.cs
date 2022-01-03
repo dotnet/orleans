@@ -48,7 +48,7 @@ namespace Orleans
         private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
         private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
-        public ActivationAddress CurrentActivationAddress
+        public GrainAddress CurrentActivationAddress
         {
             get;
             private set;
@@ -180,7 +180,7 @@ namespace Orleans
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             MessageCenter.Start();
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
+            CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
@@ -274,8 +274,8 @@ namespace Orleans
             message.InterfaceVersion = target.InterfaceVersion;
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            message.SendingGrain = CurrentActivationAddress.Grain;
-            message.SendingActivation = CurrentActivationAddress.Activation;
+            message.SendingGrain = CurrentActivationAddress.GrainId;
+            message.SendingActivation = CurrentActivationAddress.ActivationId;
             message.TargetGrain = targetGrainId;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))

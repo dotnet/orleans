@@ -8,18 +8,18 @@ namespace Orleans.GrainDirectory
     /// </summary>
     public interface IGrainLocator
     {
-        Task<ActivationAddress> Register(ActivationAddress address);
+        Task<GrainAddress> Register(GrainAddress address);
 
-        Task Unregister(ActivationAddress address, UnregistrationCause cause);
+        Task Unregister(GrainAddress address, UnregistrationCause cause);
 
-        ValueTask<ActivationAddress> Lookup(GrainId grainId);
+        ValueTask<GrainAddress> Lookup(GrainId grainId);
 
-        void CachePlacementDecision(ActivationAddress address);
+        void CachePlacementDecision(GrainAddress address);
 
         void InvalidateCache(GrainId grainId);
 
-        void InvalidateCache(ActivationAddress address);
+        void InvalidateCache(GrainAddress address);
 
-        bool TryLookupInCache(GrainId grainId, out ActivationAddress address);
+        bool TryLookupInCache(GrainId grainId, out GrainAddress address);
     }
 }

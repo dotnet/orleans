@@ -127,7 +127,7 @@ namespace Orleans.Runtime
                     _schedulingOptions);
             }
 
-            public IGrainContext CreateContext(ActivationAddress activationAddress)
+            public IGrainContext CreateContext(GrainAddress activationAddress)
             {
                 var context = new ActivationData(
                     activationAddress,
@@ -164,6 +164,6 @@ namespace Orleans.Runtime
             _sharedContext = sharedContext;
         }
 
-        public IGrainContext CreateContext(ActivationAddress address) => new StatelessWorkerGrainContext(address, _sharedContext, _innerActivator);
+        public IGrainContext CreateContext(GrainAddress address) => new StatelessWorkerGrainContext(address, _sharedContext, _innerActivator);
     }
 }

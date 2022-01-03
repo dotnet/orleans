@@ -32,9 +32,9 @@ namespace Orleans.CodeGenerator
                 {
                     members.Add(serializable);
                 }
-                else if (member is IFieldDescription field)
+                else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(libraryTypes, type, field, members.Count));
+                    members.Add(new SerializableMember(libraryTypes, type, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
@@ -275,12 +275,12 @@ namespace Orleans.CodeGenerator
                         codecType = ParseTypeName(simpleName);
                     }
                 }
-                else if (libraryTypes.WellKnownCodecs.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)) is WellKnownCodecDescription codec)
+                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)) is WellKnownCodecDescription codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.
                     codecType = codec.CodecType.ToTypeSyntax();
                 }
-                else if (member.Type is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.FirstOrDefault(c => member.Type is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
+                else if (member.Type is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => member.Type is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
                 {
                     // Construct the generic codec type using the field's type arguments.
                     codecType = genericCodec.CodecType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -360,7 +360,7 @@ namespace Orleans.CodeGenerator
                 // Codecs can either be static classes or injected into the constructor.
                 // Either way, the member signatures are the same.
                 var memberType = description.Type;
-                var staticCodec = libraryTypes.StaticCodecs.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
                 ExpressionSyntax codecExpression;
                 if (staticCodec != null && libraryTypes.Compilation.IsSymbolAccessibleWithin(staticCodec.CodecType, libraryTypes.Compilation.Assembly))
                 {
@@ -537,7 +537,7 @@ namespace Orleans.CodeGenerator
                     // Either way, the member signatures are the same.
                     var codec = codecs.First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
                     var memberType = description.Type;
-                    var staticCodec = libraryTypes.StaticCodecs.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                    var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
                     ExpressionSyntax codecExpression;
                     if (staticCodec != null)
                     {
@@ -916,7 +916,7 @@ namespace Orleans.CodeGenerator
 
             // Codecs can either be static classes or injected into the constructor.
             // Either way, the member signatures are the same.
-            var staticCodec = libraryTypes.StaticCodecs.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
+            var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
             var codecExpression = staticCodec.CodecType.ToNameSyntax();
 
             body.Add(
@@ -958,7 +958,7 @@ namespace Orleans.CodeGenerator
             var readerParam = "reader".ToIdentifierName();
             var fieldParam = "field".ToIdentifierName();
 
-            var staticCodec = libraryTypes.StaticCodecs.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
+            var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
             ExpressionSyntax codecExpression = staticCodec.CodecType.ToNameSyntax();
             ExpressionSyntax readValueExpression = InvocationExpression(
                 codecExpression.Member("ReadValue"),
@@ -1170,37 +1170,37 @@ namespace Orleans.CodeGenerator
             private readonly SemanticModel _model;
             private readonly LibraryTypes _libraryTypes;
             private IPropertySymbol _property;
-            private readonly IFieldDescription _fieldDescription;
+            private readonly IMemberDescription _member;
 
             /// <summary>
             /// The ordinal assigned to this field.
             /// </summary>
             private readonly int _ordinal;
 
-            public SerializableMember(LibraryTypes libraryTypes, ISerializableTypeDescription type, IFieldDescription member, int ordinal)
+            public SerializableMember(LibraryTypes libraryTypes, ISerializableTypeDescription type, IMemberDescription member, int ordinal)
             {
                 _libraryTypes = libraryTypes;
                 _model = type.SemanticModel;
                 _ordinal = ordinal;
-                _fieldDescription = member;
+                _member = member;
             }
 
-            public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(_fieldDescription.Type) || (Property is { } prop && prop.HasAnyAttribute(_libraryTypes.ImmutableAttributes)) || _fieldDescription.Field.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+            public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(_member.Type) || (Property is { } prop && prop.HasAnyAttribute(_libraryTypes.ImmutableAttributes)) || _member.Symbol.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
             public bool IsValueType => Type.IsValueType;
 
-            public IMemberDescription Member => _fieldDescription;
+            public IMemberDescription Member => _member;
 
             /// <summary>
             /// Gets the underlying <see cref="Field"/> instance.
             /// </summary>
-            private IFieldSymbol Field => _fieldDescription.Field;
+            private IFieldSymbol Field => (_member as IFieldDescription)?.Field;
 
-            public ITypeSymbol Type => _fieldDescription.Type;
+            public ITypeSymbol Type => _member.Type;
 
-            public INamedTypeSymbol ContainingType => _fieldDescription.Field.ContainingType;
+            public INamedTypeSymbol ContainingType => _member.ContainingType;
 
-            public string FieldName => _fieldDescription.Field.Name;
+            public string MemberName => Field?.Name ?? Property?.Name;
 
             /// <summary>
             /// Gets the name of the getter field.
@@ -1213,44 +1213,43 @@ namespace Orleans.CodeGenerator
             private string SetterFieldName => "setField" + _ordinal;
 
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete getter. 
+            /// Gets a value indicating whether or not this member represents an accessible field. 
             /// </summary>
-            private bool IsGettableProperty => Property?.GetMethod != null && _model.IsAccessible(0, Property.GetMethod) && !IsObsolete;
+            private bool IsGettableField => Field is { } field && _model.IsAccessible(0, field) && !IsObsolete;
 
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete setter. 
+            /// Gets a value indicating whether or not this member represents an accessible, mutable field. 
+            /// </summary>
+            private bool IsSettableField => Field is { } field && IsGettableField && !field.IsReadOnly;
+
+            /// <summary>
+            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter. 
+            /// </summary>
+            private bool IsGettableProperty => Property?.GetMethod is { } getMethod && _model.IsAccessible(0, getMethod) && !IsObsolete;
+
+            /// <summary>
+            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete setter. 
             /// </summary>
             private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _model.IsAccessible(0, setMethod) && !setMethod.IsInitOnly && !IsObsolete;
 
             /// <summary>
             /// Gets syntax representing the type of this field.
             /// </summary>
-            public TypeSyntax TypeSyntax => Field.Type.TypeKind == TypeKind.Dynamic
+            public TypeSyntax TypeSyntax => Member.Type.TypeKind == TypeKind.Dynamic
                 ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
-                : _fieldDescription.GetTypeSyntax(Field.Type);
+                : _member.GetTypeSyntax(Member.Type);
 
 
             /// <summary>
             /// Gets the <see cref="Property"/> which this field is the backing property for, or
             /// <see langword="null" /> if this is not the backing field of an auto-property.
             /// </summary>
-            private IPropertySymbol Property
-            {
-                get
-                {
-                    if (_property != null)
-                    {
-                        return _property;
-                    }
-
-                    return _property = PropertyUtility.GetMatchingProperty(Field);
-                }
-            }
+            private IPropertySymbol Property => _property ??= _property = Member.Symbol as IPropertySymbol ?? PropertyUtility.GetMatchingProperty(Field);
 
             /// <summary>
             /// Gets a value indicating whether or not this field is obsolete.
             /// </summary>
-            private bool IsObsolete => Field.HasAttribute(_libraryTypes.ObsoleteAttribute) ||
+            private bool IsObsolete => Member.Symbol.HasAttribute(_libraryTypes.ObsoleteAttribute) ||
                                        Property != null && Property.HasAttribute(_libraryTypes.ObsoleteAttribute);
 
             /// <summary>
@@ -1266,7 +1265,7 @@ namespace Orleans.CodeGenerator
                 {
                     result = instance.Member(Property.Name);
                 }
-                else if (Field.DeclaredAccessibility == Accessibility.Public && _model.IsAccessible(0, Field))
+                else if (IsGettableField)
                 {
                     result = instance.Member(Field.Name);
                 }
@@ -1298,16 +1297,17 @@ namespace Orleans.CodeGenerator
                         value);
                 }
 
-                if (!Field.IsReadOnly && IsDeclaredAccessible(Field) && _model.IsAccessible(0, Field))
+                if (IsSettableField)
                 {
                     return AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
                         instance.Member(Field.Name),
+
                         value);
                 }
 
                 var instanceArg = Argument(instance);
-                if (Field.ContainingType != null && Field.ContainingType.IsValueType)
+                if (ContainingType != null && ContainingType.IsValueType)
                 {
                     instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
                 }
@@ -1317,19 +1317,15 @@ namespace Orleans.CodeGenerator
                         .AddArgumentListArguments(instanceArg, Argument(value));
             }
 
-            private static bool IsDeclaredAccessible(ISymbol symbol) => symbol.DeclaredAccessibility switch
-            {
-                Accessibility.Public => true,
-                _ => false,
-            };
-
             public GetterFieldDescription GetGetterFieldDescription()
             {
-                var getterType = _libraryTypes.Func_2.ToTypeSyntax(_fieldDescription.GetTypeSyntax(ContainingType), TypeSyntax);
+                if (IsGettableField || IsGettableProperty) return null;
+
+                var getterType = _libraryTypes.Func_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, FieldName);
+                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
                 var accessorInvoke = CastExpression(
                     getterType,
                     InvocationExpression(fieldAccessorUtility.Member("GetGetter")).AddArgumentListArguments(Argument(fieldInfo)));
@@ -1341,19 +1337,21 @@ namespace Orleans.CodeGenerator
 
             public SetterFieldDescription GetSetterFieldDescription()
             {
+                if (IsSettableField || IsSettableProperty) return null;
+
                 TypeSyntax fieldType;
                 if (ContainingType != null && ContainingType.IsValueType)
                 {
-                    fieldType = _libraryTypes.ValueTypeSetter_2.ToTypeSyntax(_fieldDescription.GetTypeSyntax(ContainingType), TypeSyntax);
+                    fieldType = _libraryTypes.ValueTypeSetter_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
                 }
                 else
                 {
-                    fieldType = _libraryTypes.Action_2.ToTypeSyntax(_fieldDescription.GetTypeSyntax(ContainingType), TypeSyntax);
+                    fieldType = _libraryTypes.Action_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
                 }
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, FieldName);
+                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
                 var isContainedByValueType = ContainingType != null && ContainingType.IsValueType;
                 var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
                 var accessorInvoke = CastExpression(
@@ -1378,19 +1376,6 @@ namespace Orleans.CodeGenerator
                             .AddArgumentListArguments(
                                 Argument(fieldName.GetLiteralExpression()),
                                 Argument(bindingFlags));
-            }
-
-            /// <summary>
-            /// A comparer for <see cref="SerializableMember"/> which compares by name.
-            /// </summary>
-            public class Comparer : IComparer<SerializableMember>
-            {
-                /// <summary>
-                /// Gets the singleton instance of this class.
-                /// </summary>
-                public static Comparer Instance { get; } = new();
-
-                public int Compare(SerializableMember x, SerializableMember y) => string.Compare(x?.Field.Name, y?.Field.Name, StringComparison.Ordinal);
             }
         }
     }

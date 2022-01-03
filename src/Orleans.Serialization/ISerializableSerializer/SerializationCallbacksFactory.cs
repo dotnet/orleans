@@ -27,7 +27,7 @@ namespace Orleans.Serialization
 
         [SecurityCritical]
         public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(Type type) => (
-            SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, t => (object)CreateTypedCallbacks<TOwner, TDelegate>(type));
+            SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, t => CreateTypedCallbacks<TOwner, TDelegate>(t));
 
         [SecurityCritical]
         private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TOwner, TDelegate>(Type type)

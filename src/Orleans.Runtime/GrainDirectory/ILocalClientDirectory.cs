@@ -5,7 +5,7 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal interface ILocalClientDirectory
     {
-        bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses);
-        ValueTask<List<ActivationAddress>> Lookup(GrainId grainId);
+        bool TryLocalLookup(GrainId grainId, out List<GrainAddress> addresses);
+        ValueTask<List<GrainAddress>> Lookup(GrainId grainId);
     }
 }

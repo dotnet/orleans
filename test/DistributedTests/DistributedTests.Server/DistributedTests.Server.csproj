@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OutputPath Condition=" '$(DistributedTestsOutputPath)'!='' ">$(DistributedTestsOutputPath)/DistributedTests.Server</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\secrets.json" Link="secrets.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\DistributedTests.Common\DistributedTests.Common.csproj" />
+    <ProjectReference Include="..\DistributedTests.Grains\DistributedTests.Grains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
+  </ItemGroup>
+
+</Project>

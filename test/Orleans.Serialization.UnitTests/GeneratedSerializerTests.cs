@@ -177,14 +177,14 @@ namespace Orleans.Serialization.UnitTests
         {
             var concurrentQueueField = new ConcurrentQueue<int>();
             concurrentQueueField.Enqueue(4);
-            
+
             var concurrentQueueProperty = new ConcurrentQueue<int>();
             concurrentQueueProperty.Enqueue(5);
             concurrentQueueProperty.Enqueue(6);
-            
+
             var concurrentDictField = new ConcurrentDictionary<string, int>();
             _ = concurrentDictField.TryAdd("nine", 9);
-            
+
             var concurrentDictProperty = new ConcurrentDictionary<string, int>();
             _ = concurrentDictProperty.TryAdd("ten", 10);
             _ = concurrentDictProperty.TryAdd("eleven", 11);
@@ -212,6 +212,54 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.ConcurrentDictProperty["eleven"], result.ConcurrentDictProperty["eleven"]);
         }
 
+        [Fact]
+        public void ClassWithLargeCollectionAndUriRoundTrip()
+        {
+            var largeCollection = new List<string>(200);
+            for (int i = 0; i < 200; i++)
+            {
+                largeCollection.Add(i.ToString());
+            }
+
+            var original = new ClassWithLargeCollectionAndUri
+            {
+                LargeCollection = largeCollection,
+                Uri = new($"http://www.{Guid.NewGuid()}.com/")
+            };
+
+            var result = RoundTripThroughCodec(original);
+            Assert.Equal(original.Uri, result.Uri);
+        }
+
+        [Fact]
+        public void ClassWithManualSerializablePropertyRoundTrip()
+        {
+            var original = new ClassWithManualSerializableProperty
+            {
+                GuidProperty = Guid.NewGuid(),
+            };
+
+            var result = RoundTripThroughCodec(original);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+            Assert.Equal(original.StringProperty, result.StringProperty);
+
+            var guidValue = Guid.NewGuid();
+            original.StringProperty = guidValue.ToString("N");
+            result = RoundTripThroughCodec(original);
+
+            Assert.Equal(guidValue, result.GuidProperty);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+
+            Assert.Equal(guidValue.ToString("N"), result.StringProperty);
+            Assert.Equal(original.StringProperty, result.StringProperty);
+
+            original.StringProperty = "bananas";
+            result = RoundTripThroughCodec(original);
+ 
+            Assert.Equal(default(Guid), result.GuidProperty);
+            Assert.Equal(original.GuidProperty, result.GuidProperty);
+            Assert.Equal("bananas", result.StringProperty);
+        }
 
         public void Dispose() => _serviceProvider?.Dispose();
 

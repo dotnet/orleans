@@ -43,7 +43,7 @@ namespace Orleans.Tests.SqlUtils
 
                 if(arg is string)
                 {
-                    return "N'" + ((string)arg).Replace("'", "''") + "'";
+                    return "N'" + ((string)arg).Replace("'", "''", StringComparison.Ordinal) + "'";
                 }
 
                 if(arg is DateTime)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -78,7 +78,7 @@ namespace Orleans.Transactions.TestKit
                     cascadingAbort = false;
                     try
                     {
-                        expected = await grains.First().Get() + addval;
+                        expected = await grains[0].Get() + addval;
                         await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
                     }
                     catch (OrleansCascadingAbortException)

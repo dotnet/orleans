@@ -42,7 +42,7 @@ namespace Orleans.Runtime.GrainDirectory
 
     internal class NullGrainDirectoryCache : IGrainDirectoryCache
     {
-        public void AddOrUpdate(ActivationAddress value, int version)
+        public void AddOrUpdate(GrainAddress value, int version)
         {
         }
 
@@ -51,7 +51,7 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public bool Remove(ActivationAddress key)
+        public bool Remove(GrainAddress key)
         {
             return false;
         }
@@ -60,14 +60,14 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
+        public bool LookUp(GrainId key, out GrainAddress result, out int version)
         {
             result = default;
             version = default;
             return false;
         }
 
-        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
+        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
         {
             get { yield break; }
         }

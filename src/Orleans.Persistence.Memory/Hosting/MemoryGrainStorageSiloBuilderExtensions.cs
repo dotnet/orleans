@@ -48,8 +48,10 @@ namespace Orleans.Hosting
                 {
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
                     services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
-                    if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME))
-                        services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                    if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
+                    {
+                        services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                    }
                     services.AddSingletonNamedService<IGrainStorage>(name, MemoryGrainStorageFactory.Create);
                 });
         }

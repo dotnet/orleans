@@ -32,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="address">The address of the activation to remove.</param>
         /// <param name="origin"> the silo from which the message to the non-existing activation was sent</param>
-        Task UnregisterAfterNonexistingActivation(ActivationAddress address, SiloAddress origin);
+        Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin);
 
         /// <summary>
         /// Fetches locally known directory information for a grain.
@@ -51,7 +51,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// notifying him that the activation does not exist.
         /// </summary>
         /// <param name="activation">The address of the activation that needs to be invalidated in the directory cache for the given grain.</param>
-        void InvalidateCacheEntry(ActivationAddress activation);
+        void InvalidateCacheEntry(GrainAddress activation);
 
         /// <summary>
         /// Invalidates cache entry for the given grain.
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a cache entry for the given activation addrss.
         /// This method is intended to be called whenever a placement decision is made.
         /// </summary>
-        void CachePlacementDecision(ActivationAddress activation);
+        void CachePlacementDecision(GrainAddress activation);
 
         /// <summary>
         /// For testing purposes only.
@@ -88,12 +88,12 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        ActivationAddress GetLocalCacheData(GrainId grain);
+        GrainAddress GetLocalCacheData(GrainId grain);
 
         /// <summary>
         /// Attempts to find the specified grain in the directory cache.
         /// </summary>
-        bool TryCachedLookup(GrainId grainId, out ActivationAddress address);
+        bool TryCachedLookup(GrainId grainId, out GrainAddress address);
 
         /// <summary>
         /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not

@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Messaging
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
         private readonly Serializer<object> _bodySerializer;
-        private readonly Serializer<ActivationAddress> _activationAddressCodec;
+        private readonly Serializer<GrainAddress> _activationAddressCodec;
         private readonly Serializer _serializer;
         private readonly SerializerSession _serializationSession;
         private readonly SerializerSession _deserializationSession;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             SerializerSessionPool sessionPool,
             SharedMemoryPool memoryPool,
             IServiceProvider services,
-            Serializer<ActivationAddress> activationAddressSerializer,
+            Serializer<GrainAddress> activationAddressSerializer,
             ICodecProvider codecProvider,
             int maxHeaderSize,
             int maxBodySize)
@@ -375,12 +375,12 @@ namespace Orleans.Runtime.Messaging
             return result;
         }
 
-        private List<ActivationAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
+        private List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
         {
             var n = reader.ReadVarUInt32();
             if (n > 0)
             {
-                var list = new List<ActivationAddress>((int)n);
+                var list = new List<GrainAddress>((int)n);
                 for (int i = 0; i < n; i++)
                 {
                     list.Add(_activationAddressCodec.Deserialize(ref reader));
@@ -389,10 +389,10 @@ namespace Orleans.Runtime.Messaging
                 return list;
             }
 
-            return new List<ActivationAddress>();
+            return new List<GrainAddress>();
         }
 
-        private void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<ActivationAddress> value) where TBufferWriter : IBufferWriter<byte>
+        private void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddress> value) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteVarUInt32((uint)value.Count);
             foreach (var entry in value)

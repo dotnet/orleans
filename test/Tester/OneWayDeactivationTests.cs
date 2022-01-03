@@ -72,7 +72,7 @@ namespace UnitTests.General
             var grainId = grainToDeactivate.GetGrainId();
             var activationAddress = directoryCache.Operations
                 .OfType<TestDirectoryCache.CacheOperation.AddOrUpdate>()
-                .Last(op => op.Value.Grain.Equals(grainId))
+                .Last(op => op.Value.GrainId.Equals(grainId))
                 .Value;
             await grainToDeactivate.Deactivate();
             await grainToCallFrom.SignalSelfViaOther();
@@ -85,7 +85,7 @@ namespace UnitTests.General
             // that some entry should be successfully removed for the provided grain id.
             var newActivationAddress = directoryCache.Operations
                 .OfType<TestDirectoryCache.CacheOperation.AddOrUpdate>()
-                .Last(op => op.Value.Grain.Equals(grainId))
+                .Last(op => op.Value.GrainId.Equals(grainId))
                 .Value;
 
             var invalidationOp = directoryCache.Operations

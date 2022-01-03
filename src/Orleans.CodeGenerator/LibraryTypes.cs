@@ -64,15 +64,11 @@ namespace Orleans.CodeGenerator
                 BaseCodec_1 = Type("Orleans.Serialization.Serializers.IBaseCodec`1"),
                 BaseCopier_1 = Type("Orleans.Serialization.Cloning.IBaseCopier`1"),
                 Reader = Type("Orleans.Serialization.Buffers.Reader`1"),
-                Request = Type("Orleans.Serialization.Invocation.Request"),
-                Request_1 = Type("Orleans.Serialization.Invocation.Request`1"),
                 ResponseCompletionSourcePool = Type("Orleans.Serialization.Invocation.ResponseCompletionSourcePool"),
                 TypeManifestOptions = Type("Orleans.Serialization.Configuration.TypeManifestOptions"),
                 SerializerSession = Type("Orleans.Serialization.Session.SerializerSession"),
                 Task = Type("System.Threading.Tasks.Task"),
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
-                TaskRequest = Type("Orleans.Serialization.Invocation.TaskRequest"),
-                TaskRequest_1 = Type("Orleans.Serialization.Invocation.TaskRequest`1"),
                 Type = Type("System.Type"),
                 ICodecProvider = Type("Orleans.Serialization.Serializers.ICodecProvider"),
                 ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1"),
@@ -80,7 +76,6 @@ namespace Orleans.CodeGenerator
                 ValueTask_1 = Type("System.Threading.Tasks.ValueTask`1"),
                 ValueTypeSetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeSetter`2"),
                 Void = compilation.GetSpecialType(SpecialType.System_Void),
-                VoidRequest = Type("Orleans.Serialization.Invocation.VoidRequest"),
                 Writer = Type("Orleans.Serialization.Buffers.Writer`1"),
                 IDisposable = Type("System.IDisposable"),
                 FSharpSourceConstructFlagsOrDefault = TypeOrDefault("Microsoft.FSharp.Core.SourceConstructFlags"),
@@ -245,15 +240,11 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol BaseCodec_1 { get; private set; }
         public INamedTypeSymbol BaseCopier_1 { get; private set; }
         public INamedTypeSymbol Reader { get; private set; }
-        public INamedTypeSymbol Request { get; private set; }
-        public INamedTypeSymbol Request_1 { get; private set; }
         public INamedTypeSymbol ResponseCompletionSourcePool { get; private set; }
         public INamedTypeSymbol TypeManifestOptions { get; private set; }
         public INamedTypeSymbol SerializerSession { get; private set; }
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
-        public INamedTypeSymbol TaskRequest { get; private set; }
-        public INamedTypeSymbol TaskRequest_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
         public INamedTypeSymbol MethodInfo { get; private set; }
         public INamedTypeSymbol ICodecProvider { get; private set; }
@@ -289,7 +280,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ValueTuple { get; private set; }
         public List<INamedTypeSymbol> ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
-        public INamedTypeSymbol VoidRequest { get; private set; }
         public INamedTypeSymbol ApplicationPartAttribute { get; private set; }
         public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
         public INamedTypeSymbol InvokableCustomInitializerAttribute { get; private set; }

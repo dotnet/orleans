@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyModel;
 using System;
 using System.Buffers;
@@ -123,7 +123,7 @@ namespace Orleans.Serialization
 
             foreach (var lib in dependencyContext.RuntimeLibraries)
             {
-                if (!lib.Name.Contains("Orleans.Serialization") && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization")))
+                if (!lib.Name.Contains("Orleans.Serialization", StringComparison.Ordinal) && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization", StringComparison.Ordinal)))
                 {
                     continue;
                 }

@@ -268,7 +268,7 @@ namespace Orleans.TestingHost
         public SiloHandle GetSiloForAddress(SiloAddress siloAddress)
         {
             var activeSilos = GetActiveSilos().ToList();
-            var ret = activeSilos.FirstOrDefault(s => s.SiloAddress.Equals(siloAddress));
+            var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
             return ret;
         }
 

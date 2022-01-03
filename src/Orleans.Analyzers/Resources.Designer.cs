@@ -19,7 +19,7 @@ namespace Orleans.Analyzers {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -57,6 +57,24 @@ namespace Orleans.Analyzers {
             }
             set {
                 resourceCulture = value;
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The member &quot;{0}&quot; is marked as {1} and therefore cannot be serialized..
+        /// </summary>
+        internal static string AbstractOrStaticMembersCannotBeSerializedMessageFormat {
+            get {
+                return ResourceManager.GetString("AbstractOrStaticMembersCannotBeSerializedMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Members which are static or abstract cannot be serialized..
+        /// </summary>
+        internal static string AbstractOrStaticMembersCannotBeSerializedTitle {
+            get {
+                return ResourceManager.GetString("AbstractOrStaticMembersCannotBeSerializedTitle", resourceCulture);
             }
         }
         

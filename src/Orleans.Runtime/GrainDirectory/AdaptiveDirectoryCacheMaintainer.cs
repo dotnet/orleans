@@ -160,7 +160,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // The server indicates that it does not own the grain anymore.
                     // It could be that by now, the cache has been already updated and contains an entry received from another server (i.e., current owner for the grain).
                     // For simplicity, we do not care about this corner case and simply remove the cache entry.
-                    cache.Remove(tuple.Address.Grain);
+                    cache.Remove(tuple.Address.GrainId);
                     cnt2++;
                 }
                 else
@@ -170,7 +170,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Validate that the generation number in the request and the response are equal
                     // Contract.Assert(tuple.Item2 == refreshRequest.Find(o => o.Item1 == tuple.Item1).Item2);
                     // refresh the entry in the cache
-                    cache.MarkAsFresh(tuple.Address.Grain);
+                    cache.MarkAsFresh(tuple.Address.GrainId);
                     cnt3++;
                 }
             }

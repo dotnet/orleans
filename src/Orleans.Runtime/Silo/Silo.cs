@@ -29,7 +29,6 @@ namespace Orleans.Runtime
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
-        private static readonly TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -41,6 +40,7 @@ namespace Orleans.Runtime
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private Watchdog platformWatchdog;
+        private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
@@ -105,6 +105,8 @@ namespace Orleans.Runtime
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
+            this.waitForMessageToBeQueuedForOutbound = messagingOptions.Value.WaitForMessageToBeQueuedForOutboundTime;
+
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
@@ -126,9 +128,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
                 this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
-
-            var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-
+            
             try
             {
                 grainFactory = Services.GetRequiredService<GrainFactory>();
@@ -552,7 +552,7 @@ namespace Orleans.Runtime
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
-                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
+                    await Task.Delay(waitForMessageToBeQueuedForOutbound);
                 }
             }
             catch (Exception exc)

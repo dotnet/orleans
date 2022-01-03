@@ -50,7 +50,7 @@ namespace Orleans.Runtime
 #pragma warning restore IDE0052 // Remove unread private members
 
         public ActivationData(
-            ActivationAddress addr,
+            GrainAddress addr,
             Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
             IServiceProvider applicationServices,
             GrainTypeSharedContext shared)
@@ -67,17 +67,17 @@ namespace Orleans.Runtime
 
         public IGrainRuntime GrainRuntime => _shared.Runtime;
         public IAddressable GrainInstance { get; private set; }
-        public ActivationAddress Address { get; }
+        public GrainAddress Address { get; }
         public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
         public ActivationState State { get; private set; }
         public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
         public DateTime CollectionTicket { get; set; }
         public IServiceProvider ActivationServices => serviceScope.ServiceProvider;
-        public ActivationId ActivationId => Address.Activation;
+        public ActivationId ActivationId => Address.ActivationId;
         public IServiceProvider ServiceProvider => serviceScope?.ServiceProvider;
         public IGrainLifecycle ObservableLifecycle => lifecycle;
         internal ILifecycleObserver Lifecycle => lifecycle;
-        public GrainId GrainId => Address.Grain;
+        public GrainId GrainId => Address.GrainId;
         public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
         public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
         public bool IsValid => State is ActivationState.Valid;
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         public IWorkItemScheduler Scheduler => _workItemGroup;
         public Task Deactivated => GetDeactivationCompletionSource().Task;
 
-        public ActivationAddress ForwardingAddress
+        public GrainAddress ForwardingAddress
         {
             get => _extras?.ForwardingAddress;
             set
@@ -577,7 +577,7 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return string.Format("[Activation: {0}/{1}{2}{3} State={4}]",
-                 Address.Silo,
+                 Address.SiloAddress,
                  GrainId.ToString(),
                  ActivationId,
                  GetActivationInfoString(),
@@ -589,7 +589,7 @@ namespace Orleans.Runtime
             lock (this)
             {
                 return
-                    $"[Activation: {Address.Silo.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
+                    $"[Activation: {Address.SiloAddress.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
                     + $"State={State} NonReentrancyQueueSize={WaitingCount} NumRunning={_runningRequests.Count} "
                     + $"IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}"
                     + $"{((includeExtraDetails && _blockingRequest != null) ? " CurrentlyExecuting=" + _blockingRequest : "")}]";
@@ -1259,7 +1259,7 @@ namespace Orleans.Runtime
                         {
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
-                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(ForwardingAddress.Grain);
+                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(ForwardingAddress.GrainId);
                             var logMsg =
                                 $"Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. " +
                                 $"GrainInstance Type is {GrainInstance?.GetType()}. " +
@@ -1468,7 +1468,7 @@ namespace Orleans.Runtime
             /// <summary>
             /// If State == Invalid, this may contain a forwarding address for incoming messages
             /// </summary>
-            public ActivationAddress ForwardingAddress { get; set; }
+            public GrainAddress ForwardingAddress { get; set; }
 
             /// <summary>
             /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.

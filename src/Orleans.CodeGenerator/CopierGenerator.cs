@@ -30,9 +30,9 @@ namespace Orleans.CodeGenerator
                 {
                     members.Add(serializable);
                 }
-                else if (member is IFieldDescription field)
+                else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(libraryTypes, type, field, members.Count));
+                    members.Add(new SerializableMember(libraryTypes, type, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
@@ -254,12 +254,12 @@ namespace Orleans.CodeGenerator
                         copierType = ParseTypeName(simpleName);
                     }
                 }
-                else if (libraryTypes.WellKnownCopiers.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCopierDescription codec)
+                else if (libraryTypes.WellKnownCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCopierDescription codec)
                 {
                     // The codec is not a static copier and is also not a generic copiers.
                     copierType = codec.CopierType.ToTypeSyntax();
                 }
-                else if (t is INamedTypeSymbol named && libraryTypes.WellKnownCopiers.FirstOrDefault(c => t is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCopierDescription genericCopier)
+                else if (t is INamedTypeSymbol named && libraryTypes.WellKnownCopiers.Find(c => t is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCopierDescription genericCopier)
                 {
                     // Construct the generic copier type using the field's type arguments.
                     copierType = genericCopier.CopierType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -448,7 +448,7 @@ namespace Orleans.CodeGenerator
                 // Either way, the member signatures are the same.
                 var codec = codecs.First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
                 var memberType = description.Type;
-                var staticCopier = libraryTypes.StaticCopiers.FirstOrDefault(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                var staticCopier = libraryTypes.StaticCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
                 ExpressionSyntax codecExpression;
                 if (staticCopier != null)
                 {

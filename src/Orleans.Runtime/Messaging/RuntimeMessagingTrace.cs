@@ -39,20 +39,20 @@ namespace Orleans.Runtime
                 new EventId((int)ErrorCode.Messaging_Dispatcher_Rejected, DispatcherRejectedMessageEventName),
                 "Rejected message {Message} with reason '{Reason}' ({RejectionType})");
 
-        private static readonly Action<ILogger, Message, ActivationAddress, ActivationAddress, string, int, Exception> LogDispatcherForwarding =
-            LoggerMessage.Define<Message, ActivationAddress, ActivationAddress, string, int>(
+        private static readonly Action<ILogger, Message, GrainAddress, GrainAddress, string, int, Exception> LogDispatcherForwarding =
+            LoggerMessage.Define<Message, GrainAddress, GrainAddress, string, int>(
                 LogLevel.Information,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_TryForward, DispatcherForwardingEventName),
                 "Trying to forward {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}");
 
-        private static readonly Action<ILogger, Message, ActivationAddress, ActivationAddress, string, int, Exception> LogDispatcherForwardingFailed =
-            LoggerMessage.Define<Message, ActivationAddress, ActivationAddress, string, int>(
+        private static readonly Action<ILogger, Message, GrainAddress, GrainAddress, string, int, Exception> LogDispatcherForwardingFailed =
+            LoggerMessage.Define<Message, GrainAddress, GrainAddress, string, int>(
                 LogLevel.Warning,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_TryForwardFailed, DispatcherForwardingFailedEventName),
                 "Failed to forward message {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}");
 
-        private static readonly Action<ILogger, int, ActivationAddress, ActivationAddress, string, Exception> LogDispatcherForwardingMultiple =
-            LoggerMessage.Define<int, ActivationAddress, ActivationAddress, string>(
+        private static readonly Action<ILogger, int, GrainAddress, GrainAddress, string, Exception> LogDispatcherForwardingMultiple =
+            LoggerMessage.Define<int, GrainAddress, GrainAddress, string>(
                 LogLevel.Information,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_ForwardingRequests, DispatcherForwardingMultipleEventName),
                 "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}");
@@ -114,7 +114,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void OnDispatcherForwarding(Message message, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation, Exception exception)
+        internal void OnDispatcherForwarding(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingEventName))
             {
@@ -129,7 +129,7 @@ namespace Orleans.Runtime
             MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
         }
 
-        internal void OnDispatcherForwardingFailed(Message message, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation, Exception exception)
+        internal void OnDispatcherForwardingFailed(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingFailedEventName))
             {
@@ -139,7 +139,7 @@ namespace Orleans.Runtime
             LogDispatcherForwardingFailed(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
         }
 
-        internal void OnDispatcherForwardingMultiple(int messageCount, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation, Exception exception)
+        internal void OnDispatcherForwardingMultiple(int messageCount, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingMultipleEventName))
             {

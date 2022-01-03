@@ -120,5 +120,11 @@ namespace Orleans.Configuration
         /// The period after which an enqueued request is deemed to be delayed.
         /// </summary>
         public TimeSpan RequestQueueDelayWarningTime { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Time to wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
+        /// </summary>
+        public TimeSpan WaitForMessageToBeQueuedForOutboundTime { get; set; } = DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME;
+        public static readonly TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME = TimeSpan.FromSeconds(2);
     }
 }

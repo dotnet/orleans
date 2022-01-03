@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
@@ -59,7 +59,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddSerializationAttributes(TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var (serializableMembers, nextId) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var (serializableMembers, _, nextId) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
 
             foreach (var member in serializableMembers)
             {
@@ -76,7 +76,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddNonSerializedAttributes(SyntaxNode root, TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var (serializableMembers, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var (serializableMembers, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
 
             var insertUsingDirective = true;
             var ns = root.DescendantNodesAndSelf()

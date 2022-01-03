@@ -135,8 +135,8 @@ namespace Orleans.Runtime
             if (sendingActivation == null)
             {
                 var clientAddress = this.HostedClient.Address;
-                message.SendingGrain = clientAddress.Grain;
-                message.SendingActivation = clientAddress.Activation;
+                message.SendingGrain = clientAddress.GrainId;
+                message.SendingActivation = clientAddress.ActivationId;
             }
             else
             {
@@ -214,7 +214,7 @@ namespace Orleans.Runtime
             {
                 if (message.CacheInvalidationHeader != null)
                 {
-                    foreach (ActivationAddress address in message.CacheInvalidationHeader)
+                    foreach (GrainAddress address in message.CacheInvalidationHeader)
                     {
                         GrainLocator.InvalidateCache(address);
                     }

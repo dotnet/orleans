@@ -47,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
         private long _localVersion = 1;
         private IRemoteClientDirectory[] _remoteDirectories = Array.Empty<IRemoteClientDirectory>();
         private ImmutableHashSet<GrainId> _localClients = ImmutableHashSet<GrainId>.Empty;
-        private ImmutableDictionary<GrainId, List<ActivationAddress>> _currentSnapshot = ImmutableDictionary<GrainId, List<ActivationAddress>>.Empty;
+        private ImmutableDictionary<GrainId, List<GrainAddress>> _currentSnapshot = ImmutableDictionary<GrainId, List<GrainAddress>>.Empty;
         private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
 
         // For synchronization with remote silos.
@@ -77,20 +77,20 @@ namespace Orleans.Runtime.GrainDirectory
             _schedulePublishUpdate = () => SchedulePublishUpdates();
         }
 
-        public ValueTask<List<ActivationAddress>> Lookup(GrainId grainId)
+        public ValueTask<List<GrainAddress>> Lookup(GrainId grainId)
         {
             if (TryLocalLookup(grainId, out var clientRoutes))
             {
-                return new ValueTask<List<ActivationAddress>>(clientRoutes);
+                return new ValueTask<List<GrainAddress>>(clientRoutes);
             }
 
             return LookupClientAsync(grainId);
 
-            async ValueTask<List<ActivationAddress>> LookupClientAsync(GrainId grainId)
+            async ValueTask<List<GrainAddress>> LookupClientAsync(GrainId grainId)
             {
                 var seed = ThreadSafeRandom.Next();
                 var attemptsRemaining = 5;
-                List<ActivationAddress> result = null;
+                List<GrainAddress> result = null;
                 while (attemptsRemaining-- > 0 && _remoteDirectories is var remoteDirectories && remoteDirectories.Length > 0)
                 {
                     try
@@ -129,14 +129,14 @@ namespace Orleans.Runtime.GrainDirectory
                 // Try one last time to find the requested client's routes.
                 if (result is null && !TryLocalLookup(grainId, out result))
                 {
-                    result = new List<ActivationAddress>(0);
+                    result = new List<GrainAddress>(0);
                 }
 
                 return result;
             }
         }
 
-        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
+        public bool TryLocalLookup(GrainId grainId, out List<GrainAddress> addresses)
         {
             EnsureRefreshed();
             if (_currentSnapshot.TryGetValue(grainId, out var clientRoutes) && clientRoutes.Count > 0)
@@ -296,14 +296,14 @@ namespace Orleans.Runtime.GrainDirectory
                 if (table is object)
                 {
                     _table = table.ToImmutable();
-                    var clientsBuilder = ImmutableDictionary.CreateBuilder<GrainId, List<ActivationAddress>>();
+                    var clientsBuilder = ImmutableDictionary.CreateBuilder<GrainId, List<GrainAddress>>();
                     foreach (var entry in _table)
                     {
                         foreach (var client in entry.Value.ConnectedClients)
                         {
                             if (!clientsBuilder.TryGetValue(client, out var clientRoutes))
                             {
-                                clientRoutes = clientsBuilder[client] = new List<ActivationAddress>();
+                                clientRoutes = clientsBuilder[client] = new List<GrainAddress>();
                             }
 
                             clientRoutes.Add(Gateway.GetClientActivationAddress(client, entry.Key));

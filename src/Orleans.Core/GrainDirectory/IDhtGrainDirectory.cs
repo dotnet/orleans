@@ -21,7 +21,7 @@ namespace Orleans.GrainDirectory
         /// <param name="address">The address of the new activation.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>The registered address and the version associated with this directory mapping.</returns>
-        Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount = 0);
+        Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0);
 
         /// <summary>
         /// Removes the record for an existing activation from the directory service.
@@ -32,7 +32,7 @@ namespace Orleans.GrainDirectory
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <param name="cause">The reason for unregistration</param>
         /// <returns>An acknowledgement that the unregistration has completed.</returns>
-        Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount = 0);
+        Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0);
 
         /// <summary>
         /// Unregister a batch of addresses at once
@@ -42,7 +42,7 @@ namespace Orleans.GrainDirectory
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <param name="cause">The reason for unregistration</param>
         /// <returns>An acknowledgement that the unregistration has completed.</returns>
-        Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount = 0);
+        Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0);
 
         /// <summary>
         /// Removes all directory information about a grain.
@@ -70,7 +70,7 @@ namespace Orleans.GrainDirectory
     internal struct AddressAndTag
     {
         [Id(1)]
-        public ActivationAddress Address;
+        public GrainAddress Address;
        
         [Id(2)]
         public int VersionTag;

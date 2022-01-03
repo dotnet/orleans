@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans;
@@ -160,5 +161,39 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(5)]
         public ConcurrentDictionary<string, int> ConcurrentDictProperty { get; set; }
+    }
+
+    [GenerateSerializer]
+    public class ClassWithLargeCollectionAndUri
+    {
+        [Id(0)]
+        public List<string> LargeCollection;
+
+        [Id(1)]
+        public Uri Uri;
+    }
+
+    [GenerateSerializer]
+    public class ClassWithManualSerializableProperty
+    {
+        private string _stringPropertyValue;
+
+        [Id(0)]
+        public Guid GuidProperty { get; set; }
+
+        [Id(1)]
+        public string StringProperty
+        {
+            get
+            {
+                return _stringPropertyValue ?? GuidProperty.ToString("N");
+            }
+
+            set
+            {
+                _stringPropertyValue = value;
+                GuidProperty = Guid.TryParse(value, out var guidValue) ? guidValue : default;
+            }
+        }
     }
 }
