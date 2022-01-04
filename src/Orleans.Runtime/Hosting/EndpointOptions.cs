@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -10,11 +11,14 @@ namespace Orleans.Configuration
     /// </summary>
     public class EndpointOptions
     {
-        private IPAddress _advertisedIPAddress;
+        private IPAddress advertisedIPAddress;
+        public const int DEFAULT_SILO_PORT = 11111;
+        private int siloPort;
 
         public EndpointOptions()
         {
-            _advertisedIPAddress = ConfigUtilities.ResolveIPAddress(null, null, AddressFamily.InterNetwork).Result;            
+            advertisedIPAddress = ConfigUtilities.ResolveIPAddress(null, null, AddressFamily.InterNetwork).Result;
+            siloPort = DEFAULT_SILO_PORT;
         }
 
         /// <summary>
@@ -22,7 +26,7 @@ namespace Orleans.Configuration
         /// </summary>
         public IPAddress AdvertisedIPAddress
         {
-            get => _advertisedIPAddress;
+            get => advertisedIPAddress;
             set
             {
                 if (value is null)
@@ -41,15 +45,28 @@ namespace Orleans.Configuration
                         $"Invalid value specified for {nameof(AdvertisedIPAddress)}. The value was {value}");
                 }
 
-                _advertisedIPAddress = value;
+                advertisedIPAddress = value;
             }
         }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
         /// </summary>
-        public int SiloPort { get; set; } = DEFAULT_SILO_PORT;
-        public const int DEFAULT_SILO_PORT = 11111;
+        public int SiloPort
+        {
+            get => siloPort;
+            set
+            {
+                if (value == 0)
+                {
+                    throw new OrleansConfigurationException(
+                        $"No listening port specified. Use {nameof(Hosting.ISiloBuilder)}.{nameof(Hosting.EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
+                        + $"to configure endpoints and ensure that {nameof(SiloPort)} is set.");
+                }
+
+                siloPort = value;
+            }
+        }        
 
         /// <summary>
         /// The port this silo uses for silo-to-client (gateway) communication. Specify 0 to disable gateway functionality.

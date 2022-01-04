@@ -62,7 +62,6 @@ namespace Orleans.Hosting
 
             services.AddSingleton<Silo>();
             services.AddHostedService<SiloHostedService>();
-            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
             services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<SiloLifecycleSubject>();
