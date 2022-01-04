@@ -24,22 +24,6 @@ namespace Orleans.Configuration
         {
             var options = this.serviceProvider.GetRequiredService<IOptions<EndpointOptions>>().Value;
 
-            if (options.AdvertisedIPAddress == null)
-            {
-                throw new OrleansConfigurationException(
-                    $"No listening address specified. Use {nameof(ISiloBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
-                    + $"to configure endpoints and ensure that {nameof(options.AdvertisedIPAddress)} is set.");
-            }
-
-            if (options.AdvertisedIPAddress == IPAddress.Any 
-                || options.AdvertisedIPAddress == IPAddress.IPv6Any 
-                || options.AdvertisedIPAddress == IPAddress.None 
-                || options.AdvertisedIPAddress == IPAddress.IPv6None)
-            {
-                throw new OrleansConfigurationException(
-                    $"Invalid value specified for {nameof(options.AdvertisedIPAddress)}. The value was {options.AdvertisedIPAddress}");
-            }
-
             if (options.SiloPort == 0)
             {
                 throw new OrleansConfigurationException(

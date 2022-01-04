@@ -1,4 +1,7 @@
-﻿using System.Net;
+using System.Net;
+using System.Net.Sockets;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
@@ -7,10 +10,40 @@ namespace Orleans.Configuration
     /// </summary>
     public class EndpointOptions
     {
+        private IPAddress _advertisedIPAddress;
+
+        public EndpointOptions()
+        {
+            _advertisedIPAddress = ConfigUtilities.ResolveIPAddress(null, null, AddressFamily.InterNetwork).Result;            
+        }
+
         /// <summary>
         /// The IP address used for clustering.
         /// </summary>
-        public IPAddress AdvertisedIPAddress { get; set; }
+        public IPAddress AdvertisedIPAddress
+        {
+            get => _advertisedIPAddress;
+            set
+            {
+                if (value is null)
+                {
+                    throw new OrleansConfigurationException(
+                    $"No listening address specified. Use {nameof(Hosting.ISiloBuilder)}.{nameof(Hosting.EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
+                    + $"to configure endpoints and ensure that {nameof(AdvertisedIPAddress)} is set.");
+                }
+
+                if (value == IPAddress.Any
+                    || value == IPAddress.IPv6Any
+                    || value == IPAddress.None
+                    || value == IPAddress.IPv6None)
+                {
+                    throw new OrleansConfigurationException(
+                        $"Invalid value specified for {nameof(AdvertisedIPAddress)}. The value was {value}");
+                }
+
+                _advertisedIPAddress = value;
+            }
+        }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
