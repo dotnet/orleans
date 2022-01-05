@@ -137,6 +137,30 @@ namespace Orleans.Tests.SqlUtils
                 throw new DataException($"Field '{fieldName}' not found in data record.", e);
             }
         }
+        /// <summary>
+        /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default</em>  otherwise.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field to retrieve.</param>
+        /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
+        /// <returns>Either the given value or the default for <see cref="System.DateTime"/>?.</returns>
+        /// <exception cref="DataException"/>
+        /// <remarks>An explicit function like this is needed in cases where to connector infers a type that is undesirable.
+        /// An example here is Npgsql.NodaTime, which makes Npgsql return Noda type and consequently Orleans is not able to
+        /// use it since it expects .NET <see cref="System.DateTime"/>. This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
+        public static DateTime? GetDateTimeValueOrDefault(this IDataRecord record, string fieldName, DateTime? @default = default)
+        {
+
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.IsDBNull(ordinal) ? @default : record.GetDateTime(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
 
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.
@@ -210,6 +234,28 @@ namespace Orleans.Tests.SqlUtils
             {
                 var ordinal = record.GetOrdinal(fieldName);
                 return (TValue)record.GetValue(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
+        /// <summary>
+        /// Returns a <see cref="System.DateTime"/> value with the given <see paramref="fieldName"/>.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <returns>DateTime Value in the given field.</returns>
+        /// <exception cref="DataException"/>
+        /// <remarks>An explicit function like this is needed in cases where to connector infers a type that is undesirable.
+        /// An example here is Npgsql.NodaTime, which makes Npgsql return Noda type and consequently Orleans is not able to
+        /// use it since it expects .NET <see cref="System.DateTime"/>. This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
+        public static DateTime GetDateTimeValue(this IDataRecord record, string fieldName)
+        {
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.GetDateTime(ordinal);
             }
             catch (IndexOutOfRangeException e)
             {
