@@ -930,7 +930,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (sm.fallbackSerializer.IsSupportedType(t))
+            if (sm.fallbackSerializer.IsSupportedType(t) || sm.fallbackSerializer is IKeyedSerializer keyed && keyed.IsSupportedType(t, isFallback: true))
             {
                 sm.FallbackSerializer(obj, context, expected);
                 return;
@@ -944,7 +944,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (obj is Exception && !sm.fallbackSerializer.IsSupportedType(t))
+            if (obj is Exception)
             {
                 // Exceptions should always be serializable, and thus handled by the prior if.
                 // In case someone creates a non-serializable exception, though, we don't want to 
@@ -1645,8 +1645,7 @@ namespace Orleans.Serialization
 
             foreach (var keyedSerializer in this.orderedKeyedSerializers)
             {
-                var canUseSerializer = !keyedSerializer.IsFallbackOnly || fallback;
-                if (canUseSerializer && keyedSerializer.IsSupportedType(type))
+                if (keyedSerializer.IsSupportedType(type, isFallback: fallback))
                 {
                     this.typeToKeyedSerializer[type] = keyedSerializer;
                     serializer = keyedSerializer;

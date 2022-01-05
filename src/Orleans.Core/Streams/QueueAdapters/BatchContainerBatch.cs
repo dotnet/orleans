@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -8,6 +9,7 @@ namespace Orleans.Streams
     /// A batch of batch containers, that if configured (see StreamPullingAgentOptions), will be the data pulled by the
     /// PersistenStreamPullingAgent from it's underlying cache
     /// </summary>
+    [EnableKeyedSerializer(typeof(ILBasedSerializer))]
     class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>

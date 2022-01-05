@@ -212,7 +212,7 @@ namespace UnitTests.Serialization
         private T SerializerLoop<T>(T input)
         {
             var serializer = new ILBasedSerializer(new CachedTypeResolver(), Options.Create(new ILBasedSerializerOptions()));
-            Assert.True(serializer.IsSupportedType(input.GetType()));
+            Assert.True(serializer.IsSupportedType(input.GetType(), isFallback: true));
 
             var writer = new BinaryTokenStreamWriter();
             var serializationContext =
