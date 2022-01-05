@@ -43,6 +43,9 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubCheckpointer : IStreamQueueCheckpointer<string>
     {
+        private readonly string _streamProviderName;
+        private readonly string _partition;
+        private readonly string _serviceId;
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
         private readonly ILogger logger;
@@ -86,13 +89,17 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
+
+            _streamProviderName = streamProviderName;
+            _partition = partition;
+            _serviceId = serviceId;
             this.logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
             this.logger.LogInformation($"Creating EventHub checkpointer for partition {partition} of stream provider {streamProviderName} with serviceId {serviceId}.");
             persistInterval = options.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(
                 options,
                 loggerFactory.CreateLogger<EventHubPartitionCheckpointEntity>());
-            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, serviceId, partition);
+            entity = EventHubPartitionCheckpointEntity.Create(_streamProviderName, _serviceId, _partition);
         }
 
         private Task Initialize()
@@ -118,7 +125,11 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Resets/deletes the saved checkpoint offset
         /// </summary>
-        public async Task Reset() => await dataManager.DeleteTableEntryAsync(entity, entity.ETag);
+        public async Task Reset()
+        {
+            await dataManager.DeleteTableEntryAsync(entity, entity.ETag);
+            entity = EventHubPartitionCheckpointEntity.Create(_streamProviderName, _serviceId, _partition);
+        }
 
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.

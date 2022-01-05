@@ -167,7 +167,6 @@ namespace Orleans.ServiceBus.Providers
 
                 if (ex is ArgumentException ae)
                 {
-                    
                     // if the cause was stale offset information, reset
                     await this.checkpointer.Reset();
                 }
