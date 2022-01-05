@@ -31,8 +31,8 @@ namespace Orleans.Configuration
                 if (value is null)
                 {
                     throw new OrleansConfigurationException(
-                    $"No listening address specified. Use {nameof(Hosting.ISiloBuilder)}.{nameof(Hosting.EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
-                    + $"to configure endpoints and ensure that {nameof(AdvertisedIPAddress)} is set.");
+                        $"No listening address specified. Use {nameof(Hosting.ISiloBuilder)}.{nameof(Hosting.EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
+                        + $"to configure endpoints and ensure that {nameof(AdvertisedIPAddress)} is set.");
                 }
 
                 if (value == IPAddress.Any
