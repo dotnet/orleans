@@ -40,7 +40,7 @@ namespace Orleans.Storage
         {
             this.name = name;
             this.options = options;
-            this.grainStorageSerializer = grainStorageSerializer;
+            this.grainStorageSerializer = options.GrainStorageSerializer ?? services.GetRequiredService<IGrainStorageSerializer>();
             this.services = services;
             this.logger = logger;
         }
@@ -265,8 +265,7 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
-            var serializer = services.GetRequiredServiceByName<IGrainStorageSerializer>(name);
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsMonitor.Get(name), serializer);
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsMonitor.Get(name));
         }
     }
 }

@@ -31,7 +31,6 @@ namespace Orleans.Storage
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly IGrainStorageSerializer storageSerializer;
-        private readonly IServiceProvider services;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -51,15 +50,13 @@ namespace Orleans.Storage
             string name,
             AzureTableStorageOptions options,
             IOptions<ClusterOptions> clusterOptions,
-            IGrainStorageSerializer storageSerializer,
             IServiceProvider services,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
-            this.storageSerializer = storageSerializer;
-            this.services = services;
+            this.storageSerializer = options.GrainStorageSerializer ?? services.GetRequiredService<IGrainStorageSerializer>();
             this.logger = logger;
         }
 
@@ -465,8 +462,7 @@ namespace Orleans.Storage
         {
             var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
             var clusterOptions = services.GetProviderClusterOptions(name);
-            var storageSerializer = services.GetRequiredServiceByName<IGrainStorageSerializer>(name);
-            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions, storageSerializer);
+            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions);
         }
     }
 }

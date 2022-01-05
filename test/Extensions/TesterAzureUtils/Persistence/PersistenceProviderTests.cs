@@ -276,11 +276,11 @@ namespace Tester.AzureUtils.Persistence
             // TODO change test to include more serializer?
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
             var jsonSerializer = new JsonGrainStorageSerializer(Options.Create(jsonOptions), this.providerRuntime.ServiceProvider);
-            var serializer = useJson
+            options.GrainStorageSerializer = useJson
                 ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
                 : new GrainStorageSerializer(binarySerializer, jsonSerializer);
 
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, serializer, "TestStorage");
+            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();

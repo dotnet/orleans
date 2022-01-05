@@ -9,7 +9,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Configuration for AzureTableGrainStorage
     /// </summary>
-    public class AzureTableStorageOptions : AzureStorageOperationOptions
+    public class AzureTableStorageOptions : AzureStorageOperationOptions, IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Table name where grain stage is stored
@@ -27,6 +27,9 @@ namespace Orleans.Configuration
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        /// <inheritdoc/>
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
 
     /// <summary>
