@@ -28,7 +28,12 @@ namespace Orleans.Configuration
 
                     if (resolvedIP is null)
                     {
-                        if (logger.IsEnabled(LogLevel.Warning)) logger.LogWarning($"Unable to resolve {nameof(options.AdvertisedIPAddress)} and will set to {nameof(IPAddress.Loopback)}:{advertisedIPAddress}");
+                        if (logger.IsEnabled(LogLevel.Warning))
+                        {
+                            logger.LogWarning(
+                                $"Unable to find a suitable candidate for {nameof(EndpointOptions)}.{nameof(options.AdvertisedIPAddress)}. Falling back to {nameof(IPAddress.Loopback)} ({{AdvertisedIPAddress}})",
+                                advertisedIPAddress);
+                        }
                     }
                     else
                     { 
@@ -39,7 +44,10 @@ namespace Orleans.Configuration
                 {
                     if (logger.IsEnabled(LogLevel.Error))
                     {
-                        logger.LogError(ex, $"Failed to resolve {nameof(options.AdvertisedIPAddress)}  and will set to {nameof(IPAddress.Loopback)}:{advertisedIPAddress}");
+                        logger.LogError(
+                            ex,
+                            $"Unable to find a suitable candidate for {nameof(EndpointOptions)}.{nameof(options.AdvertisedIPAddress)}. Falling back to {nameof(IPAddress.Loopback)} ({{AdvertisedIPAddress}})",
+                            advertisedIPAddress);
                     }
                 }                
 
