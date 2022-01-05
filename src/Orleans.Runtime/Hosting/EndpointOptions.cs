@@ -17,7 +17,6 @@ namespace Orleans.Configuration
 
         public EndpointOptions()
         {
-            advertisedIPAddress = ConfigUtilities.ResolveIPAddress(null, null, AddressFamily.InterNetwork).Result;
             siloPort = DEFAULT_SILO_PORT;
         }
 

@@ -265,6 +265,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
+            services.AddSingleton<IPostConfigureOptions<EndpointOptions>, EndpointOptionsProvider>();
 
             // Type metadata
             services.AddSingleton<SiloManifestProvider>();

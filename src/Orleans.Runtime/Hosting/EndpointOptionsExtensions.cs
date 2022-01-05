@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using System.Net.Sockets;
 using Orleans.Configuration;
@@ -56,7 +57,13 @@ namespace Orleans.Hosting
             AddressFamily addressFamily = AddressFamily.InterNetwork,
             bool listenOnAnyHostAddress = false)
         {
-            var ip = ConfigUtilities.ResolveIPAddress(hostname, null, addressFamily).Result;
+            var ip = ConfigUtilities.ResolveIPAddressOrDefault(hostname, null, addressFamily);
+
+            if (ip == null)
+            {
+                throw new ArgumentException("Hostname '" + hostname + "' with subnet [] and family " + addressFamily + " is not a valid IP address or DNS name");
+            }            
+
             return builder.ConfigureEndpoints(ip, siloPort, gatewayPort, listenOnAnyHostAddress);
         }
 
