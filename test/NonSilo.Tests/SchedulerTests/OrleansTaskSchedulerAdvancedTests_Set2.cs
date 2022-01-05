@@ -505,7 +505,7 @@ namespace UnitTests.SchedulerTests
             using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            Task wrapper = new Task(async () =>
+            Task<Task> wrapper = new Task<Task>(async () =>
             {
                 Assert.Equal(scheduler, TaskScheduler.Current);
                 await DoDelay(1);
@@ -515,7 +515,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            await wrapper;
+            await wrapper.Unwrap();
         }
 
         private async Task DoDelay(int i)
