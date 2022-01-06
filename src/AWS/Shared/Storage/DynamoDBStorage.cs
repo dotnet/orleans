@@ -383,7 +383,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
 
-            if (toDelete == null) throw new ArgumentNullException("collection");
+            if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
             if (toDelete.Count == 0)
                 return Task.CompletedTask;
@@ -460,8 +460,9 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
+        /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null) where TResult : class
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
         {
             try
             {
@@ -469,7 +470,7 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     TableName = tableName,
                     ExpressionAttributeValues = keys,
-                    ConsistentRead = true,
+                    ConsistentRead = consistentRead,
                     KeyConditionExpression = keyConditionExpression,
                     Select = Select.ALL_ATTRIBUTES,
                     ExclusiveStartKey = lastEvaluatedKey
@@ -507,10 +508,11 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
+        /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
         public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
-                string indexName = "", bool scanIndexForward = true) where TResult : class
+                string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
         {
             List<TResult> resultList = null;
             Dictionary<string, AttributeValue> lastEvaluatedKey = null;
@@ -518,7 +520,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 List<TResult> results;
                 (results, lastEvaluatedKey) = await QueryAsync(tableName, keys, keyConditionExpression, resolver,
-                    indexName, scanIndexForward, lastEvaluatedKey);
+                    indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
                 if (resultList == null)
                 {
                     resultList = results;
@@ -604,7 +606,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
 
-            if (toCreate == null) throw new ArgumentNullException("collection");
+            if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
 
             if (toCreate.Count == 0)
                 return Task.CompletedTask;
