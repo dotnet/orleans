@@ -10,6 +10,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans
 {
@@ -93,7 +94,7 @@ namespace Orleans
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
         }
-        
+
         /// <summary>
         /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
         /// </summary>
@@ -123,10 +124,7 @@ namespace Orleans
         /// <returns>The builder.</returns>
         public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
         {
-            if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
-            {
-                throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
-            }
+            builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
             return builder
                 .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>();

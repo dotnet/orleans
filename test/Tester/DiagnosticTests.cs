@@ -31,19 +31,6 @@ namespace UnitTests.General
         }
         public class Fixture : BaseTestClusterFixture
         {
-            private readonly ActivityIdFormat format = Activity.DefaultIdFormat;
-
-            public Fixture()
-            {
-                Activity.DefaultIdFormat = ActivityIdFormat.W3C;
-            }
-
-            public override Task DisposeAsync()
-            {
-                Activity.DefaultIdFormat = format;
-                return base.DisposeAsync();
-            }
-
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
@@ -70,17 +57,23 @@ namespace UnitTests.General
             }
         }
 
+        private readonly ActivityIdFormat defaultIdFormat;
         private readonly Fixture fixture;
 
         public DiagnosticTests(Fixture fixture)
         {
+            defaultIdFormat = Activity.DefaultIdFormat;
             this.fixture = fixture;
             ActivitySource.AddActivityListener(activityListener);
         }
 
-        [Fact]
-        public async Task WithoutParentActivity()
+        [Theory]
+        [InlineData(ActivityIdFormat.W3C)]
+        [InlineData(ActivityIdFormat.Hierarchical)]
+        public async Task WithoutParentActivity(ActivityIdFormat idFormat)
         {
+            Activity.DefaultIdFormat = idFormat;
+
             await Test(fixture.GrainFactory);
             await Test(fixture.Client);
 
@@ -97,10 +90,13 @@ namespace UnitTests.General
         }
 
         [Fact]
-        public async Task WithParentActivity()
+        public async Task WithParentActivity_W3C()
         {
+            Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+
             var activity = new Activity("SomeName");
             activity.TraceStateString = "traceState";
+            activity.AddBaggage("foo", "bar");
             activity.Start();
 
             try
@@ -122,8 +118,42 @@ namespace UnitTests.General
                 Assert.NotNull(result);
                 Assert.NotNull(result.Id);
                 Assert.Contains(activity.TraceId.ToHexString(), result.Id); // ensure, that trace id is persisted.
-                Assert.Equal(result.TraceState, activity.TraceStateString);
+                Assert.Equal(activity.TraceStateString, result.TraceState);
+                Assert.Equal(activity.Baggage, result.Baggage);
             }
         }
+
+        [Fact]
+        public async Task WithParentActivity_Hierarchical()
+        {
+            Activity.DefaultIdFormat = ActivityIdFormat.Hierarchical;
+
+            var activity = new Activity("SomeName");
+            activity.AddBaggage("foo", "bar");
+            activity.Start();
+
+            try
+            {
+                await Test(fixture.GrainFactory);
+                await Test(fixture.Client);
+            }
+            finally
+            {
+                activity.Stop();
+            }
+
+            async Task Test(IGrainFactory grainFactory)
+            {
+                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+
+                var result = await grain.GetActivityId();
+
+                Assert.NotNull(result);
+                Assert.NotNull(result.Id);
+                Assert.StartsWith(activity.Id, result.Id);
+                Assert.Equal(activity.Baggage, result.Baggage);
+            }
+        }
+
     }
 }

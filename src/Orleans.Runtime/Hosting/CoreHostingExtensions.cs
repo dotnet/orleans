@@ -24,10 +24,7 @@ namespace Orleans.Hosting
         /// <returns>The builder.</returns>
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder)
         {
-            if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
-            {
-                throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
-            }
+            builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
             return builder
                 .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
