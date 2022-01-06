@@ -163,7 +163,7 @@ namespace Orleans.Reminders.DynamoDB
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
                         { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
-                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = unchecked(begin + 1).ToString() } },
+                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = (begin + 1).ToString() } },
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
