@@ -62,7 +62,6 @@ namespace Orleans.Hosting
 
             services.AddSingleton<Silo>();
             services.AddHostedService<SiloHostedService>();
-            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
             services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<SiloLifecycleSubject>();
@@ -266,6 +265,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
+            services.AddSingleton<IPostConfigureOptions<EndpointOptions>, EndpointOptionsProvider>();
 
             // Type metadata
             services.AddSingleton<SiloManifestProvider>();

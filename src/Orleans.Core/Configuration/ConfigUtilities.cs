@@ -53,21 +53,28 @@ namespace Orleans.Runtime.Configuration
             return TimeSpan.FromTicks((long)(rawTimeSpan * unitSize));
         }
 
-        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        internal static IPAddress ResolveIPAddressOrDefault(byte[] subnet, AddressFamily family)
         {
-            var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
-            IList<IPAddress> nodeIps;
-
-            // if the address is an empty string, just enumerate all ip addresses available
-            // on this node
-            if (string.IsNullOrEmpty(addrOrHost))
-            {
-                nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+            IList<IPAddress> nodeIps = NetworkInterface.GetAllNetworkInterfaces()
                             .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
                             .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
                             .Select(addr => addr.Address)
                             .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
                             .ToList();
+
+            var ipAddress = PickIPAddress(nodeIps, subnet, family);
+            return ipAddress;
+        }
+
+        internal static IPAddress ResolveIPAddressOrDefault(string addrOrHost, byte[] subnet, AddressFamily family)
+        {
+            var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+
+            // if the address is an empty string, just enumerate all ip addresses available
+            // on this node
+            if (string.IsNullOrEmpty(addrOrHost))
+            {
+                return ResolveIPAddressOrDefault(subnet, family);
             }
             else
             {
@@ -78,17 +85,20 @@ namespace Orleans.Runtime.Configuration
                 }
 
                 // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
-                IPAddress address;
-                if (IPAddress.TryParse(addrOrHost, out address))
+                if (IPAddress.TryParse(addrOrHost, out var address))
                 {
                     return address;
                 }
 
                 // Get IP address from DNS. If addrOrHost is localhost will 
                 // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
-                nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
+                var nodeIps = Dns.GetHostAddresses(addrOrHost);
+                return PickIPAddress(nodeIps, subnet, family);
             }
+        }
 
+        private static IPAddress PickIPAddress(IList<IPAddress> nodeIps, byte[] subnet, AddressFamily family)
+        {
             var candidates = new List<IPAddress>();
             foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
             {
@@ -107,12 +117,8 @@ namespace Orleans.Runtime.Configuration
                     }
                 }
             }
-            if (candidates.Count > 0)
-            {
-                return PickIPAddress(candidates);
-            }
-            var subnetStr = Utils.EnumerableToString(subnet, null, ".", false);
-            throw new ArgumentException("Hostname '" + addrOrHost + "' with subnet " + subnetStr + " and family " + family + " is not a valid IP address or DNS name");
+
+            return candidates.Count > 0 ? PickIPAddress(candidates) : null;
         }
 
         private static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
