@@ -470,7 +470,7 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     TableName = tableName,
                     ExpressionAttributeValues = keys,
-                    ConsistentRead = true,
+                    ConsistentRead = consistentRead,
                     KeyConditionExpression = keyConditionExpression,
                     Select = Select.ALL_ATTRIBUTES,
                     ExclusiveStartKey = lastEvaluatedKey
