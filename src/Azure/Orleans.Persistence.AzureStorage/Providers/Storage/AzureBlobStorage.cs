@@ -40,7 +40,7 @@ namespace Orleans.Storage
         {
             this.name = name;
             this.options = options;
-            this.grainStorageSerializer = options.GrainStorageSerializer ?? services.GetRequiredService<IGrainStorageSerializer>();
+            this.grainStorageSerializer = options.GrainStorageSerializer;
             this.services = services;
             this.logger = logger;
         }

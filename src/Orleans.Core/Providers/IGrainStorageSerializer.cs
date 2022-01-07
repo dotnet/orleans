@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
@@ -39,5 +40,26 @@ namespace Orleans.Storage
         /// Serializer to use for this provider
         /// </summary>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+    }
+
+    public class DefaultStorageProviderSerializerOptionsConfigurator<TOptions> : IPostConfigureOptions<TOptions> where TOptions : class, IStorageProviderSerializerOptions
+    {
+        private readonly IServiceProvider _serviceProvider;
+
+        public DefaultStorageProviderSerializerOptionsConfigurator(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
+
+        public void PostConfigure(string name, TOptions options)
+        {
+            if (options.GrainStorageSerializer == default)
+            {
+                // First, try to get a IGrainStorageSerializer that was registered with 
+                // the same name as the storage provider
+                // If none is found, fallback to system wide default
+                options.GrainStorageSerializer = _serviceProvider.GetServiceByName<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
+            }
+        }
     }
 }

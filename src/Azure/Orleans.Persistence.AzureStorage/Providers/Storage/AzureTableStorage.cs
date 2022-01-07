@@ -56,7 +56,7 @@ namespace Orleans.Storage
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
-            this.storageSerializer = options.GrainStorageSerializer ?? services.GetRequiredService<IGrainStorageSerializer>();
+            this.storageSerializer = options.GrainStorageSerializer;
             this.logger = logger;
         }
 

@@ -76,6 +76,7 @@ namespace Orleans.Hosting
         {
             configureOptions?.Invoke(services.AddOptions<AzureBlobStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(name), name));
+            services.AddTransient<IPostConfigureOptions<AzureBlobStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AzureBlobStorageOptions>>();
             services.ConfigureNamedOptionForLogging<AzureBlobStorageOptions>(name);
             if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
             {
