@@ -1,4 +1,4 @@
--- Run this migration for upgrading the PostgreSQL clustering table and routines for deployments created before 3.5.2
+-- Run this migration for upgrading the PostgreSQL clustering table and routines for deployments created before 3.6.0
 
 BEGIN;
 
