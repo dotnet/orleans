@@ -39,7 +39,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Serializer to use for this provider
         /// </summary>
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
 
     public class DefaultStorageProviderSerializerOptionsConfigurator<TOptions> : IPostConfigureOptions<TOptions> where TOptions : class, IStorageProviderSerializerOptions
