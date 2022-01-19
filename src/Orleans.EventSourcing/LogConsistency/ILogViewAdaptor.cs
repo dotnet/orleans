@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing
@@ -18,13 +19,13 @@ namespace Orleans.EventSourcing
           ILogConsistencyDiagnostics
         where TLogView : new()
     {
-        /// <summary>Called during activation, right before the user-defined <see cref="Grain.OnActivateAsync"/>.</summary>
+        /// <summary>Called during activation, right before the user-defined <see cref="Grain.OnActivateAsync(CancellationToken)"/>.</summary>
         Task PreOnActivate();
 
-        /// <summary>Called during activation, right after the user-defined <see cref="Grain.OnActivateAsync"/>..</summary>
+        /// <summary>Called during activation, right after the user-defined <see cref="Grain.OnActivateAsync(CancellationToken)"/>..</summary>
         Task PostOnActivate();
 
-        /// <summary>Called during deactivation, right after the user-defined <see cref="Grain.OnDeactivateAsync"/>.</summary>
+        /// <summary>Called during deactivation, right after the user-defined <see cref="Grain.OnDeactivateAsync(DeactivationReason, CancellationToken)"/>.</summary>
         Task PostOnDeactivate();
     }
 

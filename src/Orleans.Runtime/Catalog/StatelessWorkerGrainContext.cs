@@ -87,9 +87,9 @@ namespace Orleans.Runtime
             _workSignal.Signal();
         }
 
-        public void Deactivate(CancellationToken? cancellationToken = null)
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null)
         {
-            _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(cancellationToken)));
+            _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken)));
             _workSignal.Signal();
         }
 
@@ -134,7 +134,7 @@ namespace Orleans.Runtime
                             case WorkItemType.Deactivate:
                                 {
                                     var state = (DeactivateWorkItemState)workItem.State;
-                                    DeactivateInternal(state.CancellationToken);
+                                    DeactivateInternal(state.DeactivationReason, state.CancellationToken);
                                     break;
                                 }
                             case WorkItemType.DeactivatedTask:
@@ -207,11 +207,11 @@ namespace Orleans.Runtime
             // No-op
         }
 
-        private void DeactivateInternal(CancellationToken? cancellationToken)
+        private void DeactivateInternal(DeactivationReason reason, CancellationToken? cancellationToken)
         {
             foreach (var worker in _workers)
             {
-                worker.Deactivate(cancellationToken);
+                worker.Deactivate(reason, cancellationToken);
             }
         }
 
@@ -304,7 +304,7 @@ namespace Orleans.Runtime
         }
 
         private record ActivateWorkItemState(Dictionary<string, object> RequestContext, CancellationToken? CancellationToken);
-        private record DeactivateWorkItemState(CancellationToken? CancellationToken);
+        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken? CancellationToken);
         private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
         private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
     }

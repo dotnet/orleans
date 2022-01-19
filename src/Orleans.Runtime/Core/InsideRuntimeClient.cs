@@ -313,8 +313,9 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        this.invokeExceptionLogger.Info($"Deactivating {target} due to inconsistent state.");
-                        this.DeactivateOnIdle(target.GrainId);
+                        var msg = $"Deactivating {target} due to inconsistent state.";
+                        this.invokeExceptionLogger.Info(msg);
+                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, invocationException, invocationException.Message));
                     }
                 }
 
@@ -523,12 +524,6 @@ namespace Orleans.Runtime
             {
                 throw new InvalidOperationException("Cannot delete a local object reference from a grain.");
             }
-        }
-
-        public void DeactivateOnIdle(GrainId id)
-        {
-            if (!Catalog.TryGetActivationData(id, out var data)) return; // already gone
-            _ = data.DeactivateAsync();
         }
 
         private Task OnRuntimeInitializeStop(CancellationToken tc)

@@ -9,6 +9,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Diagnostics;
+using Orleans.Runtime;
 
 namespace UnitTests.StuckGrainTests
 {
@@ -36,6 +37,7 @@ namespace UnitTests.StuckGrainTests
                         options.CollectionAge = TimeSpan.FromSeconds(2);
                         options.CollectionQuantum = TimeSpan.FromSeconds(1);
 
+                        options.ActivationTimeout = TimeSpan.FromSeconds(2);
                         options.DeactivationTimeout = TimeSpan.FromSeconds(2);
                     });
 
@@ -121,6 +123,28 @@ namespace UnitTests.StuckGrainTests
 
             // All 4 otherwise stuck calls should have been forwarded to a new activation
             Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter());
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
+        public async Task StuckGrainTest_StuckDetectionOnActivation()
+        {
+            var id = Guid.NewGuid();
+            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+
+            // The cancellation token passed to OnActivateAsync should become cancelled and this will cause activation to fail.
+            RequestContext.Set("block_activation_seconds", 30);
+            await Assert.ThrowsAsync<TaskCanceledException>(() => stuckGrain.NonBlockingCall());
+
+            // Check to see that it did try to activate.
+            RequestContext.Clear();
+            var unstuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(Guid.NewGuid());
+            await unstuckGrain.NonBlockingCall();
+
+            var activationAttempted = await unstuckGrain.DidActivationTryToStart(stuckGrain.GetGrainId());
+            Assert.True(activationAttempted);
+
+            // Now that activation is not blocked (we cleared the request context value which told it to block), let's check that our previously stuck grain works.
+            await stuckGrain.NonBlockingCall();
         }
     }
 }

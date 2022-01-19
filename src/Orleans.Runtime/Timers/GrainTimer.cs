@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         private readonly IGrainContext grainContext;
 
         public string Name { get; }
-        
+
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
         private GrainTimer(IGrainContext activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
@@ -38,7 +38,7 @@ namespace Orleans.Runtime
             this.logger = logger;
             this.Name = name;
             this.asyncCallback = asyncCallback;
-            timer = new AsyncTaskSafeTimer(logger, 
+            timer = new AsyncTaskSafeTimer(logger,
                 stateObj => TimerTick(stateObj, ctxt),
                 state);
             this.dueTime = dueTime;
@@ -54,9 +54,9 @@ namespace Orleans.Runtime
             TimeSpan dueTime,
             TimeSpan period,
             string name = null,
-            IGrainContext activationData = null)
+            IGrainContext grainContext = null)
         {
-            return new GrainTimer(activationData, logger, asyncCallback, state, dueTime, period, name);
+            return new GrainTimer(grainContext, logger, asyncCallback, state, dueTime, period, name);
         }
 
         public void Start()
@@ -79,7 +79,9 @@ namespace Orleans.Runtime
             try
             {
                 // Schedule call back to grain context
-                await context.QueueNamedTask(() => ForwardToAsyncCallback(state), this.Name);
+                var workItem = new AsyncClosureWorkItem(() => ForwardToAsyncCallback(state), this.Name, context);
+                context.Scheduler.QueueWorkItem(workItem);
+                await workItem.Task;
             }
             catch (InvalidSchedulingContextException exc)
             {
@@ -110,18 +112,18 @@ namespace Orleans.Runtime
                     currentlyExecutingTickTask = asyncCallback(state);
                 }
                 await currentlyExecutingTickTask;
-                
+
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
-                logger.Error( 
+                logger.Error(
                     ErrorCode.Timer_GrainTimerCallbackError,
                     string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
                         exc.GetType(),
                         exc.Message,
                         GetFullName()),
-                    exc);       
+                    exc);
             }
             finally
             {
@@ -130,7 +132,7 @@ namespace Orleans.Runtime
                 // if this is not a repeating timer, then we can
                 // dispose of the timer.
                 if (timerFrequency == Constants.INFINITE_TIMESPAN)
-                    DisposeTimer();                
+                    DisposeTimer();
             }
         }
 
@@ -142,7 +144,7 @@ namespace Orleans.Runtime
         private string GetFullName()
         {
             var callback = asyncCallback;
-            var callbackTarget = callback?.Target?.ToString() ?? string.Empty; 
+            var callbackTarget = callback?.Target?.ToString() ?? string.Empty;
             var callbackMethodInfo = callback?.GetMethodInfo()?.ToString() ?? string.Empty;
             return $"GrainTimer.{this.Name ?? string.Empty} TimerCallbackHandler:{callbackTarget ?? string.Empty}->{callbackMethodInfo ?? string.Empty}";
         }
@@ -154,9 +156,9 @@ namespace Orleans.Runtime
         {
             if (TimerAlreadyStopped) return true;
             // check underlying SafeTimer (checking that .NET thread pool does not starve this timer)
-            if (!timer.CheckTimerFreeze(lastCheckTime, () => Name)) return false; 
+            if (!timer.CheckTimerFreeze(lastCheckTime, () => Name)) return false;
             // if SafeTimer failed the check, no need to check GrainTimer too, since it will fail as well.
-            
+
             // check myself (checking that scheduler.QueueWorkItem does not starve this timer)
             return SafeTimerBase.CheckTimerDelay(previousTickTime, totalNumTicks,
                 dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, true);

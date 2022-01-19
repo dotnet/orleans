@@ -547,12 +547,32 @@ namespace Orleans.Runtime
                 if (gracefully)
                 {
                     // Stop LocalGrainDirectory
-                    await localGrainDirectory.CacheValidator.QueueActionAsync(() => localGrainDirectory.Stop());
+                    var resolver = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    localGrainDirectory.CacheValidator.WorkItemGroup.QueueAction(() =>
+                    {
+                        try
+                        {
+                            localGrainDirectory.Stop();
+                            resolver.TrySetResult(true);
+                        }
+                        catch (Exception exc)
+                        {
+                            resolver.TrySetException(exc);
+                        }
+                    });
+                    await resolver.Task;
 
-                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
+                    try
+                    {
+                        await catalog.DeactivateAllActivations().WithCancellation(ct);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Error deactivating activations");
+                    }
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
-                    await Task.Delay(waitForMessageToBeQueuedForOutbound);
+                    await Task.WhenAny(Task.Delay(waitForMessageToBeQueuedForOutbound), ct.WhenCancelled());
                 }
             }
             catch (Exception exc)

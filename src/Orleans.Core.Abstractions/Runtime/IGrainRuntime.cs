@@ -25,10 +25,10 @@ namespace Orleans.Runtime
 
         IServiceProvider ServiceProvider { get; }
 
-        void DeactivateOnIdle(Grain grain);
+        void DeactivateOnIdle(IGrainContext grainContext);
 
-        void DelayDeactivation(Grain grain, TimeSpan timeSpan);
+        void DelayDeactivation(IGrainContext grainContext, TimeSpan timeSpan);
 
-        IStorage<TGrainState> GetStorage<TGrainState>(Grain grain);
+        IStorage<TGrainState> GetStorage<TGrainState>(IGrainContext grainContext);
     }
 }

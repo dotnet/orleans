@@ -14,10 +14,10 @@ namespace Orleans.Runtime.LogConsistency
     {
         private readonly ILogger log;
         private readonly DeepCopier deepCopier;
-        private readonly Grain grain;   // links to the grain that owns this service object
+        private readonly IGrainContext grain;   // links to the grain that owns this service object
 
         public ProtocolServices(
-            Grain gr,
+            IGrainContext gr,
             ILoggerFactory loggerFactory,
             DeepCopier deepCopier,
             ILocalSiloDetails siloDetails)

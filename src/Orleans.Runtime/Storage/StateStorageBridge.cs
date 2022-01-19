@@ -19,13 +19,13 @@ namespace Orleans.Core
         {
             get
             {
-                GrainRuntime.CheckRuntimeContext();
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 return grainState.State;
             }
 
             set
             {
-                GrainRuntime.CheckRuntimeContext();
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 grainState.State = value;
             }
         }
@@ -58,7 +58,7 @@ namespace Orleans.Core
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
-                GrainRuntime.CheckRuntimeContext();
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 await store.ReadStateAsync(name, grainRef, grainState);
 
@@ -90,7 +90,7 @@ namespace Orleans.Core
             const string what = "WriteState";
             try
             {
-                GrainRuntime.CheckRuntimeContext();
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 Stopwatch sw = Stopwatch.StartNew();
                 await store.WriteStateAsync(name, grainRef, grainState);
@@ -119,7 +119,7 @@ namespace Orleans.Core
             const string what = "ClearState";
             try
             {
-                GrainRuntime.CheckRuntimeContext();
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 Stopwatch sw = Stopwatch.StartNew();
                 // Clear (most likely Delete) state from external storage

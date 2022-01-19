@@ -380,31 +380,25 @@ namespace Orleans.Runtime
             _workSignal.Signal();
         }
 
-        public void Deactivate(CancellationToken? token = default)
+        public void Deactivate(DeactivationReason reason, CancellationToken? token = default)
         {
             if (!token.HasValue)
             {
                 token = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
             }
             
-            StartDeactivating();
+            StartDeactivating(reason);
             ScheduleOperation(new Command.Deactivate(token.Value));
-        }
-
-        public async Task DeactivateAsync(CancellationToken? token)
-        {
-            Deactivate(token);
-            await GetDeactivationCompletionSource().Task;
         }
 
         private void DeactivateStuckActivation()
         {
             IsStuckProcessingMessage = true;
-            var msg = $"Activation {this} has been processing request {_blockingRequest} since {_busyDuration} and is likely stuck";
-            DeactivationReason = new(DeactivationReasonCode.StuckProcessingMessage, msg);
+            var msg = $"Activation {this} has been processing request {_blockingRequest} since {_busyDuration} and is likely stuck.";
+            var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
             // Mark the grain as deactivating so that messages are forwarded instead of being invoked
-            Deactivate(token: default);
+            Deactivate(reason, token: default);
 
             // Try to remove this activation from the catalog and directory
             // This leaves this activation dangling, stuck processing the current request until it eventually completes
@@ -777,11 +771,11 @@ namespace Orleans.Runtime
                             var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
                             if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                             {
-                                DeactivationReason = new(
+                                var reason = new DeactivationReason(
                                     DeactivationReasonCode.IncompatibleRequest,
-                                    $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports version {currentVersion}");
+                                    $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
 
-                                Deactivate(token: default);
+                                Deactivate(reason, token: default);
                                 return;
                             }
                         }
@@ -826,10 +820,10 @@ namespace Orleans.Runtime
                     if (deactivatingTime > _shared.MaxRequestProcessingTime && !IsStuckDeactivating)
                     {
                         IsStuckDeactivating = true;
-                        if (DeactivationReason.Text is { Length: > 0 })
+                        if (DeactivationReason.Description is { Length: > 0 } && DeactivationReason.ReasonCode != DeactivationReasonCode.ActivationUnresponsive)
                         {
                             var msg = $"Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck";
-                            DeactivationReason = new(DeactivationReason.Code, DeactivationReason.Text + ". " + msg);
+                            DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive, DeactivationReason.Description + ". " + msg);
                         }
                     }
                 }
@@ -1071,7 +1065,7 @@ namespace Orleans.Runtime
                     msgs,
                     Address,
                     forwardingAddress: null,
-                    failedOperation: DeactivationReason.Text,
+                    failedOperation: DeactivationReason.Description,
                     exc: DeactivationException,
                     rejectMessages: true);
             }
@@ -1089,7 +1083,7 @@ namespace Orleans.Runtime
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}", msgs.Count, this);
                 _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
-                _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Text, DeactivationException);
+                _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
             }
         }
 
@@ -1156,7 +1150,11 @@ namespace Orleans.Runtime
                 try
                 {
                     RequestContextExtensions.Import(requestContextData);
-                    await Lifecycle.OnStart(cancellationToken);
+                    await Lifecycle.OnStart(cancellationToken).WithCancellation(cancellationToken, "Timed out waiting for grain lifecycle to complete activation");
+                    if (GrainInstance is IGrainBase grainBase)
+                    {
+                        await grainBase.OnActivateAsync(cancellationToken).WithCancellation(cancellationToken, $"Timed out waiting for {nameof(IGrainBase.OnActivateAsync)} to complete");
+                    }
 
                     lock (this)
                     {
@@ -1185,8 +1183,10 @@ namespace Orleans.Runtime
                     lock (this)
                     {
                         SetState(ActivationState.FailedToActivate);
-                        DeactivationReason = new(DeactivationReasonCode.FailedToActivate, sourceException, "Failed to activate grain");
+                        DeactivationReason = new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain.");
                     }
+
+                    GetDeactivationCompletionSource().TrySetResult(true);
 
                     if (IsUsingGrainDirectory && ForwardingAddress is null)
                     {
@@ -1207,7 +1207,13 @@ namespace Orleans.Runtime
                     // Unregister this as a message target after some period of time.
                     // This is delayed so that consistently failing activation, perhaps due to an application bug or network
                     // issue, does not cause a flood of doomed activations.
-                    ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
+                    // If the cancellation token was canceled, there is no need to wait an additional time, since the activation
+                    // has already waited some significant amount of time.
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
+                    }
+
                     ScheduleOperation(new Command.UnregisterFromCatalog());
 
                     lock (this)
@@ -1250,7 +1256,7 @@ namespace Orleans.Runtime
                         // Set the forwarding address so that messages enqueued on this activation can be forwarded to
                         // the existing activation.
                         ForwardingAddress = result;
-                        DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, null, "Duplicate activation");
+                        DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
                         success = false;
                         CounterStatistic
                             .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
@@ -1285,7 +1291,7 @@ namespace Orleans.Runtime
                     }
 
                     UnregisterMessageTarget();
-                    DeactivationReason = new(DeactivationReasonCode.GrainDirectoryFailure, registrationException, "Failed to register activation in grain directory");
+                    DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
                     _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
                 }
             }
@@ -1299,7 +1305,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Starts the deactivation process.
         /// </summary>
-        public void StartDeactivating()
+        public void StartDeactivating(DeactivationReason reason)
         {
             lock (this)
             {
@@ -1313,9 +1319,9 @@ namespace Orleans.Runtime
                     throw new InvalidOperationException("Calling DeactivateOnIdle from within OnActivateAsync is not supported");
                 }
 
-                if (DeactivationReason.Code == DeactivationReasonCode.None)
+                if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
                 {
-                    DeactivationReason = new(DeactivationReasonCode.ActivationInitiated, "DeactivateOnIdle");
+                    DeactivationReason = reason;
                 }
 
                 DeactivationStartTime = DateTime.UtcNow;
@@ -1342,7 +1348,6 @@ namespace Orleans.Runtime
                     _shared.Logger.LogTrace("FinishDeactivating activation {Activation}", this.ToDetailedString());
                 }
 
-                StartDeactivating();
                 StopAllTimers();
 
                 // Wait timers and call OnDeactivateAsync()
@@ -1414,7 +1419,12 @@ namespace Orleans.Runtime
                         if (State == ActivationState.Deactivating)
                         {
                             RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
-                            await Lifecycle.OnStop(ct).WithCancellation(ct);
+                            if (GrainInstance is IGrainBase grainBase)
+                            {
+                                await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation(ct, $"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete");
+                            }
+
+                            await Lifecycle.OnStop(ct).WithCancellation(ct, "Timed out waiting for grain lifecycle to complete deactivation");
                         }
 
                         if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", this, GrainInstance?.GetType().FullName);
@@ -1443,7 +1453,7 @@ namespace Orleans.Runtime
 
         Task IGrainManagementExtension.DeactivateOnIdle()
         {
-            Deactivate();
+            Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."));
             return Task.CompletedTask;
         }
 
@@ -1520,41 +1530,5 @@ namespace Orleans.Runtime
             {
             }
         }
-    }
-
-    internal struct DeactivationReason
-    {
-        public DeactivationReason(DeactivationReasonCode code, string text)
-        {
-            Code = code;
-            Text = text;
-            Exception = null;
-        }
-
-        public DeactivationReason(DeactivationReasonCode code, Exception exception, string text)
-        {
-            Code = code;
-            Text = text;
-            Exception = exception;
-        }
-
-        public string Text { get; }
-        public DeactivationReasonCode Code { get; }
-
-        /// <summary>
-        /// If not null, contains the exception thrown during activation.
-        /// </summary>
-        public Exception Exception { get; }
-    }
-
-    internal enum DeactivationReasonCode : byte
-    {
-        None,
-        FailedToActivate,
-        GrainDirectoryFailure,
-        ActivationInitiated, // DeactivateOnIdle
-        StuckProcessingMessage,
-        DuplicateActivation,
-        IncompatibleRequest,
     }
 }

@@ -11,12 +11,18 @@ namespace UnitTests.Grains
 {
     public class CollectionTestGrain : Grain, ICollectionTestGrain
     {
+        protected readonly IGrainContext _grainContext;
         private DateTime activated;
 
         private ICollectionTestGrain other;
         private ILogger logger;
         private int counter;
         private static int staticCounter;
+
+        public CollectionTestGrain(IGrainContext grainContext)
+        {
+            _grainContext = grainContext;
+        }
 
         protected virtual ILogger Logger()
         {
@@ -26,7 +32,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
@@ -112,6 +118,10 @@ namespace UnitTests.Grains
         private int counter;
         private static int staticCounter;
 
+        public ReentrantCollectionTestGrain(IGrainContext grainContext) : base(grainContext)
+        {
+        }
+
         protected override ILogger Logger()
         {
             return logger;
@@ -120,7 +130,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;
