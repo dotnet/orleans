@@ -1,13 +1,15 @@
 using System;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
+using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
     /// <summary>
     /// Configuration for AzureTableGrainStorage
     /// </summary>
-    public class AzureTableStorageOptions : AzureStorageOperationOptions
+    public class AzureTableStorageOptions : AzureStorageOperationOptions, IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Table name where grain stage is stored
@@ -26,12 +28,10 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        public bool UseJson { get; set; }
-        public bool UseFullAssemblyNames { get; set; }
-        public bool IndentJson { get; set; }
-        public TypeNameHandling? TypeNameHandling { get; set; }
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
+        /// <inheritdoc/>
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
+
     /// <summary>
     /// Configuration validator for AzureTableStorageOptions
     /// </summary>

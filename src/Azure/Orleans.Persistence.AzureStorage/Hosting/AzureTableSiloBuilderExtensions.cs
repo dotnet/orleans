@@ -48,6 +48,7 @@ namespace Orleans.Hosting
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(name), name));
+            services.AddTransient<IPostConfigureOptions<AzureTableStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AzureTableStorageOptions>>();
             services.ConfigureNamedOptionForLogging<AzureTableStorageOptions>(name);
             if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
             {

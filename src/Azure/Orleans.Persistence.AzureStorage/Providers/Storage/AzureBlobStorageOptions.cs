@@ -7,10 +7,11 @@ using Azure.Storage.Blobs;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
-    public class AzureBlobStorageOptions
+    public class AzureBlobStorageOptions : IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Container name where grain stage is stored
@@ -34,11 +35,8 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        public bool UseJson { get; set; }
-        public bool UseFullAssemblyNames { get; set; }
-        public bool IndentJson { get; set; }
-        public TypeNameHandling? TypeNameHandling { get; set; }
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
+        /// <inheritdoc/>
+        public IGrainStorageSerializer GrainStorageSerializer { get; set;}
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using a connection string.
