@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,7 +30,7 @@ namespace UnitTests.Grains
             return logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
@@ -39,7 +40,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             Logger().Info("OnDeactivateAsync.");
             return Task.CompletedTask;
@@ -127,7 +128,7 @@ namespace UnitTests.Grains
             return logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
@@ -136,7 +137,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             Logger().Info("OnDeactivateAsync.");
             return Task.CompletedTask;

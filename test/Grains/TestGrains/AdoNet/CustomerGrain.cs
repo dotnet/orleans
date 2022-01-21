@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
@@ -11,9 +12,9 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
     {
         private readonly Random _random = new Random();
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
         }
 
         public Task<string> IntroduceSelf()

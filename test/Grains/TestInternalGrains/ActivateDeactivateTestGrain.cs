@@ -24,7 +24,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
@@ -36,7 +36,7 @@ namespace UnitTests.Grains
             doingActivate = false;
         }
 
-        public override async Task OnDeactivateAsync()
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             Assert.False(doingActivate, "Activate method should have finished");
@@ -79,7 +79,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
@@ -95,7 +95,7 @@ namespace UnitTests.Grains
                 });
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             Assert.False(doingActivate, "Activate method should have finished");
@@ -142,7 +142,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
@@ -176,7 +176,7 @@ namespace UnitTests.Grains
             doingActivate = false;
         }
 
-        public override async Task OnDeactivateAsync()
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
 
@@ -227,7 +227,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             Assert.NotNull(TaskScheduler.Current);
             Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
@@ -284,7 +284,7 @@ namespace UnitTests.Grains
             await awaitMe;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             Task.Factory.StartNew(() => logger.Info("OnDeactivateAsync"));
 
@@ -332,13 +332,13 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             throw new ApplicationException("Thrown from Application-OnActivateAsync");
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             throw new ApplicationException("Thrown from Application-OnDeactivateAsync");
@@ -365,14 +365,14 @@ namespace UnitTests.Grains
             throw new ApplicationException("Thrown from Constructor");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             throw new NotImplementedException("OnActivateAsync should not have been called");
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException("OnDeactivateAsync() should not have been called");
+            throw new NotImplementedException("OnDeactivateAsync(...) should not have been called");
         }
 
         public Task<string> DoSomething()
@@ -390,14 +390,14 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             this.DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -422,7 +422,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             logger.Info("OnActivateAsync");

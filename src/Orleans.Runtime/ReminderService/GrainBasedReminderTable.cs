@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -19,14 +20,14 @@ namespace Orleans.Runtime.ReminderService
             this.logger = logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("Activated");
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation virtually indefinitely.
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.LogInformation("Deactivated");
             return Task.CompletedTask;

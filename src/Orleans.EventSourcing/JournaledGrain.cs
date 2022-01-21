@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Storage;
 
@@ -169,7 +170,7 @@ namespace Orleans.EventSourcing
         /// view from storage. Subclasses can override this behavior,
         /// and skip the wait if desired.
         /// </summary>
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return LogViewAdaptor.Synchronize();
         }

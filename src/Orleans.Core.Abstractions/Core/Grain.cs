@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Runtime;
 
@@ -49,28 +50,8 @@ namespace Orleans
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
         /// Client code should use the GrainFactory property to get a reference to a Grain.
         /// </summary>
-        protected Grain()
+        protected Grain() : this(RuntimeContext.Current, grainRuntime: null)
         {
-            var context = RuntimeContext.Current;
-            if (context is null)
-            {
-                return;
-            }
-
-            if (!(context is IActivationData data))
-            {
-                ThrowInvalidContext();
-                return;
-            }
-
-            _grainContext = data;
-            this.Runtime = data.GrainRuntime;
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidContext()
-        {
-            throw new InvalidOperationException("Current execution context is not suitable for use with Grain");
         }
 
         /// <summary>
@@ -78,9 +59,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainContext grainContext, IGrainRuntime runtime) : this()
+        protected Grain(IGrainContext grainContext, IGrainRuntime grainRuntime = null)
         {
-            Runtime = runtime;
+            _grainContext = grainContext;
+            Runtime = grainRuntime ?? grainContext?.ActivationServices.GetRequiredService<IGrainRuntime>();
         }
 
         /// <summary>
@@ -224,26 +206,14 @@ namespace Orleans
         /// For grains with declared persistent state, this method is called after the State property has been populated.
         /// </summary>
         /// <param name="cancellationToken">A cancellation token which signals when activation is being canceled.</param>
-        public virtual Task OnActivateAsync(CancellationToken cancellationToken) => OnActivateAsync();
-
-        /// <summary>
-        /// This method is called at the end of the process of activating a grain.
-        /// It is called before any messages have been dispatched to the grain.
-        /// For grains with declared persistent state, this method is called after the State property has been populated.
-        /// </summary>
-        public virtual Task OnActivateAsync() => Task.CompletedTask;
+        public virtual Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         /// <summary>
         /// This method is called at the beginning of the process of deactivating a grain.
         /// </summary>
         /// <param name="reason">The reason for deactivation. Informational only.</param>
         /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
-        public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => OnDeactivateAsync();
-
-        /// <summary>
-        /// This method is called at the beginning of the process of deactivating a grain.
-        /// </summary>
-        public virtual Task OnDeactivateAsync() => Task.CompletedTask;
+        public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 
         private void EnsureRuntime()
         {

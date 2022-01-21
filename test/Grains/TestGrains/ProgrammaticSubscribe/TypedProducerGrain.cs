@@ -5,6 +5,7 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
@@ -24,7 +25,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
@@ -102,7 +103,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger.Info("{0} (item={1})", caller, numProducedItems);
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -200,11 +201,11 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class GrainWithListFields : Grain<IGrainWithListFieldsState>, IGrainWithListFields
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (State.Items == null)
                 State.Items = new List<string>();
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task AddItem(string item)
@@ -230,12 +231,12 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class GenericGrainWithListFields<T> : Grain<GenericGrainWithListFieldsState<T>>, IGenericGrainWithListFields<T>
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (State.Items == null)
                 State.Items = new List<T>();
 
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task AddItem(T item)
@@ -597,13 +598,13 @@ namespace UnitTests.Grains
             DeactivateOnIdle();
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this.logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
@@ -718,7 +719,7 @@ namespace UnitTests.Grains
     {
         private A collection;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             collection = new A();
             return Task.CompletedTask;

@@ -73,7 +73,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceTestGrain : Grain<PersistenceTestGrainState>, IPersistenceTestGrain
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -136,7 +136,7 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -229,7 +229,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceErrorGrain
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -277,7 +277,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.Warn(1, "OnActivateAsync");
             return Task.CompletedTask;
@@ -301,7 +301,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.Info(1, "OnActivateAsync");
             return Task.CompletedTask;
@@ -333,7 +333,7 @@ namespace UnitTests.Grains
     public class GrainStorageTestGrain : Grain<PersistenceTestGrainState>,
         IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -365,7 +365,7 @@ namespace UnitTests.Grains
     public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IGrainStorageGenericGrain<T>
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -397,7 +397,7 @@ namespace UnitTests.Grains
     public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -438,7 +438,7 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -472,7 +472,7 @@ namespace UnitTests.Grains
     public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IAWSStorageGenericGrain<T>
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -504,7 +504,7 @@ namespace UnitTests.Grains
     public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -544,7 +544,7 @@ namespace UnitTests.Grains
     public class MemoryStorageTestGrain : Grain<MemoryStorageTestGrain.NestedPersistenceTestGrainState>,
         IMemoryStorageTestGrain
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -713,12 +713,12 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _context = RuntimeContext.Current;
             _scheduler = TaskScheduler.Current;
             executing = false;
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         // When reentrant grain is doing WriteStateAsync, etag violations are posssible due to concurent writes.
@@ -889,7 +889,7 @@ namespace UnitTests.Grains
         private static int _counter = 1;
         private int _id;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _id = _counter++;
             var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
@@ -901,7 +901,7 @@ namespace UnitTests.Grains
             executing = false;
             Log("--> OnActivateAsync");
             Log("<-- OnActivateAsync");
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         private async Task SetOne(int iter, int level)
@@ -1067,10 +1067,10 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task<int> GetValue()

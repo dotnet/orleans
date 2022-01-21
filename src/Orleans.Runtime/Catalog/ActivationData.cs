@@ -1350,7 +1350,7 @@ namespace Orleans.Runtime
 
                 StopAllTimers();
 
-                // Wait timers and call OnDeactivateAsync()
+                // Wait timers and call OnDeactivateAsync(reason, cancellationToken)
                 await WaitForAllTimersToFinish(cancellationToken);
                 await CallGrainDeactivate(cancellationToken);
 
@@ -1410,7 +1410,7 @@ namespace Orleans.Runtime
                 try
                 {
                     // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", this, GrainInstance?.GetType().FullName);
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
 
                     // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
                     try
@@ -1427,12 +1427,12 @@ namespace Orleans.Runtime
                             await Lifecycle.OnStop(ct).WithCancellation(ct, "Timed out waiting for grain lifecycle to complete deactivation");
                         }
 
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", this, GrainInstance?.GetType().FullName);
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
                     }
                     catch (Exception exc)
                     {
                         _shared.Logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                            string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", this, GrainInstance?.GetType().FullName), exc);
+                            string.Format("Error calling grain's OnDeactivateAsync(...) method - Grain type = {1} Activation = {0}", this, GrainInstance?.GetType().FullName), exc);
                     }
                 }
                 catch (Exception exc)

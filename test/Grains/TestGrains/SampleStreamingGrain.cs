@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -52,7 +53,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
@@ -112,7 +113,7 @@ namespace UnitTests.Grains
             logger.Info("{0} (item={1})", caller, numProducedItems);
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -132,7 +133,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             numConsumedItems = 0;
@@ -164,7 +165,7 @@ namespace UnitTests.Grains
             return Task.FromResult(numConsumedItems);
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -183,7 +184,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info( "OnActivateAsync" );
             numConsumedItems = 0;
@@ -234,7 +235,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;

@@ -109,7 +109,7 @@ namespace UnitTests.Grains
                 }
             }
 
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -127,7 +127,7 @@ namespace UnitTests.Grains
             {
                 tcss.Remove(key);
             }
-            return base.OnDeactivateAsync();
+            return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }
 

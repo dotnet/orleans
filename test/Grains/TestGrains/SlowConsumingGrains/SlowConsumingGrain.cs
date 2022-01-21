@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
@@ -22,7 +23,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             ConsumerHandle = null;

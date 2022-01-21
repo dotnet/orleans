@@ -11,8 +11,8 @@ namespace Orleans
     public interface IGrainBase
     {
         IGrainContext GrainContext { get; }
-        Task OnActivateAsync(CancellationToken token) => default;
-        Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token) => default;
+        Task OnActivateAsync(CancellationToken token) => Task.CompletedTask;
+        Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token) => Task.CompletedTask;
     }
 
     /// <summary>

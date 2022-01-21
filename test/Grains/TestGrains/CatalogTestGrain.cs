@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -8,7 +9,7 @@ namespace UnitTests.Grains
 {
     public class CatalogTestGrain : Grain, ICatalogTestGrain
     {
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.Delay(TimeSpan.FromMilliseconds(50));
         }

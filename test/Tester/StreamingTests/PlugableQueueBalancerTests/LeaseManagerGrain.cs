@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tester.StreamingTests
@@ -28,7 +29,7 @@ namespace Tester.StreamingTests
         private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
         private ISiloStatusOracle siloStatusOracle;
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
             this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();

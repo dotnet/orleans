@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -25,18 +26,23 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger("FaultableConsumerGrain " + base.IdentityString);
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
+            Reset();
+            return Task.CompletedTask;
+        }
+
+        private void Reset()
+        {
             eventsConsumedCount = 0;
             errorsCount = 0;
             eventsFailedCount = 0;
             consumerHandle = null;
             failPeriodTimer = null;
-            return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -47,7 +53,14 @@ namespace UnitTests.Grains
             logger.Info("BecomeConsumer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
-            consumerHandle = await consumer.SubscribeAsync(OnNextAsync, OnErrorAsync, OnActivateAsync);
+            consumerHandle = await consumer.SubscribeAsync(
+                OnNextAsync,
+                OnErrorAsync,
+                () =>
+                {
+                    Reset();
+                    return Task.CompletedTask;
+                });
         }
 
         public Task SetFailPeriod(TimeSpan failurePeriod)

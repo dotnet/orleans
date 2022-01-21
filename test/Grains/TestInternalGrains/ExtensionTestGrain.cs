@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -9,11 +10,11 @@ namespace UnitTests.Grains
         public string ExtensionProperty { get; private set; }
         private TestExtension extender;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ExtensionProperty = "";
             extender = null;
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task InstallExtension(string name)
@@ -33,11 +34,11 @@ namespace UnitTests.Grains
         public T ExtensionProperty { get; private set; }
         private GenericTestExtension<T> extender;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ExtensionProperty = default(T);
             extender = null;
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task InstallExtension(T name)
@@ -60,7 +61,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
         
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (extender == null)
             {
@@ -68,7 +69,7 @@ namespace UnitTests.Grains
                 this.Data.SetComponent<ISimpleExtension>(extender);
             }
 
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
     }
 }

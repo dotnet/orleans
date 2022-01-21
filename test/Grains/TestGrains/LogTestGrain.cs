@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.EventSourcing;
 using UnitTests.GrainInterfaces;
@@ -71,7 +72,7 @@ namespace TestGrains
     public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask; // do not wait for initial load
         }

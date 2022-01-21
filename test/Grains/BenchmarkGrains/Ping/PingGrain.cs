@@ -2,6 +2,7 @@ using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using System.Threading;
 
 namespace BenchmarkGrains.Ping
 {
@@ -9,10 +10,10 @@ namespace BenchmarkGrains.Ping
     {
         private IPingGrain _self;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _self = this.AsReference<IPingGrain>();
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public ValueTask Run() => default;
