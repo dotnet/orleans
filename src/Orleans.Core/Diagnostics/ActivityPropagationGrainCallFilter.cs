@@ -92,20 +92,21 @@ namespace Orleans.Runtime
 
         public Task Invoke(IIncomingGrainCallContext context)
         {
-            var activity = activitySource.CreateActivity(ActivityNameIn, ActivityKind.Server);
-            if (activity is not null)
-            {
-                propagator.ExtractTraceIdAndState(null,
-                    static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
-                    {
-                        fieldValues = default;
-                        fieldValue = RequestContext.Get(fieldName) as string;
-                    },
-                    out var traceParent,
-                    out var traceState);
-                if (!string.IsNullOrEmpty(traceParent))
+            Activity activity = default;
+
+            propagator.ExtractTraceIdAndState(null,
+                static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
                 {
-                    activity.SetParentId(traceParent);
+                    fieldValues = default;
+                    fieldValue = RequestContext.Get(fieldName) as string;
+                },
+                out var traceParent,
+                out var traceState);
+            if (!string.IsNullOrEmpty(traceParent))
+            {
+                activity = activitySource.CreateActivity(ActivityNameIn, ActivityKind.Server, traceParent);
+                if (activity is not null)
+                {
                     if (!string.IsNullOrEmpty(traceState))
                     {
                         activity.TraceStateString = traceState;
@@ -123,6 +124,14 @@ namespace Orleans.Runtime
                         }
                     }
                 }
+            }
+            else
+            {
+                activity = activitySource.CreateActivity(ActivityNameIn, ActivityKind.Server);
+            }
+
+            if (activity is not null)
+            {
                 activity.Start();
             }
             return Process(context, activity);
