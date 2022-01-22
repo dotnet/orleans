@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Serialization.Abstractions</PackageId>
     <Title>Microsoft Orleans Serialization Abstractions</Title>
-    <Description>Serialization abstractions library of Microsoft Orleans</Description>
+    <Description>Serialization abstractions for Microsoft Orleans</Description>
     <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>

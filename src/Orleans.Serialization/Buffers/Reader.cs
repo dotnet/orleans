@@ -2,13 +2,13 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO;
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 #endif
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Session;
-#if !NETCOREAPP
+#if !NETCOREAPP3_1_OR_GREATER
 using Orleans.Serialization.Utilities;
 #endif
 
@@ -59,7 +59,7 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void ReadBytes(in Span<byte> destination)
         {
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             var count = _stream.Read(destination);
             if (count < destination.Length)
             {
@@ -97,12 +97,12 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-#if NET5_0
+#if NET5_0_OR_GREATER
         [SkipLocalsInit]
 #endif
         public override uint ReadUInt32()
         {
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             Span<byte> buffer = stackalloc byte[sizeof(uint)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
@@ -113,12 +113,12 @@ namespace Orleans.Serialization.Buffers
 #endif
         }
 
-#if NET5_0
+#if NET5_0_OR_GREATER
         [SkipLocalsInit]
 #endif
         public override ulong ReadUInt64()
         {
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             Span<byte> buffer = stackalloc byte[sizeof(ulong)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt64LittleEndian(buffer);

@@ -2,7 +2,7 @@
   "profiles": {
     "Benchmarks": {
       "commandName": "Project",
-      "commandLineArgs": "ConcurrentPing_HostedClient"
+      "commandLineArgs": "ConcurrentPing"
     }
   }
 }

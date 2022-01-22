@@ -30,7 +30,7 @@ namespace Orleans.Transactions.Azure.Tests
         private const string tableName = "StateStorageTests";
         private const string partition = "testpartition";
         public AzureTransactionalStateStorageTests(TestFixture fixture, ITestOutputHelper testOutput)
-            :base(()=>StateStorageFactory(fixture), (seed)=>new TestState(){State = seed}, fixture.GrainFactory, testOutput)
+            : base(() => StateStorageFactory(fixture), (seed) => new TestState() { State = seed }, fixture.GrainFactory, testOutput)
         {
         }
 

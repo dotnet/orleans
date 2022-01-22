@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,14 +27,14 @@ namespace Orleans.Transactions.TestKit
             await coordinator.MultiGrainAdd(committer, new PassOperation("pass"), grains, expected);
 
             Func<Task> task = () => coordinator.MultiGrainAdd(committer, new FailOperation("fail"), grains, expected);
-            task.ShouldThrow<OrleansTransactionAbortedException>();
+            await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
 
             foreach (var grain in grains)
             {
                 var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
 
@@ -56,14 +56,14 @@ namespace Orleans.Transactions.TestKit
             await coordinator.MultiGrainAdd(committer, new PassOperation("pass"), grains, expected);
 
             Func<Task> task = () => coordinator.MultiGrainAdd(committer, new ThrowOperation("throw"), grains, expected);
-            task.ShouldThrow<OrleansTransactionInDoubtException>();
+            await task.Should().ThrowAsync<OrleansTransactionInDoubtException>();
 
             foreach (var grain in grains)
             {
                 var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
 

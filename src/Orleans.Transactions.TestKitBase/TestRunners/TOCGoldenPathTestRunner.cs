@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,7 +30,7 @@ namespace Orleans.Transactions.TestKit
                 var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
-                    actual.ShouldBeEquivalentTo(expected);
+                    actual.Should().Be(expected);
                 }
             }
 

@@ -22,7 +22,7 @@ namespace Orleans.Serialization.Codecs
 
             var length = reader.ReadVarUInt32();
             IPAddress result;
-#if NET5_0
+#if NET5_0_OR_GREATER
             if (reader.TryReadBytes((int)length, out var bytes))
             {
                 result = new IPAddress(bytes);
@@ -32,7 +32,7 @@ namespace Orleans.Serialization.Codecs
 #endif
                 var addressBytes = reader.ReadBytes(length);
                 result = new IPAddress(addressBytes);
-#if NET5_0
+#if NET5_0_OR_GREATER
             }
 #endif
 
@@ -53,7 +53,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
-#if NET5_0
+#if NET5_0_OR_GREATER
             Span<byte> buffer = stackalloc byte[64];
             if (value.TryWriteBytes(buffer, out var length))
             {

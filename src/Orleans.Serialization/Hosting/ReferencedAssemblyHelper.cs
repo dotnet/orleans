@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
 using System.Runtime.Loader;
 #endif
 
@@ -20,7 +20,7 @@ namespace Orleans.Serialization
 
             AddFromDependencyContext(parts);
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             AddFromAssemblyLoadContext(parts);
 #endif
 
@@ -58,7 +58,7 @@ namespace Orleans.Serialization
             }
         }
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
         public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, AssemblyLoadContext context)
         {
             if (context is null)
@@ -115,7 +115,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             var assemblyContext = assembly is not null
                 ? AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default
                 : AssemblyLoadContext.Default;
@@ -130,7 +130,7 @@ namespace Orleans.Serialization
 
                 try
                 {
-#if NET5_0
+#if NET5_0_OR_GREATER
                     var name = lib.GetRuntimeAssemblyNames(dependencyContext, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier).FirstOrDefault();
                     if (name is null)
                     {
@@ -145,7 +145,7 @@ namespace Orleans.Serialization
                         continue;
                     }
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
                     var asm = assemblyContext.LoadFromAssemblyName(name);
 #else
                     var asm = Assembly.Load(name);

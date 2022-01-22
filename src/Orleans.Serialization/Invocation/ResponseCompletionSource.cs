@@ -126,7 +126,7 @@ namespace Orleans.Serialization.Invocation
         private void SetInvalidCastException(object result)
         {
             var exception = new InvalidCastException($"Cannot cast object of type {result.GetType()} to {typeof(TResult)}");
-#if NET5_0
+#if NET5_0_OR_GREATER
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.SetCurrentStackTrace(exception);
             SetException(exception);
 #else

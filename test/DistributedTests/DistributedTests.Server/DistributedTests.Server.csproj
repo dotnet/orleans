@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <Content Include="..\secrets.json" Link="secrets.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
