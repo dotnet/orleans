@@ -28,11 +28,13 @@ namespace UnitTests.General
             };
             static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options)
             {
-                var _ = options.TraceId;
+                //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
+                var _ = options.TraceId; 
                 return ActivitySamplingResult.PropagationData;
             };
             static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options)
             {
+                //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
                 var _ = options.TraceId;
                 return ActivitySamplingResult.PropagationData;
             };
