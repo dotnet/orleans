@@ -24,10 +24,18 @@ namespace UnitTests.General
             {
                 ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ActivitySourceName,
                 Sample = Sample,
-                SampleUsingParentId = SampleUsingParentId
+                SampleUsingParentId = SampleUsingParentId,
             };
-            static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.PropagationData;
-            static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options) => ActivitySamplingResult.PropagationData;
+            static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options)
+            {
+                var _ = options.TraceId;
+                return ActivitySamplingResult.PropagationData;
+            };
+            static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options)
+            {
+                var _ = options.TraceId;
+                return ActivitySamplingResult.PropagationData;
+            };
         }
         public class Fixture : BaseTestClusterFixture
         {
