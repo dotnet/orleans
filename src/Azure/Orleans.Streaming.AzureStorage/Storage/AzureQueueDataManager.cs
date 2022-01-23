@@ -308,6 +308,13 @@ namespace Orleans.AzureUtils
                 await client.DeleteMessageAsync(message.MessageId, message.PopReceipt);
 
             }
+            catch (RequestFailedException exc)
+            {
+                if (exc.Status != (int)HttpStatusCode.NotFound)
+                {
+                    ReportErrorAndRethrow(exc, "DeleteMessage", AzureQueueErrorCode.AzureQueue_11);
+                }
+            }
             catch (Exception exc)
             {
                 ReportErrorAndRethrow(exc, "DeleteMessage", AzureQueueErrorCode.AzureQueue_11);
