@@ -50,21 +50,39 @@ namespace Orleans.Runtime
         /// <param name="value">The component instance.</param>
         void SetComponent<TComponent>(TComponent value);
 
+        /// <summary>
+        /// Submits an incoming message to this instance.
+        /// </summary>
+        /// <param name="message">The message.</param>
         void ReceiveMessage(object message);
 
         IWorkItemScheduler Scheduler { get; }
-        PlacementStrategy PlacementStrategy { get; }
 
+        /// <summary>
+        /// Start activating this instance.
+        /// </summary>
+        /// <param name="requestContext">The request conext of the request which is causing this instance to be activated, if any.</param>
+        /// <param name="cancellationToken">A cancellation token which when cancelled, indicates that the process should complete prompty.</param>
         void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
-        void Deactivate(CancellationToken? cancellationToken = default);
+
+        /// <summary>
+        /// Start deactivating this instance.
+        /// </summary>
+        /// <param name="deactivationReason">The reason for deactivation, for informational purposes.</param>
+        /// <param name="cancellationToken">A cancellation token which when cancelled, indicates that the process should complete prompty.</param>
+        void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default);
+
+        /// <summary>
+        /// A task which completes when the grain has deactivated.
+        /// </summary>
         Task Deactivated { get; }
     }
 
     public static class GrainContextExtensions
     {
-        public static Task DeactivateAsync(this IGrainContext grainContext, CancellationToken? cancellationToken = default)
+        public static Task DeactivateAsync(this IGrainContext grainContext, DeactivationReason deactivationReason, CancellationToken? cancellationToken = default)
         {
-            grainContext.Deactivate(cancellationToken);
+            grainContext.Deactivate(deactivationReason, cancellationToken);
             return grainContext.Deactivated;
         }
     }
@@ -79,7 +97,7 @@ namespace Orleans.Runtime
         bool IsInactive { get; }
         bool IsStale();
         TimeSpan GetIdleness();
-        void StartDeactivating();
+        void StartDeactivating(DeactivationReason deactivationReason);
         void DelayDeactivation(TimeSpan timeSpan);
     }
 

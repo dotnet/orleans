@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -18,7 +19,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{nameof(FilteredImplicitSubscriptionWithExtensionGrain)} {IdentityString}");
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             var streamProvider = this.GetStreamProvider("SMSProvider");

@@ -242,11 +242,14 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainContextActivator>();
             services.AddSingleton<IConfigureGrainTypeComponents, ConfigureDefaultGrainActivator>();
             services.TryAddSingleton<GrainReferenceActivator>();
-            services.TryAddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
-            services.TryAddSingleton<IGrainContextAccessor, GrainContextAccessor>();
+            services.AddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
+            services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
+
+            // Scoped to a grain activation
+            services.AddScoped<IGrainContext>(sp => RuntimeContext.Current);
 
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>

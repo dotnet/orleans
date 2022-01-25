@@ -187,6 +187,7 @@ namespace Orleans.Runtime
         {
             var now = DateTime.UtcNow;
             List<ICollectibleGrainContext> condemned = null;
+            var reason = GetDeactivationReason();
             while (DequeueQuantum(out var activations, now))
             {
                 // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
@@ -221,7 +222,7 @@ namespace Orleans.Runtime
                         else
                         {
                             // Atomically set Deactivating state, to disallow any new requests or new timer ticks to be dispatched on this activation.
-                            activation.StartDeactivating();
+                            activation.StartDeactivating(reason);
                             AddActivationToList(activation, ref condemned);
                         }
                     }
@@ -240,6 +241,7 @@ namespace Orleans.Runtime
         {
             List<ICollectibleGrainContext> condemned = null;
             var now = DateTime.UtcNow;
+            var reason = GetDeactivationReason();
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
@@ -267,7 +269,7 @@ namespace Orleans.Runtime
                                 if (bucket.TryRemove(activation))
                                 {
                                     // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.StartDeactivating();
+                                    activation.StartDeactivating(reason);
                                     AddActivationToList(activation, ref condemned);
                                 }
                                 // someone else has already deactivated the activation, so there's nothing to do.
@@ -282,6 +284,13 @@ namespace Orleans.Runtime
             }
 
             return condemned ?? nothing;
+        }
+
+        private static DeactivationReason GetDeactivationReason()
+        {
+            var reasonText = "This activation has become idle.";
+            var reason = new DeactivationReason(DeactivationReasonCode.ActivationIdle, reasonText);
+            return reason;
         }
 
         private void AddActivationToList(ICollectibleGrainContext activation, ref List<ICollectibleGrainContext> condemned)
@@ -478,12 +487,13 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
             Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {
                 var activationData = list[i];
 
                 // Continue deactivation when ready
-                _ = activationData.DeactivateAsync(cts.Token).ContinueWith(signalCompletion);
+                _ = activationData.DeactivateAsync(reason, cts.Token).ContinueWith(signalCompletion);
             }
 
             await mtcs.Task;

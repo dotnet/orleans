@@ -19,7 +19,7 @@ namespace Orleans.EventSourcing
     public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<IGrainLifecycle>
     {
         /// <summary>
-        /// called right after grain construction to install the log view adaptor 
+        /// called right after grain construction to install the log view adaptor
         /// </summary>
         /// <param name="factory"> The adaptor factory to use </param>
         /// <param name="state"> The initial state of the view </param>
@@ -29,14 +29,13 @@ namespace Orleans.EventSourcing
         protected abstract void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services);
 
         /// <summary>
-        /// Gets the default adaptor factory to use, or null if there is no default 
+        /// Gets the default adaptor factory to use, or null if there is no default
         /// (in which case user MUST configure a consistency provider)
         /// </summary>
         protected abstract ILogViewAdaptorFactory DefaultAdaptorFactory { get; }
 
-        public override void Participate(IGrainLifecycle lifecycle)
+        public virtual void Participate(IGrainLifecycle lifecycle)
         {
-            base.Participate(lifecycle);
             lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.SetupState, OnSetupState, OnDeactivateState);
             if (this is ILogConsistencyProtocolParticipant)
             {
@@ -57,10 +56,11 @@ namespace Orleans.EventSourcing
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
             IGrainContextAccessor grainContextAccessor = this.ServiceProvider.GetRequiredService<IGrainContextAccessor>();
-            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<Grain, ILogConsistencyProtocolServices>>();
-            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContextAccessor.GrainContext);
-            IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? this.GetGrainStorage(this.ServiceProvider) : null;
-            InstallLogViewAdaptor(protocolServicesFactory, consistencyProvider, grainStorage);
+            Factory<IGrainContext, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<IGrainContext, ILogConsistencyProtocolServices>>();
+            var grainContext = grainContextAccessor.GrainContext;
+            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContext);
+            IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? GrainStorageExtensions.GetGrainStorage(grainContext?.GrainInstance.GetType(), this.ServiceProvider) : null;
+            InstallLogViewAdaptor(grainContext, protocolServicesFactory, consistencyProvider, grainStorage);
             return Task.CompletedTask;
         }
 
@@ -70,17 +70,18 @@ namespace Orleans.EventSourcing
         }
 
         private async Task PostActivate(CancellationToken ct)
-        { 
+        {
             await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
         }
 
         private void InstallLogViewAdaptor(
-            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory,
+            IGrainContext grainContext,
+            Factory<IGrainContext, ILogConsistencyProtocolServices> protocolServicesFactory,
             ILogViewAdaptorFactory factory,
             IGrainStorage grainStorage)
         {
             // encapsulate runtime services used by consistency adaptors
-            ILogConsistencyProtocolServices svc = protocolServicesFactory(this);
+            ILogConsistencyProtocolServices svc = protocolServicesFactory(grainContext);
 
             TView state = (TView)Activator.CreateInstance(typeof(TView));
 

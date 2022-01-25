@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using System.Collections.Generic;
+using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -39,10 +40,8 @@ namespace UnitTests.SchedulerTests
 
         public PlacementStrategy PlacementStrategy => throw new NotImplementedException();
 
-        IAddressable IGrainContext.GrainInstance => throw new NotImplementedException();
-
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default) => throw new NotImplementedException();
-        public void Deactivate(CancellationToken? cancellationToken = default) { }
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose() => (Scheduler as IDisposable)?.Dispose();
         public TComponent GetComponent<TComponent>() => throw new NotImplementedException();

@@ -693,7 +693,7 @@ namespace UnitTests.SchedulerTests
             };
             var grain = new NonReentrentStressGrainWithoutState();
 
-            await Task.Factory.StartNew(() => grain.OnActivateAsync(), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
+            await Task.Factory.StartNew(() => grain.OnActivateAsync(CancellationToken.None), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 
             Task wrapped = null;
             var wrapperDone = new TaskCompletionSource<bool>();

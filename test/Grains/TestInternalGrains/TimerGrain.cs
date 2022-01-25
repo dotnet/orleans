@@ -29,7 +29,7 @@ namespace UnitTestGrains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ThrowIfDeactivating();
             context = RuntimeContext.Current;
@@ -148,7 +148,7 @@ namespace UnitTestGrains
         public Task<int> GetTickCount() { return Task.FromResult(tickCount); }
         public Task<Exception> GetException() { return Task.FromResult(tickException); }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             context = RuntimeContext.Current;
             activationTaskScheduler = TaskScheduler.Current;

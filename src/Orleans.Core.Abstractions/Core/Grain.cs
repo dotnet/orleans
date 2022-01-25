@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Runtime;
 
@@ -11,20 +12,26 @@ namespace Orleans
     /// <summary>
     /// The abstract base class for all grain classes.
     /// </summary>
-    public abstract class Grain : IAddressable, ILifecycleParticipant<IGrainLifecycle>
+    public abstract class Grain : IGrainBase, IAddressable
     {
+        private readonly IGrainContext _grainContext;
+
         // Do not use this directly because we currently don't provide a way to inject it;
-        // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
+        // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
-        internal IActivationData Data;
-        public GrainReference GrainReference { get { return Data.GrainReference; } }
+        internal IActivationData Data => _grainContext as IActivationData;
+
+        IGrainContext IGrainBase.GrainContext => _grainContext;
+
+        public GrainReference GrainReference { get { return _grainContext.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; }
+
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected IGrainFactory GrainFactory 
+        protected IGrainFactory GrainFactory
         {
             get { return Runtime?.GrainFactory; }
         }
@@ -32,39 +39,19 @@ namespace Orleans
         /// <summary>
         /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected internal IServiceProvider ServiceProvider 
+        protected internal IServiceProvider ServiceProvider
         {
-            get { return Data?.ActivationServices ?? Runtime?.ServiceProvider; }
+            get { return _grainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
         }
 
-        internal GrainId GrainId => this.Data.GrainId;
+        internal GrainId GrainId => _grainContext.GrainId;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
         /// Client code should use the GrainFactory property to get a reference to a Grain.
         /// </summary>
-        protected Grain()
+        protected Grain() : this(RuntimeContext.Current, grainRuntime: null)
         {
-            var context = RuntimeContext.Current;
-            if (context is null)
-            {
-                return;
-            }
-
-            if (!(context is IActivationData data))
-            {
-                ThrowInvalidContext();
-                return;
-            }
-
-            this.Data = data;
-            this.Runtime = data.GrainRuntime;
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidContext()
-        {
-            throw new InvalidOperationException("Current execution context is not suitable for use with Grain");
         }
 
         /// <summary>
@@ -72,9 +59,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainRuntime runtime) : this()
+        protected Grain(IGrainContext grainContext, IGrainRuntime grainRuntime = null)
         {
-            Runtime = runtime;
+            _grainContext = grainContext;
+            Runtime = grainRuntime ?? grainContext?.ActivationServices.GetRequiredService<IGrainRuntime>();
         }
 
         /// <summary>
@@ -100,16 +88,16 @@ namespace Orleans
         /// If the grain is deactivated, then the timer will be discarded.
         /// </para>
         /// <para>
-        /// Until the Task returned from the asyncCallback is resolved, 
-        /// the next timer tick will not be scheduled. 
+        /// Until the Task returned from the asyncCallback is resolved,
+        /// the next timer tick will not be scheduled.
         /// That is to say, timer callbacks never interleave their turns.
         /// </para>
         /// <para>
-        /// The timer may be stopped at any time by calling the <c>Dispose</c> method 
+        /// The timer may be stopped at any time by calling the <c>Dispose</c> method
         /// on the timer handle returned from this call.
         /// </para>
         /// <para>
-        /// Any exceptions thrown by or faulted Task's returned from the asyncCallback 
+        /// Any exceptions thrown by or faulted Task's returned from the asyncCallback
         /// will be logged, but will not prevent the next timer tick from being queued.
         /// </para>
         /// </remarks>
@@ -121,11 +109,11 @@ namespace Orleans
         /// <seealso cref="IDisposable"/>
         protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            if (asyncCallback == null) 
+            if (asyncCallback == null)
                 throw new ArgumentNullException(nameof(asyncCallback));
 
             EnsureRuntime();
-            return Runtime.TimerRegistry.RegisterTimer(this, asyncCallback, state, dueTime, period);
+            return Runtime.TimerRegistry.RegisterTimer(_grainContext ?? RuntimeContext.Current, asyncCallback, state, dueTime, period);
         }
 
         /// <summary>
@@ -196,20 +184,20 @@ namespace Orleans
         protected void DeactivateOnIdle()
         {
             EnsureRuntime();
-            Runtime.DeactivateOnIdle(this);
+            Runtime.DeactivateOnIdle(_grainContext ?? RuntimeContext.Current);
         }
 
         /// <summary>
         /// Delay Deactivation of this activation at least for the specified time duration.
         /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
         /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.
-        /// DeactivateOnIdle method would undo / override any current “keep alive” setting, 
+        /// DeactivateOnIdle method would undo / override any current “keep alive” setting,
         /// making this grain immediately available for deactivation.
         /// </summary>
         protected void DelayDeactivation(TimeSpan timeSpan)
         {
             EnsureRuntime();
-            Runtime.DelayDeactivation(this, timeSpan);
+            Runtime.DelayDeactivation(_grainContext ?? RuntimeContext.Current, timeSpan);
         }
 
         /// <summary>
@@ -217,18 +205,15 @@ namespace Orleans
         /// It is called before any messages have been dispatched to the grain.
         /// For grains with declared persistent state, this method is called after the State property has been populated.
         /// </summary>
-        public virtual Task OnActivateAsync()
-        {
-            return Task.CompletedTask;
-        }
+        /// <param name="cancellationToken">A cancellation token which signals when activation is being canceled.</param>
+        public virtual Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         /// <summary>
         /// This method is called at the beginning of the process of deactivating a grain.
         /// </summary>
-        public virtual Task OnDeactivateAsync()
-        {
-            return Task.CompletedTask;
-        }
+        /// <param name="reason">The reason for deactivation. Informational only.</param>
+        /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
+        public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 
         private void EnsureRuntime()
         {
@@ -237,18 +222,13 @@ namespace Orleans
                 throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
             }
         }
-
-        public virtual void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
-        }
     }
 
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain
+    public class Grain<TGrainState> : Grain, ILifecycleParticipant<IGrainLifecycle>
     {
         private IStorage<TGrainState> storage;
 
@@ -271,7 +251,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Strongly typed accessor for the grain state 
+        /// Strongly typed accessor for the grain state
         /// </summary>
         protected TGrainState State
         {
@@ -298,9 +278,8 @@ namespace Orleans
             return storage.ReadStateAsync();
         }
 
-        public override void Participate(IGrainLifecycle lifecycle)
+        public virtual void Participate(IGrainLifecycle lifecycle)
         {
-            base.Participate(lifecycle);
             lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
         }
 
@@ -308,7 +287,7 @@ namespace Orleans
         {
             if (ct.IsCancellationRequested)
                 return Task.CompletedTask;
-            this.storage = this.Runtime.GetStorage<TGrainState>(this);
+            this.storage = this.Runtime.GetStorage<TGrainState>(Data);
             return this.ReadStateAsync();
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,7 @@ namespace UnitTests.Grains
 {
     public class CollectionTestGrain : Grain, ICollectionTestGrain
     {
+        protected readonly IGrainContext _grainContext;
         private DateTime activated;
 
         private ICollectionTestGrain other;
@@ -18,22 +20,27 @@ namespace UnitTests.Grains
         private int counter;
         private static int staticCounter;
 
+        public CollectionTestGrain(IGrainContext grainContext)
+        {
+            _grainContext = grainContext;
+        }
+
         protected virtual ILogger Logger()
         {
             return logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             Logger().Info("OnDeactivateAsync.");
             return Task.CompletedTask;
@@ -112,21 +119,25 @@ namespace UnitTests.Grains
         private int counter;
         private static int staticCounter;
 
+        public ReentrantCollectionTestGrain(IGrainContext grainContext) : base(grainContext)
+        {
+        }
+
         protected override ILogger Logger()
         {
             return logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             Logger().Info("OnDeactivateAsync.");
             return Task.CompletedTask;

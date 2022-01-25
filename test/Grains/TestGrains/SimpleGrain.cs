@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -24,7 +25,7 @@ namespace UnitTests.Grains
         protected int A { get; set; }
         protected int B { get; set; }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("Activate.");
             return Task.CompletedTask;
@@ -64,7 +65,7 @@ namespace UnitTests.Grains
             return Task.FromResult(A);
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             logger.Info("OnDeactivateAsync.");
             return Task.CompletedTask;

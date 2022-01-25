@@ -2,6 +2,7 @@ using Orleans;
 using Orleans.EventSourcing;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using TestGrainInterfaces;
 
@@ -68,8 +69,7 @@ namespace TestGrains
         {
         }
 
-        
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             // on activation, we load lazily (do not wait until the current state is loaded).
             return Task.CompletedTask;

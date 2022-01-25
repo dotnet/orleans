@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -11,6 +12,8 @@ namespace UnitTests.GrainInterfaces
         Task NonBlockingCall();
 
         Task<int> GetNonBlockingCallCounter();
+
+        Task<bool> DidActivationTryToStart(GrainId id);
 
         Task BlockingDeactivation();
     }

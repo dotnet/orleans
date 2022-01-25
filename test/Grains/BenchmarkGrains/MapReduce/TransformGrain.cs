@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -91,11 +91,11 @@ namespace BenchmarkGrains.MapReduce
             this._processingStarted = true;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this._proccessingStopped = true;
             this._processingStarted = false;
-            return base.OnDeactivateAsync();
+            return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public Task<List<TOutput>> ReceiveAll()

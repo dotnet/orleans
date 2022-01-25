@@ -5,6 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -42,6 +44,7 @@ namespace Orleans.Runtime
             _maxWorkers = ((StatelessWorkerPlacement)_sharedContext.PlacementStrategy).MaxLocal;
             _messageLoopTask = Task.Run(RunMessageLoop);
             _sharedContext.OnCreateActivation(this);
+
         }
 
         public GrainReference GrainReference => _grainReference ??= _sharedContext.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -84,9 +87,9 @@ namespace Orleans.Runtime
             _workSignal.Signal();
         }
 
-        public void Deactivate(CancellationToken? cancellationToken = null)
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null)
         {
-            _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(cancellationToken)));
+            _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken)));
             _workSignal.Signal();
         }
 
@@ -131,7 +134,7 @@ namespace Orleans.Runtime
                             case WorkItemType.Deactivate:
                                 {
                                     var state = (DeactivateWorkItemState)workItem.State;
-                                    DeactivateInternal(state.CancellationToken);
+                                    DeactivateInternal(state.DeactivationReason, state.CancellationToken);
                                     break;
                                 }
                             case WorkItemType.DeactivatedTask:
@@ -180,7 +183,8 @@ namespace Orleans.Runtime
 
                     // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
                     var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-                    newWorker.Activate(requestContext);
+                    var cancellation = new CancellationTokenSource(_sharedContext.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                    newWorker.Activate(requestContext, cancellation.Token);
 
                     _workers.Add(newWorker);
                 }
@@ -203,11 +207,11 @@ namespace Orleans.Runtime
             // No-op
         }
 
-        private void DeactivateInternal(CancellationToken? cancellationToken)
+        private void DeactivateInternal(DeactivationReason reason, CancellationToken? cancellationToken)
         {
             foreach (var worker in _workers)
             {
-                worker.Deactivate(cancellationToken);
+                worker.Deactivate(reason, cancellationToken);
             }
         }
 
@@ -300,7 +304,7 @@ namespace Orleans.Runtime
         }
 
         private record ActivateWorkItemState(Dictionary<string, object> RequestContext, CancellationToken? CancellationToken);
-        private record DeactivateWorkItemState(CancellationToken? CancellationToken);
+        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken? CancellationToken);
         private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
         private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
     }

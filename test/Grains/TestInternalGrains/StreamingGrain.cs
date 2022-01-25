@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -487,7 +488,7 @@ namespace UnitTests.Grains
         protected List<IProducerObserver> _producers;
         private InterlockedFlag _cleanedUpFlag;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");
@@ -496,7 +497,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -598,9 +599,9 @@ namespace UnitTests.Grains
     {
         private ILogger _logger;
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");
             if (State.Producers == null)
@@ -618,10 +619,10 @@ namespace UnitTests.Grains
             }
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
-            return base.OnDeactivateAsync();
+            return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public override async Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
@@ -666,7 +667,7 @@ namespace UnitTests.Grains
         protected List<IConsumerObserver> _observers;
         private string _providerToUse;
         
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");    
@@ -674,7 +675,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -724,9 +725,9 @@ namespace UnitTests.Grains
     {
         private ILogger _logger;
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");
 
@@ -745,10 +746,10 @@ namespace UnitTests.Grains
             }
         }
 
-        public override async Task OnDeactivateAsync()
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
-            await base.OnDeactivateAsync();
+            await base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public override async Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
@@ -772,11 +773,11 @@ namespace UnitTests.Grains
     {
         private ILogger _logger;
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId) ;
             _logger.Info("OnActivateAsync");
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
         }
     }
 
@@ -787,13 +788,13 @@ namespace UnitTests.Grains
         private ConsumerObserver _consumer;
         private string _providerToUseForConsumer;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -897,7 +898,7 @@ namespace UnitTests.Grains
         private ILogger _logger;
         private Dictionary<string, IConsumerObserver> _observers;
         
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ImplicitConsumerGrain1 " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("{0}.OnActivateAsync", GetType().FullName);    
@@ -911,7 +912,7 @@ namespace UnitTests.Grains
             await Task.WhenAll(activeStreamProviders.Select(stream => BecomeConsumer(this.GetPrimaryKey(), stream, "TestNamespace1")));
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;

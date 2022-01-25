@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -44,7 +45,7 @@ namespace UnitTests.Grains
             this.reminderOptions = services.GetService<IOptions<ReminderOptions>>();
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this._id = Guid.NewGuid().ToString();
             this.allReminders = new Dictionary<string, IGrainReminder>();
@@ -55,7 +56,7 @@ namespace UnitTests.Grains
             return GetMissingReminders();
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this.logger.Info("OnDeactivateAsync");
             return Task.CompletedTask;
@@ -242,7 +243,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.myId = new Random().Next();
             this.allReminders = new Dictionary<string, IGrainReminder>();
@@ -253,7 +254,7 @@ namespace UnitTests.Grains
             await GetMissingReminders();
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this.logger.Info("OnDeactivateAsync.");
             return Task.CompletedTask;
@@ -400,7 +401,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.Info("OnActivateAsync.");
             return Task.CompletedTask;

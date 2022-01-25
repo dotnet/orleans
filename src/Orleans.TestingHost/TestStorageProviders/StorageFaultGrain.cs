@@ -1,10 +1,11 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
 
 namespace Orleans.TestingHost
 {
@@ -23,9 +24,9 @@ namespace Orleans.TestingHost
         /// It is called before any messages have been dispatched to the grain.
         /// For grains with declared persistent state, this method is called after the State property has been populated.
         /// </summary>
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
             logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
             readFaults = new Dictionary<GrainReference, Exception>();
             writeFaults = new Dictionary<GrainReference, Exception>();

@@ -3,6 +3,7 @@ using Orleans.Transactions.Abstractions;
 using System;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
@@ -74,10 +75,10 @@ namespace Orleans.Transactions.TestKit
             this.loggerFactory = loggerFactory;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public async Task Set(int newValue)
@@ -120,7 +121,7 @@ namespace Orleans.Transactions.TestKit
                     return state.Value;
                 });
             }
-            return result;              
+            return result;
         }
 
         public async Task AddAndThrow(int numberToAdd)

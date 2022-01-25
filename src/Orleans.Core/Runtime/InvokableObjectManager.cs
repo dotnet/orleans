@@ -343,7 +343,7 @@ namespace Orleans
             }
 
             public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
-            public void Deactivate(CancellationToken? cancellationToken = null) { }
+            public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
             public Task Deactivated => Task.CompletedTask;
         }
     }

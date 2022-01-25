@@ -39,7 +39,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                CheckRuntimeContext();
+                CheckRuntimeContext(RuntimeContext.Current);
                 return this.grainFactory;
             }
         }
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                CheckRuntimeContext();
+                CheckRuntimeContext(RuntimeContext.Current);
                 return this.timerRegistry;
             }
         }
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                CheckRuntimeContext();
+                CheckRuntimeContext(RuntimeContext.Current);
                 return this.reminderRegistry;
             }
         }
@@ -66,34 +66,39 @@ namespace Orleans.Runtime
         {
             get
             {
-                CheckRuntimeContext();
+                CheckRuntimeContext(RuntimeContext.Current);
                 return this.serviceProvider;
             }
         }
 
-        public void DeactivateOnIdle(Grain grain)
+        public void DeactivateOnIdle(IGrainContext grainContext)
         {
-            CheckRuntimeContext();
-            grain.Data.Deactivate();
+            CheckRuntimeContext(grainContext);
+            grainContext.Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateOnIdle)} was called."));
         }
 
-        public void DelayDeactivation(Grain grain, TimeSpan timeSpan)
+        public void DelayDeactivation(IGrainContext grainContext, TimeSpan timeSpan)
         {
-            CheckRuntimeContext();
-            grain.Data.DelayDeactivation(timeSpan);
+            CheckRuntimeContext(grainContext);
+            if (grainContext is not ICollectibleGrainContext collectibleContext)
+            {
+                throw new NotSupportedException($"Grain context {grainContext} does not implement {nameof(ICollectibleGrainContext)} and therefore {nameof(DelayDeactivation)} is not supported");
+            }
+
+            collectibleContext.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain)
+        public IStorage<TGrainState> GetStorage<TGrainState>(IGrainContext grainContext)
         {
-            IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
-            string grainTypeName = grain.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
+            if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
+            var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
+            IGrainStorage grainStorage = GrainStorageExtensions.GetGrainStorage(grainType, ServiceProvider);
+            string grainTypeName = grainContext.GrainInstance.GetType().FullName;
+            return new StateStorageBridge<TGrainState>(grainTypeName, grainContext.GrainReference, grainStorage, this.loggerFactory);
         }
 
-        public static void CheckRuntimeContext()
+        public static void CheckRuntimeContext(IGrainContext context)
         {
-            var context = RuntimeContext.Current;
-
             if (context is null)
             {
                 // Move exceptions into local functions to help inlining this method.

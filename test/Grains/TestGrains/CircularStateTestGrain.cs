@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans;
 using TestGrainInterfaces;
 
@@ -6,7 +7,7 @@ namespace TestGrains
 {
     public class CircularStateTestGrain : Grain<CircularStateTestState>, ICircularStateTestGrain
     {
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var c1 = new CircularTest1();
             var c2 = new CircularTest2();

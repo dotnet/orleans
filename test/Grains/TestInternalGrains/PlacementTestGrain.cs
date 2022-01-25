@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -26,14 +27,16 @@ namespace UnitTests.Grains
         private readonly OverloadDetector overloadDetector;
 
         private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
-        
+        private readonly IGrainContext _grainContext;
         private readonly LoadSheddingOptions loadSheddingOptions;
 
         public PlacementTestGrainBase(
             OverloadDetector overloadDetector,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
         {
+            _grainContext = grainContext;
             this.overloadDetector = overloadDetector;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
@@ -41,7 +44,7 @@ namespace UnitTests.Grains
 
         public Task<IPEndPoint> GetEndpoint()
         {
-            return Task.FromResult(Data.Address.SiloAddress.Endpoint);
+            return Task.FromResult(_grainContext.Address.SiloAddress.Endpoint);
         }
 
         public Task<string> GetRuntimeInstanceId()
@@ -130,8 +133,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = Data.Address.SiloAddress;
-            return Task.FromResult(siloAddress);
+            return Task.FromResult(_grainContext.Address.SiloAddress);
         }
     }
 
@@ -141,8 +143,9 @@ namespace UnitTests.Grains
         public RandomPlacementTestGrain(
             OverloadDetector overloadDetector,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
         {
         }
     }
@@ -153,8 +156,9 @@ namespace UnitTests.Grains
         public PreferLocalPlacementTestGrain(
             OverloadDetector overloadDetector,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
         {
         }
     }
@@ -165,8 +169,9 @@ namespace UnitTests.Grains
         public LocalPlacementTestGrain(
             OverloadDetector overloadDetector,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
         {
         }
     }
@@ -177,8 +182,9 @@ namespace UnitTests.Grains
         public ActivationCountBasedPlacementTestGrain(
             OverloadDetector overloadDetector,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
         {
         }
     }
@@ -207,7 +213,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
             DelayDeactivation(TimeSpan.MaxValue);   // make sure this activation is not collected.
@@ -237,10 +243,10 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.Info("OnActivateAsync");
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task<string> GetRuntimeInstanceId()

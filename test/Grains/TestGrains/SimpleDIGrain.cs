@@ -6,6 +6,7 @@ using UnitTests.GrainInterfaces;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 
 namespace UnitTests.Grains
 {
@@ -31,10 +32,10 @@ namespace UnitTests.Grains
             this.grainContextAccessor = grainContextAccessor;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.originalGrainContext = this.grainContextAccessor.GrainContext;
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task<long> GetLongValue()

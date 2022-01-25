@@ -1,7 +1,11 @@
-﻿using System;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 
@@ -9,10 +13,17 @@ namespace UnitTests.Grains
 {
     public class StuckGrain : Grain, IStuckGrain
     {
+        private static ConcurrentDictionary<GrainId, bool> ActivationCalls = new();
         private static Dictionary<Guid, TaskCompletionSource<bool>> tcss = new Dictionary<Guid, TaskCompletionSource<bool>>();
         private static Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
         private static HashSet<Guid> grains = new HashSet<Guid>();
+        private readonly ILogger<StuckGrain> _log;
         private bool isDeactivatingBlocking = false;
+
+        public StuckGrain(ILogger<StuckGrain> log)
+        {
+            _log = log;
+        }
 
         public static bool Release(Guid key)
         {
@@ -58,6 +69,11 @@ namespace UnitTests.Grains
             return Task.FromResult(counters[this.GetPrimaryKey()]);
         }
 
+        public Task<bool> DidActivationTryToStart(GrainId id)
+        {
+            return Task.FromResult(ActivationCalls.TryGetValue(id, out _));
+        }
+
         public Task BlockingDeactivation()
         {
             isDeactivatingBlocking = true;
@@ -65,22 +81,41 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            ActivationCalls[this.GetGrainId()] = true;
+
+            _log.LogInformation("Activating");
             var key = this.GetPrimaryKey();
             lock (grains)
             {
                 grains.Add(key);
             }
+
             lock (counters)
             {
                 counters[key] = 0;
             }
-            return base.OnActivateAsync();
+
+            if (RequestContext.Get("block_activation_seconds") is int blockActivationSeconds && blockActivationSeconds > 1)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(blockActivationSeconds), cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _log.LogInformation(exception, "Error while waiting");
+                }
+            }
+
+            await base.OnActivateAsync(cancellationToken);
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
+            _log.LogInformation(reason.Exception, "Deactivating ReasonCode: {ReasonCode} Description: {ReasonText}", reason.ReasonCode, reason.Description);
+
             if (isDeactivatingBlocking) return RunForever();
 
             var key = this.GetPrimaryKey();
@@ -92,7 +127,7 @@ namespace UnitTests.Grains
             {
                 tcss.Remove(key);
             }
-            return base.OnDeactivateAsync();
+            return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }
 

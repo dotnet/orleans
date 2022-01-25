@@ -13,7 +13,9 @@ namespace Orleans.Runtime
         /// Delete activations from this silo
         /// </summary>
         /// <param name="activationAddresses"></param>
+        /// <param name="reasonCode"></param>
+        /// <param name="reasonText"></param>
         /// <returns></returns>
-        Task DeleteActivations(List<GrainAddress> activationAddresses);
+        Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
     }
 }

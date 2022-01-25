@@ -2,6 +2,7 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Serialization;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
@@ -83,7 +84,7 @@ namespace TestGrains
 
         // simulate an async call during activation. This caused deadlock in earlier version,
         // so I add it here to catch regressions.
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await Task.Run(async () =>
             {

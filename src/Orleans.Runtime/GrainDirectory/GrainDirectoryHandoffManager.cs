@@ -319,7 +319,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
 
                     var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
-                    await remoteCatalog.DeleteActivations(pair.Value);
+                    await remoteCatalog.DeleteActivations(pair.Value, DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere");
                 }
 
                 duplicates.Remove(pair.Key);

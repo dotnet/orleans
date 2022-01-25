@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -169,7 +170,7 @@ namespace UnitTests.Grains
 
         protected IDictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
@@ -199,7 +200,7 @@ namespace UnitTests.Grains
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not conected to stream yet.");
             }
         }
-        public override async Task OnDeactivateAsync()
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();
@@ -287,7 +288,7 @@ namespace UnitTests.Grains
         {
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
@@ -302,7 +303,8 @@ namespace UnitTests.Grains
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not connected to stream yet.");
             }
         }
-        public override async Task OnDeactivateAsync()
+
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();

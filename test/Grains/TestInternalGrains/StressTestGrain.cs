@@ -9,6 +9,7 @@ using UnitTests.GrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using System.Threading;
 
 namespace UnitTests.Grains
 {
@@ -23,7 +24,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
@@ -120,7 +121,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
             this.logger.Info("OnActivateAsync");
@@ -277,7 +278,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
             this.logger.Info("OnActivateAsync");

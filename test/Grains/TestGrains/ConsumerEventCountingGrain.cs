@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -46,20 +47,20 @@ namespace UnitTests.Grains
             }
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _logger.Info("Consumer.OnActivateAsync");
             _numConsumedItems = 0;
             _subscriptionHandle = null;
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
-        public override async Task OnDeactivateAsync()
+        public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.Info("Consumer.OnDeactivateAsync");
             await StopConsuming();
             _numConsumedItems = 0;
-            await base.OnDeactivateAsync();
+            await base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
