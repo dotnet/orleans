@@ -1547,7 +1547,7 @@ namespace Orleans.Serialization.UnitTests
             StringComparer.OrdinalIgnoreCase,
             EqualityComparer<string>.Default,
 #endif
-#if NET6_0
+#if NET6_0_OR_GREATER
             StringComparer.InvariantCulture,
             StringComparer.InvariantCultureIgnoreCase,
             StringComparer.CurrentCulture,
