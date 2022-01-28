@@ -311,11 +311,46 @@ namespace Orleans
         /// </summary>
         [Id(11)]
         public DateTime IAmAliveTime { get; set; }
+
+        public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
+        {
+            var allVotes = SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
+
+            // Find voting place:
+            //      update my vote, if I voted previously
+            //      OR if the list is not full - just add a new vote
+            //      OR overwrite the oldest entry.
+            int indexToWrite = allVotes.FindIndex(voter => localSilo.Equals(voter.Item1));
+            if (indexToWrite == -1)
+            {
+                // My vote is not recorded. Find the most outdated vote if the list is full, and overwrite it
+                if (allVotes.Count >= maxVotes) // if the list is full
+                {
+                    // The list is full, so pick the most outdated value to overwrite.
+                    DateTime minVoteTime = allVotes.Min(voter => voter.Item2);
+
+                    // Only overwrite an existing vote if the local time is greater than the current minimum vote time.
+                    if (voteTime >= minVoteTime)
+                    {
+                        indexToWrite = allVotes.FindIndex(voter => voter.Item2.Equals(minVoteTime));
+                    }
+                }
+            }
+
+            if (indexToWrite == -1)
+            {
+                AddSuspector(localSilo, voteTime);
+            }
+            else
+            {
+                var newEntry = new Tuple<SiloAddress, DateTime>(localSilo, voteTime);
+                SuspectTimes[indexToWrite] = newEntry;
+            }
+        }
         
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
         {
-            if (SuspectTimes == null)
-                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
+            SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
 
             var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
             SuspectTimes.Add(suspector);
@@ -354,18 +389,34 @@ namespace Orleans
                 return ImmutableList<Tuple<SiloAddress, DateTime>>.Empty;
 
             var result = ImmutableList.CreateBuilder<Tuple<SiloAddress, DateTime>>();
+
+            // Find the latest time from the set of suspect times and the local time.
+            // This prevents local clock skew from resulting in a different tally of fresh votes.
+            var recencyWindowEndTime = Max(now, SuspectTimes);
             foreach (var voter in this.SuspectTimes)
             {
                 // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
                 // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.
-                var otherVoterTime = voter.Item2;
-                if (now < otherVoterTime || now.Subtract(otherVoterTime) < expiration)
+                var suspectTime = voter.Item2;
+                if (recencyWindowEndTime.Subtract(suspectTime) < expiration)
                 {
                     result.Add(voter);
                 }
             }
 
             return result.ToImmutable();
+
+            static DateTime Max(DateTime localTime, List<Tuple<SiloAddress, DateTime>> suspectTimes)
+            {
+                var maxValue = localTime;
+                foreach (var entry in suspectTimes)
+                {
+                    var suspectTime = entry.Item2;
+                    if (suspectTime > maxValue) maxValue = suspectTime;
+                }
+
+                return maxValue;
+            }
         }
 
         public override string ToString()
