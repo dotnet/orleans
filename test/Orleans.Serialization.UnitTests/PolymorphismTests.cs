@@ -55,7 +55,7 @@ namespace Orleans.Serialization.UnitTests
 
             var result = RoundTripToExpectedType<Exception, InvalidOperationException>(exception);
             Assert.Equal(exception.Message, result.Message);
-            Assert.Equal(exception.StackTrace, result.StackTrace);
+            Assert.Contains(exception.StackTrace, result.StackTrace);
             Assert.Equal(exception.InnerException, result.InnerException);
             Assert.NotNull(result.Data);
             var data = result.Data;
@@ -64,7 +64,7 @@ namespace Orleans.Serialization.UnitTests
 
             var agResult = RoundTripToExpectedType<Exception, AggregateException>(aggregateException);
             Assert.Equal(aggregateException.Message, agResult.Message);
-            Assert.Equal(aggregateException.StackTrace, agResult.StackTrace);
+            Assert.Contains(aggregateException.StackTrace, agResult.StackTrace);
             var inner = Assert.IsType<InvalidOperationException>(agResult.InnerException);
             Assert.Equal(exception.Message, inner.Message);
         }

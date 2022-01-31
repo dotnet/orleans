@@ -10,6 +10,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
@@ -107,7 +108,11 @@ namespace Orleans.Serialization
             info.AddValue("ClassName", value.GetType().ToString(), typeof(string));
             info.AddValue("Data", null, typeof(IDictionary));
             info.AddValue("HelpURL", null, typeof(string));
+#if NET6_0_OR_GREATER
+            info.AddValue("RemoteStackTraceString", null, typeof(string));
+#else
             info.AddValue("RemoteStackTraceString", stackTrace, typeof(string));
+#endif
             info.AddValue("RemoteStackIndex", 0, typeof(int));
             info.AddValue("ExceptionMethod", null, typeof(string));
             info.AddValue("HResult", hResult);
@@ -122,6 +127,10 @@ namespace Orleans.Serialization
                     value.Data[pair.Key] = pair.Value;
                 }
             }
+
+#if NET6_0_OR_GREATER
+            ExceptionDispatchInfo.SetRemoteStackTrace(value, stackTrace);
+#endif
         }
 
         public Dictionary<object, object> GetDataProperty(Exception exception)
