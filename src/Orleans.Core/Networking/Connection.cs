@@ -446,22 +446,25 @@ namespace Orleans.Runtime.Messaging
             // The message body was not successfully decoded, but the headers were.
             MessagingStatisticsGroup.OnRejectedMessage(message);
 
-            if (message.Direction == Message.Directions.Request)
+            if (message.HasDirection)
             {
-                // Send a fast fail to the caller.
-                var response = this.MessageFactory.CreateResponseMessage(message);
-                response.Result = Message.ResponseTypes.Error;
-                response.BodyObject = Response.FromException(exception);
+                if (message.Direction == Message.Directions.Request)
+                {
+                    // Send a fast fail to the caller.
+                    var response = this.MessageFactory.CreateResponseMessage(message);
+                    response.Result = Message.ResponseTypes.Error;
+                    response.BodyObject = Response.FromException(exception);
 
-                // Send the error response and continue processing the next message.
-                this.Send(response);
-            }
-            else if (message.Direction == Message.Directions.Response)
-            {
-                // If the message was a response, propagate the exception to the intended recipient.
-                message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.FromException(exception);
-                this.MessageCenter.DispatchLocalMessage(message);
+                    // Send the error response and continue processing the next message.
+                    this.Send(response);
+                }
+                else if (message.Direction == Message.Directions.Response)
+                {
+                    // If the message was a response, propagate the exception to the intended recipient.
+                    message.Result = Message.ResponseTypes.Error;
+                    message.BodyObject = Response.FromException(exception);
+                    this.MessageCenter.DispatchLocalMessage(message);
+                }
             }
 
             // The exception has been handled by propagating it onwards.

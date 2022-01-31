@@ -64,6 +64,7 @@ namespace Orleans.Runtime
         [GenerateSerializer]
         public enum Categories : byte
         {
+            None,
             Ping,
             System,
             Application,
@@ -72,6 +73,7 @@ namespace Orleans.Runtime
         [GenerateSerializer]
         public enum Directions : byte
         {
+            None,
             Request,
             Response,
             OneWay
@@ -80,6 +82,7 @@ namespace Orleans.Runtime
         [GenerateSerializer]
         public enum ResponseTypes : byte
         {
+            None,
             Success,
             Error,
             Rejection,
@@ -89,6 +92,7 @@ namespace Orleans.Runtime
         [GenerateSerializer]
         public enum RejectionTypes : byte
         {
+            None,
             Transient,
             Overloaded,
             DuplicateRequest,
