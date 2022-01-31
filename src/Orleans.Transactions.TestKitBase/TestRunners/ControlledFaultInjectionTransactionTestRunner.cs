@@ -19,10 +19,10 @@ namespace Orleans.Transactions.TestKit
             IFaultInjectionTransactionTestGrain grain = grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
             await grain.Set(expected);
             int actual = await grain.Get();
-            actual.ShouldBeEquivalentTo(expected);
+            actual.Should().Be(expected);
             await grain.Deactivate();
             actual = await grain.Get();
-            actual.ShouldBeEquivalentTo(expected);
+            actual.Should().Be(expected);
         }
         
         public virtual async Task SingleGrainWriteTransaction()
@@ -34,7 +34,7 @@ namespace Orleans.Transactions.TestKit
             await grain.Deactivate();
             int expected = original + delta;
             int actual = await grain.Get();
-            actual.ShouldBeEquivalentTo(expected);
+            actual.Should().Be(expected);
         }
 
         public virtual async Task MultiGrainWriteTransaction_FaultInjection(TransactionFaultInjectPhase injectionPhase, FaultInjectionType injectionType)
@@ -85,7 +85,7 @@ namespace Orleans.Transactions.TestKit
                     {
                         this.testOutput($"Retry failed with OrleansCascadingAbortException: {e}, retrying without fault");
                         // should only encounter this when faulting after storage write
-                        injectionType.ShouldBeEquivalentTo(FaultInjectionType.ExceptionAfterStore);
+                        injectionType.Should().Be(FaultInjectionType.ExceptionAfterStore);
                         // only allow one retry
                         firstAttempt.Should().BeTrue();
                         // add delay prevent castcading abort.
@@ -99,7 +99,7 @@ namespace Orleans.Transactions.TestKit
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
-                actual.ShouldBeEquivalentTo(expected);
+                actual.Should().Be(expected);
             }
         }
     }

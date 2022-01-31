@@ -137,15 +137,18 @@ namespace Benchmarks.Ping
 
         public async Task Shutdown()
         {
-            await this.clientHost.StopAsync();
-            if (clientHost is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
-            else clientHost.Dispose();
+            if (clientHost is { } client)
+            {
+                await client.StopAsync();
+                if (client is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
+                else client.Dispose();
+            }
 
             this.hosts.Reverse();
-            foreach (var h in this.hosts)
+            foreach (var host in this.hosts)
             {
-                await h.StopAsync();
-                h.Dispose();
+                await host.StopAsync();
+                host.Dispose();
             }
         }
 

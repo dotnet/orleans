@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
+using System.Reflection;
 using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
@@ -26,7 +27,7 @@ namespace UnitTests.Serialization
             this.environment = SerializationTestEnvironment.InitializeWithDefaults(
                 builder => builder.ConfigureServices(services =>
                 {
-                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.GetCustomAttribute<JsonTypeAttribute>() != null));
                 }));
         }
 
@@ -48,7 +49,7 @@ namespace UnitTests.Serialization
                     .ConfigureServices(
                     services =>
                     {
-                        services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                        services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.GetCustomAttribute<JsonTypeAttribute>() != null));
                     });
                 })
                 .Build();

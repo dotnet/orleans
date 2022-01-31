@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -81,10 +81,12 @@ namespace Orleans.TelemetryConsumers.NewRelic
         {
             if (metrics != null)
             {
-                metrics.AsParallel().ForAll(m =>
-                   {
-                       NRClient.AddCustomParameter(m.Key, m.Value);
-                   });
+                var agent = NRClient.GetAgent();
+                var transaction = agent.CurrentTransaction;
+                foreach (var metric in metrics)
+                {
+                   transaction.AddCustomAttribute(metric.Key, metric.Value);
+                }
             }
         }
 
@@ -92,10 +94,12 @@ namespace Orleans.TelemetryConsumers.NewRelic
         {
             if (properties != null)
             {
-                properties.AsParallel().ForAll(p =>
+                var agent = NRClient.GetAgent();
+                var transaction = agent.CurrentTransaction;
+                foreach (var property in properties)
                 {
-                    NRClient.AddCustomParameter(p.Key, p.Value);
-                });
+                   transaction.AddCustomAttribute(property.Key, property.Value);
+                }
             }
         }
 

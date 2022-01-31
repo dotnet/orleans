@@ -2,7 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO;
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 #else
 using Orleans.Serialization.Utilities;

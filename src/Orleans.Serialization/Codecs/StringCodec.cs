@@ -31,7 +31,7 @@ namespace Orleans.Serialization.Codecs
             var length = reader.ReadVarUInt32();
 
             string result;
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             if (reader.TryReadBytes((int) length, out var span))
             {
                 result = Encoding.UTF8.GetString(span);
@@ -58,7 +58,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             var numBytes = Encoding.UTF8.GetByteCount(value);
             writer.WriteVarUInt32((uint)numBytes);
             if (numBytes < 512)

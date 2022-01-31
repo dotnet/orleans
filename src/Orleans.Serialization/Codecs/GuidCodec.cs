@@ -19,7 +19,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(Guid), WireType.LengthPrefixed);
             writer.WriteVarUInt32(Width);
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             writer.EnsureContiguous(Width);
             if (value.TryWriteBytes(writer.WritableSpan))
             {
@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Codecs
                 throw new UnexpectedLengthPrefixValueException(nameof(Guid), Width, length);
             }
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             if (reader.TryReadBytes(Width, out var readOnly))
             {
                 return new Guid(readOnly);

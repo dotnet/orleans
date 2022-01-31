@@ -12,7 +12,7 @@ namespace Orleans.Analyzers
         private const string AlwaysInterleaveAttributeName = "Orleans.Concurrency.AlwaysInterleaveAttribute";
 
         public const string DiagnosticId = "ORLEANS0001";
-        public const string Title = "[AlwaysInterleave] must only be used on the grain interface method and not the grain class method.";
+        public const string Title = "[AlwaysInterleave] must only be used on the grain interface method and not the grain class method";
         public const string MessageFormat = Title;
         public const string Category = "Usage";
 

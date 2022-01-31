@@ -32,7 +32,7 @@ namespace BenchmarkGrains.Ping
             Stopwatch sw = Stopwatch.StartNew();
             while (!this.end)
             {
-                foreach(Pending pending in pendingWork.Where(t => t.PendingCall == null))
+                foreach(Pending pending in pendingWork.Where(t => t.PendingCall == default))
                 {
                     pending.PendingCall = pending.Grain.Run();
                 }
@@ -57,7 +57,7 @@ namespace BenchmarkGrains.Ping
                     await Task.WhenAny(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
             } catch (Exception) {}
-            foreach (Pending pending in pendingWork.Where(p => p.PendingCall != null))
+            foreach (Pending pending in pendingWork.Where(p => p.PendingCall != default))
             {
                 if (pending.PendingCall.IsFaulted || pending.PendingCall.IsCanceled)
                 {

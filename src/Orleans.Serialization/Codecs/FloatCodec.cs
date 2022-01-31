@@ -57,7 +57,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
         public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int32BitsToSingle(reader.ReadInt32());
 #else
         public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.ToSingle(BitConverter.GetBytes(reader.ReadInt32()), 0);
@@ -117,7 +117,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
         public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int64BitsToDouble(reader.ReadInt64());
 #else
         public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.ToDouble(BitConverter.GetBytes(reader.ReadInt64()), 0);

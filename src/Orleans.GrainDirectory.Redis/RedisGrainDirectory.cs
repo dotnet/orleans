@@ -160,10 +160,10 @@ return 0
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogInformation(e.Exception, "Connection to {EndPoint) failed: {FailureType}", e.EndPoint, e.FailureType);
+            => this.logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogError(e.Exception, "Connection to {EndPoint) failed: {FailureType}", e.EndPoint, e.FailureType);
+            => this.logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogErrorMessage(object sender, RedisErrorEventArgs e)
             => this.logger.LogError(e.Message);

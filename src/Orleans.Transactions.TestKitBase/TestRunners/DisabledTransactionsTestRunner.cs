@@ -16,7 +16,7 @@ namespace Orleans.Transactions.TestKit
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
             Func<Task> task = ()=>grain.Set(delta);
-            var response = task.ShouldThrow<OrleansTransactionsDisabledException>();
+            var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
 
         public virtual void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
@@ -31,7 +31,7 @@ namespace Orleans.Transactions.TestKit
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
-            var response = task.ShouldThrow<OrleansTransactionsDisabledException>();
+            var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
     }
 }

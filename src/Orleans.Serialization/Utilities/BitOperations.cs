@@ -1,6 +1,6 @@
 namespace Orleans.Serialization.Utilities
 {
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
 #else
     /// <summary>
     /// BitOperations polyfill.

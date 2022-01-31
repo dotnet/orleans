@@ -82,7 +82,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             var files = Directory.GetFiles(directory, VersionTestBinaryName, SearchOption.AllDirectories)
                 .Where(f => !f.Contains(Path.DirectorySeparatorChar + "ref" + Path.DirectorySeparatorChar))
                 .Where(f => f.Contains("publish"))
-#if NET5_0
+#if NET5_0_OR_GREATER
                 .Where(f => f.Contains("net5"))
 #else
                 .Where(f => f.Contains("netcoreapp"))
