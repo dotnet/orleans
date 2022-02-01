@@ -222,7 +222,7 @@ namespace Orleans.Runtime
                         else
                         {
                             // Atomically set Deactivating state, to disallow any new requests or new timer ticks to be dispatched on this activation.
-                            activation.StartDeactivating(reason);
+                            activation.Deactivate(reason, cancellationToken: default);
                             AddActivationToList(activation, ref condemned);
                         }
                     }
@@ -269,7 +269,7 @@ namespace Orleans.Runtime
                                 if (bucket.TryRemove(activation))
                                 {
                                     // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.StartDeactivating(reason);
+                                    activation.Deactivate(reason, cancellationToken: default);
                                     AddActivationToList(activation, ref condemned);
                                 }
                                 // someone else has already deactivated the activation, so there's nothing to do.

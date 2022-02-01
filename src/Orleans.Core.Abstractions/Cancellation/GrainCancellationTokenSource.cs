@@ -1,15 +1,17 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
-using Orleans.Serialization;
+using System.Threading;
 
 namespace Orleans
 {
     /// <summary>
-    /// Distributed version of the CancellationTokenSource
+    /// An analogue to <see cref="CancellationTokenSource"/> which can be sent between grains.
     /// </summary>
     public sealed class GrainCancellationTokenSource : IDisposable
     {
+        /// <summary>
+        /// The underlying grain cancellation token.
+        /// </summary>
         private readonly GrainCancellationToken _grainCancellationToken;
 
         /// <summary>
@@ -32,23 +34,16 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Gets whether cancellation has been requested for this <see
-        /// cref="GrainCancellationTokenSource">CancellationTokenSource</see>.
+        /// Gets a value indicating whether cancellation has been requested.
         /// </summary>
-        /// <value>Whether cancellation has been requested for this <see
-        /// cref="GrainCancellationTokenSource">CancellationTokenSource</see>.</value>
         /// <remarks>
         /// <para>
-        /// This property indicates whether cancellation has been requested for this token source, such as
-        /// due to a call to its
-        /// <see cref="Cancel()">Cancel</see> method.
+        /// This property indicates whether cancellation has been requested for this token source, such as due to a call to its <see cref="Cancel()" /> method.
         /// </para>
         /// <para>
-        /// If this property returns true, it only guarantees that cancellation has been requested. It does not
-        /// guarantee that every handler registered with the corresponding token has finished executing, nor
-        /// that cancellation requests have finished propagating to all registered handlers and remote targets. Additional
-        /// synchronization may be required, particularly in situations where related objects are being
-        /// canceled concurrently.
+        /// If this property returns true, it only guarantees that cancellation has been requested. It does not guarantee that every handler registered with the corresponding token has finished executing, nor that
+        /// cancellation requests have finished propagating to all registered handlers and remote targets. Additional synchronization may be required, particularly in situations where related objects are being canceled
+        /// concurrently.
         /// </para>
         /// </remarks>
         public bool IsCancellationRequested
@@ -61,26 +56,18 @@ namespace Orleans
         /// </summary>
         /// <remarks>
         /// <para>
-        /// The associated <see cref="T:Orleans.Async.GrainCancellationToken" /> will be
-        /// notified of the cancellation and will transition to a state where
-        /// <see cref="GrainCancellationToken.CancellationToken">IsCancellationRequested</see> returns true.
-        /// Any callbacks or cancelable operations
-        /// registered with the <see cref="T:Orleans.Threading.CancellationToken"/>  will be executed.
+        /// The associated <see cref="GrainCancellationToken" /> will be notified of the cancellation and will transition to a state where
+        /// <see cref="GrainCancellationToken.CancellationToken"><see cref="IsCancellationRequested"/></see> returns true. Any callbacks or cancelable operations registered with the
+        /// <see cref="CancellationToken" /> will be executed.
         /// </para>
         /// <para>
-        /// Cancelable operations and callbacks registered with the token should not throw exceptions.
-        /// However, this overload of Cancel will aggregate any exceptions thrown into a <see cref="AggregateException"/>,
-        /// such that one callback throwing an exception will not prevent other registered callbacks from being executed.
+        /// Cancelable operations and callbacks registered with the token should not <see langword="throw"/> exceptions. However, this overload of <see cref="Cancel"/> will aggregate any exceptions thrown into a
+        /// <see cref="AggregateException" /> , such that one callback throwing an exception will not prevent other registered callbacks from being executed.
         /// </para>
-        /// <para>
-        /// The <see cref="T:System.Threading.ExecutionContext"/> that was captured when each callback was registered
-        /// will be reestablished when the callback is invoked.
-        /// </para>
+        /// <para>The <see cref="System.Threading.ExecutionContext" /> that was captured when each callback was registered will be reestablished when the callback is invoked.</para>
         /// </remarks>
-        /// <exception cref="T:System.AggregateException">An aggregate exception containing all the exceptions thrown
-        /// by the registered callbacks on the associated <see cref="T:Orleans.Async.GrainCancellationToken"/>.</exception>
-        /// <exception cref="T:System.ObjectDisposedException">This <see
-        /// cref="T:Orleans.Async.GrainCancellationTokenSource"/> has been disposed.</exception>
+        /// <exception cref="AggregateException">An aggregate exception containing all the exceptions thrown by the registered callbacks on the associated <see cref="GrainCancellationToken" /> .</exception>
+        /// <exception cref="ObjectDisposedException">This <see cref="GrainCancellationTokenSource" /> has been disposed.</exception>
         public Task Cancel()
         {
             return _grainCancellationToken.Cancel();

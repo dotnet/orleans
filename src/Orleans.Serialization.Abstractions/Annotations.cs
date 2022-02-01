@@ -251,14 +251,27 @@ namespace Orleans
         public string AssemblyName { get; }
     }
 
+    /// <summary>
+    /// Specifies a type to be instantiated and invoked when performing serialization operations on instances of the type which this attribute is attached to.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
     public sealed class SerializationCallbacksAttribute : Attribute
     {
+        /// <summary>
+        /// Instantiates a new <see cref="SerializationCallbacksAttribute"/> instance.
+        /// </summary>
+        /// <param name="hookType">The type of the object used to invoke serialization hooks.</param>
         public SerializationCallbacksAttribute(Type hookType)
         {
             HookType = hookType;
         }
 
+        /// <summary>
+        /// The type of the hook class.
+        /// </summary>
+        /// <remarks>
+        /// This value is used to get the hooks implementation from an <see cref="IServiceProvider"/>.
+        /// </remarks>
         public Type HookType { get; }
     }
 

@@ -12,8 +12,14 @@ namespace Orleans.Metadata
     public class GrainManifest
     {
         /// <summary>
-        /// Creates a new <see cref="GrainManifest"/> instance.
+        /// Initializes a new instance of the <see cref="GrainManifest"/> class.
         /// </summary>
+        /// <param name="grains">
+        /// The grain properties.
+        /// </param>
+        /// <param name="interfaces">
+        /// The interface properties.
+        /// </param>
         public GrainManifest(
             ImmutableDictionary<GrainType, GrainProperties> grains,
             ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces)

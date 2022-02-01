@@ -77,7 +77,7 @@ namespace Orleans
             }
         }
 
-        public virtual async Task OnStart(CancellationToken ct)
+        public virtual async Task OnStart(CancellationToken cancellationToken = default)
         {
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
@@ -86,7 +86,7 @@ namespace Orleans
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
-                    if (ct.IsCancellationRequested)
+                    if (cancellationToken.IsCancellationRequested)
                     {
                         throw new OrleansLifecycleCanceledException("Lifecycle start canceled by request");
                     }
@@ -94,7 +94,7 @@ namespace Orleans
                     var stage = observerGroup.Key;
                     this.highStage = stage;
                     var stopWatch = ValueStopwatch.StartNew();
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, ct)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, cancellationToken)));
                     stopWatch.Stop();
                     this.PerfMeasureOnStart(stage, stopWatch.Elapsed);
 
@@ -138,7 +138,7 @@ namespace Orleans
             }
         }
 
-        public virtual async Task OnStop(CancellationToken ct)
+        public virtual async Task OnStop(CancellationToken cancellationToken = default)
         {
             // if not started, do nothing
             if (!this.highStage.HasValue) return;
@@ -149,7 +149,7 @@ namespace Orleans
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key))
             {
-                if (ct.IsCancellationRequested && !loggedCancellation)
+                if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
                     this.logger?.LogWarning("Lifecycle stop operations canceled by request.");
                     loggedCancellation = true;
@@ -160,7 +160,7 @@ namespace Orleans
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, ct)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, cancellationToken)));
                     stopwatch.Stop();
                     this.PerfMeasureOnStop(stage, stopwatch.Elapsed);
                 }

@@ -64,7 +64,7 @@ namespace Orleans.Runtime
                     "[GrainAddress: {0}, Full GrainId: {1}, Full ActivationId: {2}]",
                     this.ToString(),                        // 0
                     this.GrainId.ToString(),                  // 1
-                    this.ActivationId.ToFullString());        // 2
+                    this.ActivationId.ToParsableString());        // 2
         }
 
         internal static GrainAddress NewActivationAddress(SiloAddress silo, GrainId grain)

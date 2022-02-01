@@ -16,8 +16,11 @@ namespace Orleans.Runtime
         private const char SegmentSeparator = '+';
 
         /// <summary>
-        /// Creates a new <see cref="SystemTargetGrainId"/> instance.
+        /// Initializes a new instance of the <see cref="SystemTargetGrainId"/> struct.
         /// </summary>
+        /// <param name="grainId">
+        /// The grain id.
+        /// </param>
         private SystemTargetGrainId(GrainId grainId)
         {
             this.GrainId = grainId;
@@ -31,11 +34,32 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="SystemTargetGrainId"/> instance.
         /// </summary>
+        /// <param name="kind">
+        /// The grain type.
+        /// </param>
+        /// <param name="address">
+        /// The server which the system target exists on.
+        /// </param>
+        /// <returns>
+        /// A <see cref="SystemTargetGrainId"/>.
+        /// </returns>
         public static SystemTargetGrainId Create(GrainType kind, SiloAddress address) => new SystemTargetGrainId(new GrainId(kind, new IdSpan(address.ToUtf8String())));
 
         /// <summary>
         /// Creates a new <see cref="SystemTargetGrainId"/> instance.
         /// </summary>
+        /// <param name="kind">
+        /// The grain type.
+        /// </param>
+        /// <param name="address">
+        /// The server which the system target exists on.
+        /// </param>
+        /// <param name="extraIdentifier">
+        /// An optional key extension.
+        /// </param>
+        /// <returns>
+        /// A <see cref="SystemTargetGrainId"/>.
+        /// </returns>
         public static SystemTargetGrainId Create(GrainType kind, SiloAddress address, string extraIdentifier)
         {
             var addr = address.ToUtf8String();
@@ -55,11 +79,26 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the provided instance represents a system target, <see langword="false"/> if otherwise.
         /// </summary>
+        /// <param name="id">
+        /// The grain id.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if the value is a system target grain id, <see langword="false"/> otherwise.
+        /// </returns>
         public static bool IsSystemTargetGrainId(in GrainId id) => id.Type.AsSpan().StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span);
 
         /// <summary>
         /// Converts the provided <see cref="GrainId"/> to a <see cref="SystemTargetGrainId"/>. A return value indicates whether the operation succeeded.
         /// </summary>
+        /// <param name="grainId">
+        /// The grain id.
+        /// </param>
+        /// <param name="systemTargetId">
+        /// The resulting system target id.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if the value is a system target grain id, <see langword="false"/> otherwise.
+        /// </returns>
         public static bool TryParse(GrainId grainId, out SystemTargetGrainId systemTargetId)
         {
             if (!IsSystemTargetGrainId(grainId))
@@ -75,6 +114,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a new <see cref="SystemTargetGrainId"/> targeting the provided address.
         /// </summary>
+        /// <param name="siloAddress">
+        /// The silo address.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="SystemTargetGrainId"/> targeting the provided address.
+        /// </returns>
         public SystemTargetGrainId WithSiloAddress(SiloAddress siloAddress)
         {
             var addr = siloAddress.ToUtf8String();
@@ -96,11 +141,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the <see cref="SiloAddress"/> of the system target.
         /// </summary>
+        /// <returns>
+        /// The silo address corresponding to this system target id.
+        /// </returns>
         public SiloAddress GetSiloAddress()
         {
             var key = this.GrainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
+            {
                 key = key.Slice(0, index);
+            }
 
             return SiloAddress.FromUtf8String(key);
         }
@@ -108,9 +158,29 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a <see cref="GrainId"/> for a grain service.
         /// </summary>
+        /// <param name="typeCode">
+        /// The type code.
+        /// </param>
+        /// <param name="grainSystemId">
+        /// The system id.
+        /// </param>
+        /// <param name="address">
+        /// The silo address.
+        /// </param>
+        /// <returns>A grain id for a grain service instance.</returns>
         public static GrainId CreateGrainServiceGrainId(int typeCode, string grainSystemId, SiloAddress address)
             => CreateGrainServiceGrainId(CreateGrainServiceGrainType(typeCode, grainSystemId), address);
 
+        /// <summary>
+        /// Creates a <see cref="GrainId"/> for a grain service.
+        /// </summary>
+        /// <param name="typeCode">
+        /// The type code.
+        /// </param>
+        /// <param name="grainSystemId">
+        /// The system id.
+        /// </param>
+        /// <returns>A grain id for a grain service instance.</returns>
         internal static GrainType CreateGrainServiceGrainType(int typeCode, string grainSystemId)
         {
             var extraLen = grainSystemId is null ? 0 : Encoding.UTF8.GetByteCount(grainSystemId);
@@ -122,12 +192,28 @@ namespace Orleans.Runtime
             return new GrainType(buf);
         }
 
+        /// <summary>
+        /// Creates a <see cref="GrainId"/> for a grain service.
+        /// </summary>
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
+        /// <param name="address">
+        /// The silo address.
+        /// </param>
+        /// <returns>A grain id for a grain service instance.</returns>
         internal static GrainId CreateGrainServiceGrainId(GrainType grainType, SiloAddress address)
             => new GrainId(grainType, new IdSpan(address.ToUtf8String()));
 
         /// <summary>
         /// Creates a system target <see cref="GrainType"/> with the provided name.
         /// </summary>
+        /// <param name="name">
+        /// The system target grain type name.
+        /// </param>
+        /// <returns>
+        /// The grain type.
+        /// </returns>
         public static GrainType CreateGrainType(string name) => GrainType.Create($"{GrainTypePrefix.SystemTargetPrefix}{name}");
 
         /// <inheritdoc/>
@@ -145,22 +231,52 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public int CompareTo(SystemTargetGrainId other) => this.GrainId.CompareTo(other.GrainId);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
         public static bool operator ==(SystemTargetGrainId left, SystemTargetGrainId right) => left.Equals(right);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(SystemTargetGrainId left, SystemTargetGrainId right) => !(left == right);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator <(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) < 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator <=(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) <= 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) > 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >=(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) >= 0;
 
         /// <summary>
@@ -169,7 +285,7 @@ namespace Orleans.Runtime
         public sealed class Comparer : IEqualityComparer<SystemTargetGrainId>, IComparer<SystemTargetGrainId>
         {
             /// <summary>
-            /// A singleton <see cref="Comparer"/> instance.
+            /// Gets the singleton <see cref="Comparer"/> instance.
             /// </summary>
             public static Comparer Instance { get; } = new Comparer();
 

@@ -38,18 +38,6 @@ namespace Orleans.Runtime
 
         public IRuntimeClient RuntimeClient { get; private set; }
 
-        /// <inheritdoc />
-        public void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options)
-        {
-            throw new NotSupportedException();
-        }
-
-        /// <inheritdoc />
-        public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options)
-        {
-            throw new NotSupportedException();
-        }
-
         public ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             // TODO: Remove expensive interface type check

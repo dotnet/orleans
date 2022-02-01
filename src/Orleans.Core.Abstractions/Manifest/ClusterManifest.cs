@@ -13,8 +13,17 @@ namespace Orleans.Metadata
     public class ClusterManifest
     {
         /// <summary>
-        /// Creates a new <see cref="ClusterManifest"/> instance.
+        /// Initializes a new instance of the <see cref="ClusterManifest"/> class.
         /// </summary>
+        /// <param name="version">
+        /// The manifest version.
+        /// </param>
+        /// <param name="silos">
+        /// The silo manifests.
+        /// </param>
+        /// <param name="allGrainManifests">
+        /// All grain manifests.
+        /// </param>
         public ClusterManifest(
             MajorMinorVersion version,
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
@@ -26,19 +35,19 @@ namespace Orleans.Metadata
         }
 
         /// <summary>
-        /// The version of this instance.
+        /// Gets the version of this instance.
         /// </summary>
         [Id(1)]
         public MajorMinorVersion Version { get; }
 
         /// <summary>
-        /// Manifests for each silo in the cluster.
+        /// Gets the manifests for each silo in the cluster.
         /// </summary>
         [Id(2)]
         public ImmutableDictionary<SiloAddress, GrainManifest> Silos { get; }
 
         /// <summary>
-        /// All grain manifests.
+        /// Gets all grain manifests.
         /// </summary>
         [Id(3)]
         public ImmutableArray<GrainManifest> AllGrainManifests { get; }

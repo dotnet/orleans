@@ -33,7 +33,7 @@ namespace Orleans.Runtime
             this.lowestStoppedStage = int.MaxValue;
         }
 
-        public override Task OnStart(CancellationToken ct)
+        public override Task OnStart(CancellationToken cancellationToken = default)
         {
             foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
                     string.Join(", ", stage.Select(o => o.Name)));
             }
 
-            return base.OnStart(ct);
+            return base.OnStart(cancellationToken);
         }
 
         protected override void OnStartStageCompleted(int stage)
@@ -134,12 +134,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            public async Task OnStop(CancellationToken ct)
+            public async Task OnStop(CancellationToken cancellationToken = default)
             {
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await this.observer.OnStop(ct);
+                    await this.observer.OnStop(cancellationToken);
                     stopwatch.Stop();
                     this.logger?.LogInformation(
                         (int)ErrorCode.SiloStartPerfMeasure,

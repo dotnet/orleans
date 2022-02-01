@@ -228,54 +228,84 @@ namespace Orleans
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
     public class Grain<TGrainState> : Grain, ILifecycleParticipant<IGrainLifecycle>
     {
+        /// <summary>
+        /// The underlying state storage.
+        /// </summary>
         private IStorage<TGrainState> storage;
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="Grain{TGrainState}"/> class.
+        /// </summary>
+        /// <remarks>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.
-        /// </summary>
+        /// </remarks>
         protected Grain()
         {
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="Grain{TGrainState}"/> class.
+        /// </summary>
+        /// <param name="storage">
+        /// The storage implementation.
+        /// </param>
+        /// <remarks>
         /// Grain implementers do NOT have to expose this constructor but can choose to do so.
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
-        /// </summary>
+        /// </remarks>
         protected Grain(IStorage<TGrainState> storage)
         {
             this.storage = storage;
         }
 
         /// <summary>
-        /// Strongly typed accessor for the grain state
+        /// Gets or sets the grain state.
         /// </summary>
         protected TGrainState State
         {
-            get { return this.storage.State; }
-            set { this.storage.State = value; }
+            get => storage.State;
+            set => storage.State = value;
         }
 
-        /// <summary>Clear the current grain state data from backing store.</summary>
+        /// <summary>
+        /// Clears the current grain state data from backing store.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
         protected virtual Task ClearStateAsync()
         {
             return storage.ClearStateAsync();
         }
 
-        /// <summary>Write of the current grain state data into backing store.</summary>
+        /// <summary>
+        /// Write the current grain state data into the backing store.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
         protected virtual Task WriteStateAsync()
         {
             return storage.WriteStateAsync();
         }
 
-        /// <summary>Read the current grain state data from backing store.</summary>
-        /// <remarks>Any previous contents of the grain state data will be overwritten.</remarks>
+        /// <summary>
+        /// Reads grain state from backing store, updating <see cref="State"/>.
+        /// </summary>
+        /// <remarks>
+        /// Any previous contents of the grain state data will be overwritten.
+        /// </remarks>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
         protected virtual Task ReadStateAsync()
         {
             return storage.ReadStateAsync();
         }
 
+        /// <inheritdoc />
         public virtual void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);

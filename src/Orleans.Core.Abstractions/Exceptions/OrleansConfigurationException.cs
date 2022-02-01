@@ -11,14 +11,21 @@ namespace Orleans.Runtime
     public class OrleansConfigurationException : Exception
     {
         /// <inheritdoc />
-        public OrleansConfigurationException(string message) : base(message) { }
+        public OrleansConfigurationException(string message)
+            : base(message)
+        {
+        }
 
         /// <inheritdoc />
-        public OrleansConfigurationException(string message, Exception innerException) : base(message, innerException) { }
+        public OrleansConfigurationException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
 
         /// <inheritdoc />
-        protected OrleansConfigurationException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
+        /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
+        protected OrleansConfigurationException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }

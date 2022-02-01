@@ -25,7 +25,9 @@ namespace Orleans
         /// </summary>
         public interface IGrainReminder
         {
-            /// <summary> Name of this Reminder. </summary>
+            /// <summary>
+            /// Gets the name of this reminder.
+            /// </summary>
             string ReminderName { get; }
         }
 
@@ -42,24 +44,31 @@ namespace Orleans
         public struct TickStatus
         {
             /// <summary>
-            /// The time at which the first tick of this reminder is due, or was triggered
+            /// Gets the time at which the first tick of this reminder is due, or was triggered.
             /// </summary>
             [Id(1)]
             public DateTime FirstTickTime { get; private set; }
 
             /// <summary>
-            /// The period of the reminder
+            /// Gets the period of the reminder.
             /// </summary>
             [Id(2)]
             public TimeSpan Period { get; private set; }
 
             /// <summary>
-            /// The time on the runtime silo when the silo initiated the delivery of this tick.
+            /// Gets the time on the runtime silo when the silo initiated the delivery of this tick.
             /// </summary>
             [Id(3)]
             public DateTime CurrentTickTime { get; private set; }
 
-            public static TickStatus NewStruct(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
+            /// <summary>
+            /// Creates a new <see cref="TickStatus"/> instance.
+            /// </summary>
+            /// <param name="firstTickTime">The time at which the first tick of the reminder is due.</param>
+            /// <param name="period">The period of the reminder.</param>
+            /// <param name="timeStamp">The time when delivery of the current tick was initiated.</param>
+            /// <returns></returns>
+            public static TickStatus Create(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
             {
                 return
                     new TickStatus
@@ -70,10 +79,8 @@ namespace Orleans
                         };
             }
 
-            public override String ToString()
-            {
-                return String.Format("<{0}, {1}, {2}>", FirstTickTime, Period, CurrentTickTime);
-            }
+            /// <inheritdoc/>
+            public override string ToString() => $"<{FirstTickTime}, {Period}, {CurrentTickTime}>";
         }
 
         /// <summary>
@@ -83,8 +90,17 @@ namespace Orleans
         [GenerateSerializer]
         public class ReminderException : OrleansException
         {
-            public ReminderException(string msg) : base(msg) { }
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ReminderException"/> class.
+            /// </summary>
+            /// <param name="message">The message.</param>
+            public ReminderException(string message) : base(message) { }
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ReminderException"/> class.
+            /// </summary>
+            /// <param name="info">The serialization info.</param>
+            /// <param name="context">The context.</param>
             public ReminderException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {

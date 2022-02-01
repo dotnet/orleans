@@ -11,24 +11,23 @@ namespace Orleans.Runtime
     /// </summary>
     public interface IGrainReferenceRuntime
     {
-        /// <summary>Invokes a fire and forget method on a remote object.</summary>
-        /// <param name="reference">The reference to the addressable target.</param>
-        /// <param name="methodId">The method to invoke.</param>
-        /// <param name="arguments">The method payload.</param>
-        /// <param name="options">Invocation options.</param>
-        void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options);
-
-        /// <summary>Invokes a method on a remote object.</summary>
-        /// <typeparam name="T">The result type</typeparam>
-        /// <param name="reference">The reference to the addressable target.</param>
-        /// <param name="methodId">The method to invoke.</param>
-        /// <param name="arguments">The method payload.</param>
-        /// <param name="options">Invocation options.</param>
-        /// <returns>Returns the response from the remote object.</returns>
-        Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options);
-
+        /// <summary>
+        /// Invokes the specified method on the provided grain interface.
+        /// </summary>
+        /// <typeparam name="T">The underlying return type of the method.</typeparam>
+        /// <param name="reference">The grain reference.</param>
+        /// <param name="request">The method description.</param>
+        /// <param name="options">The invocation options.</param>
+        /// <returns>The result of invocation.</returns>
         ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
+        /// <summary>
+        /// Invokes the specified method on the provided grain interface.
+        /// </summary>
+        /// <param name="reference">The grain reference.</param>
+        /// <param name="request">The method description.</param>
+        /// <param name="options">The invocation options.</param>
+        /// <returns>A <see cref="ValueTask"/> representing the operation</returns>
         ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
         /// <summary>

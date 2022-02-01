@@ -10,8 +10,24 @@ namespace Orleans
     /// </summary>
     public interface IGrainBase
     {
+        /// <summary>
+        /// Gets the grain context.
+        /// </summary>
         IGrainContext GrainContext { get; }
+
+        /// <summary>
+        /// Method overridden by grain implementations to handle activation.
+        /// </summary>
+        /// <param name="token">The cancellation token used to signify that activation should abort promptly.</param>
+        /// <returns>A <see cref="Task"/> which represents the operation.</returns>
         Task OnActivateAsync(CancellationToken token) => Task.CompletedTask;
+
+        /// <summary>
+        /// Method overridden by grain implementations to handle deactivation.
+        /// </summary>
+        /// <param name="reason">The reason for deactivation.</param>
+        /// <param name="token">The cancellation token used to signify that deactivation should complete promptly.</param>
+        /// <returns>A <see cref="Task"/> which represents the operation.</returns>
         Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token) => Task.CompletedTask;
     }
 
@@ -35,6 +51,9 @@ namespace Orleans
     [GenerateSerializer]
     public enum DeactivationReasonCode : byte
     {
+        /// <summary>
+        /// No reason provided.
+        /// </summary>
         None,
 
         /// <summary>

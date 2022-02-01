@@ -15,8 +15,11 @@ namespace Orleans.Metadata
     public class GrainProperties
     {
         /// <summary>
-        /// Creates a <see cref="GrainProperties"/> instance.
+        /// Initializes a new instance of the <see cref="GrainProperties"/> class.
         /// </summary>
+        /// <param name="values">
+        /// The underlying property collection.
+        /// </param>
         public GrainProperties(ImmutableDictionary<string, string> values)
         {
             this.Properties = values;
@@ -29,8 +32,11 @@ namespace Orleans.Metadata
         public ImmutableDictionary<string, string> Properties { get; }
 
         /// <summary>
-        /// Returns a detailed string representation of this instance.
+        /// Returns a detailed, string representation of this instance.
         /// </summary>
+        /// <returns>
+        /// A detailed, string representation of this instance.
+        /// </returns>
         public string ToDetailedString()
         {
             if (this.Properties is null) return string.Empty;
@@ -152,6 +158,15 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain properties to <paramref name="properties"/>.
         /// </summary>
+        /// <param name="grainClass">
+        /// The grain class.
+        /// </param>
+        /// <param name="grainType">
+        /// The grain type id.
+        /// </param>
+        /// <param name="properties">
+        /// The properties collection which calls to this method should populate.
+        /// </param>
         void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties);
     }
 
@@ -163,6 +178,18 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain properties to <paramref name="properties"/>.
         /// </summary>
+        /// <param name="services">
+        /// The service provider.
+        /// </param>
+        /// <param name="grainClass">
+        /// The grain class.
+        /// </param>
+        /// <param name="grainType">
+        /// The grain type id.
+        /// </param>
+        /// <param name="properties">
+        /// The properties collection which calls to this method should populate.
+        /// </param>
         void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties);
     }
 
@@ -174,8 +201,11 @@ namespace Orleans.Metadata
         private readonly IServiceProvider serviceProvider;
 
         /// <summary>
-        /// Creates a <see cref="AttributeGrainPropertiesProvider"/> instance.
+        /// Initializes a new instance of the <see cref="AttributeGrainPropertiesProvider"/> class.
         /// </summary>
+        /// <param name="serviceProvider">
+        /// The service provider.
+        /// </param>
         public AttributeGrainPropertiesProvider(IServiceProvider serviceProvider)
         {
             this.serviceProvider = serviceProvider;
@@ -202,6 +232,18 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets bindings for the type this attribute is attached to.
         /// </summary>
+        /// <param name="services">
+        /// The service provider.
+        /// </param>
+        /// <param name="grainClass">
+        /// The grain class.
+        /// </param>
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
+        /// <returns>
+        /// The bindings for the specified grain.
+        /// </returns>
         IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType);
     }
 
@@ -218,8 +260,11 @@ namespace Orleans.Metadata
         private readonly IServiceProvider serviceProvider;
 
         /// <summary>
-        /// Creates a <see cref="AttributeGrainBindingsProvider"/> instance.
+        /// Initializes a new instance of the <see cref="AttributeGrainBindingsProvider"/> class.
         /// </summary>
+        /// <param name="serviceProvider">
+        /// The service provider.
+        /// </param>
         public AttributeGrainBindingsProvider(IServiceProvider serviceProvider)
         {
             this.serviceProvider = serviceProvider;

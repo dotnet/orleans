@@ -54,21 +54,37 @@ namespace Orleans.Runtime
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
     }
 
+    /// <summary>
+    /// Helper class used to invoke <see cref="IOnDeserialized.OnDeserialized"/> on objects which implement <see cref="IOnDeserialized"/>, immediately after deserialization.
+    /// </summary>
     public class OnDeserializedCallbacks : DeserializationContext
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IRuntimeClient _runtimeClient;
-
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OnDeserializedCallbacks"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">
+        /// The service provider.
+        /// </param>
         public OnDeserializedCallbacks(IServiceProvider serviceProvider)
         {
-            _serviceProvider = serviceProvider;
-            _runtimeClient = serviceProvider.GetRequiredService<IRuntimeClient>();
+            ServiceProvider = serviceProvider;
+            RuntimeClient = serviceProvider.GetRequiredService<IRuntimeClient>();
         }
 
-        public override IServiceProvider ServiceProvider => _serviceProvider;
+        /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        public override IServiceProvider ServiceProvider { get; }
 
-        public override object RuntimeClient => _runtimeClient;
+        /// <summary>
+        /// Gets the runtime client.
+        /// </summary>
+        public override object RuntimeClient { get; }
 
+        /// <summary>
+        /// The hook method invoked by the serialization infrastructure.
+        /// </summary>
+        /// <param name="value">The value which was deserialized.</param>
         public void OnDeserialized(IOnDeserialized value) => value.OnDeserialized(this);
     }
 }

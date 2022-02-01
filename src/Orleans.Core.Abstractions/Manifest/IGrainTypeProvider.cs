@@ -21,14 +21,17 @@ namespace Orleans.Metadata
     /// </summary>
     public class AttributeGrainTypeProvider : IGrainTypeProvider
     {
-        private readonly IServiceProvider serviceProvider;
+        private readonly IServiceProvider _serviceProvider;
 
         /// <summary>
-        /// Creates a <see cref="AttributeGrainTypeProvider"/> instance.
+        /// Initializes a new instance of the <see cref="AttributeGrainTypeProvider"/> class. 
         /// </summary>
+        /// <param name="serviceProvider">
+        /// The service provider.
+        /// </param>
         public AttributeGrainTypeProvider(IServiceProvider serviceProvider)
         {
-            this.serviceProvider = serviceProvider;
+            _serviceProvider = serviceProvider;
         }
 
         /// <inheritdoc />
@@ -38,7 +41,7 @@ namespace Orleans.Metadata
             {
                 if (attr is IGrainTypeProviderAttribute typeProviderAttribute)
                 {
-                    grainType = typeProviderAttribute.GetGrainType(this.serviceProvider, grainClass);
+                    grainType = typeProviderAttribute.GetGrainType(this._serviceProvider, grainClass);
                     return true;
                 }
             }
@@ -49,7 +52,7 @@ namespace Orleans.Metadata
     }
 
     /// <summary>
-    /// An <see cref="Attribute"/> which implements this specifies the <see cref="GrainType"/> of the
+    /// Functionality which can be implemented by a custom <see cref="Attribute"/> which implements this specifies the <see cref="GrainType"/> of the
     /// type which it is attached to.
     /// </summary>
     public interface IGrainTypeProviderAttribute
@@ -57,6 +60,12 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the <see cref="GrainType"/> for the attached <see cref="Type"/>.
         /// </summary>
+        /// <param name="services">
+        /// The service provider.
+        /// </param>
+        /// <param name="type">
+        /// The grain class.
+        /// </param>
         GrainType GetGrainType(IServiceProvider services, Type type);
     }
 }
@@ -69,17 +78,23 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class GrainTypeAttribute : Attribute, IGrainTypeProviderAttribute
     {
-        private readonly GrainType grainType;
+        /// <summary>
+        /// The grain type name.
+        /// </summary>
+        private readonly GrainType _grainType;
 
         /// <summary>
-        /// Creates a <see cref="GrainTypeAttribute"/> instance.
+        /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class. 
         /// </summary>
+        /// <param name="grainType">
+        /// The grain type name.
+        /// </param>
         public GrainTypeAttribute(string grainType)
         {
-            this.grainType = GrainType.Create(grainType);
+            this._grainType = GrainType.Create(grainType);
         }
 
         /// <inheritdoc />
-        public GrainType GetGrainType(IServiceProvider services, Type type) => this.grainType;
+        public GrainType GetGrainType(IServiceProvider services, Type type) => this._grainType;
     }
 }

@@ -21,21 +21,63 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public class DeadlockException : OrleansException
     {
-        [Id(0)]
-        internal IEnumerable<GrainId> CallChain { get; private set; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeadlockException"/> class.
+        /// </summary>
+        public DeadlockException()
+            : base("Deadlock between grain calls")
+        {
+        }
 
-        public DeadlockException() : base("Deadlock between grain calls") {}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeadlockException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        public DeadlockException(string message)
+            : base(message)
+        {
+        }
 
-        public DeadlockException(string message) : base(message) { }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeadlockException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        /// <param name="innerException">
+        /// The inner exception.
+        /// </param>
+        public DeadlockException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
 
-        public DeadlockException(string message, Exception innerException) : base(message, innerException) { }
-
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeadlockException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        /// <param name="callChain">
+        /// The call chain.
+        /// </param>
         internal DeadlockException(string message, IList<GrainId> callChain)
             : base(message)
         {
             CallChain = callChain;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeadlockException"/> class.
+        /// </summary>
+        /// <param name="info">
+        /// The serialization info.
+        /// </param>
+        /// <param name="context">
+        /// The context.
+        /// </param>
         protected DeadlockException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -45,13 +87,16 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets the call chain.
+        /// </summary>
+        [Id(0)]
+        internal IEnumerable<GrainId> CallChain { get; private set; }
+
+        /// <inheritdoc />
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            if (info != null)
-            {
-                info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<GrainId>));
-            }
-
+            info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<GrainId>));
             base.GetObjectData(info, context);
         }
     }
