@@ -160,6 +160,13 @@ namespace Orleans.Statistics
                 var deltaIdleTime = idleTime - _prevIdleTime;
                 var deltaTotalTime = totalTime - _prevTotalTime;
 
+                // When running in gVisor, /proc/stat returns all zeros, so check here and leave CpuUsage unset.
+                // see: https://github.com/google/gvisor/blob/master/pkg/sentry/fs/proc/stat.go#L88-L95
+                if (deltaTotalTime == 0f)
+                {
+                    return;
+                }
+
                 var currentCpuUsage = (1.0f - deltaIdleTime / ((float)deltaTotalTime)) * 100f;
 
                 var previousCpuUsage = CpuUsage ?? 0f;
@@ -195,7 +202,7 @@ namespace Orleans.Statistics
 
         private void WriteToStatistics()
         {
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage.Value);
+            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage ?? 0f);
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB - 1.0) / KB)); // Round up
 
 #if LOG_MEMORY_PERF_COUNTERS
