@@ -107,9 +107,18 @@ namespace Orleans.ServiceBus.Providers
         public async Task<string> Load()
         {
             var results = await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
+
             if (results.Entity != null)
             {
-                entity = results.Entity;
+                var offset = results.Entity.Offset;
+                if (long.TryParse(offset, out _))
+                {
+                    entity = results.Entity;
+                }
+                else
+                {
+                    this.logger.LogError("Wrong format for offset value, ignoring value read from storage. Value :\"{Offset}\"", offset);
+                }
             }
 
             return entity.Offset;
