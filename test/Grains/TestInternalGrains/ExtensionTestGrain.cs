@@ -1,14 +1,21 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     internal class ExtensionTestGrain : Grain, IExtensionTestGrain
     {
+        private readonly IGrainContext _grainContext;
         public string ExtensionProperty { get; private set; }
         private TestExtension extender;
+
+        public ExtensionTestGrain(IGrainContext grainContext)
+        {
+            _grainContext = grainContext;
+        }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -22,8 +29,9 @@ namespace UnitTests.Grains
             if (extender == null)
             {
                 extender = new TestExtension(this, GrainFactory);
-                this.Data.SetComponent<ITestExtension>(extender);
+                _grainContext.SetComponent<ITestExtension>(extender);
             }
+
             ExtensionProperty = name;
             return Task.CompletedTask;
         }
@@ -31,8 +39,14 @@ namespace UnitTests.Grains
 
     public class GenericExtensionTestGrain<T> : Grain, IGenericExtensionTestGrain<T>
     {
+        private readonly IGrainContext _grainContext;
         public T ExtensionProperty { get; private set; }
         private GenericTestExtension<T> extender;
+
+        public GenericExtensionTestGrain(IGrainContext grainContext)
+        {
+            _grainContext = grainContext;
+        }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -46,8 +60,9 @@ namespace UnitTests.Grains
             if (extender == null)
             {
                 extender = new GenericTestExtension<T>(this, this.GrainFactory);
-                this.Data.SetComponent<IGenericTestExtension<T>>(extender);
+                _grainContext.SetComponent<IGenericTestExtension<T>>(extender);
             }
+
             ExtensionProperty = name;
             return Task.CompletedTask;
         }
@@ -55,18 +70,25 @@ namespace UnitTests.Grains
 
     internal class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
     {
+        private readonly IGrainContext _grainContext;
         private SimpleExtension extender;
-        
-        public Task DoSomething() {
+
+        public GenericGrainWithNonGenericExtension(IGrainContext grainContext)
+        {
+            _grainContext = grainContext;
+        }
+
+        public Task DoSomething()
+        {
             return Task.CompletedTask;
         }
-        
+
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             if (extender == null)
             {
                 extender = new SimpleExtension("A");
-                this.Data.SetComponent<ISimpleExtension>(extender);
+                _grainContext.SetComponent<ISimpleExtension>(extender);
             }
 
             return base.OnActivateAsync(cancellationToken);

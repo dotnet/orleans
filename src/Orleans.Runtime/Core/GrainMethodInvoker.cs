@@ -43,7 +43,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public IAddressable Grain => grainContext.GrainInstance;
+        public object Grain => grainContext.GrainInstance;
 
         /// <inheritdoc />
         public MethodInfo Method => request.Method;

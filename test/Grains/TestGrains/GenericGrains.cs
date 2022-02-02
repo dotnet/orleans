@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -540,15 +542,20 @@ namespace UnitTests.Grains
     }
 
     [Reentrant]
-    public class PingSelfGrain<T> : Grain, IGenericPingSelf<T>
+    public class PingSelfGrain<T> : IGrainBase, IGenericPingSelf<T>
     {
         private readonly ILogger logger;
         private T _lastValue;
+        private readonly ITimerRegistry _timerRegistry;
 
-        public PingSelfGrain(ILoggerFactory loggerFactory)
+        public PingSelfGrain(ILogger<PingSelfGrain<T>> logger, IGrainContext context, ITimerRegistry timerRegistry)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            this.logger = logger;
+            this.GrainContext = context;
+            _timerRegistry = timerRegistry;
         }
+
+        public IGrainContext GrainContext { get; set; }
 
         public Task<T> Ping(T t)
         {
@@ -575,17 +582,18 @@ namespace UnitTests.Grains
 
         public Task ScheduleDelayedPing(IGenericPingSelf<T> target, T t, TimeSpan delay)
         {
-            RegisterTimer(o =>
-            {
-                this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
-                return target.Ping(t);
-            },
+            _timerRegistry.RegisterTimer(
+                GrainContext,
+                o =>
+                {
+                    this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
+                    return target.Ping(t);
+                },
                 null,
                 delay,
                 TimeSpan.FromMilliseconds(-1));
             return Task.CompletedTask;
         }
-
 
         public Task<T> GetLastValue()
         {
@@ -595,16 +603,16 @@ namespace UnitTests.Grains
         public async Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay)
         {
             await target.ScheduleDelayedPing(this, t, delay);
-            DeactivateOnIdle();
+            this.DeactivateOnIdle();
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        public Task OnDeactivateAsync(DeactivationReason deactivationReason, CancellationToken cancellationToken)
         {
             this.logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
@@ -614,7 +622,7 @@ namespace UnitTests.Grains
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
         private T lastValue;
-        
+
         public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
         {
             tc.CancellationToken.Register(() =>
@@ -760,7 +768,7 @@ namespace UnitTests.Grains
         }
     }
 
-        
+
     public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
         public Task<string> Hello() {
