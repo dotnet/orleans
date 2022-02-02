@@ -24,23 +24,23 @@ if not exist %TestResultDir% md %TestResultDir%
 SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
 
 set TESTS=^
-%CMDHOME%\test\Extensions\TesterAzureUtils,^
-%CMDHOME%\test\TesterInternal,^
-%CMDHOME%\test\Tester,^
-%CMDHOME%\test\DefaultCluster.Tests,^
-%CMDHOME%\test\NonSilo.Tests,^
-%CMDHOME%\test\Extensions\AWSUtils.Tests,^
-%CMDHOME%\test\Extensions\Consul.Tests,^
-%CMDHOME%\test\Extensions\ServiceBus.Tests,^
-%CMDHOME%\test\Extensions\TestServiceFabric,^
-%CMDHOME%\test\Extensions\TesterAdoNet,^
-%CMDHOME%\test\Extensions\TesterZooKeeperUtils,^
-%CMDHOME%\test\Transactions\Orleans.Transactions.Tests,^
-%CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
-%CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
-%CMDHOME%\test\DependencyInjection.Tests,^
-%CMDHOME%\test\Orleans.Connections.Security.Tests,^
-%CMDHOME%\test\Analyzers.Tests
+'%CMDHOME%\test\Extensions\TesterAzureUtils',^
+'%CMDHOME%\test\TesterInternal',^
+'%CMDHOME%\test\Tester',^
+'%CMDHOME%\test\DefaultCluster.Tests',^
+'%CMDHOME%\test\NonSilo.Tests',^
+'%CMDHOME%\test\Extensions\AWSUtils.Tests',^
+'%CMDHOME%\test\Extensions\Consul.Tests',^
+'%CMDHOME%\test\Extensions\ServiceBus.Tests',^
+'%CMDHOME%\test\Extensions\TestServiceFabric',^
+'%CMDHOME%\test\Extensions\TesterAdoNet',^
+'%CMDHOME%\test\Extensions\TesterZooKeeperUtils',^
+'%CMDHOME%\test\Transactions\Orleans.Transactions.Tests',^
+'%CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test',^
+'%CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests',^
+'%CMDHOME%\test\DependencyInjection.Tests',^
+'%CMDHOME%\test\Orleans.Connections.Security.Tests',^
+'%CMDHOME%\test\Analyzers.Tests'"
 
 @Echo Test assemblies = %TESTS%
 
