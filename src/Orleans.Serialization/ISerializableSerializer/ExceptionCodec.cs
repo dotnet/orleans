@@ -129,7 +129,10 @@ namespace Orleans.Serialization
             }
 
 #if NET6_0_OR_GREATER
-            ExceptionDispatchInfo.SetRemoteStackTrace(value, stackTrace);
+            if (stackTrace is not null)
+            {
+                ExceptionDispatchInfo.SetRemoteStackTrace(value, stackTrace);
+            }
 #endif
         }
 
