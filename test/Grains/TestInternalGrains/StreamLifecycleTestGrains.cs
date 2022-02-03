@@ -18,7 +18,7 @@ namespace UnitTests.Grains
     [GenerateSerializer]
     public class StreamLifecycleTestGrainState
     {
-        // For producer and consumer 
+        // For producer and consumer
         // -- only need to store this because of how we run our unit tests against multiple providers
         [Id(0)]
         public string StreamProviderName { get; set; }
@@ -243,7 +243,6 @@ namespace UnitTests.Grains
 
             //var subsHandle = await State.Stream.SubscribeAsync(observer);
 
-            var context = this.Data;
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
             string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());

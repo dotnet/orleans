@@ -19,17 +19,15 @@ namespace Orleans.Runtime.Utilities
         {
             switch (grainReference)
             {
-                case Grain _:
+                case Grain:
+                case IGrainBase:
+                case ISystemTargetBase:
                     return grainReference;
                 case GrainReference reference:
                     {
                         var runtime = (reference.Runtime as GrainReferenceRuntime)?.RuntimeClient;
-                        if (runtime is null) return null;
-
-                        var activations = runtime.ServiceProvider.GetService<ActivationDirectory>();
-                        if (activations is null) return null;
-
-                        var grains = activations.FindTarget(reference.GrainId);
+                        var activations = runtime?.ServiceProvider.GetService<ActivationDirectory>();
+                        var grains = activations?.FindTarget(reference.GrainId);
                         return grains?.GrainInstance;
                     }
                 default:

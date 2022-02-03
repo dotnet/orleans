@@ -103,7 +103,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
             services.AddSingleton<IConfigureGrainTypeComponents, ReentrantSharedComponentsConfigurator>();
-            services.TryAddSingleton<NewRpcProvider>();
+            services.TryAddSingleton<RpcProvider>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.AddSingleton<GrainVersionManifest>();
             services.TryAddSingleton<GrainBindingsResolver>();
