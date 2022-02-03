@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public IAddressable Grain => this.grainReference;
+        public object Grain => this.grainReference;
 
         /// <inheritdoc />
         public MethodInfo Method => request.Method;

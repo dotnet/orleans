@@ -40,6 +40,8 @@ namespace UnitTests.SchedulerTests
 
         public PlacementStrategy PlacementStrategy => throw new NotImplementedException();
 
+        object IGrainContext.GrainInstance => throw new NotImplementedException();
+
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default) { }
         public Task Deactivated => Task.CompletedTask;

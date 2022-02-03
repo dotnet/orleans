@@ -13,19 +13,19 @@ using System.Text;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Properties common to <see cref="GrainReference"/> instances with the same <see cref="Runtime.GrainType"/> and <see cref="GrainInterfaceType"/>.
+    /// Properties common to <see cref="GrainReference"/> instances with the same <see cref="GrainType"/> and <see cref="GrainInterfaceType"/>.
     /// </summary>
     public class GrainReferenceShared
     {
         public GrainReferenceShared(
-            GrainType graintype,
+            GrainType grainType,
             GrainInterfaceType grainInterfaceType,
             ushort interfaceVersion,
             IGrainReferenceRuntime runtime,
             InvokeMethodOptions invokeMethodOptions,
             IServiceProvider serviceProvider)
         {
-            this.GrainType = graintype;
+            this.GrainType = grainType;
             this.InterfaceType = grainInterfaceType;
             this.Runtime = runtime;
             this.InvokeMethodOptions = invokeMethodOptions;

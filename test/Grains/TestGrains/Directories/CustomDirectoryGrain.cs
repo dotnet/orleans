@@ -1,16 +1,23 @@
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.GrainDirectory;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces.Directories;
 
 namespace UnitTests.Grains.Directories
 {
     [GrainDirectory(GrainDirectoryName = DIRECTORY), GrainType(DIRECTORY)]
-    public class CustomDirectoryGrain : Grain, ICustomDirectoryGrain
+    public class CustomDirectoryGrain : ICustomDirectoryGrain
     {
         private int counter = 0;
+        private readonly SiloAddress _siloAddress;
 
         public const string DIRECTORY = "CustomGrainDirectory";
+
+        public CustomDirectoryGrain(ILocalSiloDetails siloDetails)
+        {
+            _siloAddress = siloDetails.SiloAddress;
+        }
 
         public Task<int> Ping() => Task.FromResult(++this.counter);
 
@@ -22,7 +29,7 @@ namespace UnitTests.Grains.Directories
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(_siloAddress.ToString());
         }
 
         public Task<int> ProxyPing(ICommonDirectoryGrain grain)

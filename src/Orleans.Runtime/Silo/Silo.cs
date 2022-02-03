@@ -128,7 +128,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
                 this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
-            
+
             try
             {
                 grainFactory = Services.GetRequiredService<GrainFactory>();
@@ -196,7 +196,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await this.lifecycleSchedulingSystemTarget.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken));
+                await this.lifecycleSchedulingSystemTarget.WorkItemGroup.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), lifecycleSchedulingSystemTarget);
             }
             catch (Exception exc)
             {
@@ -315,7 +315,7 @@ namespace Orleans.Runtime
                 async Task StartDeploymentLoadCollector()
                 {
                     var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
-                    await deploymentLoadPublisher.QueueTask(deploymentLoadPublisher.Start)
+                    await deploymentLoadPublisher.WorkItemGroup.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
                         .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
                     logger.Debug("Silo deployment load publisher started successfully.");
                 }
@@ -602,7 +602,7 @@ namespace Orleans.Runtime
 
             if (reminderService != null)
             {
-                await reminderServiceContext 
+                await reminderServiceContext
                     .QueueTask(reminderService.Stop)
                     .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
             }

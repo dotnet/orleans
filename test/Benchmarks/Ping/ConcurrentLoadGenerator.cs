@@ -91,12 +91,11 @@ namespace Benchmarks.Ping
                 this.tasks[i] = this.RunWorker(this.states[i], this.requestsPerBlock, this.blocksPerWorker);
             }
 
-            var completion = Task.WhenAll(this.tasks);
-            _ = Task.Run(async () => { try { await completion; } catch { } finally { this.completedBlocks.Writer.Complete(); } });
+            _ = Task.Run(async () => { try { await Task.WhenAll(this.tasks); } catch { } finally { this.completedBlocks.Writer.Complete(); } });
             var blocks = new List<WorkBlock>(this.numWorkers * this.blocksPerWorker);
             var blocksPerReport = this.numWorkers * this.blocksPerWorker / 5;
             var nextReportBlockCount = blocksPerReport;
-            while (!completion.IsCompleted)
+            while (true)
             {
                 var more = await completedBlockReader.WaitToReadAsync();
                 if (!more) break;

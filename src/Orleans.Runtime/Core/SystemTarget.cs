@@ -26,7 +26,6 @@ namespace Orleans.Runtime
         public SiloAddress Silo { get; }
         internal GrainAddress ActivationAddress { get; }
 
-        GrainId ISystemTargetBase.GrainId => id.GrainId;
         internal ActivationId ActivationId { get; set; }
         private InsideRuntimeClient runtimeClient;
         private RuntimeMessagingTrace messagingTrace;
@@ -49,7 +48,7 @@ namespace Orleans.Runtime
 
         GrainId IGrainContext.GrainId => this.id.GrainId;
 
-        IAddressable IGrainContext.GrainInstance => this;
+        object IGrainContext.GrainInstance => this;
 
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 

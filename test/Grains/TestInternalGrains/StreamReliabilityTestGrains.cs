@@ -18,7 +18,7 @@ namespace UnitTests.Grains
     [GenerateSerializer]
     public class StreamReliabilityTestGrainState
     {
-        // For producer and consumer 
+        // For producer and consumer
         // -- only need to store because of how we run our unit tests against multiple providers
         [Id(0)]
         public string StreamProviderName { get; set; }
@@ -63,6 +63,8 @@ namespace UnitTests.Grains
         [NonSerialized]
         private ILogger logger;
 
+        private readonly IGrainContext _grainContext;
+
 #if USE_GENERICS
         private IAsyncStream<T> Stream { get; set; }
         private IAsyncObserver<T> Producer { get; set; }
@@ -74,8 +76,9 @@ namespace UnitTests.Grains
 #endif
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
-        public StreamReliabilityTestGrain(ILoggerFactory loggerFactory)
+        public StreamReliabilityTestGrain(ILoggerFactory loggerFactory, IGrainContext grainContext)
         {
+            _grainContext = grainContext;
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
@@ -262,7 +265,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = Data.Address.SiloAddress;
+            SiloAddress siloAddress = _grainContext.Address.SiloAddress;
             logger.Info("GetLocation SiloAddress={0}", siloAddress);
             return Task.FromResult(siloAddress);
         }

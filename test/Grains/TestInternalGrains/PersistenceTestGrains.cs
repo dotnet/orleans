@@ -91,7 +91,7 @@ namespace UnitTests.Grains
 
         public Task<string> CheckProviderType()
         {
-            IGrainStorage grainStorage = this.GetGrainStorage(this.ServiceProvider);
+            IGrainStorage grainStorage = GrainStorageExtensions.GetGrainStorage(GetType(), this.ServiceProvider);
             Assert.NotNull(grainStorage);
             return Task.FromResult(grainStorage.GetType().FullName);
         }
@@ -124,13 +124,13 @@ namespace UnitTests.Grains
             await ClearStateAsync();
         }
     }
-        
+
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceTestGenericGrain<T> : PersistenceTestGrain, IPersistenceTestGenericGrain<T>
     {
         //...
     }
-    
+
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceProviderErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceProviderErrorGrain
     {
@@ -357,7 +357,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 
@@ -389,7 +389,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 
@@ -428,7 +428,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 
@@ -464,7 +464,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 
@@ -496,7 +496,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 
@@ -535,7 +535,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
         }
     }
 

@@ -35,7 +35,7 @@ namespace Orleans
         /// <summary>
         /// Gets the grain being invoked.
         /// </summary>
-        IAddressable Grain { get; }
+        object Grain { get; }
 
         /// <summary>
         /// Gets the <see cref="MethodInfo"/> of the method being invoked.

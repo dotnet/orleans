@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         private readonly IConsistentRingProvider ring;
         private readonly string typeName;
         private GrainServiceStatus status;
-        
+
         private ILogger Logger;
         /// <summary>Token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
@@ -99,14 +99,14 @@ namespace Orleans.Runtime
 
             Logger.Info(ErrorCode.RS_ServiceStopping, $"Stopping {this.typeName} grain service");
             Status = GrainServiceStatus.Stopped;
-            
+
             return Task.CompletedTask;
         }
 
 
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            this.QueueTask(() => OnRangeChange(oldRange, newRange, increased)).Ignore();
+            this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
         }
 
         /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>
