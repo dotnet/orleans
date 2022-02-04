@@ -4,7 +4,9 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -159,6 +161,41 @@ namespace Tester
             // Check that we only connected once to the fake GW
             Assert.Equal(1, connectionCount);
             Assert.Equal(1, timeoutCount);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task ConnectionFromDifferentClusterIsRejected()
+        {
+            // Arange
+            List<Exception> exceptions = new();
+            Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)
+            {
+                Assert.IsType<InvalidOperationException>(exception);
+                Assert.Equal(@"Unexpected cluster id ""myClusterId"", expected ""{this.myClusterId}""", exception.Message);
+                exceptions.Add(exception);
+                return Task.FromResult(true);
+            }
+
+            using var host = new HostBuilder().UseOrleansClient(clientBuilder =>
+            {
+                clientBuilder
+                    .Configure<ClusterOptions>(options =>
+                    {
+                        var existingClientOptions = this.HostedCluster.ServiceProvider
+                            .GetRequiredService<IOptions<ClusterOptions>>().Value;
+                        options.ClusterId = "myClusterId";
+                        options.ServiceId = existingClientOptions.ServiceId;
+                    })
+                    .UseConnectionRetryFilter(RetryFunc);
+            })
+            .Build();
+
+            var client = host.Services.GetRequiredService<IClusterClient>();
+
+            // Act
+            await host.StartAsync();
+            Assert.Single(exceptions);
+            await host.StopAsync();
         }
     }
 }

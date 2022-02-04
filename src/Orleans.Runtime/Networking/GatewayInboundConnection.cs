@@ -17,6 +17,7 @@ namespace Orleans.Runtime.Messaging
         private readonly OverloadDetector overloadDetector;
         private readonly CounterStatistic loadSheddingCounter;
         private readonly SiloAddress myAddress;
+        private readonly string myClusterId;
 
         public GatewayInboundConnection(
             ConnectionContext connection,
@@ -37,6 +38,7 @@ namespace Orleans.Runtime.Messaging
             this.connectionPreambleHelper = connectionPreambleHelper;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.myAddress = siloDetails.SiloAddress;
+            this.myClusterId = siloDetails.ClusterId;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }
@@ -111,13 +113,19 @@ namespace Orleans.Runtime.Messaging
                     {
                         NodeIdentity = Constants.SiloDirectConnectionId,
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
-                        SiloAddress = this.myAddress
+                        SiloAddress = this.myAddress,
+                        ClusterId = this.myClusterId
                     });
             }
 
             if (!ClientGrainId.TryParse(preamble.NodeIdentity, out var clientId))
             {
                 throw new InvalidOperationException($"Unexpected connection id {preamble.NodeIdentity} on proxy endpoint from {preamble.SiloAddress?.ToString() ?? "unknown silo"}");
+            }
+
+            if (preamble.ClusterId != this.myClusterId)
+            {
+                throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{this.myClusterId}""");
             }
 
             try

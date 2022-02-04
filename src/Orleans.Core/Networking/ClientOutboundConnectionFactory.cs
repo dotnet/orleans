@@ -11,6 +11,7 @@ namespace Orleans.Runtime.Messaging
         internal static readonly object ServicesKey = new object();
         private readonly ConnectionCommon connectionShared;
         private readonly ClientConnectionOptions clientConnectionOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly object initializationLock = new object();
         private bool isInitialized;
@@ -20,12 +21,14 @@ namespace Orleans.Runtime.Messaging
         public ClientOutboundConnectionFactory(
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClientConnectionOptions> clientConnectionOptions,
+            IOptions<ClusterOptions> clusterOptions,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
             : base(connectionShared.ServiceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
         {
             this.connectionShared = connectionShared;
             this.clientConnectionOptions = clientConnectionOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
             this.connectionPreambleHelper = connectionPreambleHelper;
         }
 
@@ -41,7 +44,8 @@ namespace Orleans.Runtime.Messaging
                 this.connectionManager,
                 this.ConnectionOptions,
                 this.connectionShared,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.clusterOptions);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

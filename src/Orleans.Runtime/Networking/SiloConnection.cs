@@ -39,12 +39,15 @@ namespace Orleans.Runtime.Messaging
             this.probeMonitor = probeMonitor;
             this.connectionPreambleHelper = connectionPreambleHelper;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
+            this.LocalClusterId = localSiloDetails.ClusterId;
             this.RemoteSiloAddress = remoteSiloAddress;
         }
 
         public SiloAddress RemoteSiloAddress { get; private set; }
 
         public SiloAddress LocalSiloAddress { get; }
+
+        public string LocalClusterId { get; }
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
 
@@ -249,7 +252,8 @@ namespace Orleans.Runtime.Messaging
                     {
                         NodeIdentity = Constants.SiloDirectConnectionId,
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
-                        SiloAddress = this.LocalSiloAddress
+                        SiloAddress = this.LocalSiloAddress,
+                        ClusterId = this.LocalClusterId
                     });
             }
 
