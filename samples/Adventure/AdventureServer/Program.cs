@@ -1,14 +1,12 @@
+using System.Reflection;
 using AdventureSetup;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
-using System;
-using System.IO;
-using System.Reflection;
 
-var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-string mapFileName = Path.Combine(path, "AdventureMap.json");
+var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
+var mapFileName = Path.Combine(path, "AdventureMap.json");
 
 switch (args.Length)
 {
