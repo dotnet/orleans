@@ -1,6 +1,5 @@
 using AdventureGrainInterfaces;
 using Orleans;
-using System;
 
 using var client = new ClientBuilder()
     .UseLocalhostClustering()
@@ -18,7 +17,7 @@ Console.WriteLine(@"
 
 Console.WriteLine();
 Console.WriteLine("What's your name?");
-string name = Console.ReadLine();
+var name = Console.ReadLine()!;
 
 var player = client.GetGrain<IPlayerGrain>(Guid.NewGuid());
 await player.SetName(name);
@@ -28,13 +27,12 @@ await player.SetRoomGrain(room1);
 
 Console.WriteLine(await player.Play("look"));
 
-string result = "Start";
-
+var result = "Start";
 try
 {
-    while (result != "")
+    while (result is not "")
     {
-        string command = Console.ReadLine();
+        var command = Console.ReadLine()!;
 
         result = await player.Play(command);
         Console.WriteLine(result);
