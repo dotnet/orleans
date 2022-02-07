@@ -1,18 +1,8 @@
-﻿using Orleans.Concurrency;
-using System;
+using Orleans.Concurrency;
 
-namespace BlazorWasm.Models
-{
-    [Immutable]
-    public class TodoNotification
-    {
-        public TodoNotification(Guid itemKey, TodoItem item)
-        {
-            ItemKey = itemKey;
-            Item = item;
-        }
+namespace BlazorWasm.Models;
 
-        public Guid ItemKey { get; }
-        public TodoItem Item { get; }
-    }
-}
+[Immutable]
+public record class TodoNotification(
+    Guid ItemKey,
+    TodoItem? Item = null);
