@@ -21,8 +21,8 @@ public class StreamObserver : IAsyncObserver<ChatMsg>
     public Task OnNextAsync(ChatMsg item, StreamSequenceToken? token = null)
     {
         AnsiConsole.MarkupLine(
-            "[[[dim]{0}[/]]] [bold yellow]{1}:[/] {2}",
-            item.Created.LocalDateTime, item.Author, item.Text);
+            "[[[dim]{0}[/]]][[{1}]] [bold yellow]{2}:[/] {3}",
+            item.Created.LocalDateTime, _roomName, item.Author, item.Text);
 
         return Task.CompletedTask;
     }

@@ -64,7 +64,6 @@ static async Task ProcessLoopAsync(ClientContext context)
             context = context with { UserName = input.Replace("/n", "").Trim() };
             AnsiConsole.MarkupLine(
                 "[dim][[STATUS]][/] Set username to [lime]{0}[/]", context.UserName);
-
             continue;
         }
 
