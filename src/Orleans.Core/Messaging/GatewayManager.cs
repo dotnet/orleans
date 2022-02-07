@@ -37,6 +37,8 @@ namespace Orleans.Messaging
         private bool gatewayRefreshCallInitiated;
         private bool gatewayListProviderInitialized;
 
+        private readonly ILogger<SafeTimer> timerLogger;
+
         public GatewayManager(
             IOptions<GatewayOptions> gatewayOptions,
             IGatewayListProvider gatewayListProvider,
@@ -47,12 +49,7 @@ namespace Orleans.Messaging
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
             this.connectionManager = connectionManager;
             this.gatewayListProvider = gatewayListProvider;
-            this.gatewayRefreshTimer = new AsyncTaskSafeTimer(
-                loggerFactory.CreateLogger<SafeTimer>(),
-                RefreshSnapshotLiveGateways_TimerCallback,
-                null,
-                this.gatewayOptions.GatewayListRefreshPeriod,
-                this.gatewayOptions.GatewayListRefreshPeriod);
+            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -62,6 +59,13 @@ namespace Orleans.Messaging
                 await this.gatewayListProvider.InitializeGatewayListProvider();
                 gatewayListProviderInitialized = true;
             }
+
+            this.gatewayRefreshTimer = new AsyncTaskSafeTimer(
+                this.timerLogger,
+                RefreshSnapshotLiveGateways_TimerCallback,
+                null,
+                this.gatewayOptions.GatewayListRefreshPeriod,
+                this.gatewayOptions.GatewayListRefreshPeriod);
 
             var knownGateways = await this.gatewayListProvider.GetGateways();
             if (knownGateways.Count == 0)
