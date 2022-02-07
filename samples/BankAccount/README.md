@@ -10,7 +10,7 @@ There are two kinds of grains:
 
 `AtmGrain` has this interface:
 
-``` C#
+```csharp
 public interface IAtmGrain : IGrainWithIntegerKey
 {
     [Transaction(TransactionOption.Create)]
@@ -20,7 +20,7 @@ public interface IAtmGrain : IGrainWithIntegerKey
 
 `AccountGrain` has this interface:
 
-``` C#
+```csharp
 public interface IAccountGrain : IGrainWithGuidKey
 {
     [Transaction(TransactionOption.Join)]
@@ -39,7 +39,7 @@ The `IAtmGrain.Transfer` method creates a transation, while the `IAccountGrain.W
 
 `AtmGrain.Transfer(...)` is implemented as follows:
 
-``` C#
+```csharp
 public async Task Transfer(IAccountGrain fromAccount, IAccountGrain toAccount, uint amountToTransfer)
 {
     await Task.WhenAll(
@@ -52,13 +52,13 @@ The `Transfer` method withdraws the specified amount from one `IAccountGrain` an
 
 The `AccountGrain.Deposit` method adds the deposited amount to the account balance using the `ITransactionalState<T>.PerformUpdate` method:
 
-``` C#
+```csharp
 public Task Deposit(uint amount) => _balance.PerformUpdate(x => x.Value += amount);
 ```
 
 Real banks allow overdrawing accounts, but this sample does not. `AccountGrain.Withdraw(uint amount)` prevents overdrawing by throwing an exception, causing the transaction to be aborted:
 
-``` C#
+```csharp
 public Task Withdraw(uint amount) => _balance.PerformUpdate(x =>
 {
     if (x.Value < amount)
