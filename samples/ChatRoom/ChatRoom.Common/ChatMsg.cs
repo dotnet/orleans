@@ -1,23 +1,9 @@
-using System;
+namespace ChatRoom;
 
-namespace ChatRoom
+[Serializable]
+public record class ChatMsg(string? Author, string Text)
 {
-	[Serializable]
-	public class ChatMsg
-	{
-		public DateTimeOffset Created { get; set; } = DateTimeOffset.Now;
-		public string Author { get; set; } = "Alexey";
-		public string Text { get; set; }
+    public string Author { get; init; } = Author ?? "Alexey";
 
-
-		public ChatMsg()
-		{
-		}
-
-		public ChatMsg(string author, string msg)
-		{
-			Author = author;
-			Text = msg;
-		}
-	}
+    public DateTimeOffset Created { get; init; } = DateTimeOffset.Now;    
 }

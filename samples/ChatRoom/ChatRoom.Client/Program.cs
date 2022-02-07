@@ -1,7 +1,4 @@
-using System;
-using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 using ChatRoom;
 using Orleans;
 using Orleans.Hosting;
@@ -36,10 +33,10 @@ await AnsiConsole.Status().StartAsync("Connecting to server", async ctx =>
     ctx.Status = "Connected!";
 });
 
-string currentChannel = null;
+string? currentChannel = null;
 var userName = AnsiConsole.Ask<string>("What is your [aqua]name[/]?");
 
-string input = null;
+string? input = null;
 do
 {
     input = Console.ReadLine();
@@ -90,7 +87,7 @@ void PrintUsage()
 {
     AnsiConsole.WriteLine();
     using var logoStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ChatRoom.Client.logo.png");
-    var logo = new CanvasImage(logoStream)
+    var logo = new CanvasImage(logoStream!)
     {
         MaxWidth = 25
     };
@@ -124,7 +121,7 @@ void PrintUsage()
     rightTable.AddRow(header).AddRow(header2).AddEmptyRow().AddEmptyRow().AddRow(markup);
     table.AddRow(logo, rightTable);
 
-    AnsiConsole.Render(table);
+    AnsiConsole.Write(table);
     AnsiConsole.WriteLine();
 }
 
@@ -133,7 +130,7 @@ async Task ShowChannelMembers()
     var room = client.GetGrain<IChannelGrain>(currentChannel);
     var members = await room.GetMembers();
 
-    AnsiConsole.Render(new Rule($"Members for '{currentChannel}'")
+    AnsiConsole.Write(new Rule($"Members for '{currentChannel}'")
     {
         Alignment = Justify.Center,
         Style = Style.Parse("darkgreen")
@@ -144,7 +141,7 @@ async Task ShowChannelMembers()
         AnsiConsole.MarkupLine("[bold yellow]{0}[/]", member);
     }
 
-    AnsiConsole.Render(new Rule()
+    AnsiConsole.Write(new Rule()
     {
         Alignment = Justify.Center,
         Style = Style.Parse("darkgreen")
@@ -156,7 +153,7 @@ async Task ShowCurrentChannelHistory()
     var room = client.GetGrain<IChannelGrain>(currentChannel);
     var history = await room.ReadHistory(1000);
 
-    AnsiConsole.Render(new Rule($"History for '{currentChannel}'")
+    AnsiConsole.Write(new Rule($"History for '{currentChannel}'")
     {
         Alignment = Justify.Center,
         Style = Style.Parse("darkgreen")
@@ -167,7 +164,7 @@ async Task ShowCurrentChannelHistory()
         AnsiConsole.MarkupLine("[[[dim]{0}[/]]] [bold yellow]{1}:[/] {2}", chatMsg.Created.LocalDateTime, chatMsg.Author, chatMsg.Text);
     }
 
-    AnsiConsole.Render(new Rule()
+    AnsiConsole.Write(new Rule()
     {
         Alignment = Justify.Center,
         Style = Style.Parse("darkgreen")
@@ -195,7 +192,7 @@ async Task JoinChannel(string channelName)
         var room = client.GetGrain<IChannelGrain>(currentChannel);
         var streamId = await room.Join(userName);
         var stream = client.GetStreamProvider("chat").GetStream<ChatMsg>(streamId, "default");
-        //subscribe to the stream to receiver furthur messages sent to the chatroom
+        //subscribe to the stream to receive furthur messages sent to the chatroom
         await stream.SubscribeAsync(new StreamObserver(channelName));
     });
     AnsiConsole.MarkupLine("[bold aqua]Joined channel [/]{0}", currentChannel);
@@ -203,7 +200,7 @@ async Task JoinChannel(string channelName)
 
 async Task LeaveChannel()
 {
-    AnsiConsole.MarkupLine("[bold olive]Leaving channel [/]{0}", currentChannel);
+    AnsiConsole.MarkupLine("[bold olive]Leaving channel [/]{0}", currentChannel!);
     await AnsiConsole.Status().StartAsync("Leaving channel...", async ctx =>
     {
         var room = client.GetGrain<IChannelGrain>(currentChannel);
@@ -219,5 +216,5 @@ async Task LeaveChannel()
         }
     });
 
-    AnsiConsole.MarkupLine("[bold olive]Left channel [/]{0}", currentChannel);
+    AnsiConsole.MarkupLine("[bold olive]Left channel [/]{0}", currentChannel!);
 }
