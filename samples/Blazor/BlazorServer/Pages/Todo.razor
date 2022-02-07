@@ -1,6 +1,6 @@
 @page "/todo"
 @inject TodoService TodoService
-@implements IDisposable
+@implements IAsyncDisposable
 
 <h1>Todo (@todos.Count(todo => !todo.IsDone))</h1>
 
@@ -9,13 +9,16 @@
     <div class="input-group mb-3">
         <div class="input-group-prepend">
             <div class="input-group-text">
-                <input type="checkbox" checked="@todo.IsDone" @onchange="@(async e => await HandleTodoDoneAsync(todo, (bool)e.Value))" />
+                <input type="checkbox" checked="@todo.IsDone"
+                    @onchange="@(async e => await HandleTodoDoneAsync(todo, (bool)e.Value!))" />
             </div>
-            <button class="btn btn-outline-secondary" type="button" @onclick="@(async e => await HandleDeleteTodoAsync(todo))">
+            <button class="btn btn-outline-secondary" type="button"
+                @onclick="@(async e => await HandleDeleteTodoAsync(todo))">
                 <span class="oi oi-trash" aria-hidden="true"></span>
             </button>
         </div>
-        <input class="form-control" value="@todo.Title" @onchange="@(async e => await HandleTodoTitleChangeAsync(todo, (string)e.Value))" />
+        <input class="form-control" value="@todo.Title"
+            @onchange="@(async e => await HandleTodoTitleChangeAsync(todo, (string)e.Value!))" />
     </div>
 }
 
@@ -25,16 +28,20 @@
 @code {
 
     private Guid ownerKey = Guid.Empty;
-    private TodoKeyedCollection todos = new TodoKeyedCollection();
-    private string newTodo;
-    private StreamSubscriptionHandle<TodoNotification> subscription;
+    private TodoKeyedCollection todos = new();
+    private string? newTodo;
+    private StreamSubscriptionHandle<TodoNotification>? subscription;
 
     protected override async Task OnInitializedAsync()
     {
         // subscribe to updates for the current list
         // note that the blazor task scheduler is reentrant
-        // therefore notifications can and will come through when the code is stuck at an await
-        subscription = await TodoService.SubscribeAsync(ownerKey, notification => InvokeAsync(() => HandleNotificationAsync(notification)));
+        // therefore notifications can and will come
+        // // through when the code is stuck at an await
+        subscription = await TodoService.SubscribeAsync(
+            ownerKey,
+            notification => InvokeAsync(
+                () => HandleNotificationAsync(notification)));
 
         // get all items from the cluster
         foreach (var item in await TodoService.GetAllAsync(ownerKey))
@@ -45,12 +52,15 @@
         await base.OnInitializedAsync();
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        // unsubscribe from the orleans stream - best effort
         try
         {
-            subscription?.UnsubscribeAsync();
+            if (subscription is not null)
+            {
+                // unsubscribe from the orleans stream - best effort
+                await subscription.UnsubscribeAsync();
+            }
         }
         catch
         {
@@ -91,7 +101,7 @@
     private Task HandleNotificationAsync(TodoNotification notification)
     {
         // was the item removed
-        if (notification.Item == null)
+        if (notification.Item is null)
         {
             // attempt to remove it from the user interface
             if (todos.Remove(notification.ItemKey))
@@ -133,14 +143,14 @@
 
     private async Task HandleTodoDoneAsync(TodoItem item, bool isDone)
     {
-        var updated = item.WithIsDone(isDone);
+        var updated = item with { IsDone = isDone };
         await TodoService.SetAsync(updated);
         TryUpdateCollection(updated);
     }
 
     private async Task HandleTodoTitleChangeAsync(TodoItem item, string title)
     {
-        var updated = item.WithTitle(title);
+        var updated = item with { Title = title };
         await TodoService.SetAsync(updated);
         TryUpdateCollection(updated);
     }
