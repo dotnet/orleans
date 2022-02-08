@@ -1,56 +1,53 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Chirper.Grains;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Orleans;
 using Spectre.Console;
 
-namespace Chirper.Client
+namespace Chirper.Client;
+
+public class ClusterClientHostedService : IHostedService
 {
-    public class ClusterClientHostedService : IHostedService
-    {
-        public ClusterClientHostedService()
-        {
-            Client = new ClientBuilder()
-                .UseLocalhostClustering()
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IChirperAccount).Assembly))
-                .Build();
-        }
+    public IClusterClient Client { get; }
 
-        public IClusterClient Client { get; }
+    public ClusterClientHostedService() =>
+        Client = new ClientBuilder()
+            .UseLocalhostClustering()
+            .ConfigureApplicationParts(
+                parts => parts.AddApplicationPart(typeof(IChirperAccount).Assembly))
+            .Build();
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken) =>
+        AnsiConsole.Status().StartAsync("Connecting to server", async ctx =>
         {
-            await AnsiConsole.Status().StartAsync("Connecting to server", async ctx =>
+            ctx.Spinner(Spinner.Known.Dots);
+            ctx.Status = "Connecting...";
+
+            await Client.Connect(async error =>
             {
-                ctx.Spinner(Spinner.Known.Dots);
-                ctx.Status = "Connecting...";
-
-                await Client.Connect(async error =>
-                {
-                    AnsiConsole.MarkupLine("[bold red]Error:[/] error connecting to server!");
-                    AnsiConsole.WriteException(error);
-                    ctx.Status = "Waiting to retry...";
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-                    ctx.Status = "Retrying connection...";
-                    return true;
-                });
-
-                ctx.Status = "Connected!";
+                AnsiConsole.MarkupLine("[bold red]Error:[/] error connecting to server!");
+                AnsiConsole.WriteException(error);
+                ctx.Status = "Waiting to retry...";
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                ctx.Status = "Retrying connection...";
+                return true;
             });
-        }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+            ctx.Status = "Connected!";
+        });
+
+    public Task StopAsync(CancellationToken cancellationToken) =>
+        AnsiConsole.Status().StartAsync("Disconnecting...", async ctx =>
         {
-            await AnsiConsole.Status().StartAsync("Disconnecting...", async ctx =>
-            {
-                ctx.Spinner(Spinner.Known.Dots);
-                var cancellation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                using var _ = cancellationToken.Register(() => cancellation.TrySetCanceled(cancellationToken));
-                await Task.WhenAny(Client.Close(), cancellation.Task);
-            });
-        }
-    }
+            ctx.Spinner(Spinner.Known.Dots);
+
+            var cancellation =
+                new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+            using var _ =
+                cancellationToken.Register(
+                    () => cancellation.TrySetCanceled(cancellationToken));
+
+            await Task.WhenAny(Client.Close(), cancellation.Task);
+        });
 }
