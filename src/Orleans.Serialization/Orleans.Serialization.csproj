@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Serialization</PackageId>
     <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PackageDescription>Fast, flexible, and version-tolerant serializer for .NET</PackageDescription>
