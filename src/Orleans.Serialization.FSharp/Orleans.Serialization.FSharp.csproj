@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Serialization.FSharp</PackageId>
     <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
     <PackageDescription>F# core type support for Orleans.Serialization</PackageDescription>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

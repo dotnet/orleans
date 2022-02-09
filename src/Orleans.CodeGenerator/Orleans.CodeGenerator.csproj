@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageDescription>Code generation library for Orleans.Serialization</PackageDescription>
     <NoPackageAnalysis>true</NoPackageAnalysis>
