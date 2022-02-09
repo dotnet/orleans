@@ -105,18 +105,15 @@ namespace Orleans.Runtime.Messaging
         {
             var preamble = await connectionPreambleHelper.Read(this.Context);
 
-            if (preamble.NetworkProtocolVersion >= NetworkProtocolVersion.Version3)
-            {
-                await connectionPreambleHelper.Write(
-                    this.Context,
-                    new ConnectionPreamble
-                    {
-                        NodeIdentity = Constants.SiloDirectConnectionId,
-                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
-                        SiloAddress = this.myAddress,
-                        ClusterId = this.myClusterId
-                    });
-            }
+            await connectionPreambleHelper.Write(
+                this.Context,
+                new ConnectionPreamble
+                {
+                    NodeIdentity = Constants.SiloDirectConnectionId,
+                    NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
+                    SiloAddress = this.myAddress,
+                    ClusterId = this.myClusterId
+                });
 
             if (!ClientGrainId.TryParse(preamble.NodeIdentity, out var clientId))
             {

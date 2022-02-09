@@ -19,6 +19,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime.Messaging;
 
 namespace Tester
 {
@@ -167,34 +168,36 @@ namespace Tester
         public async Task ConnectionFromDifferentClusterIsRejected()
         {
             // Arange
-            List<Exception> exceptions = new();
+            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gwEndpoint  = gateways.First().ToIPEndPoint();
+            var exceptions = new List<Exception>();
+
             Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)
             {
-                Assert.IsType<InvalidOperationException>(exception);
-                Assert.Equal(@"Unexpected cluster id ""myClusterId"", expected ""{this.myClusterId}""", exception.Message);
+                Assert.IsType<ConnectionFailedException>(exception);
                 exceptions.Add(exception);
-                return Task.FromResult(true);
+                return Task.FromResult(false);
             }
 
-            using var host = new HostBuilder().UseOrleansClient(clientBuilder =>
-            {
-                clientBuilder
-                    .Configure<ClusterOptions>(options =>
-                    {
-                        var existingClientOptions = this.HostedCluster.ServiceProvider
-                            .GetRequiredService<IOptions<ClusterOptions>>().Value;
-                        options.ClusterId = "myClusterId";
-                        options.ServiceId = existingClientOptions.ServiceId;
-                    })
-                    .UseConnectionRetryFilter(RetryFunc);
-            })
-            .Build();
-
-            var client = host.Services.GetRequiredService<IClusterClient>();
-
-            // Act
-            await host.StartAsync();
-            Assert.Single(exceptions);
+            // Close current client connection
+            await this.HostedCluster.StopClusterClientAsync();
+            var hostBuilder = new HostBuilder().UseOrleansClient(
+                clientBuilder =>
+                {
+                    clientBuilder.Configure<ClientMessagingOptions>(
+                        options => { options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(10); });
+                    clientBuilder.Configure<ClusterOptions>(
+                        options =>
+                        {
+                            options.ClusterId = "myClusterId";
+                        })
+                        .UseStaticClustering(gwEndpoint)
+                        .UseConnectionRetryFilter(RetryFunc);
+                    ;
+                });
+            var host = hostBuilder.Build();
+            var exception = await Assert.ThrowsAsync<ConnectionFailedException>(async () => await host.StartAsync());
+            Assert.Contains("Unable to connect to", exception.Message);
             await host.StopAsync();
         }
     }

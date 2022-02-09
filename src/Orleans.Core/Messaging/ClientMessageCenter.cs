@@ -137,9 +137,10 @@ namespace Orleans.Messaging
 
             try
             {
-                while (pendingTasks.Count > 0)
+                // There will always be one task to represent cancellation.
+                while (pendingTasks.Count > 1)
                 {
-                    var completedTask = Task.WhenAny(pendingTasks);
+                    var completedTask = await Task.WhenAny(pendingTasks);
                     pendingTasks.Remove(completedTask);
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -151,7 +152,7 @@ namespace Orleans.Messaging
                     }
 
                     // If there are no more gateways, observe the most recent exception and bail out.
-                    if (pendingTasks.Count == 0)
+                    if (pendingTasks.Count == 1)
                     {
                         await completedTask;
                     }

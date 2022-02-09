@@ -57,6 +57,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messageCenter.OnGatewayConnectionOpen();
 
+                var myClusterId = clusterOptions.ClusterId;
                 await connectionPreambleHelper.Write(
                     this.Context,
                     new ConnectionPreamble
@@ -64,16 +65,18 @@ namespace Orleans.Runtime.Messaging
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                         NodeIdentity = this.messageCenter.ClientId.GrainId,
                         SiloAddress = null,
-                        ClusterId = clusterOptions.ClusterId
+                        ClusterId = myClusterId
                     });
 
-                if (this.connectionOptions.ProtocolVersion >= NetworkProtocolVersion.Version2)
+                var preamble = await connectionPreambleHelper.Read(this.Context);
+                this.Log.LogInformation(
+                    "Established connection to {Silo} with protocol version {ProtocolVersion}",
+                    preamble.SiloAddress,
+                    preamble.NetworkProtocolVersion.ToString());
+
+                if (preamble.ClusterId != myClusterId)
                 {
-                    var preamble = await connectionPreambleHelper.Read(this.Context);
-                    this.Log.LogInformation(
-                        "Established connection to {Silo} with protocol version {ProtocolVersion}",
-                        preamble.SiloAddress,
-                        preamble.NetworkProtocolVersion.ToString());
+                    throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{myClusterId}""");
                 }
 
                 await base.RunInternal();

@@ -53,8 +53,6 @@ namespace Orleans.Runtime.Messaging
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
 
-        public NetworkProtocolVersion RemoteProtocolVersion { get; private set; }
-
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
@@ -186,48 +184,7 @@ namespace Orleans.Runtime.Messaging
             Exception error = default;
             try
             {
-                if (this.connectionOptions.ProtocolVersion == NetworkProtocolVersion.Version1)
-                {
-                    // This version of the protocol does not support symmetric preamble, so either send or receive preamble depending on
-                    // Whether or not this is an inbound or outbound connection.
-                    if (this.RemoteSiloAddress is null)
-                    {
-                        // Inbound connection
-                        var protocolVersion = await ReadPreamble();
-
-                        // To support graceful transition to higher protocol versions, send a preamble if the remote endpoint supports it.
-                        if (protocolVersion >= NetworkProtocolVersion.Version2)
-                        {
-                            await WritePreamble();
-                        }
-                    }
-                    else
-                    {
-                        // Outbound connection
-                        await WritePreamble();
-                    }
-                }
-                else
-                {
-                    // Later versions of the protocol send and receive preamble at both ends of the connection.
-                    if (this.RemoteSiloAddress is null)
-                    {
-                        // Inbound connection
-                        var protocolVersion = await ReadPreamble();
-
-                        // To support graceful transition from lower protocol versions, only send a preamble if the remote endpoint supports it.
-                        if (protocolVersion >= NetworkProtocolVersion.Version2)
-                        {
-                            await WritePreamble();
-                        }
-                    }
-                    else
-                    {
-                        // Outbound connection
-                        await Task.WhenAll(ReadPreamble().AsTask(), WritePreamble());
-                    }
-                }
-
+                await Task.WhenAll(ReadPreamble(), WritePreamble());
                 this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
                 this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
                 await base.RunInternal();
@@ -257,13 +214,18 @@ namespace Orleans.Runtime.Messaging
                     });
             }
 
-            async ValueTask<NetworkProtocolVersion> ReadPreamble()
+            async Task ReadPreamble()
             {
                 var preamble = await connectionPreambleHelper.Read(this.Context);
 
                 if (!preamble.NodeIdentity.Equals(Constants.SiloDirectConnectionId))
                 {
-                    throw new InvalidOperationException("Unexpected non-proxied connection on silo endpoint.");
+                    throw new InvalidOperationException("Unexpected client connection on silo endpoint.");
+                }
+
+                if (preamble.ClusterId != LocalClusterId)
+                {
+                    throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{LocalClusterId}""");
                 }
 
                 if (preamble.SiloAddress is object)
@@ -271,10 +233,6 @@ namespace Orleans.Runtime.Messaging
                     this.RemoteSiloAddress = preamble.SiloAddress;
                     this.connectionManager.OnConnected(preamble.SiloAddress, this);
                 }
-
-                this.RemoteProtocolVersion = preamble.NetworkProtocolVersion;
-
-                return this.RemoteProtocolVersion;
             }
         }
 
@@ -331,19 +289,6 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
-            }
-        }
-
-        public override void Send(Message message)
-        {
-            if (this.RemoteProtocolVersion == NetworkProtocolVersion.Version1 && this.RemoteSiloAddress is null)
-            {
-                // Incoming Version1 connections are half-duplex (read-only)
-                this.messageCenter.SendMessage(message);
-            }
-            else
-            {
-                base.Send(message);
             }
         }
 
