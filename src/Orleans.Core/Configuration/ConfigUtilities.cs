@@ -1,58 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Configuration
 {
     /// <summary>
-    /// Utilities class for handling configuration.
+    /// Utilities class for working with configuration.
     /// </summary>
     public static class ConfigUtilities
     {
-        // Time spans are entered as a string of decimal digits, optionally followed by a unit string: "ms", "s", "m", "hr"
-        internal static TimeSpan ParseTimeSpan(string input, string errorMessage)
-        {
-            long unitSize;
-            string numberInput;
-            var trimmedInput = input.Trim().ToLowerInvariant();
-            if (trimmedInput.EndsWith("ms", StringComparison.Ordinal))
-            {
-                unitSize = 10000;
-                numberInput = trimmedInput.Remove(trimmedInput.Length - 2).Trim();
-            }
-            else if (trimmedInput.EndsWith('s'))
-            {
-                unitSize = 1000 * 10000;
-                numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();
-            }
-            else if (trimmedInput.EndsWith('m'))
-            {
-                unitSize = 60 * 1000 * 10000;
-                numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();
-            }
-            else if (trimmedInput.EndsWith("hr", StringComparison.Ordinal))
-            {
-                unitSize = 60 * 60 * 1000 * 10000L;
-                numberInput = trimmedInput.Remove(trimmedInput.Length - 2).Trim();
-            }
-            else
-            {
-                unitSize = 1000 * 10000; // Default is seconds
-                numberInput = trimmedInput;
-            }
-            decimal rawTimeSpan;
-            if (!decimal.TryParse(numberInput, NumberStyles.Any, CultureInfo.InvariantCulture, out rawTimeSpan))
-            {
-                throw new FormatException(errorMessage + ". Tried to parse " + input);
-            }
-            return TimeSpan.FromTicks((long)(rawTimeSpan * unitSize));
-        }
-
         internal static IPAddress ResolveIPAddressOrDefault(byte[] subnet, AddressFamily family)
         {
             IList<IPAddress> nodeIps = NetworkInterface.GetAllNetworkInterfaces()

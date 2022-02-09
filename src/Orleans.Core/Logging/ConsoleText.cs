@@ -2,6 +2,9 @@ using System;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Methods for writing to the console.
+    /// </summary>
     internal static class ConsoleText
     {
         public static bool IsConsoleAvailable
@@ -19,10 +22,10 @@ namespace Orleans.Runtime
 
         public static void WriteError(string msg, Exception exc)
         {
-            var logMsg = 
-                msg 
+            var logMsg =
+                msg
                 + Environment.NewLine
-                + "Exception = " + exc 
+                + "Exception = " + exc
                 + Environment.NewLine;
 
             WriteLine(ConsoleColor.Red, logMsg);

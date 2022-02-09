@@ -12,7 +12,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// <see cref="SystemResponseTimeout"/>.
         /// </summary>
-        private TimeSpan systemResponseTimeout = DEFAULT_RESPONSE_TIMEOUT;
+        private TimeSpan systemResponseTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// The SiloSenderQueues attribute specifies the number of parallel queues and attendant threads used by the silo to send outbound
@@ -81,7 +81,7 @@ namespace Orleans.Configuration
         /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
         /// </summary>
         public TimeSpan MaxRequestProcessingTime { get; set; } = DEFAULT_MAX_REQUEST_PROCESSING_TIME;
-        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
+        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = TimeSpan.FromHours(2);
 
         /// <summary>
         /// For test only - Do not use in production

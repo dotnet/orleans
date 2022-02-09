@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// A grain call filter which helps to propagate activity correlation information across a call chain.
+    /// </summary>
     internal abstract class ActivityPropagationGrainCallFilter
     {
         protected const string TraceParentHeaderName = "traceparent";
@@ -55,15 +58,23 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Propagates distributed context information to outgoing requests.
+    /// </summary>
     internal class ActivityPropagationOutgoingGrainCallFilter : ActivityPropagationGrainCallFilter, IOutgoingGrainCallFilter
     {
         private readonly DistributedContextPropagator propagator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ActivityPropagationOutgoingGrainCallFilter"/> class.
+        /// </summary>
+        /// <param name="propagator">The context propagator.</param>
         public ActivityPropagationOutgoingGrainCallFilter(DistributedContextPropagator propagator)
         {
             this.propagator = propagator;
         }
 
+        /// <inheritdoc />
         public Task Invoke(IOutgoingGrainCallContext context)
         {
             var activity = activitySource.StartActivity(ActivityNameOut, ActivityKind.Client);
@@ -81,15 +92,23 @@ namespace Orleans.Runtime
 
     }
 
+    /// <summary>
+    /// Populates distributed context information from incoming requests.
+    /// </summary>
     internal class ActivityPropagationIncomingGrainCallFilter : ActivityPropagationGrainCallFilter, IIncomingGrainCallFilter
     {
         private readonly DistributedContextPropagator propagator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ActivityPropagationIncomingGrainCallFilter"/> class.
+        /// </summary>
+        /// <param name="propagator">The context propagator.</param>
         public ActivityPropagationIncomingGrainCallFilter(DistributedContextPropagator propagator)
         {
             this.propagator = propagator;
         }
 
+        /// <inheritdoc />
         public Task Invoke(IIncomingGrainCallContext context)
         {
             Activity activity = default;

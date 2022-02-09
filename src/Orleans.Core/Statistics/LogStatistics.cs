@@ -71,7 +71,7 @@ namespace Orleans.Runtime
                 WriteStatsLogEntry(stat.GetDisplayString());
             }
             WriteStatsLogEntry(null); // Write any remaining log data
-            
+
             // Reset current value for counter that have delta.
             // Do it ONLY after all counters have been logged.
             foreach (ICounter stat in allCounters.Where(cs => cs.Storage != CounterStorage.DontStore).Where(cs => cs.IsValueDelta))
@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             int newSize = logMsgBuilder.Length + Environment.NewLine.Length + counterData.Length;
             int newSizeWithPostfix = newSize + STATS_LOG_POSTFIX.Length + Environment.NewLine.Length;
 
-            if (newSizeWithPostfix >= LoggingUtils.MAX_LOG_MESSAGE_SIZE)
+            if (newSizeWithPostfix >= LogFormatter.MAX_LOG_MESSAGE_SIZE)
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);

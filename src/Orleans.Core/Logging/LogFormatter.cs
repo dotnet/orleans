@@ -6,8 +6,12 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Formats values for logging purposes.
+    /// </summary>
     public static class LogFormatter
     {
+        public const int MAX_LOG_MESSAGE_SIZE = 20000;
         private const string TIME_FORMAT = "HH:mm:ss.fff 'GMT'"; // Example: 09:50:43.341 GMT
         private const string DATE_FORMAT = "yyyy-MM-dd " + TIME_FORMAT; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern
         private static readonly ConcurrentDictionary<Type, Func<Exception, string>> exceptionDecoders = new ConcurrentDictionary<Type, Func<Exception, string>>();
@@ -22,6 +26,11 @@ namespace Orleans.Runtime
             return date.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
         }
 
+        /// <summary>
+        /// Parses a date.
+        /// </summary>
+        /// <param name="dateStr">The date string.</param>
+        /// <returns>The parsed date.</returns>
         public static DateTime ParseDate(string dateStr)
         {
             return DateTime.ParseExact(dateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
@@ -47,6 +56,11 @@ namespace Orleans.Runtime
             return exception == null ? String.Empty : PrintException_Helper(exception, 0, true);
         }
 
+        /// <summary>
+        /// Configures the exception decoder for the specified exception type.
+        /// </summary>
+        /// <param name="exceptionType">The exception type to configure a decoder for.</param>
+        /// <param name="decoder">The decoder.</param>
         public static void SetExceptionDecoder(Type exceptionType, Func<Exception, string> decoder)
         {
             exceptionDecoders.TryAdd(exceptionType, decoder);

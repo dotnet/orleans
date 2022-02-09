@@ -4,12 +4,15 @@ using System.Collections.Generic;
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// Options for Configure StaticGatewayListProvider
+    /// Options for configuring a static list of gateways.
     /// </summary>
+    /// <remarks>>
+    /// See <see cref="ClientBuilderExtensions.UseStaticClustering(IClientBuilder, System.Net.IPEndPoint[])"/> for more information.
+    /// </remarks>
     public class StaticGatewayListProviderOptions
     {
         /// <summary>
-        /// Static gateways to use
+        /// Gets or sets the list of gateway addresses.
         /// </summary>
         public List<Uri> Gateways { get; set; } = new List<Uri>();
     }

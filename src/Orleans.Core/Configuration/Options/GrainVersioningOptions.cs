@@ -10,15 +10,15 @@ namespace Orleans.Configuration
     public class GrainVersioningOptions
     {
         /// <summary>
-        /// Strategy used to determine grain compatibility in heterogeneous deployments.
+        /// Gets or sets the name of the default strategy used to determine grain compatibility in heterogeneous deployments.
         /// </summary>
-        public string DefaultCompatibilityStrategy { get; set; } = DEFAULT_COMPATABILITY_STRATEGY;
-        public const string DEFAULT_COMPATABILITY_STRATEGY = nameof(BackwardCompatible);
+        /// <value>The <see cref="BackwardCompatible"/> strategy is used by default.</value>
+        public string DefaultCompatibilityStrategy { get; set; } = nameof(BackwardCompatible);
 
         /// <summary>
-        /// Strategy for selecting grain versions in heterogeneous deployments.
+        /// Gets or sets the name of the default strategy for selecting grain versions in heterogeneous deployments.
         /// </summary>
-        public string DefaultVersionSelectorStrategy { get; set; } = DEFAULT_VERSION_SELECTOR_STRATEGY;
-        public const string DEFAULT_VERSION_SELECTOR_STRATEGY = nameof(AllCompatibleVersions);
+        /// <value>The <see cref="AllCompatibleVersions"/> strategy is used by default.</value>
+        public string DefaultVersionSelectorStrategy { get; set; } = nameof(AllCompatibleVersions);
     }
 }

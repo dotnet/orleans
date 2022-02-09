@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace Orleans.GrainDirectory
 {
     /// <summary>
-    /// Specifies the name of the grain directory provider to use for the grain class which this attribute is attached to.
+    /// Specifies the name of the grain directory provider to use for the grain class which this attribute is applied to.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class GrainDirectoryAttribute : Attribute, IGrainPropertiesProviderAttribute

@@ -144,11 +144,14 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Specifies the <see cref="GrainInterfaceType"/> of the type which it is attached to.
+    /// When applied to a grain interface, specifies the <see cref="GrainInterfaceType"/>.
     /// </summary>
     [AttributeUsage(AttributeTargets.Interface, AllowMultiple = false)]
     public sealed class GrainInterfaceTypeAttribute : Attribute, IGrainInterfaceTypeProviderAttribute
     {
+        /// <summary>
+        /// The grain interface type.
+        /// </summary>
         private readonly GrainInterfaceType _value;
 
         /// <summary>

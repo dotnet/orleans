@@ -2,14 +2,25 @@ using System;
 
 namespace Orleans
 {
-    /// <summary>Defines the state of a grain</summary>
+    /// <summary>
+    /// Defines the state of a grain
+    /// </summary>
+    /// <typeparam name="T">
+    /// The underlying state type.
+    /// </typeparam>
     public interface IGrainState<T>
     {
+        /// <summary>
+        /// Gets or sets the state.
+        /// </summary>
         T State { get; set; }
 
-        /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
+        /// <summary>Gets or sets the ETag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether the record exists in storage.
+        /// </summary>
         bool RecordExists { get; set; }
     }
 
@@ -21,29 +32,44 @@ namespace Orleans
     [GenerateSerializer]
     public class GrainState<T> : IGrainState<T>
     {
+        /// <inheritdoc />
         [Id(1)]
         public T State { get; set; }
 
         /// <inheritdoc />
         [Id(2)]
         public string ETag { get; set; }
+
+        /// <inheritdoc />
         [Id(3)]
         public bool RecordExists { get; set; }
 
-        /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainState{T}"/> class. 
+        /// </summary>
         public GrainState()
         {
         }
 
-        /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>
-        /// <param name="state"> The initial value of the state.</param>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainState{T}"/> class. 
+        /// </summary>
+        /// <param name="state">
+        /// The initial value of the state.
+        /// </param>
         public GrainState(T state) : this(state, null)
         {
         }
 
-        /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>
-        /// <param name="state">The initial value of the state.</param>
-        /// <param name="eTag">The initial e-tag value that allows optimistic concurrency checks at the storage provider level.</param>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainState{T}"/> class.
+        /// </summary>
+        /// <param name="state">
+        /// The initial value of the state.
+        /// </param>
+        /// <param name="eTag">
+        /// The initial e-tag value that allows optimistic concurrency checks at the storage provider level.
+        /// </param>
         public GrainState(T state, string eTag)
         {
             State = state;

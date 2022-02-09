@@ -10,6 +10,10 @@ namespace Orleans.Runtime
     [Immutable]
     public readonly struct GenericGrainType : IEquatable<GenericGrainType>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GenericGrainType"/> struct.
+        /// </summary>
+        /// <param name="grainType">The underlying grain type.</param>
         private GenericGrainType(GrainType grainType)
         {
             GrainType = grainType;

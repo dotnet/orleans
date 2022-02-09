@@ -23,10 +23,17 @@ using Microsoft.Extensions.Hosting;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Configures the default services for a client.
+    /// </summary>
     internal static class DefaultClientServices
     {
         private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
 
+        /// <summary>
+        /// Configures the default services for a client.
+        /// </summary>
+        /// <param name="services">The service collection.</param>
         public static void AddDefaultServices(IServiceCollection services)
         {
             if (services.Contains(ServiceDescriptor))
@@ -138,8 +145,12 @@ namespace Orleans
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
         }
 
+        /// <summary>
+        /// A <see cref="ITypeFilter"/> which allows any type from an assembly containing "Orleans" in its name to be allowed for the purposes of serialization and deserialization.
+        /// </summary>
         private class AllowOrleansTypes : ITypeFilter
         {
+            /// <inheritdoc />
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
                 if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
@@ -151,6 +162,9 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// A marker type used to determine 
+        /// </summary>
         private class ServicesAdded { }
     }
 }

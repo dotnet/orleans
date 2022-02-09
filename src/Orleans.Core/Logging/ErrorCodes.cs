@@ -2,7 +2,7 @@
 namespace Orleans
 {
     /// <summary>
-    /// The set of error types used by the Orleans runtime libraries for logging errors.
+    /// The set of error codes used by the Orleans runtime libraries for logging errors.
     /// </summary>
     public enum ErrorCode
     {
