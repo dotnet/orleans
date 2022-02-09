@@ -344,7 +344,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
 
             // persistent state facet support
-            services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
+            services.TryAddSingleton<IGrainStorageSerializer, OrleansGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
 

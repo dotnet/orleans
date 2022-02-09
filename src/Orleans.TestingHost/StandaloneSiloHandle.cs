@@ -44,6 +44,13 @@ namespace Orleans.TestingHost
             }
 
             Name = siloName;
+
+            // If the debugger is attached to this process, give it an opportunity to attach to the remote process.
+            if (Debugger.IsAttached)
+            {
+                configuration["AttachDebugger"] = "true";
+            }
+
             var serializedConfiguration = TestClusterHostFactory.SerializeConfiguration(configuration);
 
             Process = new Process();
