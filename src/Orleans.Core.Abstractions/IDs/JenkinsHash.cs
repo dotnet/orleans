@@ -4,7 +4,7 @@ using System.Text;
 namespace Orleans
 {
     /// <summary>
-    /// Implements Peter Jenkins' hashing algorithm.
+    /// Implements Bob Jenkins' hashing algorithm.
     /// </summary>
     /// <seealso href="https://en.wikipedia.org/wiki/Jenkins_hash_function"/>
     public static class JenkinsHash
