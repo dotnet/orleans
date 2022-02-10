@@ -28,6 +28,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
         /// </summary>
-        public bool Overloaded => this.Enabled && this.hostEnvironmentStatistics.CpuUsage > this.limit;
+        public bool Overloaded => this.Enabled && (this.hostEnvironmentStatistics.CpuUsage ?? 0) > this.limit;
     }
 }

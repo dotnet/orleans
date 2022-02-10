@@ -90,7 +90,7 @@ namespace Orleans.Runtime
             CpuUsage = hostEnvironmentStatistics.CpuUsage;
             AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
             MemoryUsage = appEnvironmentStatistics.MemoryUsage;
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && this.CpuUsage > loadSheddingOptions.Value.LoadSheddingLimit;
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
             ClientCount = MessagingStatisticsGroup.ConnectedClientCount.GetCurrentValue();
             TotalPhysicalMemory = hostEnvironmentStatistics.TotalPhysicalMemory;
             ReceivedMessages = MessagingStatisticsGroup.MessagesReceived.GetCurrentValue();
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
                 "SiloRuntimeStatistics: "
                 + $"ActivationCount={ActivationCount} " 
                 + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
-                + $"CpuUsage={CpuUsage} "
+                + $"CpuUsage={(CpuUsage.HasValue? CpuUsage : "<unset>")} "
                 + $"AvailableMemory={AvailableMemory} "
                 + $"MemoryUsage={MemoryUsage} "
                 + $"IsOverloaded={IsOverloaded} "

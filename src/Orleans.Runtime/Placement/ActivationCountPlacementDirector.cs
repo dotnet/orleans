@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Placement
 
         private static bool IsSiloOverloaded(SiloRuntimeStatistics stats)
         {
-            return stats.IsOverloaded || stats.CpuUsage >= 100;
+            return stats.IsOverloaded || (stats.CpuUsage ?? 0) >= 100;
         }
 
         private Task<SiloAddress> SelectSiloPowerOfK(PlacementTarget target, IPlacementContext context)
