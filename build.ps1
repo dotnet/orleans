@@ -38,11 +38,11 @@ Install-Dotnet
 if ($args[0] -ne "Pack")
 {
     Write-Output "Build $env:BuildConfiguration =============================="
-    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
-    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
+    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
 }
 
 Write-Output "Package $env:BuildConfiguration ============================"
-Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
 
 Write-Output "===== Build succeeded for $solution ====="
