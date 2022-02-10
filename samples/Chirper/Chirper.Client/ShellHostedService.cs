@@ -182,7 +182,7 @@ public class ShellHostedService : BackgroundService
         if (account is null)
         {
             AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] This command requires an [red underline]active user[/][red].[/]"
-                + " Set an active user using [bold fuchsia]/fuchsia[/] [aqua]username[/] or type [bold fuchisa]/help] for a list of commands.");
+                + " Set an active user using [bold fuchsia]/fuchsia[/] [aqua]username[/] or type [bold fuchsia]/help[/] for a list of commands.");
             return false;
         }
         return true;
