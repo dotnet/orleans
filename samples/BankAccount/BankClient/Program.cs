@@ -50,8 +50,7 @@ while (!Console.KeyAvailable)
 
         if (exception.InnerException is { } inner)
         {
-            Console.WriteLine(
-                $"\tInnerException: {inner.Message}\n");
+            Console.WriteLine($"\tInnerException: {inner.Message}\n");
         }
 
         Console.WriteLine();
