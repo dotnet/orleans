@@ -1,7 +1,6 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31320.298
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32002.185
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chirper.Grains.Interfaces", "Chirper.Grains.Interfaces\Chirper.Grains.Interfaces.csproj", "{A6AFFAFA-0CF8-43FA-8B1E-24DC53A3F81C}"
 EndProject
@@ -14,6 +13,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1223A865-0D72-4BF7-8FCD-016A48F3EC68}"
 	ProjectSection(SolutionItems) = preProject
 		README.md = README.md
+		screenshot.png = screenshot.png
 	EndProjectSection
 EndProject
 Global
