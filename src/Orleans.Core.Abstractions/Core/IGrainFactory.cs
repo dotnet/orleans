@@ -61,7 +61,7 @@ namespace Orleans
         /// </typeparam>
         /// <param name="obj">The object to create a reference to.</param>
         /// <returns>The reference to <paramref name="obj"/>.</returns>
-        Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
+        TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         /// <summary>
         /// Deletes the provided object reference.

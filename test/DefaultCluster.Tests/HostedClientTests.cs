@@ -154,7 +154,7 @@ namespace DefaultCluster.Tests.General
                 },
                 handle,
                 client.ServiceProvider.GetRequiredService<ILogger<ISimpleGrainObserver>>());
-            var reference = await client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var reference = client.CreateObjectReference<ISimpleGrainObserver>(observer);
             await grain.Subscribe(reference);
             await grain.SetA(3);
             await grain.SetB(2);

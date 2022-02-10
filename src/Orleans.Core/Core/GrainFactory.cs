@@ -82,10 +82,10 @@ namespace Orleans
 
 
         /// <inheritdoc />
-        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
-            return Task.FromResult(this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj));
+            return this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj);
         }
 
         /// <inheritdoc />
