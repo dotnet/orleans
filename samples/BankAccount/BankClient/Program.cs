@@ -1,8 +1,6 @@
-using System;
-using System.Threading.Tasks;
+using AccountTransfer.Interfaces;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using AccountTransfer.Interfaces;
 
 using var client = new ClientBuilder()
     .UseLocalhostClustering()
@@ -12,7 +10,8 @@ using var client = new ClientBuilder()
 await client.Connect();
 
 var accountNames = new[] { "Xaawo", "Pasqualino", "Derick", "Ida", "Stacy", "Xiao" };
-var random = new Random();
+var random = Random.Shared;
+
 while (!Console.KeyAvailable)
 {
     var atm = client.GetGrain<IAtmGrain>(0);
@@ -39,11 +38,16 @@ while (!Console.KeyAvailable)
         var fromBalance = await from.GetBalance();
         var toBalance = await to.GetBalance();
 
-        Console.WriteLine($"We transfered 100 credits from {fromName} to {toName}.\n{fromName} balance: {fromBalance}\n{toName} balance: {toBalance}\n");
+        Console.WriteLine(
+            $"We transfered 100 credits from {fromName} to " +
+            $"{toName}.\n{fromName} balance: {fromBalance}\n{toName} balance: {toBalance}\n");
     }
     catch (Exception exception)
     {
-        Console.WriteLine($"Error transfering 100 credits from {fromName} to {toName}: {exception.Message}");
+        Console.WriteLine(
+            $"Error transfering 100 credits from "+
+            $"{fromName} to {toName}: {exception.Message}");
+
         if (exception.InnerException is { } inner)
         {
             Console.WriteLine($"\tInnerException: {inner.Message}\n");
@@ -53,5 +57,5 @@ while (!Console.KeyAvailable)
     }
 
     // Sleep and run again
-    await Task.Delay(200);
+    await Task.Delay(TimeSpan.FromMilliseconds(200));
 }
