@@ -161,7 +161,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.True(await handle.WaitForFinished(_timeout));
 
-            await client.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            client.DeleteObjectReference<ISimpleGrainObserver>(reference);
             Assert.NotNull(observer);
         }
 

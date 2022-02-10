@@ -59,7 +59,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.True(await result.WaitForFinished(timeout));
 
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
         [Fact, TestCategory("BVT")]
@@ -77,7 +77,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.True(await result.WaitForFinished(timeout));
 
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
         void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
@@ -142,7 +142,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetA(2)", timeout));
 
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
         void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
@@ -174,7 +174,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));
 
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
         void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
@@ -201,7 +201,7 @@ namespace DefaultCluster.Tests.General
             {
                 await grain.Unsubscribe(reference);
 
-                await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+                this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             }
             catch (TimeoutException)
             {
@@ -232,8 +232,8 @@ namespace DefaultCluster.Tests.General
 
             Assert.True(await result.WaitForFinished(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
 
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
         }
 
         void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
@@ -261,7 +261,7 @@ namespace DefaultCluster.Tests.General
             await grain.Subscribe(reference);
             await grain.SetA(5);
             Assert.True(await result.WaitForContinue(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
-            await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             await grain.SetB(3);
 
             Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));

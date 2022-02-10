@@ -89,11 +89,10 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public Task DeleteObjectReference<TGrainObserverInterface>(
+        public void DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
             this.runtimeClient.DeleteObjectReference(obj);
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc />

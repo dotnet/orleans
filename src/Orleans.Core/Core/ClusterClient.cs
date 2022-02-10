@@ -115,7 +115,7 @@ namespace Orleans
             where TGrainObserverInterface : IGrainObserver => ((IGrainFactory)_runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
-        public Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
+        public void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
