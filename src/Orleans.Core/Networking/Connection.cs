@@ -140,21 +140,18 @@ namespace Orleans.Runtime.Messaging
 
         private void StartClosing(Exception exception)
         {
-            if (_closeTask is object)
+            if (_closeTask is not null)
             {
                 return;
             }
 
             var task = new Task<Task>(CloseAsync);
-            if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is object)
+            if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is not null)
             {
                 return;
             }
 
-            if (exception is not null)
-            {
-                _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
-            }
+            _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
 
             if (this.Log.IsEnabled(LogLevel.Information))
             {
