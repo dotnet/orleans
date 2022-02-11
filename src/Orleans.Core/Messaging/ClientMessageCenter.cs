@@ -123,16 +123,17 @@ namespace Orleans.Messaging
         {
             var cancellationTask = cancellationToken.WhenCancelled();
             var liveGateways = gatewayManager.GetLiveGateways();
+
+            if (liveGateways.Count == 0)
+            {
+                throw new ConnectionFailedException("There are no available gateways");
+            }
+
             var pendingTasks = new List<Task>(liveGateways.Count + 1);
             pendingTasks.Add(cancellationTask);
             foreach (var gateway in liveGateways)
             {
                 pendingTasks.Add(connectionManager.GetConnection(gateway).AsTask());
-            }
-
-            if (liveGateways.Count == 0)
-            {
-                throw new ConnectionFailedException("There are no available gateways");
             }
 
             try
