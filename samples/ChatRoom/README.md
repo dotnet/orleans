@@ -16,13 +16,13 @@ Each chat channel has a corresponding `ChannelGrain` which is identified by the 
 
 First, start the server in one terminal window by executing the following:
 
-``` PowerShell
+```PowerShell
 dotnet run --project .\ChatRoom.Service\
 ```
 
 Then, once the server has started, open one or more terminal windows and execute the following in each:
 
-``` PowerShell
+```PowerShell
 dotnet run --project .\ChatRoom.Client\
 ```
 
