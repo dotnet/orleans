@@ -1,15 +1,13 @@
 using BlazorServer.Models;
 using Orleans;
-using System.Threading.Tasks;
 
-namespace BlazorServer
+namespace BlazorServer;
+
+public interface ITodoGrain : IGrainWithGuidKey
 {
-    public interface ITodoGrain : IGrainWithGuidKey
-    {
-        Task SetAsync(TodoItem item);
+    Task SetAsync(TodoItem item);
 
-        Task ClearAsync();
+    Task ClearAsync();
 
-        Task<TodoItem> GetAsync();
-    }
+    Task<TodoItem?> GetAsync();
 }
