@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         IAsyncEnumerable<ClusterManifest> Updates { get; }
 
         /// <summary>
-        /// Gets the local grain manifest
+        /// Gets the local grain manifest.
         /// </summary>
         GrainManifest LocalGrainManifest { get; }
     }

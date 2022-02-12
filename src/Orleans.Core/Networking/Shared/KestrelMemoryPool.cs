@@ -2,7 +2,7 @@ using System.Buffers;
 
 namespace Orleans.Networking.Shared
 {
-    public static class KestrelMemoryPool
+    internal static class KestrelMemoryPool
     {
         public static MemoryPool<byte> Create()
         {

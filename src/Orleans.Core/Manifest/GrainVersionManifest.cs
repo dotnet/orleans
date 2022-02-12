@@ -6,6 +6,9 @@ using Orleans.Metadata;
 
 namespace Orleans.Runtime.Versions
 {
+    /// <summary>
+    /// Functionality for querying the declared version of grain interfaces.
+    /// </summary>
     internal class GrainVersionManifest
     {
         private readonly object _lockObj = new object();
@@ -15,6 +18,10 @@ namespace Orleans.Runtime.Versions
         private readonly Dictionary<GrainInterfaceType, ushort> _localVersions;
         private Cache _cache;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainVersionManifest"/> class.
+        /// </summary>
+        /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
         public GrainVersionManifest(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
@@ -22,8 +29,16 @@ namespace Orleans.Runtime.Versions
             _localVersions = BuildLocalVersionMap(clusterManifestProvider.LocalGrainManifest);
         }
 
+        /// <summary>
+        /// Gets the current cluster manifest version.
+        /// </summary>
         public MajorMinorVersion LatestVersion => _clusterManifestProvider.Current.Version;
 
+        /// <summary>
+        /// Gets the local version for a specified grain interface type.
+        /// </summary>
+        /// <param name="interfaceType">The grain intrerface type name.</param>
+        /// <returns>The version of the specified grain interface.</returns>
         public ushort GetLocalVersion(GrainInterfaceType interfaceType)
         {
             if (_localVersions.TryGetValue(interfaceType, out var result))
@@ -45,6 +60,11 @@ namespace Orleans.Runtime.Versions
             return 0;
         }
 
+        /// <summary>
+        /// Gets a collection of all known versions for a grain interface.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type name.</param>
+        /// <returns>All known versions for the specified grain interface.</returns>
         public (MajorMinorVersion Version, ushort[] Result) GetAvailableVersions(GrainInterfaceType interfaceType)
         {
             var cache = GetCache();
@@ -68,6 +88,12 @@ namespace Orleans.Runtime.Versions
             return (cache.Version, Array.Empty<ushort>());
         }
 
+        /// <summary>
+        /// Gets the set of supported silos for a specified grain interface and version.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type name.</param>
+        /// <param name="version">The grain interface version.</param>
+        /// <returns>The set of silos which support the specified grain interface type and version.</returns>
         public (MajorMinorVersion Version, SiloAddress[] Result) GetSupportedSilos(GrainInterfaceType interfaceType, ushort version)
         {
             var cache = GetCache();
@@ -91,6 +117,11 @@ namespace Orleans.Runtime.Versions
             return (cache.Version, Array.Empty<SiloAddress>());
         }
 
+        /// <summary>
+        /// Gets the set of supported silos for the specified grain type.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <returns>The silos which support the specified grain type.</returns>
         public (MajorMinorVersion Version, SiloAddress[] Result) GetSupportedSilos(GrainType grainType)
         {
             var cache = GetCache();
@@ -114,6 +145,13 @@ namespace Orleans.Runtime.Versions
             return (cache.Version, Array.Empty<SiloAddress>());
         }
 
+        /// <summary>
+        /// Gets the set of supported silos for the specified combination of grain type, interface type, and version.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="interfaceType">The grain interface type name.</param>
+        /// <param name="versions">The grain interface version.</param>
+        /// <returns>The set of silos which support the specifed grain.</returns>
         public (MajorMinorVersion Version, Dictionary<ushort, SiloAddress[]> Result) GetSupportedSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort[] versions)
         {
             var result = new Dictionary<ushort, SiloAddress[]>();

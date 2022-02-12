@@ -9,6 +9,11 @@ namespace Orleans.Configuration
     public class LoadSheddingOptions
     {
         /// <summary>
+        /// The default value for <see cref="LoadSheddingLimit"/>.
+        /// </summary>
+        internal const int DefaultLoadSheddingLimit = 95;
+
+        /// <summary>
         /// Gets or sets a value indicating whether load shedding in the client gateway and stream providers is enabled.
         /// The default value is <see langword="false"/>, meaning that load shedding is disabled.
         /// In addition to enabling this option, a valid <see cref="IHostEnvironmentStatistics"/> implementation must be registered on gateway hosts to enable this functionality.
@@ -24,6 +29,6 @@ namespace Orleans.Configuration
         /// If load shedding is enabled and this attribute does not appear, then the default limit is 95%.
         /// </summary>
         /// <value>Load shedding begins at a CPU utilization of 95% by default.</value>
-        public int LoadSheddingLimit { get; set; } = 95;
+        public int LoadSheddingLimit { get; set; } = DefaultLoadSheddingLimit;
     }
 }

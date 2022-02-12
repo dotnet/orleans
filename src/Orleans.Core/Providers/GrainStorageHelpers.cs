@@ -7,12 +7,19 @@ using System.Linq;
 
 namespace Orleans.Storage
 {
-    public static class GrainStorageExtensions
+    /// <summary>
+    /// Utility functions for grain storage.
+    /// </summary>
+    public static class GrainStorageHelpers
     {
         /// <summary>
-        /// Acquire the storage provider associated with the grain type.
+        /// Gets the <see cref="IGrainStorage"/> associated with the specified grain type, which must derive from <see cref="Grain{T}"/>.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="grainType">The grain type, which must derive from <see cref="Grain{T}"/>.</param>
+        /// <param name="services">The service provider.</param>
+        /// <returns>
+        /// The <see cref="IGrainStorage"/> associated with the specified grain type, which must derive from <see cref="Grain{T}"/>.
+        /// </returns>
         public static IGrainStorage GetGrainStorage(Type grainType, IServiceProvider services)
         {
             if (grainType is null) throw new ArgumentNullException(nameof(grainType));
@@ -24,6 +31,7 @@ namespace Orleans.Storage
             {
                 ThrowMissingProviderException(grainType, attr?.ProviderName);
             }
+
             return storageProvider;
         }
 

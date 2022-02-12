@@ -10,8 +10,7 @@ namespace Orleans.Runtime
     [Serializable]
     [GenerateSerializer]
     [JsonConverter(typeof(MembershipVersionConverter))]
-    [Immutable]
-    public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
+    public struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MembershipVersion"/> struct.
