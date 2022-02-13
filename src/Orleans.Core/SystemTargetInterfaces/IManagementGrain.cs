@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
         /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
-        /// <returns></returns>
+        /// <returns>The hosts and their corresponding statuses.</returns>
         Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
 
         /// <summary>
@@ -23,44 +23,52 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
         /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
-        /// <returns></returns>
+        /// <returns>The host entries.</returns>
         Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
 
         /// <summary>
         /// Perform a run of the .NET garbage collector in the specified silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>A <see cref="Task"/> represesnting the work performed.</returns>
         Task ForceGarbageCollection(SiloAddress[] hostsIds);
-        /// <summary>Perform a run of the Orleans activation collecter in the specified silos.</summary>
+
+        /// <summary>Perform a run of the Orleans activation collector in the specified silos.</summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="ageLimit">Maximum idle time of activations to be collected.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task ForceActivationCollection(SiloAddress[] hostsIds, TimeSpan ageLimit);
+
+        /// <summary>
+        /// Forces activation collection.
+        /// </summary>
+        /// <param name="ageLimit">The age limit. Grains which have been idle for longer than this period of time will be eligible for collection.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task ForceActivationCollection(TimeSpan ageLimit);
+
         /// <summary>Perform a run of the silo statistics collector in the specified silos.</summary>
         /// <param name="siloAddresses">List of silos this command is to be sent to.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses);
 
         /// <summary>
         /// Return the most recent silo runtime statistics information for the specified silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>Runtime statistics from the specified hosts.</returns>
         Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
         /// Return the most recent grain statistics information, amalgamated across silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>Simple grain statistics for the specified hosts.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
         /// Return the most recent grain statistics information, amalgamated across all silos.
         /// </summary>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <returns>Simple grain statistics.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
 
         /// <summary>
@@ -68,15 +76,18 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="types">Array of grain types to filter the results with</param>
-        /// <returns></returns>
+        /// <returns>Detailed grain statistics.</returns>
         Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null);
-
+        /// <summary>
+        /// Gets the grain activation count for a specific grain type.
+        /// </summary>
+        /// <param name="grainReference">The grain reference.</param>
+        /// <returns>Gets the number of activations of grains with the same type as the provided grain reference.</returns>
         Task<int> GetGrainActivationCount(GrainReference grainReference);
         /// <summary>
         /// Return the total count of all current grain activations across all silos.
         /// </summary>
-        /// <returns>Completion promise for this operation.</returns>
-        ///
+        /// <returns>The total number of grain activations across all silos.</returns>
         Task<int> GetTotalActivationCount();
 
         /// <summary>
@@ -110,6 +121,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns all activations of the specified grain type.
         /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>A list of all active grains of the specified type.</returns>
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
     }
 }

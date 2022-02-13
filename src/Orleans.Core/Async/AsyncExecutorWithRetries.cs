@@ -11,6 +11,9 @@ namespace Orleans.Internal
     /// </summary>
     public static class AsyncExecutorWithRetries
     {
+        /// <summary>
+        /// Constant used to request an infinite number of retries.
+        /// </summary>
         public static readonly int INFINITE_RETRIES = -1;
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     /// <summary> Severity levels for log messages. </summary>
     public enum Severity

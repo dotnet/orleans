@@ -4,12 +4,17 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Implementation of <see cref="ISerializationBinder"/> which resolves types using a <see cref="TypeResolver"/>.
+    /// </summary>
     public class OrleansJsonSerializationBinder : DefaultSerializationBinder
     {
         private readonly TypeResolver typeResolver;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansJsonSerializationBinder"/> class.
+        /// </summary>
+        /// <param name="typeResolver">The type resolver.</param>
         public OrleansJsonSerializationBinder(TypeResolver typeResolver)
         {
             this.typeResolver = typeResolver;

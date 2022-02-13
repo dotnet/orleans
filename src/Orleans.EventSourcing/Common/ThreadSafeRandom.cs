@@ -2,7 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 
 #nullable enable
-namespace Orleans.Internal
+namespace Orleans.Internal.EventSourcing
 {
     /// <summary>
     /// Thread-safe random number generator

@@ -3,23 +3,32 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// <see cref="ITelemetryConsumer"/> implementation which writes output to the console.
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.ITraceTelemetryConsumer" />
+    /// <seealso cref="Orleans.Runtime.IExceptionTelemetryConsumer" />
     public class ConsoleTelemetryConsumer : ITraceTelemetryConsumer, IExceptionTelemetryConsumer
     {
+        /// <inheritdoc/>
         public void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
         {
             ConsoleText.WriteError(TraceParserUtils.PrintProperties(exception.Message, properties), exception);
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message)
         {
             ConsoleText.WriteLine(message);
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, IDictionary<string, string> properties = null)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties));
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severity)
         {
             switch (severity)
@@ -46,12 +55,16 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties = null)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties));
         }
 
+        /// <inheritdoc/>
         public void Flush() { }
+
+        /// <inheritdoc/>
         public void Close() { }
 
         private static class ConsoleText

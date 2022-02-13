@@ -2,6 +2,9 @@ using System;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Interface for services which can be probed for health status.
+    /// </summary>
     public interface IHealthCheckable
     {
         /// <summary>

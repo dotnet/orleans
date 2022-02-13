@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 
-namespace Orleans
+namespace Orleans.Internal.Trasactions
 {
-    public class PeriodicAction
+    internal class PeriodicAction
     {
         private readonly Action action;
         private readonly TimeSpan period;

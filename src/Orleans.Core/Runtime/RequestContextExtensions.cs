@@ -6,8 +6,15 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Extensions for working wiht <see cref="RequestContext"/>.
+    /// </summary>
     public static class RequestContextExtensions
     {
+        /// <summary>
+        /// Imports the specified context data into the current <see cref="RequestContext"/>, clearing all existing values.
+        /// </summary>
+        /// <param name="contextData">The context data.</param>
         public static void Import(Dictionary<string, object> contextData)
         {
             if (RequestContext.PropagateActivityId)
@@ -37,6 +44,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Exports a copy of the current <see cref="RequestContext"/>.
+        /// </summary>
+        /// <param name="copier">The copier.</param>
+        /// <returns>A copy of the current request context.</returns>
         public static Dictionary<string, object> Export(DeepCopier copier)
         {
             var values = RequestContext.CallContextData.Value;
