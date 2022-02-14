@@ -16,7 +16,7 @@ namespace Orleans.Runtime.TestHooks
     /// <summary>
     /// A fake, test-only implementation of <see cref="IHostEnvironmentStatistics"/>.
     /// </summary>
-    public class TestHooksHostEnvironmentStatistics : IHostEnvironmentStatistics
+    internal class TestHooksHostEnvironmentStatistics : IHostEnvironmentStatistics
     {
         /// <inheritdoc />
         public long? TotalPhysicalMemory { get; set; }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
@@ -13,6 +14,11 @@ namespace Orleans.Metadata
         private readonly TypeConverter _typeConverter;
         private readonly ImmutableDictionary<GrainType, Type> _types;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainClassMap"/> class.
+        /// </summary>
+        /// <param name="typeConverter">The type converter.</param>
+        /// <param name="classes">The grain classes.</param>
         public GrainClassMap(TypeConverter typeConverter, ImmutableDictionary<GrainType, Type> classes)
         {
             _typeConverter = typeConverter;
@@ -22,7 +28,10 @@ namespace Orleans.Metadata
         /// <summary>
         /// Returns the grain class type corresponding to the provided grain type.
         /// </summary>
-        public bool TryGetGrainClass(GrainType grainType, out Type grainClass)
+        /// <param name="grainType">Type of the grain.</param>
+        /// <param name="grainClass">The grain class.</param>
+        /// <returns><see langword="true"/> if a corresponding grain class was found, <see langword="false"/> otherwise.</returns>
+        public bool TryGetGrainClass(GrainType grainType, [NotNullWhen(true)] out Type grainClass)
         {
             GrainType lookupType;
             Type[] args;

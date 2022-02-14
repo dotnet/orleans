@@ -25,6 +25,10 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public int LowestStoppedStage => this.lowestStoppedStage;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
         public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : base(logger)
         {
             this.logger = logger;
@@ -33,6 +37,7 @@ namespace Orleans.Runtime
             this.lowestStoppedStage = int.MaxValue;
         }
 
+        /// <inheritdoc />
         public override Task OnStart(CancellationToken cancellationToken = default)
         {
             foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
@@ -47,24 +52,28 @@ namespace Orleans.Runtime
             return base.OnStart(cancellationToken);
         }
 
+        /// <inheritdoc />
         protected override void OnStartStageCompleted(int stage)
         {
             Interlocked.Exchange(ref this.highestCompletedStage, stage);
             base.OnStartStageCompleted(stage);
         }
 
+        /// <inheritdoc />
         protected override void OnStopStageCompleted(int stage)
         {
             Interlocked.Exchange(ref this.lowestStoppedStage, stage);
             base.OnStopStageCompleted(stage);
         }
 
+        /// <inheritdoc />
         protected override string GetStageName(int stage)
         {
             if (StageNames.TryGetValue(stage, out var result)) return result;
             return base.GetStageName(stage);
         }
 
+        /// <inheritdoc />
         protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
             this.logger?.LogInformation(
@@ -74,6 +83,7 @@ namespace Orleans.Runtime
                     elapsed.TotalMilliseconds);
         }
 
+        /// <inheritdoc />
         protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
             this.logger?.LogInformation(
@@ -83,6 +93,7 @@ namespace Orleans.Runtime
                     elapsed.TotalMilliseconds);
         }
 
+        /// <inheritdoc />
         public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.logger);

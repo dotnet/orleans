@@ -19,6 +19,7 @@ namespace Orleans.Runtime.Services
         /// <summary>
         /// Currently we only support a single GrainService per Silo, when multiple are supported we will request the number of GrainServices to partition per silo here.
         /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
         protected GrainServiceClient(IServiceProvider serviceProvider)
         {
             grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.Services
         }
 
         /// <summary>
-        /// Resolves the correct GrainService responsible for actioning the request based on the CallingGrainReference
+        /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <see cref="CallingGrainReference"/>
         /// </summary>
         protected TGrainService GrainService
         {
@@ -46,15 +47,10 @@ namespace Orleans.Runtime.Services
         }
 
         /// <summary>
-        /// Resolves the Grain Reference invoking this request.
+        /// Gets a reference to the the currently executing grain.
         /// </summary>
         protected GrainReference CallingGrainReference => RuntimeContext.Current?.GrainReference;
 
-        /// <summary>
-        /// Moved from InsideRuntimeClient.cs
-        /// </summary>
-        /// <param name="grainRef"></param>
-        /// <returns></returns>
         private SiloAddress MapGrainReferenceToSiloRing(GrainReference grainRef)
         {
             var hashCode = grainRef.GetUniformHashCode();

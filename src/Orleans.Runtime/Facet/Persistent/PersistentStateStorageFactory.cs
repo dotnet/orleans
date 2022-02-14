@@ -7,8 +7,14 @@ using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Creates <see cref="IPersistentState{TState}"/> instances for grains.
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.IPersistentStateFactory" />
     public class PersistentStateFactory : IPersistentStateFactory
     {
+
+        /// <inheritdoc/>
         public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             IGrainStorage storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)

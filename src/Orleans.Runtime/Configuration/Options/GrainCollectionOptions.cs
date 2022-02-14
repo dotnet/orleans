@@ -12,6 +12,10 @@ namespace Orleans.Configuration
         /// Regulates the periodic collection of inactive grains.
         /// </summary>
         public TimeSpan CollectionQuantum { get; set; } = DEFAULT_COLLECTION_QUANTUM;
+
+        /// <summary>
+        /// The default value for <see cref="CollectionQuantum"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromMinutes(1);
 
         /// <summary>
@@ -28,6 +32,10 @@ namespace Orleans.Configuration
         /// Timeout value before giving up when trying to activate a grain.
         /// </summary>
         public TimeSpan ActivationTimeout { get; set; } = DEFAULT_ACTIVATION_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="ActivationTimeout"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_ACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
 
         /// <summary>
@@ -35,6 +43,10 @@ namespace Orleans.Configuration
         /// (waiting for all timers to stop and calling Grain.OnDeactivate())
         /// </summary>
         public TimeSpan DeactivationTimeout { get; set; } = DEFAULT_DEACTIVATION_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="DeactivationTimeout"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
     }
 }

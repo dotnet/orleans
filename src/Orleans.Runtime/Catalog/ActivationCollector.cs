@@ -30,6 +30,12 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> _options;
         private readonly CounterStatistic collectionCounter;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
+        /// </summary>
+        /// <param name="timerFactory">The timer factory.</param>
+        /// <param name="options">The options.</param>
+        /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
             IOptions<GrainCollectionOptions> options,
@@ -65,8 +71,22 @@ namespace Orleans.Runtime
             return sum;
         }
 
+        /// <summary>
+        /// Collects all eligible grain activations which have been idle for at least <paramref name="ageLimit"/>.
+        /// </summary>
+        /// <param name="ageLimit">The age limit.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
-
+                
+        /// <summary>
+        /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
+        /// </summary>        
+        /// <param name="item">
+        /// The grain context.
+        /// </param>        
+        /// <param name="timeout">
+        /// The current idle collection time for the grain.
+        /// </param>
         public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout)
         {
             lock (item)
@@ -86,7 +106,12 @@ namespace Orleans.Runtime
                 Add(item, ticket);
             }
         }
-        
+
+        /// <summary>
+        /// Tries the cancel idle activation collection.
+        /// </summary>
+        /// <param name="item">The grain context.</param>
+        /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
         public bool TryCancelCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
@@ -105,6 +130,11 @@ namespace Orleans.Runtime
             return true;
         }
 
+        /// <summary>
+        /// Tries the reschedule collection.
+        /// </summary>
+        /// <param name="item">The grain context.</param>
+        /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
         public bool TryRescheduleCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
@@ -168,6 +198,7 @@ namespace Orleans.Runtime
             return true;
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             var now = DateTime.UtcNow;
@@ -236,7 +267,7 @@ namespace Orleans.Runtime
         /// Scans for activations that have been idle for the specified age limit.
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
-        /// <returns></returns>
+        /// <returns>The grain activations which have been idle for at least the specified age limit.</returns>
         public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
         {
             List<ICollectibleGrainContext> condemned = null;
@@ -499,6 +530,7 @@ namespace Orleans.Runtime
             await mtcs.Task;
         }
 
+        /// <inheritdoc/>
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
             if (_collectionTimer is IAsyncTimer timer)

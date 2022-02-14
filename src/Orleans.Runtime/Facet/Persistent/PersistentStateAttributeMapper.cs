@@ -4,10 +4,15 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Attribute mapper which maps persistent state attributes to a corresponding factory instance.
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.IAttributeToFactoryMapper{Orleans.Runtime.PersistentStateAttribute}" />
     public class PersistentStateAttributeMapper : IAttributeToFactoryMapper<PersistentStateAttribute>
     {
         private static readonly MethodInfo create = typeof(IPersistentStateFactory).GetMethod("Create");
 
+        /// <inheritdoc/>
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute attribute)
         {
             IPersistentStateConfiguration config = attribute;
