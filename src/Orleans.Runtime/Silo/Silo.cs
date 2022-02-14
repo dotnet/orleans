@@ -642,7 +642,7 @@ namespace Orleans.Runtime
 
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
 
-        /// <summary> Object.ToString override -- summary info for this silo. </summary>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return localGrainDirectory.ToString();
