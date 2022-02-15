@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Codec for arrays of rank 1.
+    /// Serializer for arrays of rank 1.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -19,11 +19,16 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T> _fieldCodec;
         private static readonly Type CodecElementType = typeof(T);
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArrayCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public ArrayCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -44,6 +49,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public T[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -121,16 +127,25 @@ namespace Orleans.Serialization.Codecs
         private static T[] ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
+    /// <summary>
+    /// Copier for arrays of rank 1.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class ArrayCopier<T> : IDeepCopier<T[]>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArrayCopier{T}"/> class.
+        /// </summary>
+        /// <param name="elementCopier">The element copier.</param>
         public ArrayCopier(IDeepCopier<T> elementCopier)
         {
             _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
         }
 
+        /// <inheritdoc/>
         public T[] DeepCopy(T[] input, CopyContext context)
         {
             if (context.TryGetCopy<T[]>(input, out var result))
@@ -150,7 +165,7 @@ namespace Orleans.Serialization.Codecs
     }
 
     /// <summary>
-    /// Codec for <see cref="ReadOnlyMemory{T}"/>.
+    /// Serializer for <see cref="ReadOnlyMemory{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -159,11 +174,16 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReadOnlyMemoryCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public ReadOnlyMemoryCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -184,6 +204,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public ReadOnlyMemory<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -261,16 +282,25 @@ namespace Orleans.Serialization.Codecs
             $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="ReadOnlyMemory{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class ReadOnlyMemoryCopier<T> : IDeepCopier<ReadOnlyMemory<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReadOnlyMemoryCopier{T}"/> class.
+        /// </summary>
+        /// <param name="elementCopier">The element copier.</param>
         public ReadOnlyMemoryCopier(IDeepCopier<T> elementCopier)
         {
             _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
         }
 
+        /// <inheritdoc/>
         public ReadOnlyMemory<T> DeepCopy(ReadOnlyMemory<T> input, CopyContext context)
         {
             if (input.IsEmpty)
@@ -299,7 +329,7 @@ namespace Orleans.Serialization.Codecs
     }
     
     /// <summary>
-    /// Codec for <see cref="Memory{T}"/>.
+    /// Serializer for <see cref="Memory{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -308,11 +338,16 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MemoryCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public MemoryCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -333,6 +368,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public Memory<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -410,16 +446,25 @@ namespace Orleans.Serialization.Codecs
             $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Memory{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class MemoryCopier<T> : IDeepCopier<Memory<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MemoryCopier{T}"/> class.
+        /// </summary>
+        /// <param name="elementCopier">The element copier.</param>
         public MemoryCopier(IDeepCopier<T> elementCopier)
         {
             _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
         }
 
+        /// <inheritdoc/>
         public Memory<T> DeepCopy(Memory<T> input, CopyContext context)
         {
             if (input.IsEmpty)
@@ -442,7 +487,7 @@ namespace Orleans.Serialization.Codecs
     }
     
     /// <summary>
-    /// Codec for <see cref="ArraySegment{T}"/>.
+    /// Serializer for <see cref="ArraySegment{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -451,11 +496,16 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArraySegmentCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public ArraySegmentCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ArraySegment<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -476,6 +526,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public ArraySegment<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -553,16 +604,25 @@ namespace Orleans.Serialization.Codecs
             $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="ArraySegment{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class ArraySegmentCopier<T> : IDeepCopier<ArraySegment<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArraySegmentCopier{T}"/> class.
+        /// </summary>
+        /// <param name="elementCopier">The element copier.</param>
         public ArraySegmentCopier(IDeepCopier<T> elementCopier)
         {
             _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
         }
 
+        /// <inheritdoc/>
         public ArraySegment<T> DeepCopy(ArraySegment<T> input, CopyContext context)
         {
             if (input.Array is null)

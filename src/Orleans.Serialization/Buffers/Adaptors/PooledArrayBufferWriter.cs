@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 
@@ -15,6 +15,10 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private byte[] _current;
         private long _totalLength;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
+        /// </summary>
+        /// <param name="minAllocationSize">Minimum size of the allocation.</param>
         public PooledArrayBufferWriter(int minAllocationSize)
         {
             _committed = new();
@@ -23,6 +27,10 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _minAllocationSize = minAllocationSize > 0 ? minAllocationSize : 4096;
         }
 
+        /// <summary>
+        /// Returns the data which has been written as an array.
+        /// </summary>
+        /// <returns>The data which has been written.</returns>
         public byte[] ToArray()
         {
             var result = new byte[_totalLength];
@@ -36,6 +44,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return result;
         }
 
+        /// <inheritdoc/>
         public void Advance(int bytes)
         {
             if (bytes == 0)
@@ -48,6 +57,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _current = Array.Empty<byte>();
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             foreach (var (array, _) in _committed)
@@ -63,6 +73,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _committed.Clear();
         }
 
+        /// <inheritdoc/>
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
             if (sizeHint == 0)
@@ -82,6 +93,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return newBuffer;
         }
 
+        /// <inheritdoc/>
         public Span<byte> GetSpan(int sizeHint)
         {
             if (sizeHint == 0)

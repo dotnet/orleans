@@ -117,7 +117,7 @@ namespace Orleans.Runtime
     internal class GrainReferenceCopierProvider : ISpecializableCopier
     {
         /// <inheritdoc/>
-        public IDeepCopier GetSpecializedCodec(Type type) => (IDeepCopier)Activator.CreateInstance(typeof(TypedGrainReferenceCopier<>).MakeGenericType(type));
+        public IDeepCopier GetSpecializedCopier(Type type) => (IDeepCopier)Activator.CreateInstance(typeof(TypedGrainReferenceCopier<>).MakeGenericType(type));
 
         /// <inheritdoc/>
         public bool IsSupportedType(Type type) => typeof(IAddressable).IsAssignableFrom(type) && type.IsInterface;

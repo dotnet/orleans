@@ -7,13 +7,18 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="byte"/> arrays.
+    /// </summary>
     [RegisterSerializer]
     public sealed class ByteArrayCodec : TypedCodecBase<byte[], ByteArrayCodec>, IFieldCodec<byte[]>
     {
         private static readonly Type CodecFieldType = typeof(byte[]);
 
+        /// <inheritdoc/>
         byte[] IFieldCodec<byte[]>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <inheritdoc/>
         public static byte[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -32,8 +37,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<byte[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte[] value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <inheritdoc/>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -51,11 +58,16 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for byte[] fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="byte"/> arrays.
+    /// </summary>
     [RegisterCopier]
     public sealed class ByteArrayCopier : IDeepCopier<byte[]>
     {
+        /// <inheritdoc/>
         byte[] IDeepCopier<byte[]>.DeepCopy(byte[] input, CopyContext context) => DeepCopy(input, context);
 
+        /// <inheritdoc/>
         public static byte[] DeepCopy(byte[] input, CopyContext context)
         {
             if (context.TryGetCopy<byte[]>(input, out var result))
@@ -70,13 +82,18 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="ReadOnlyMemory{Byte}"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class ReadOnlyMemoryOfByteCodec : TypedCodecBase<ReadOnlyMemory<byte>, ReadOnlyMemoryOfByteCodec>, IFieldCodec<ReadOnlyMemory<byte>>
     {
         private static readonly Type CodecFieldType = typeof(ReadOnlyMemory<byte>);
 
+        /// <inheritdoc/>
         ReadOnlyMemory<byte> IFieldCodec<ReadOnlyMemory<byte>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <inheritdoc/>
         public static byte[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -95,8 +112,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<ReadOnlyMemory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <inheritdoc/>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<byte> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -114,11 +133,16 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for ReadOnlyMemory<byte> fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="ReadOnlyMemory{Byte}"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class ReadOnlyMemoryOfByteCopier : IDeepCopier<ReadOnlyMemory<byte>>
     {
+        /// <inheritdoc/>
         ReadOnlyMemory<byte> IDeepCopier<ReadOnlyMemory<byte>>.DeepCopy(ReadOnlyMemory<byte> input, CopyContext _) => DeepCopy(input, _);
 
+        /// <inheritdoc/>
         public static ReadOnlyMemory<byte> DeepCopy(ReadOnlyMemory<byte> input, CopyContext _)
         {
             if (input.IsEmpty)
@@ -132,11 +156,16 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Copier for <see cref="ArraySegment{Byte}"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class ArraySegmentOfByteCopier : IDeepCopier<ArraySegment<byte>>
     {
+        /// <inheritdoc/>
         ArraySegment<byte> IDeepCopier<ArraySegment<byte>>.DeepCopy(ArraySegment<byte> input, CopyContext _) => DeepCopy(input, _);
 
+        /// <inheritdoc/>
         public static ArraySegment<byte> DeepCopy(ArraySegment<byte> input, CopyContext _)
         {
             if (input.Array is null)
@@ -150,13 +179,18 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Memory{Byte}"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class MemoryOfByteCodec : TypedCodecBase<Memory<byte>, MemoryOfByteCodec>, IFieldCodec<Memory<byte>>
     {
         private static readonly Type CodecFieldType = typeof(Memory<byte>);
 
+        /// <inheritdoc/>
         Memory<byte> IFieldCodec<Memory<byte>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <inheritdoc/>
         public static Memory<byte> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -175,8 +209,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<Memory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <inheritdoc/>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<byte> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -194,11 +230,16 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for ReadOnlyMemory<byte> fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Memory{T}"/> of <see cref="byte"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class MemoryOfByteCopier : IDeepCopier<Memory<byte>>
     {
+        /// <inheritdoc/>
         Memory<byte> IDeepCopier<Memory<byte>>.DeepCopy(Memory<byte> input, CopyContext _) => DeepCopy(input, _);
 
+        /// <inheritdoc/>
         public static Memory<byte> DeepCopy(Memory<byte> input, CopyContext _)
         {
             if (input.IsEmpty)

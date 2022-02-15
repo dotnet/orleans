@@ -12,13 +12,22 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     public static class FieldHeaderCodec
     {
+        /// <summary>
+        /// Writes the field header.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="actualType">The actual type.</param>
+        /// <param name="wireType">The wire type.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteFieldHeader<TBufferWriter>(
-            ref this Writer<TBufferWriter> writer,
-            uint fieldId,
-            Type expectedType,
-            Type actualType,
-            WireType wireType) where TBufferWriter : IBufferWriter<byte>
+                    ref this Writer<TBufferWriter> writer,
+                    uint fieldId,
+                    Type expectedType,
+                    Type actualType,
+                    WireType wireType) where TBufferWriter : IBufferWriter<byte>
         {
             var hasExtendedFieldId = fieldId > Tag.MaxEmbeddedFieldIdDelta;
             var embeddedFieldId = hasExtendedFieldId ? Tag.FieldIdCompleteMask : (byte)fieldId;
@@ -64,9 +73,16 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Writes an expected field header value.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="wireType">The wire type of the field.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteFieldHeaderExpected<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-            where TBufferWriter : IBufferWriter<byte>
+                    where TBufferWriter : IBufferWriter<byte>
         {
             if (fieldId < Tag.MaxEmbeddedFieldIdDelta)
             {
@@ -78,18 +94,38 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Writes an field header value with an expected type and an embedded field identifier.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="wireType">The wire type.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteFieldHeaderExpectedEmbedded<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-            where TBufferWriter : IBufferWriter<byte> => writer.WriteByte((byte)((byte)wireType | (byte)fieldId));
+                    where TBufferWriter : IBufferWriter<byte> => writer.WriteByte((byte)((byte)wireType | (byte)fieldId));
 
+        /// <summary>
+        /// Writes a field header with an expected type and an extended field id.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="wireType">The wire type.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteFieldHeaderExpectedExtended<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-            where TBufferWriter : IBufferWriter<byte>
+                    where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteByte((byte)((byte)wireType | Tag.FieldIdCompleteMask));
             writer.WriteVarUInt32(fieldId);
         }
 
+        /// <summary>
+        /// Reads a field header.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field header.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ReadFieldHeader<TInput>(ref this Reader<TInput> reader, ref Field field)
         {
@@ -108,6 +144,12 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Reads a field header.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The field header.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Field ReadFieldHeader<TInput>(ref this Reader<TInput> reader)
         {
@@ -128,8 +170,14 @@ namespace Orleans.Serialization.Codecs
             return field;
         }
 
+        /// <summary>
+        /// Reads an extended field header.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, ref Field field)
+        internal static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, ref Field field)
         {
             // If all of the field id delta bits are set and the field isn't an extended wiretype field, read the extended field id delta
             var notExtended = (field.Tag & (byte)WireType.Extended) != (byte)WireType.Extended;
@@ -210,6 +258,12 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Reads a field header for diagnostic purposes.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The value which was read.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (Field Field, string Type) ReadFieldHeaderForAnalysis<TInput>(ref this Reader<TInput> reader)
         {
@@ -256,6 +310,5 @@ namespace Orleans.Serialization.Codecs
                 field.FieldTypeRaw = default;
             }
         }
-
     }
 }

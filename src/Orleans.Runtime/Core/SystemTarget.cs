@@ -169,6 +169,7 @@ namespace Orleans.Runtime
         /// The time interval between invocations of <paramref name="asyncCallback"/>.
         /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signalling.
         /// </param>
+        /// <param name="name">The timer name.</param>
         /// <returns>
         /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
         /// </returns>

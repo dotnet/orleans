@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -15,6 +15,11 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private byte[] _buffer;
         private int _index;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArrayStreamBufferWriter"/> struct.
+        /// </summary>
+        /// <param name="stream">The stream.</param>
+        /// <param name="sizeHint">The size hint.</param>
         public ArrayStreamBufferWriter(Stream stream, int sizeHint = 0)
         {
             if (sizeHint == 0)

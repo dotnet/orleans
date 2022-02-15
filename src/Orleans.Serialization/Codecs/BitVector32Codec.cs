@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 using System;
@@ -7,11 +7,15 @@ using System.Collections.Specialized;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="BitVector32"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class BitVector32Codec : IFieldCodec<BitVector32>
     {
         void IFieldCodec<BitVector32>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, BitVector32 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <inheritdoc/>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, BitVector32 value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
@@ -19,8 +23,10 @@ namespace Orleans.Serialization.Codecs
             writer.WriteInt32(value.Data);  // BitVector32.Data gets the value of the BitVector32 as an Int32
         }
 
+        /// <inheritdoc/>
         BitVector32 IFieldCodec<BitVector32>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <inheritdoc/>
         public static BitVector32 ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -36,9 +42,13 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {nameof(BitVector32)} fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="BitVector32"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class BitVector32Copier : IDeepCopier<BitVector32>
     {
+        /// <inheritdoc/>
         public BitVector32 DeepCopy(BitVector32 input, CopyContext _) => new(input);
     }
 }

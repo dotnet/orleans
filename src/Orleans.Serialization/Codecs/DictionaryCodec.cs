@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Codec for <see cref="Dictionary{TKey, TValue}"/>.
+    /// Serializer for <see cref="Dictionary{TKey, TValue}"/>.
     /// </summary>
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
@@ -24,6 +24,12 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<IEqualityComparer<TKey>> _comparerCodec;
         private readonly DictionaryActivator<TKey, TValue> _activator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DictionaryCodec{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="pairCodec">The key value pair codec.</param>
+        /// <param name="comparerCodec">The comparer codec.</param>
+        /// <param name="activator">The activator.</param>
         public DictionaryCodec(
             IFieldCodec<KeyValuePair<TKey, TValue>> pairCodec,
             IFieldCodec<IEqualityComparer<TKey>> comparerCodec,
@@ -34,6 +40,7 @@ namespace Orleans.Serialization.Codecs
             _activator = activator;
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Dictionary<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -60,6 +67,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public Dictionary<TKey, TValue> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -130,18 +138,29 @@ namespace Orleans.Serialization.Codecs
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Dictionary{TKey, TValue}"/>.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the t key.</typeparam>
+    /// <typeparam name="TValue">The type of the t value.</typeparam>
     [RegisterCopier]
     public sealed class DictionaryCopier<TKey, TValue> : IDeepCopier<Dictionary<TKey, TValue>>, IBaseCopier<Dictionary<TKey, TValue>>
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DictionaryCopier{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="keyCopier">The key copier.</param>
+        /// <param name="valueCopier">The value copier.</param>
         public DictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
             _keyCopier = keyCopier;
             _valueCopier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public Dictionary<TKey, TValue> DeepCopy(Dictionary<TKey, TValue> input, CopyContext context)
         {
             if (context.TryGetCopy<Dictionary<TKey, TValue>>(input, out var result))
@@ -164,6 +183,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(Dictionary<TKey, TValue> input, Dictionary<TKey, TValue> output, CopyContext context)
         {
             foreach (var pair in input)

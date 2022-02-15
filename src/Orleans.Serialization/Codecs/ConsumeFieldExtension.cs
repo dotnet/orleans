@@ -3,11 +3,17 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Extension methods for consuming unknown fields.
+    /// </summary>
     public static class ConsumeFieldExtension
     {
         /// <summary>
         /// Consumes an unknown field.
         /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
         public static void ConsumeUnknownField<TInput>(this ref Reader<TInput> reader, Field field)
         {
             // References cannot themselves be referenced.
@@ -51,6 +57,8 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Consumes a tag-delimited field.
         /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
         private static void ConsumeTagDelimitedField<TInput>(this ref Reader<TInput> reader)
         {
             while (true)

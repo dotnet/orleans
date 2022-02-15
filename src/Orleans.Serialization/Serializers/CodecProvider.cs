@@ -512,7 +512,7 @@ namespace Orleans.Serialization.Serializers
                     {
                         if (specializableCopier.IsSupportedType(fieldType))
                         {
-                            untypedResult = specializableCopier.GetSpecializedCodec(fieldType);
+                            untypedResult = specializableCopier.GetSpecializedCopier(fieldType);
                             break;
                         }
                     }

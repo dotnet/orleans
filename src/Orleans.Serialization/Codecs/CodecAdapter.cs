@@ -14,11 +14,18 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Converts a strongly-typed codec into an untyped codec.
         /// </summary>
+        /// <typeparam name="TField">The underlying field type.</typeparam>
+        /// <typeparam name="TCodec">The type of the codec being adapted.</typeparam>
+        /// <param name="typedCodec">The typed codec.</param>
+        /// <returns>The adapted codec.</returns>
         public static IFieldCodec<object> CreateUntypedFromTyped<TField, TCodec>(TCodec typedCodec) where TCodec : IFieldCodec<TField> => new TypedCodecWrapper<TField, TCodec>(typedCodec);
 
         /// <summary>
         /// Converts an untyped codec into a strongly-typed codec.
         /// </summary>
+        /// <typeparam name="TField">The underlying field type.</typeparam>
+        /// <param name="untypedCodec">The untyped codec.</param>
+        /// <returns>The adapted coded.</returns>
         public static IFieldCodec<TField> CreateTypedFromUntyped<TField>(IFieldCodec<object> untypedCodec) => new UntypedCodecWrapper<TField>(untypedCodec);
 
         private sealed class TypedCodecWrapper<TField, TCodec> : IFieldCodec<object>, IWrappedCodec where TCodec : IFieldCodec<TField>
@@ -62,11 +69,18 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Converts a strongly-typed codec into an untyped base codec.
         /// </summary>
+        /// <typeparam name="TField">The field type.</typeparam>
+        /// <typeparam name="TCodec">The codec type.</typeparam>
+        /// <param name="typedCodec">The typed codec.</param>
+        /// <returns>The adapted codec.</returns>
         public static IBaseCodec<object> CreateUntypedFromTyped<TField, TCodec>(TCodec typedCodec) where TCodec : IBaseCodec<TField> where TField : class => new TypedBaseCodecWrapper<TField, TCodec>(typedCodec);
 
         /// <summary>
         /// Converts an untyped codec into a strongly-typed base codec.
         /// </summary>
+        /// <typeparam name="TField">The field type.</typeparam>
+        /// <param name="untypedCodec">The untyped codec.</param>
+        /// <returns>The adapted codec.</returns>
         public static IBaseCodec<TField> CreateTypedFromUntyped<TField>(IBaseCodec<object> untypedCodec) where TField : class => new UntypedBaseCodecWrapper<TField>(untypedCodec);
 
         private sealed class TypedBaseCodecWrapper<TField, TCodec> : IBaseCodec<object>, IWrappedCodec where TCodec : IBaseCodec<TField> where TField : class
