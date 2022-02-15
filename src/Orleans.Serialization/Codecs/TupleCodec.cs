@@ -7,6 +7,10 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
     public sealed class TupleCodec<T> : IFieldCodec<Tuple<T>>
     {
@@ -14,11 +18,16 @@ namespace Orleans.Serialization.Codecs
 
         private readonly IFieldCodec<T> _valueCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T}"/> class.
+        /// </summary>
+        /// <param name="valueCodec">The value codec.</param>
         public TupleCodec(IFieldCodec<T> valueCodec)
         {
             _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -33,6 +42,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T> IFieldCodec<Tuple<T>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -78,15 +88,25 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T> : IDeepCopier<Tuple<T>>
     {
         private readonly IDeepCopier<T> _copier;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The copier.</param>
         public TupleCopier(IDeepCopier<T> copier)
         {
             _copier = copier;
         }
 
+        /// <inheritdoc />
         public Tuple<T> DeepCopy(Tuple<T> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T> result))
@@ -105,6 +125,11 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2> : IFieldCodec<Tuple<T1, T2>>
     {
@@ -114,12 +139,18 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
         public TupleCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec)
         {
             _item1Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item1Codec);
             _item2Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item2Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -135,6 +166,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2> IFieldCodec<Tuple<T1, T2>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -183,13 +215,23 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
-    
+
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2}"/>
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2> : IDeepCopier<Tuple<T1, T2>>
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
         public TupleCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2)
         {
             _copier1 = copier1;
@@ -216,6 +258,12 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3> : IFieldCodec<Tuple<T1, T2, T3>>
     {
@@ -227,6 +275,12 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T2> _item2Codec;
         private readonly IFieldCodec<T3> _item3Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -237,6 +291,7 @@ namespace Orleans.Serialization.Codecs
             _item3Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item3Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2, T3> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -253,6 +308,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3> IFieldCodec<Tuple<T1, T2, T3>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -305,7 +361,13 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
-    
+
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3> : IDeepCopier<Tuple<T1, T2, T3>>
     {
@@ -313,6 +375,12 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -323,6 +391,7 @@ namespace Orleans.Serialization.Codecs
             _copier3 = copier3;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3> DeepCopy(Tuple<T1, T2, T3> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3> result))
@@ -344,6 +413,13 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3, T4}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3, T4> : IFieldCodec<Tuple<T1, T2, T3, T4>>
     {
@@ -357,6 +433,13 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T3> _item3Codec;
         private readonly IFieldCodec<T4> _item4Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3, T4}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
+        /// <param name="item4Codec">The <typeparamref name="T4"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -369,6 +452,7 @@ namespace Orleans.Serialization.Codecs
             _item4Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item4Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3, T4>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2, T3, T4> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -386,6 +470,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3, T4> IFieldCodec<Tuple<T1, T2, T3, T4>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -443,6 +528,13 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3, T4}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3, T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>
     {
@@ -451,6 +543,13 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T3> _copier3;
         private readonly IDeepCopier<T4> _copier4;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
+        /// <param name="copier4">The <typeparamref name="T4"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -463,6 +562,7 @@ namespace Orleans.Serialization.Codecs
             _copier4 = copier4;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3, T4> DeepCopy(Tuple<T1, T2, T3, T4> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4> result))
@@ -483,8 +583,16 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             return result;
         }
-    } 
+    }
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3, T4, T5> : IFieldCodec<Tuple<T1, T2, T3, T4, T5>>
     {
@@ -500,6 +608,14 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T4> _item4Codec;
         private readonly IFieldCodec<T5> _item5Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3, T4, T5}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
+        /// <param name="item4Codec">The <typeparamref name="T4"/> codec.</param>
+        /// <param name="item5Codec">The <typeparamref name="T5"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -514,6 +630,7 @@ namespace Orleans.Serialization.Codecs
             _item5Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item5Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3, T4, T5>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
@@ -535,6 +652,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3, T4, T5> IFieldCodec<Tuple<T1, T2, T3, T4, T5>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -596,6 +714,14 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>
     {
@@ -605,6 +731,14 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T4> _copier4;
         private readonly IDeepCopier<T5> _copier5;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
+        /// <param name="copier4">The <typeparamref name="T4"/> copier.</param>
+        /// <param name="copier5">The <typeparamref name="T5"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -619,6 +753,7 @@ namespace Orleans.Serialization.Codecs
             _copier5 = copier5;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5> DeepCopy(Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5> result))
@@ -642,6 +777,15 @@ namespace Orleans.Serialization.Codecs
         }
     } 
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3, T4, T5, T6> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>
     {
@@ -659,6 +803,15 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T5> _item5Codec;
         private readonly IFieldCodec<T6> _item6Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3, T4, T5, T6}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
+        /// <param name="item4Codec">The <typeparamref name="T4"/> codec.</param>
+        /// <param name="item5Codec">The <typeparamref name="T5"/> codec.</param>
+        /// <param name="item6Codec">The <typeparamref name="T6"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -675,6 +828,7 @@ namespace Orleans.Serialization.Codecs
             _item6Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item6Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
@@ -697,6 +851,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3, T4, T5, T6> IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -762,6 +917,15 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>
     {
@@ -772,6 +936,15 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T5> _copier5;
         private readonly IDeepCopier<T6> _copier6;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
+        /// <param name="copier4">The <typeparamref name="T4"/> copier.</param>
+        /// <param name="copier5">The <typeparamref name="T5"/> copier.</param>
+        /// <param name="copier6">The <typeparamref name="T6"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -788,6 +961,7 @@ namespace Orleans.Serialization.Codecs
             _copier6 = copier6;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6> result))
@@ -812,6 +986,16 @@ namespace Orleans.Serialization.Codecs
         }
     } 
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
+    /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3, T4, T5, T6, T7> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>
     {
@@ -831,6 +1015,16 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T6> _item6Codec;
         private readonly IFieldCodec<T7> _item7Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3, T4, T5, T6, T7}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
+        /// <param name="item4Codec">The <typeparamref name="T4"/> codec.</param>
+        /// <param name="item5Codec">The <typeparamref name="T5"/> codec.</param>
+        /// <param name="item6Codec">The <typeparamref name="T6"/> codec.</param>
+        /// <param name="item7Codec">The <typeparamref name="T7"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -849,6 +1043,7 @@ namespace Orleans.Serialization.Codecs
             _item7Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item7Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
@@ -873,6 +1068,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3, T4, T5, T6, T7> IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -942,6 +1138,16 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
+    /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>
     {
@@ -953,6 +1159,16 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T6> _copier6;
         private readonly IDeepCopier<T7> _copier7;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6, T7}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
+        /// <param name="copier4">The <typeparamref name="T4"/> copier.</param>
+        /// <param name="copier5">The <typeparamref name="T5"/> copier.</param>
+        /// <param name="copier6">The <typeparamref name="T6"/> copier.</param>
+        /// <param name="copier7">The <typeparamref name="T7"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -971,6 +1187,7 @@ namespace Orleans.Serialization.Codecs
             _copier7 = copier7;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7> result))
@@ -996,6 +1213,17 @@ namespace Orleans.Serialization.Codecs
         }
     } 
 
+    /// <summary>
+    /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7, T8}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
+    /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
+    /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterSerializer]
     public class TupleCodec<T1, T2, T3, T4, T5, T6, T7, T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
     {
@@ -1017,6 +1245,17 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T7> _item7Codec;
         private readonly IFieldCodec<T8> _item8Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCodec{T1, T2, T3, T4, T5, T6, T7, T8}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The <typeparamref name="T1"/> codec.</param>
+        /// <param name="item2Codec">The <typeparamref name="T2"/> codec.</param>
+        /// <param name="item3Codec">The <typeparamref name="T3"/> codec.</param>
+        /// <param name="item4Codec">The <typeparamref name="T4"/> codec.</param>
+        /// <param name="item5Codec">The <typeparamref name="T5"/> codec.</param>
+        /// <param name="item6Codec">The <typeparamref name="T6"/> codec.</param>
+        /// <param name="item7Codec">The <typeparamref name="T7"/> codec.</param>
+        /// <param name="item8Codec">The <typeparamref name="T8"/> codec.</param>
         public TupleCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -1037,6 +1276,7 @@ namespace Orleans.Serialization.Codecs
             _item8Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item8Codec);
         }
 
+        /// <inheritdoc />
         void IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
@@ -1061,6 +1301,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Tuple<T1, T2, T3, T4, T5, T6, T7, T8> IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -1134,6 +1375,17 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
+    /// <summary>
+    /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7, T8}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
+    /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
+    /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
+    /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
+    /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
+    /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
+    /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
+    /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterCopier]
     public class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
     {
@@ -1146,6 +1398,17 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<T7> _copier7;
         private readonly IDeepCopier<T8> _copier8;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6, T7, T8}"/> class.
+        /// </summary>
+        /// <param name="copier1">The <typeparamref name="T1"/> copier.</param>
+        /// <param name="copier2">The <typeparamref name="T2"/> copier.</param>
+        /// <param name="copier3">The <typeparamref name="T3"/> copier.</param>
+        /// <param name="copier4">The <typeparamref name="T4"/> copier.</param>
+        /// <param name="copier5">The <typeparamref name="T5"/> copier.</param>
+        /// <param name="copier6">The <typeparamref name="T6"/> copier.</param>
+        /// <param name="copier7">The <typeparamref name="T7"/> copier.</param>
+        /// <param name="copier8">The <typeparamref name="T8"/> copier.</param>
         public TupleCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -1166,6 +1429,7 @@ namespace Orleans.Serialization.Codecs
             _copier8 = copier8;
         }
 
+        /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8> result))

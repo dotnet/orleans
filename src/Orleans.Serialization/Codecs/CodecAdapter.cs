@@ -87,14 +87,22 @@ namespace Orleans.Serialization.Codecs
         {
             private readonly TCodec _codec;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="TypedBaseCodecWrapper{TField, TCodec}"/> class.
+            /// </summary>
+            /// <param name="codec">The codec.</param>
             public TypedBaseCodecWrapper(TCodec codec)
             {
                 _codec = codec;
             }
 
+            /// <inheritdoc />
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte> => _codec.Serialize(ref writer, (TField)value);
+
+            /// <inheritdoc />
             public void Deserialize<TInput>(ref Reader<TInput> reader, object value) => _codec.Deserialize(ref reader, (TField)value);
 
+            /// <inheritdoc />
             public object Inner => _codec;
         }
 
@@ -102,14 +110,22 @@ namespace Orleans.Serialization.Codecs
         {
             private readonly IBaseCodec<object> _codec;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="UntypedBaseCodecWrapper{TField}"/> class.
+            /// </summary>
+            /// <param name="codec">The codec.</param>
             public UntypedBaseCodecWrapper(IBaseCodec<object> codec)
             {
                 _codec = codec;
             }
 
+            /// <inheritdoc />
             public object Inner => _codec;
 
+            /// <inheritdoc />
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField value) where TBufferWriter : IBufferWriter<byte> => _codec.Serialize(ref writer, value);
+
+            /// <inheritdoc />
             public void Deserialize<TInput>(ref Reader<TInput> reader, TField value) => _codec.Deserialize(ref reader, value);
         }
     }

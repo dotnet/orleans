@@ -20,12 +20,18 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<int[]> _intArrayCodec;
         private readonly IFieldCodec<T> _elementCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{T}"/> class.
+        /// </summary>
+        /// <param name="intArrayCodec">The int array codec.</param>
+        /// <param name="elementCodec">The element codec.</param>
         public MultiDimensionalArrayCodec(IFieldCodec<int[]> intArrayCodec, IFieldCodec<T> elementCodec)
         {
             _intArrayCodec = OrleansGeneratedCodeHelper.UnwrapService(this, intArrayCodec);
             _elementCodec = OrleansGeneratedCodeHelper.UnwrapService(this, elementCodec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -77,6 +83,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -146,6 +153,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public bool IsSupportedType(Type type) => type.IsArray && type.GetArrayRank() > 1;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -168,11 +176,16 @@ namespace Orleans.Serialization.Codecs
     {
         private readonly IDeepCopier<object> _elementCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCopier{T}"/> class.
+        /// </summary>
+        /// <param name="elementCopier">The element copier.</param>
         public MultiDimensionalArrayCopier(IDeepCopier<object> elementCopier)
         {
             _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
         }
 
+        /// <inheritdoc/>
         object IDeepCopier<object>.DeepCopy(object original, CopyContext context)
         {
             if (context.TryGetCopy<Array>(original, out var result))
@@ -243,6 +256,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public bool IsSupportedType(Type type) => type.IsArray && type.GetArrayRank() > 1;
     }
 }

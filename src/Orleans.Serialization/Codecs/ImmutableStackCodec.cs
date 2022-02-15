@@ -189,16 +189,25 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Stack{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>>
     {
         private readonly IDeepCopier<T> _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StackCopier{T}"/> class.
+        /// </summary>
+        /// <param name="valueCopier">The value copier.</param>
         public StackCopier(IDeepCopier<T> valueCopier)
         {
             _copier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
         {
             if (context.TryGetCopy<Stack<T>>(input, out var result))
@@ -221,6 +230,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(Stack<T> input, Stack<T> output, CopyContext context)
         {
             foreach (var item in input)

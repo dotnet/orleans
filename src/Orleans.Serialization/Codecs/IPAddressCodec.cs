@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
@@ -6,13 +6,27 @@ using System.Net;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="IPAddress"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class IPAddressCodec : IFieldCodec<IPAddress>, IDerivedTypeCodec
     {
+        /// <summary>
+        /// The codec field type
+        /// </summary>
         public static readonly Type CodecFieldType = typeof(IPAddress);
 
+        /// <inheritdoc/>
         IPAddress IFieldCodec<IPAddress>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
         public static IPAddress ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -40,11 +54,27 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
         void IFieldCodec<IPAddress>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPAddress value)
         {
             WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPAddress value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -73,9 +103,13 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Copier for <see cref="IPAddress"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class IPAddressCopier : IDeepCopier<IPAddress>
     {
+        /// <inheritdoc/>
         public IPAddress DeepCopy(IPAddress input, CopyContext _) => input;
     }
 }

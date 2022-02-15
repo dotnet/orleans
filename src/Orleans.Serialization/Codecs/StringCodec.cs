@@ -8,13 +8,27 @@ using System.Text;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="string"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class StringCodec : TypedCodecBase<string, StringCodec>, IFieldCodec<string>
     {
+        /// <summary>
+        /// The codec field type
+        /// </summary>
         public static readonly Type CodecFieldType = typeof(string);
 
+        /// <inheritdoc />
         string IFieldCodec<string>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -47,8 +61,17 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc />
         void IFieldCodec<string>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, string value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, string value) where TBufferWriter : IBufferWriter<byte>
         {
@@ -94,10 +117,21 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for string fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="string"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class StringCopier : IDeepCopier<string>
     {
-        public static string DeepCopy(string input, CopyContext _) => input;
+        /// <summary>
+        /// Creates a copy of the provided input.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="copyContext">The copy context.</param>
+        /// <returns>A copy of the provided value.</returns>
+        public static string DeepCopy(string input, CopyContext copyContext) => input;
+
+        /// <inheritdoc />
         string IDeepCopier<string>.DeepCopy(string input, CopyContext _) => input;
     }
 }

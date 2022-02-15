@@ -18,6 +18,10 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReferenceTypeSurrogateCodec{TField, TSurrogate}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The surrogate serializer.</param>
         protected ReferenceTypeSurrogateCodec(IValueSerializer<TSurrogate> surrogateSerializer)
         {
             _surrogateSerializer = surrogateSerializer;

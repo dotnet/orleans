@@ -1,17 +1,25 @@
-﻿using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="NameValueCollection"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class NameValueCollectionCodec : GeneralizedReferenceTypeSurrogateCodec<NameValueCollection, NameValueCollectionSurrogate>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NameValueCollectionCodec"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The surrogate serializer.</param>
         public NameValueCollectionCodec(IValueSerializer<NameValueCollectionSurrogate> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         public override NameValueCollection ConvertFromSurrogate(ref NameValueCollectionSurrogate surrogate)
         {
             if (surrogate.Values is null)
@@ -30,6 +38,7 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(NameValueCollection value, ref NameValueCollectionSurrogate surrogate)
         {
             if (value is null)
@@ -53,16 +62,27 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Surrogate type used by <see cref="NameValueCollectionCodec"/>.
+    /// </summary>
     [GenerateSerializer]
     public struct NameValueCollectionSurrogate
     {
+        /// <summary>
+        /// Gets or sets the values.
+        /// </summary>
+        /// <value>The values.</value>
         [Id(1)]
         public Dictionary<string, string> Values { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="NameValueCollection"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class NameValueCollectionCopier : IDeepCopier<NameValueCollection>
     {
+        /// <inheritdoc/>
         public NameValueCollection DeepCopy(NameValueCollection input, CopyContext context)
         {
             if (context.TryGetCopy<NameValueCollection>(input, out var result))
