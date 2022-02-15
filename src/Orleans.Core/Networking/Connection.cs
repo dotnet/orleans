@@ -34,7 +34,8 @@ namespace Orleans.Runtime.Messaging
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly List<Message> inflight = new List<Message>(4);
-        private readonly TaskCompletionSource<int> _transportConnectionClosed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _transportConnectionClosed = new (TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
@@ -71,6 +72,8 @@ namespace Orleans.Runtime.Messaging
         protected abstract IMessageCenter MessageCenter { get; }
 
         public bool IsValid => _closeTask is null;
+
+        public Task Initialized => _initializationTcs.Task;
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
@@ -110,6 +113,7 @@ namespace Orleans.Runtime.Messaging
             _transport = this.Context.Transport;
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
+            _initializationTcs.TrySetResult(0);
             await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
 
@@ -136,16 +140,18 @@ namespace Orleans.Runtime.Messaging
 
         private void StartClosing(Exception exception)
         {
-            if (_closeTask is object)
+            if (_closeTask is not null)
             {
                 return;
             }
 
             var task = new Task<Task>(CloseAsync);
-            if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is object)
+            if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is not null)
             {
                 return;
             }
+
+            _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
 
             if (this.Log.IsEnabled(LogLevel.Information))
             {

@@ -1,3 +1,5 @@
+using System;
+
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
@@ -6,7 +8,5 @@ namespace Orleans.Runtime.Messaging
     public enum NetworkProtocolVersion : byte
     {
         Version1 = 1,
-        Version2 = 2,
-        Version3 = 3,
     }
 }
