@@ -15,6 +15,9 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="Exception"/> types.
+    /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
     [WellKnownAlias("Exception")]
@@ -30,6 +33,14 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<Dictionary<object, object>> _dictionaryCopier;
         private readonly IDeepCopier<Exception> _exceptionCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExceptionCodec"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="typeConverter">The type converter.</param>
+        /// <param name="dictionaryCodec">The dictionary codec.</param>
+        /// <param name="dictionaryCopier">The dictionary copier.</param>
+        /// <param name="exceptionCopier">The exception copier.</param>
         public ExceptionCodec(
             IServiceProvider serviceProvider,
             TypeConverter typeConverter,
@@ -49,6 +60,7 @@ namespace Orleans.Serialization
             _exceptionCopier = exceptionCopier;
         }
 
+        /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, Exception value)
         {
             uint fieldId = 0;
@@ -92,6 +104,11 @@ namespace Orleans.Serialization
             SetBaseProperties(value, message, stackTrace, innerException, hResult, data);
         }
 
+        /// <summary>
+        /// Gets the object data from the provided exception.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>A populated <see cref="SerializationInfo"/> value.</returns>
         public SerializationInfo GetObjectData(Exception value)
         {
             var info = new SerializationInfo(value.GetType(), _formatterConverter);
@@ -99,6 +116,15 @@ namespace Orleans.Serialization
             return info;
         }
 
+        /// <summary>
+        /// Sets base properties on the provided exception.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="message">The message.</param>
+        /// <param name="stackTrace">The stack trace.</param>
+        /// <param name="innerException">The inner exception.</param>
+        /// <param name="hResult">The HResult.</param>
+        /// <param name="data">The data.</param>
         public void SetBaseProperties(Exception value, string message, string stackTrace, Exception innerException, int hResult, Dictionary<object, object> data)
         {
             var info = new SerializationInfo(typeof(Exception), _formatterConverter);
@@ -136,6 +162,11 @@ namespace Orleans.Serialization
 #endif
         }
 
+        /// <summary>
+        /// Gets the data property from the provided exception.
+        /// </summary>
+        /// <param name="exception">The exception.</param>
+        /// <returns>The provided exception's <see cref="Exception.Data"/> property.</returns>
         public Dictionary<object, object> GetDataProperty(Exception exception)
         {
             if (exception.Data is null or { Count: 0 })
@@ -154,6 +185,7 @@ namespace Orleans.Serialization
             return tmp;
         }
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             StringCodec.WriteField(ref writer, 0, typeof(string), value.Message);
@@ -166,6 +198,7 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public void SerializeException<TBufferWriter>(ref Writer<TBufferWriter> writer, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             StringCodec.WriteField(ref writer, 0, typeof(string), _typeConverter.Format(value.GetType()));
@@ -179,6 +212,7 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
@@ -201,6 +235,7 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public bool IsSupportedType(Type type)
         {
             if (type == typeof(ExceptionCodec))
@@ -221,6 +256,7 @@ namespace Orleans.Serialization
             return false;
         }
 
+        /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
@@ -235,6 +271,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
        }
 
+        /// <inheritdoc />
         public Exception ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             // In order to handle null values.
@@ -256,6 +293,7 @@ namespace Orleans.Serialization
             return OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TInput, Exception>(ref reader, field);
         }
 
+        /// <inheritdoc />
         object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -265,7 +303,7 @@ namespace Orleans.Serialization
 
             return DeserializeException(ref reader, field);
         }
-        
+                
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -333,6 +371,7 @@ namespace Orleans.Serialization
             return result;
         }
 
+        /// <inheritdoc />
         public void DeepCopy(Exception input, Exception output, CopyContext context)
         {
             var info = GetObjectData(input);
@@ -346,7 +385,10 @@ namespace Orleans.Serialization
                 _dictionaryCopier.DeepCopy(GetDataProperty(input), context));
         }
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte> => Serialize(ref writer, (Exception)value);
+
+        /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, object value) => Deserialize(ref reader, (Exception)value);
     }
 
@@ -386,9 +428,12 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Surrogate type for <see cref="AggregateExceptionCodec"/>.
+    /// </summary>
     [GenerateSerializer]
     public struct AggregateExceptionSurrogate
-    {
+    {                        
         [Id(0)]
         public string Message { get; set; }
 

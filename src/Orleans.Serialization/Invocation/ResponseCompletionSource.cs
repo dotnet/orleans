@@ -5,26 +5,50 @@ using System.Threading.Tasks.Sources;
 
 namespace Orleans.Serialization.Invocation
 {
+    /// <summary>
+    /// A fulfillable promise.
+    /// </summary>
     public sealed class ResponseCompletionSource : IResponseCompletionSource, IValueTaskSource<Response>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<Response> _core;
 
+        /// <summary>
+        /// Returns this instance as a <see cref="ValueTask{Response}"/>.
+        /// </summary>
+        /// <returns>This instance, as a <see cref="ValueTask{Response}"/>.</returns>
         public ValueTask<Response> AsValueTask() => new(this, _core.Version);
 
+        /// <summary>
+        /// Returns this instance as a <see cref="ValueTask"/>.
+        /// </summary>
+        /// <returns>This instance, as a <see cref="ValueTask"/>.</returns>
         public ValueTask AsVoidValueTask() => new(this, _core.Version);
 
+        /// <inheritdoc/>
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
+        /// <inheritdoc/>
         public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
 
+        /// <summary>
+        /// Resets this instance.
+        /// </summary>
         public void Reset()
         {
             _core.Reset();
             ResponseCompletionSourcePool.Return(this);
         }
 
+        /// <summary>
+        /// Completes this instance with an exception.
+        /// </summary>
+        /// <param name="exception">The exception.</param>
         public void SetException(Exception exception) => _core.SetException(exception);
 
+        /// <summary>
+        /// Completes this instance with a result.
+        /// </summary>
+        /// <param name="result">The result.</param>
         public void SetResult(Response result)
         {
             if (result.Exception is not { } exception)
@@ -36,9 +60,19 @@ namespace Orleans.Serialization.Invocation
                 _core.SetException(exception);
             }
         }
+
+        /// <summary>
+        /// Completes this instance with a result.
+        /// </summary>
+        /// <param name="value">The result value.</param>
         public void Complete(Response value) => SetResult(value);
+
+        /// <summary>
+        /// Completes this instance with the default result.
+        /// </summary>
         public void Complete() => SetResult(Response.Completed);
 
+        /// <inheritdoc />
         public Response GetResult(short token)
         {
             bool isValid = token == _core.Version;
@@ -55,6 +89,7 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
+        /// <inheritdoc />
         void IValueTaskSource.GetResult(short token)
         {
             bool isValid = token == _core.Version;
@@ -72,28 +107,54 @@ namespace Orleans.Serialization.Invocation
         }
     }
 
+    /// <summary>
+    /// A fulfillable promise.
+    /// </summary>
+    /// <typeparam name="TResult">The underlying result type.</typeparam>
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<TResult> _core;
 
+        /// <summary>
+        /// Returns this instance as a <see cref="ValueTask{Response}"/>.
+        /// </summary>
+        /// <returns>This instance, as a <see cref="ValueTask{Response}"/>.</returns>
         public ValueTask<TResult> AsValueTask() => new(this, _core.Version);
 
+        /// <summary>
+        /// Returns this instance as a <see cref="ValueTask"/>.
+        /// </summary>
+        /// <returns>This instance, as a <see cref="ValueTask"/>.</returns>
         public ValueTask AsVoidValueTask() => new(this, _core.Version);
 
+        /// <inheritdoc/>
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
+        /// <inheritdoc/>
         public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
 
+        /// <summary>
+        /// Resets this instance.
+        /// </summary>
         public void Reset()
         {
             _core.Reset();
             ResponseCompletionSourcePool.Return(this);
         }
 
+        /// <summary>
+        /// Completes this instance with an exception.
+        /// </summary>
+        /// <param name="exception">The exception.</param>
         public void SetException(Exception exception) => _core.SetException(exception);
 
+        /// <summary>
+        /// Completes this instance with a result.
+        /// </summary>
+        /// <param name="result">The result.</param>
         public void SetResult(TResult result) => _core.SetResult(result);
 
+        /// <inheritdoc/>
         public void Complete(Response value)
         {
             if (value is Response<TResult> typed)
@@ -142,7 +203,7 @@ namespace Orleans.Serialization.Invocation
         }
 
         /// <summary>
-        /// Sets the result.
+        /// Completes this instance with a result.
         /// </summary>
         /// <param name="value">The result value.</param>
         public void Complete(Response<TResult> value)
@@ -157,8 +218,10 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
+        /// <inheritdoc/>
         public void Complete() => SetResult(default);
 
+        /// <inheritdoc/>
         public TResult GetResult(short token)
         {
             bool isValid = token == _core.Version;
@@ -175,6 +238,7 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
+        /// <inheritdoc/>
         void IValueTaskSource.GetResult(short token)
         {
             bool isValid = token == _core.Version;

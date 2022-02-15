@@ -11,6 +11,9 @@ using System.Security;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Serializer for types which implement the <see cref="ISerializable"/> pattern.
+    /// </summary>
     [WellKnownAlias("ISerializable")]
     public class DotNetSerializableCodec : IGeneralizedCodec
     {
@@ -25,6 +28,10 @@ namespace Orleans.Serialization
         private readonly TypeConverter _typeConverter;
         private readonly ValueTypeSerializerFactory _valueTypeSerializerFactory;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DotNetSerializableCodec"/> class.
+        /// </summary>
+        /// <param name="typeResolver">The type resolver.</param>
         public DotNetSerializableCodec(TypeConverter typeResolver)
         {
             _streamingContext = new StreamingContext(StreamingContextStates.All);
@@ -43,6 +50,7 @@ namespace Orleans.Serialization
                 _streamingContext);
         }
 
+        /// <inheritdoc />
         [SecurityCritical]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
@@ -66,6 +74,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         [SecurityCritical]
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -159,7 +168,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-
         private void WriteObject<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type, object value) where TBufferWriter : IBufferWriter<byte>
         {
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
@@ -206,6 +214,7 @@ namespace Orleans.Serialization
             callbacks.OnSerialized?.Invoke(value, _streamingContext);
         }
 
+        /// <inheritdoc />
         [SecurityCritical]
         public bool IsSupportedType(Type type) =>
             type == CodecType || typeof(Exception).IsAssignableFrom(type) || (SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type));

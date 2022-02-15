@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.Invocation
 {
-
     /// <summary>
     /// Represents an object which can be invoked asynchronously.
     /// </summary>
