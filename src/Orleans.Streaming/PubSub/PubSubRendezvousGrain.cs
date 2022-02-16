@@ -4,12 +4,45 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
+    internal class PubSubGrainStateStorageFactory
+    {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ILoggerFactory _loggerFactory;
+
+        public PubSubGrainStateStorageFactory(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        {
+            _serviceProvider = serviceProvider;
+            _loggerFactory = loggerFactory;
+        }
+
+        public IStorage<PubSubGrainState> GetStorage(PubSubRendezvousGrain grain)
+        {
+            var logger = _loggerFactory.CreateLogger<PubSubGrainStateStorageFactory>();
+            var streamId = InternalStreamId.Parse(grain.GetGrainId().Key.ToString());
+
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug($"Trying to find storage provider {streamId.ProviderName}");
+
+            var storage = _serviceProvider.GetServiceByName<IGrainStorage>(streamId.ProviderName);
+            if (storage == null)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug($"Fallback to storage provider {ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME}");
+
+                storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+            }
+            return new StateStorageBridge<PubSubGrainState>(typeof(PubSubRendezvousGrain).FullName, grain.GrainReference, storage, _loggerFactory);
+        }
+    }
+
     [Serializable]
     [GenerateSerializer]
     internal class PubSubGrainState
@@ -21,8 +54,7 @@ namespace Orleans.Streams
     }
 
     [GrainType("pubsubrendezvous")]
-    [StorageProvider(ProviderName = "PubSubStore")]
-    internal class PubSubRendezvousGrain : Grain<PubSubGrainState>, IPubSubRendezvousGrain
+    internal class PubSubRendezvousGrain : Grain, IPubSubRendezvousGrain
     {
         private readonly ILogger logger;
         private const bool DEBUG_PUB_SUB = false;
@@ -34,6 +66,11 @@ namespace Orleans.Streams
         private static readonly CounterStatistic counterConsumersRemoved;
         private static readonly CounterStatistic counterConsumersTotal;
 
+        private readonly PubSubGrainStateStorageFactory _storageFactory;
+        private IStorage<PubSubGrainState> _storage;
+
+        private PubSubGrainState State => _storage.State;
+
         static PubSubRendezvousGrain()
         {
             counterProducersAdded   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_PRODUCERS_ADDED);
@@ -44,15 +81,17 @@ namespace Orleans.Streams
             counterConsumersTotal   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_TOTAL);
         }
 
-        public PubSubRendezvousGrain(ILogger<PubSubRendezvousGrain> logger)
+        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger)
         {
+            _storageFactory = storageFactory;
             this.logger = logger;
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             LogPubSubCounts("OnActivateAsync");
-            return Task.CompletedTask;
+            _storage = _storageFactory.GetStorage(this);
+            await ReadStateAsync();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -425,5 +464,9 @@ namespace Orleans.Streams
                 }
             }
         }
+
+        private Task ReadStateAsync() => _storage.ReadStateAsync();
+        private Task WriteStateAsync() => _storage.WriteStateAsync();
+        private Task ClearStateAsync() => _storage.ClearStateAsync();
     }
 }

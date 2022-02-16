@@ -12,7 +12,6 @@ namespace Orleans.Hosting
     public class PersistentStreamStorageConfigurationValidator : IConfigurationValidator
     {
         private IServiceProvider services;
-        private const string pubsubStoreName = "PubSubStore";
         private string streamProviderName;
 
         private PersistentStreamStorageConfigurationValidator(IServiceProvider services, string streamProviderName)
@@ -26,11 +25,11 @@ namespace Orleans.Hosting
             var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
             if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                var pubsubStore = services.GetServiceByName<IGrainStorage>(pubsubStoreName);
+                var pubsubStore = services.GetServiceByName<IGrainStorage>(this.streamProviderName) ?? services.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
                 if (pubsubStore == null)
                     throw new OrleansConfigurationException(
-                        $" Streams with pubsub type {StreamPubSubType.ExplicitGrainBasedAndImplicit} and {StreamPubSubType.ExplicitGrainBasedOnly} requires a grain storage named {pubsubStoreName} " +
-                        $"to be configured with silo. Please configure one for your stream {streamProviderName}.");
+                        $" Streams with pubsub type {StreamPubSubType.ExplicitGrainBasedAndImplicit} and {StreamPubSubType.ExplicitGrainBasedOnly} requires a grain storage named " +
+                        $"{ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME} or {this.streamProviderName} to be configured with silo. Please configure one for your stream {streamProviderName}.");
             }
         }
 
