@@ -40,6 +40,33 @@ namespace Microsoft.Extensions.Hosting
         }
 
         /// <summary>
+        /// Configures the host builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <param name="configureDelegate">The delegate used to configure the silo.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IHostBuilder"/> instance will result in one silo being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// </remarks>
+        public static IHostBuilder UseOrleans(
+            this IHostBuilder hostBuilder,
+            Action<HostBuilderContext, ISiloBuilder> configureDelegate)
+        {
+            if (hostBuilder is null) throw new ArgumentNullException(nameof(hostBuilder));
+            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+
+            if (hostBuilder.Properties.ContainsKey("HasOrleansClientBuilder"))
+            {
+                throw GetOrleansClientAddedException();
+            }
+
+            hostBuilder.Properties["HasOrleansSiloBuilder"] = "true";
+
+            return hostBuilder.ConfigureServices((context, services) => configureDelegate(context, AddOrleans(services)));
+        }
+
+        /// <summary>
         /// Configures the service collection to host an Orleans silo.
         /// </summary>
         /// <param name="services">The service collection.</param>
@@ -54,6 +81,14 @@ namespace Microsoft.Extensions.Hosting
             Action<ISiloBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            var builder = AddOrleans(services);
+
+            configureDelegate(builder);
+            return services;
+        }
+
+        private static ISiloBuilder AddOrleans(IServiceCollection services)
+        {
             ISiloBuilder builder = default;
             foreach (var descriptor in services)
             {
@@ -75,8 +110,7 @@ namespace Microsoft.Extensions.Hosting
                 services.Add(new(typeof(OrleansBuilderMarker), new OrleansBuilderMarker(builder)));
             }
 
-            configureDelegate(builder);
-            return services;
+            return builder;
         }
 
         private static OrleansConfigurationException GetOrleansClientAddedException() => new("Do not call both UseOrleansClient/AddOrleansClient with UseOrleans/AddOrleans. If you want a client and server in the same process, only UseOrleans/AddOrleans is necessary and the UseOrleansClient/AddOrleansClient call can be removed.");
