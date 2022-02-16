@@ -110,7 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             finally
             {
-                this.cache.Remove(address.GrainId);
+                this.cache.Remove(address);
             }
         }
 
