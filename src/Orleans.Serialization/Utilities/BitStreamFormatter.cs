@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
@@ -9,8 +9,17 @@ using System.Text;
 
 namespace Orleans.Serialization.Utilities
 {
+    /// <summary>
+    /// Utilities for formatting an encoded bitstream in a textual manner.
+    /// </summary>
     public static class BitStreamFormatter
     {
+        /// <summary>
+        /// Formats the provided buffer.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format<TInput>(ref Reader<TInput> reader)
         {
             var res = new StringBuilder();
@@ -18,36 +27,72 @@ namespace Orleans.Serialization.Utilities
             return res.ToString();
         }
 
+        /// <summary>
+        /// Formats the specified array.
+        /// </summary>
+        /// <param name="array">The array.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format(byte[] array, SerializerSession session)
         {
             var reader = Reader.Create(array, session);
             return Format(ref reader);
         }
 
+        /// <summary>
+        /// Formats the specified buffer.
+        /// </summary>
+        /// <param name="input">The input buffer.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format(ReadOnlySpan<byte> input, SerializerSession session)
         {
             var reader = Reader.Create(input, session);
             return Format(ref reader);
         }
 
+        /// <summary>
+        /// Formats the specified buffer.
+        /// </summary>
+        /// <param name="input">The input buffer.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format(ReadOnlyMemory<byte> input, SerializerSession session)
         {
             var reader = Reader.Create(input, session);
             return Format(ref reader);
         }
 
+        /// <summary>
+        /// Formats the specified buffer.
+        /// </summary>
+        /// <param name="input">The input buffer.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format(ReadOnlySequence<byte> input, SerializerSession session)
         {
             var reader = Reader.Create(input, session);
             return Format(ref reader);
         }
 
+        /// <summary>
+        /// Formats the specified buffer.
+        /// </summary>
+        /// <param name="input">The input buffer.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
         public static string Format(Stream input, SerializerSession session)
         {
             var reader = Reader.Create(input, session);
             return Format(ref reader);
         }
 
+        /// <summary>
+        /// Formats the specified buffer.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="result">The destination string builder.</param>
         public static void Format<TInput>(ref Reader<TInput> reader, StringBuilder result)
         {
             var (field, type) = reader.ReadFieldHeaderForAnalysis();

@@ -15,6 +15,9 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization.Serializers
 {
+    /// <summary>
+    /// Provides access to serializers and related objects.
+    /// </summary>
     public sealed class CodecProvider : ICodecProvider
     {
         private static readonly Type ObjectType = typeof(object);
@@ -53,6 +56,11 @@ namespace Orleans.Serialization.Serializers
         private readonly IDeepCopier _voidCopier = new VoidCopier();
         private bool _initialized;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CodecProvider"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="codecConfiguration">The codec configuration.</param>
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
             _serviceProvider = serviceProvider;
@@ -66,6 +74,7 @@ namespace Orleans.Serialization.Serializers
             ConsumeMetadata(codecConfiguration);
         }
 
+        /// <inheritdoc/>
         public IServiceProvider Services => _serviceProvider;
 
         private void Initialize()
@@ -141,12 +150,16 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        /// <inheritdoc/>
         public IFieldCodec<TField> TryGetCodec<TField>() => TryGetCodecInner<TField>(typeof(TField));
 
+        /// <inheritdoc/>
         public IFieldCodec<object> GetCodec(Type fieldType) => TryGetCodec(fieldType) ?? ThrowCodecNotFound<object>(fieldType);
 
+        /// <inheritdoc/>
         public IFieldCodec<object> TryGetCodec(Type fieldType) => TryGetCodecInner<object>(fieldType);
 
+        /// <inheritdoc/>
         public IFieldCodec<TField> GetCodec<TField>() => TryGetCodec<TField>() ?? ThrowCodecNotFound<TField>(typeof(TField));
 
         private IFieldCodec<TField> TryGetCodecInner<TField>(Type fieldType)
@@ -281,6 +294,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        /// <inheritdoc/>
         public IActivator<T> GetActivator<T>()
         {
             if (!_initialized)
@@ -419,6 +433,7 @@ namespace Orleans.Serialization.Serializers
             static void ThrowCannotConvert(object rawCodec) => throw new InvalidOperationException($"Cannot convert codec of type {rawCodec.GetType()} to codec of type {typeof(IBaseCodec<TField>)}.");
         }
 
+        /// <inheritdoc/>
         public IBaseCodec<TField> GetBaseCodec<TField>() where TField : class
         {
             if (!_initialized)
@@ -439,6 +454,7 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
+        /// <inheritdoc/>
         public IValueSerializer<TField> GetValueSerializer<TField>() where TField : struct
         {
             if (!_initialized)
@@ -453,6 +469,7 @@ namespace Orleans.Serialization.Serializers
             return GetValueSerializerInner<TField>(type, searchType) ?? ThrowValueSerializerNotFound<TField>(type);
         }
 
+        /// <inheritdoc/>
         public IBaseCopier<TField> GetBaseCopier<TField>() where TField : class
         {
             if (!_initialized)
@@ -467,12 +484,16 @@ namespace Orleans.Serialization.Serializers
             return GetBaseCopierInner<TField>(type, searchType) ?? ThrowBaseCopierNotFound<TField>(type);
         }
 
+        /// <inheritdoc/>
         public IDeepCopier<T> GetDeepCopier<T>() => TryGetCopierInner<T>(typeof(T)) ?? ThrowCopierNotFound<T>(typeof(T));
 
+        /// <inheritdoc/>
         public IDeepCopier<T> TryGetDeepCopier<T>() => TryGetCopierInner<T>(typeof(T));
 
+        /// <inheritdoc/>
         public IDeepCopier<object> GetDeepCopier(Type fieldType) => TryGetCopierInner<object>(fieldType) ?? ThrowCopierNotFound<object>(fieldType);
 
+        /// <inheritdoc/>
         public IDeepCopier<object> TryGetDeepCopier(Type fieldType) => TryGetCopierInner<object>(fieldType);
         
         private IDeepCopier<T> TryGetCopierInner<T>(Type fieldType)

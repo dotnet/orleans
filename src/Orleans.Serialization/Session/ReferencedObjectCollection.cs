@@ -2,11 +2,15 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Session
 {
+    /// <summary>
+    /// A collection of objects which are referenced while serializing, deserializing, or copying.
+    /// </summary>
     public sealed class ReferencedObjectCollection
     {
         private readonly struct ReferencePair
@@ -22,6 +26,10 @@ namespace Orleans.Serialization.Session
             public object Object { get; }
         }
 
+        /// <summary>
+        /// Gets or sets the reference to object count.
+        /// </summary>
+        /// <value>The reference to object count.</value>
         public int ReferenceToObjectCount { get; set; }
         private readonly ReferencePair[] _referenceToObject = new ReferencePair[64];
 
@@ -31,8 +39,14 @@ namespace Orleans.Serialization.Session
         private Dictionary<uint, object> _referenceToObjectOverflow;
         private Dictionary<object, uint> _objectToReferenceOverflow;
 
+        /// <summary>
+        /// Tries to get the referenced object with the specified id.
+        /// </summary>
+        /// <param name="reference">The reference.</param>
+        /// <param name="value">The value.</param>
+        /// <returns><see langword="true" /> if there was a referenced object with the specified id, <see langword="false" /> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetReferencedObject(uint reference, out object value)
+        public bool TryGetReferencedObject(uint reference, [NotNullWhen(true)] out object value)
         {
             // Reference 0 is always null.
             if (reference == 0)
@@ -59,9 +73,18 @@ namespace Orleans.Serialization.Session
             return false;
         }
 
+        /// <summary>
+        /// Marks a value field.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void MarkValueField() => ++CurrentReferenceId;
 
+        /// <summary>
+        /// Gets or adds a reference.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="reference">The reference.</param>
+        /// <returns><see langword="true" /> if a reference already existed, <see langword="false" /> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool GetOrAddReference(object value, out uint reference)
         {
@@ -104,6 +127,11 @@ namespace Orleans.Serialization.Session
             return false;
         }
 
+        /// <summary>
+        /// Gets the index of the reference, or <c>-1</c> if the object has not been encountered before.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The index of the reference, or <c>-1</c> if the object has not been encountered before.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetReferenceIndex(object value)
         {
@@ -198,9 +226,18 @@ namespace Orleans.Serialization.Session
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowReferenceExistsException(uint reference) => throw new InvalidOperationException($"Reference {reference} already exists");
 
+        /// <summary>
+        /// Records a reference field.
+        /// </summary>
+        /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RecordReferenceField(object value) => RecordReferenceField(value, ++CurrentReferenceId);
 
+        /// <summary>
+        /// Records a reference field with the specified identifier.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="referenceId">The reference identifier.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RecordReferenceField(object value, uint referenceId)
         {
@@ -212,11 +249,27 @@ namespace Orleans.Serialization.Session
             AddToReferences(value, referenceId);
         }
 
+        /// <summary>
+        /// Copies the reference table.
+        /// </summary>
+        /// <returns>A copy of the reference table.</returns>
         public Dictionary<uint, object> CopyReferenceTable() => _referenceToObject.Take(ReferenceToObjectCount).ToDictionary(r => r.Id, r => r.Object);
+
+        /// <summary>
+        /// Copies the identifier table.
+        /// </summary>
+        /// <returns>A copy of the identifier table.</returns>
         public Dictionary<object, uint> CopyIdTable() => _objectToReference.Take(_objectToReferenceCount).ToDictionary(r => r.Object, r => r.Id);
 
+        /// <summary>
+        /// Gets or sets the current reference identifier.
+        /// </summary>
+        /// <value>The current reference identifier.</value>
         public uint CurrentReferenceId { get; set; }
 
+        /// <summary>
+        /// Resets this instance.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Reset()
         {

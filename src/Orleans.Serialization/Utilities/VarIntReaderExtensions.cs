@@ -4,26 +4,72 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Utilities
 {
+    /// <summary>
+    /// Extension method for working with variable-width integers.
+    /// </summary>
     public static class VarIntReaderExtensions
     {
+        /// <summary>
+        /// Reads a variable-width <see cref="sbyte"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static sbyte ReadVarInt8<TInput>(this ref Reader<TInput> reader) => ZigZagDecode((byte)reader.ReadVarUInt32());
 
+        /// <summary>
+        /// Reads a variable-width <see cref="ushort"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static short ReadVarInt16<TInput>(this ref Reader<TInput> reader) => ZigZagDecode((ushort)reader.ReadVarUInt32());
 
+        /// <summary>
+        /// Reads a variable-width <see cref="byte"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ReadVarUInt8<TInput>(this ref Reader<TInput> reader) => (byte)reader.ReadVarUInt32();
 
+        /// <summary>
+        /// Reads a variable-width <see cref="ushort"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ushort ReadVarUInt16<TInput>(this ref Reader<TInput> reader) => (ushort)reader.ReadVarUInt32();
 
+        /// <summary>
+        /// Reads a variable-width <see cref="int"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadVarInt32<TInput>(this ref Reader<TInput> reader) => ZigZagDecode(reader.ReadVarUInt32());
 
+        /// <summary>
+        /// Reads a variable-width <see cref="long"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long ReadVarInt64<TInput>(this ref Reader<TInput> reader) => ZigZagDecode(reader.ReadVarUInt64());
 
+        /// <summary>
+        /// Reads a variable-width <see cref="byte"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte ReadUInt8<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -33,6 +79,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<byte>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="ushort"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ushort ReadUInt16<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -42,6 +95,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<ushort>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="uint"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint ReadUInt32<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -51,6 +111,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<uint>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="ulong"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong ReadUInt64<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -60,6 +127,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<ulong>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="sbyte"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static sbyte ReadInt8<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -69,6 +143,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<sbyte>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="short"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static short ReadInt16<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {
@@ -78,6 +159,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<short>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="int"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadInt32<TInput>(this ref Reader<TInput> reader, WireType wireType)
         {
@@ -97,6 +185,13 @@ namespace Orleans.Serialization.Utilities
             _ => ExceptionHelper.ThrowArgumentOutOfRange<int>(nameof(wireType)),
         };
 
+        /// <summary>
+        /// Reads a variable-width <see cref="long"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="wireType">The wire type.</param>
+        /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long ReadInt64<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
         {

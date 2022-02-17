@@ -303,7 +303,7 @@ namespace Orleans.Serialization
 
             return DeserializeException(ref reader, field);
         }
-                
+                                
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -392,15 +392,25 @@ namespace Orleans.Serialization
         public void Deserialize<TInput>(ref Reader<TInput> reader, object value) => Deserialize(ref reader, (Exception)value);
     }
 
+    /// <summary>
+    /// Serializer for <see cref="AggregateException"/>.
+    /// </summary>
     [RegisterSerializer]
     public class AggregateExceptionCodec : GeneralizedReferenceTypeSurrogateCodec<AggregateException, AggregateExceptionSurrogate>
     {
         private readonly ExceptionCodec _baseCodec;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AggregateExceptionCodec"/> class.
+        /// </summary>
+        /// <param name="baseCodec">The base codec.</param>
+        /// <param name="surrogateSerializer">The surrogate serializer.</param>
         public AggregateExceptionCodec(ExceptionCodec baseCodec, IValueSerializer<AggregateExceptionSurrogate> surrogateSerializer) : base(surrogateSerializer)
         {
             _baseCodec = baseCodec;
         }
 
+        /// <inheritdoc/>
         public override AggregateException ConvertFromSurrogate(ref AggregateExceptionSurrogate surrogate)
         {
             var result = new AggregateException(surrogate.InnerExceptions);
@@ -409,6 +419,7 @@ namespace Orleans.Serialization
             return result;
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(AggregateException value, ref AggregateExceptionSurrogate surrogate)
         {
             var info = _baseCodec.GetObjectData(value);
@@ -433,7 +444,7 @@ namespace Orleans.Serialization
     /// </summary>
     [GenerateSerializer]
     public struct AggregateExceptionSurrogate
-    {                        
+    {        
         [Id(0)]
         public string Message { get; set; }
 

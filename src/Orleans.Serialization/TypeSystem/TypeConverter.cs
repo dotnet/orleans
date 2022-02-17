@@ -9,6 +9,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Orleans.Serialization.TypeSystem
@@ -28,6 +29,13 @@ namespace Orleans.Serialization.TypeSystem
         private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
         private readonly HashSet<string> _allowedTypesConfiguration;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TypeConverter"/> class.
+        /// </summary>
+        /// <param name="formatters">The type name formatters.</param>
+        /// <param name="filters">The type filters.</param>
+        /// <param name="options">The options.</param>
+        /// <param name="typeResolver">The type resolver.</param>
         public TypeConverter(IEnumerable<ITypeConverter> formatters, IEnumerable<ITypeFilter> filters, IOptions<TypeManifestOptions> options, TypeResolver typeResolver)
         {
             _resolver = typeResolver;
@@ -161,16 +169,24 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Formats the provided type.
         /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The formatted type name.</returns>
         public string Format(Type type) => FormatInternal(type);
 
         /// <summary>
         /// Formats the provided type, rewriting elements using the provided delegate.
         /// </summary>
+        /// <param name="type">The type.</param>
+        /// <param name="rewriter">A delegate used to rewrite the type.</param>
+        /// <returns>The formatted type name.</returns>
         public string Format(Type type, Func<TypeSpec, TypeSpec> rewriter) => FormatInternal(type, rewriter);
 
         /// <summary>
         /// Parses the provided type string.
         /// </summary>
+        /// <param name="formatted">The formatted type name.</param>
+        /// <returns>The parsed type.</returns>
+        /// <exception cref="TypeLoadException">Unable to load the resulting type.</exception>
         public Type Parse(string formatted)
         {
             if (ParseInternal(formatted, out var type))
@@ -184,7 +200,10 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Parses the provided type string.
         /// </summary>
-        public bool TryParse(string formatted, out Type result)
+        /// <param name="formatted">The formatted type name.</param>
+        /// <param name="result">The result.</param>
+        /// <returns><see langword="true"/> if the type was parsed and loaded; otherwise <see langword="false"/>.</returns>
+        public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
         {
             if (ParseInternal(formatted, out result))
             {
