@@ -1,8 +1,18 @@
 namespace Orleans.Serialization.WireProtocol
 {
+    /// <summary>
+    /// Represents an extended wire type
+    /// </summary>
     public enum ExtendedWireType : byte
-    {
-        EndTagDelimited = 0b00 << 3, // This tag marks the end of a tag-delimited object.
-        EndBaseFields = 0b01 << 3, // This tag marks the end of a base object in a tag-delimited object.
+    {        
+        /// <summary>
+        /// Marks the end of a tag-delimited field.
+        /// </summary>
+        EndTagDelimited = 0b00 << 3,
+
+        /// <summary>
+        /// Marks the end of base-type fields in a tag-delimited object.
+        /// </summary>
+        EndBaseFields = 0b01 << 3,
     }
 }

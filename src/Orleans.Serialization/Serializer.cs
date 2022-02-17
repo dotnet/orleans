@@ -20,6 +20,11 @@ namespace Orleans.Serialization
         private readonly SerializerSessionPool _sessionPool;
         private readonly ICodecProvider _codecProvider;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Serializer"/> class.
+        /// </summary>
+        /// <param name="sessionPool">The session pool.</param>
+        /// <param name="codecProvider">The codec provider.</param>
         public Serializer(SerializerSessionPool sessionPool, ICodecProvider codecProvider)
         {
             _sessionPool = sessionPool;
@@ -482,6 +487,11 @@ namespace Orleans.Serialization
         private readonly SerializerSessionPool _sessionPool;
         private readonly Type _expectedType;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Serializer{T}"/> class.
+        /// </summary>
+        /// <param name="codecProvider">The codec provider.</param>
+        /// <param name="sessionPool">The session pool.</param>
         public Serializer(ICodecProvider codecProvider, SerializerSessionPool sessionPool)
         {
             _expectedType = typeof(T);
@@ -856,6 +866,11 @@ namespace Orleans.Serialization
         private readonly SerializerSessionPool _sessionPool;
         private readonly Type _expectedType;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueSerializer{T}"/> class.
+        /// </summary>
+        /// <param name="codecProvider">The codec provider.</param>
+        /// <param name="sessionPool">The session pool.</param>
         public ValueSerializer(IValueSerializerProvider codecProvider, SerializerSessionPool sessionPool)
         {
             _sessionPool = sessionPool;
@@ -1262,6 +1277,11 @@ namespace Orleans.Serialization
         private readonly SerializerSessionPool _sessionPool;
         private readonly ICodecProvider _codecProvider;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ObjectSerializer"/> class.
+        /// </summary>
+        /// <param name="sessionPool">The session pool.</param>
+        /// <param name="codecProvider">The codec provider.</param>
         public ObjectSerializer(SerializerSessionPool sessionPool, ICodecProvider codecProvider)
         {
             _sessionPool = sessionPool;
@@ -1689,6 +1709,11 @@ namespace Orleans.Serialization
         private readonly CodecProvider _codecProvider;
         private readonly CopyContextPool _contextPool;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeepCopier"/> class.
+        /// </summary>
+        /// <param name="codecProvider">The codec provider.</param>
+        /// <param name="contextPool">The context pool.</param>
         public DeepCopier(CodecProvider codecProvider, CopyContextPool contextPool)
         {
             _codecProvider = codecProvider;
@@ -1722,6 +1747,11 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<T> _copier;
         private readonly CopyContextPool _contextPool;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeepCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The copier.</param>
+        /// <param name="contextPool">The context pool.</param>
         public DeepCopier(IDeepCopier<T> copier, CopyContextPool contextPool)
         {
             _copier = copier;
