@@ -103,7 +103,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
             services.AddSingleton<IConfigureGrainTypeComponents, ReentrantSharedComponentsConfigurator>();
-            services.TryAddSingleton<NewRpcProvider>();
+            services.TryAddSingleton<RpcProvider>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.AddSingleton<GrainVersionManifest>();
             services.TryAddSingleton<GrainBindingsResolver>();
@@ -344,7 +344,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
 
             // persistent state facet support
-            services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
+            services.TryAddSingleton<IGrainStorageSerializer, OrleansGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
 

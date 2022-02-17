@@ -141,7 +141,7 @@ namespace UnitTests.GrainInterfaces
     public interface IHubGrain<TKey, T1, T2> : IGrainWithIntegerKey
     {
         Task Bar(TKey key, T1 message1, T2 message2);
-        
+
     }
 
     public interface IEchoHubGrain<TKey, TMessage> : IHubGrain<TKey, TMessage, TMessage>
@@ -227,10 +227,10 @@ namespace UnitTests.GrainInterfaces
         Task DoSomething();
     }
 
-    
+
     public interface IGenericCastableGrain<T> : IGrainWithGuidKey
     { }
-    
+
 
 
     public interface IGrainSayingHello : IGrainWithGuidKey
@@ -244,7 +244,7 @@ namespace UnitTests.GrainInterfaces
     public interface INonGenericCastGrain : IGrainSayingHello
     { }
 
-    
+
 
     public interface IIndependentlyConcretizedGrain : ISomeGenericGrain<string>
     { }
@@ -273,10 +273,10 @@ namespace UnitTests.GrainInterfaces
         public interface IGrainReceivingRepeatedGenArgs<T1, T2> : IBasicGrain
         { }
 
-        
+
         public interface IPartiallySpecifyingInterface<T> : IGrainWithTwoGenArgs<T, int>
         { }
-        
+
 
         public interface IReceivingRepeatedGenArgsAmongstOthers<T1, T2, T3> : IBasicGrain
         { }
@@ -322,18 +322,18 @@ namespace UnitTests.GrainInterfaces
     public interface IG2<T1, T2> : IGrainWithGuidKey
     { }
 
-    public class HalfOpenGrain1<T> : Grain, IG2<T, int>
+    public class HalfOpenGrain1<T> : IG2<T, int>
     { }
-    public class HalfOpenGrain2<T> : Grain, IG2<int, T>
-    { }
-
-    public class OpenGeneric<T2, T1> : Grain, IG2<T2, T1>
+    public class HalfOpenGrain2<T> : IG2<int, T>
     { }
 
-    public class ClosedGeneric : Grain, IG2<Dummy1, Dummy2>
+    public class OpenGeneric<T2, T1> : IG2<T2, T1>
     { }
 
-    public class ClosedGenericWithManyInterfaces : Grain, IG2<Dummy1, Dummy2>, IG2<Dummy2, Dummy1>
+    public class ClosedGeneric : IG2<Dummy1, Dummy2>
+    { }
+
+    public class ClosedGenericWithManyInterfaces : IG2<Dummy1, Dummy2>, IG2<Dummy2, Dummy1>
     { }
 
     [GenerateSerializer]

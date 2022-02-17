@@ -28,6 +28,11 @@ namespace Orleans.TestingHost
             var monitorProcessId = int.Parse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture);
             var serializedConfiguration = args[1];
             var configuration = TestClusterHostFactory.DeserializeConfiguration(serializedConfiguration);
+            if (string.Equals(configuration["AttachDebugger"], "true", StringComparison.OrdinalIgnoreCase))
+            {
+                Debugger.Launch();
+            }
+
             var name = configuration["SiloName"];
             using var host = TestClusterHostFactory.CreateSiloHost(name, configuration);
             try

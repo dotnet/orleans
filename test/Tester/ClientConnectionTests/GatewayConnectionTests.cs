@@ -4,7 +4,9 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -17,6 +19,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime.Messaging;
 
 namespace Tester
 {
@@ -159,6 +162,43 @@ namespace Tester
             // Check that we only connected once to the fake GW
             Assert.Equal(1, connectionCount);
             Assert.Equal(1, timeoutCount);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task ConnectionFromDifferentClusterIsRejected()
+        {
+            // Arange
+            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gwEndpoint  = gateways.First().ToIPEndPoint();
+            var exceptions = new List<Exception>();
+
+            Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)
+            {
+                Assert.IsType<ConnectionFailedException>(exception);
+                exceptions.Add(exception);
+                return Task.FromResult(false);
+            }
+
+            // Close current client connection
+            await this.HostedCluster.StopClusterClientAsync();
+            var hostBuilder = new HostBuilder().UseOrleansClient(
+                clientBuilder =>
+                {
+                    clientBuilder.Configure<ClientMessagingOptions>(
+                        options => { options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(10); });
+                    clientBuilder.Configure<ClusterOptions>(
+                        options =>
+                        {
+                            options.ClusterId = "myClusterId";
+                        })
+                        .UseStaticClustering(gwEndpoint)
+                        .UseConnectionRetryFilter(RetryFunc);
+                    ;
+                });
+            var host = hostBuilder.Build();
+            var exception = await Assert.ThrowsAsync<ConnectionFailedException>(async () => await host.StartAsync());
+            Assert.Contains("Unable to connect to", exception.Message);
+            await host.StopAsync();
         }
     }
 }

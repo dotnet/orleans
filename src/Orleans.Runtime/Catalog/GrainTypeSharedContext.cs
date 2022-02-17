@@ -114,6 +114,11 @@ namespace Orleans.Runtime
         /// <typeparam name="TComponent">The type specified in the corresponding <see cref="SetComponent{TComponent}"/> call.</typeparam>
         public TComponent GetComponent<TComponent>()
         {
+            if (typeof(TComponent) == typeof(PlacementStrategy) && PlacementStrategy is TComponent component)
+            {
+                return component;
+            }
+
             if (_components is null) return default;
             _components.TryGetValue(typeof(TComponent), out var resultObj);
             return (TComponent)resultObj;

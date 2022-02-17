@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
@@ -97,9 +98,10 @@ namespace Orleans
 
             GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
 
-            GrainReference IGrainContext.GrainReference => (this.LocalObject.Target as IAddressable).AsReference();
+            GrainReference IGrainContext.GrainReference =>
+                _manager.runtimeClient.InternalGrainFactory.GetGrain(ObserverId.GrainId).AsReference();
 
-            IAddressable IGrainContext.GrainInstance => this.LocalObject.Target as IAddressable;
+            object IGrainContext.GrainInstance => this.LocalObject.Target;
 
             ActivationId IGrainContext.ActivationId => throw new NotImplementedException();
 
@@ -110,10 +112,6 @@ namespace Orleans
             IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException();
 
             public IWorkItemScheduler Scheduler => throw new NotImplementedException();
-
-            public bool IsExemptFromCollection => true;
-
-            public PlacementStrategy PlacementStrategy => ClientObserversPlacement.Instance;
 
             void IGrainContext.SetComponent<TComponent>(TComponent value)
             {
@@ -330,7 +328,7 @@ namespace Orleans
                                     "Exception trying to send an exception response");
                                 return;
                             }
-                             
+
                             // the deep-copy succeeded.
                             var response = Response.FromException(deepCopy);
                             _manager.runtimeClient.SendResponse(message, response);

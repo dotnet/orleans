@@ -29,6 +29,7 @@ namespace Orleans.Hosting
                 return;
             }
 
+            services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();

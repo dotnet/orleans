@@ -66,15 +66,17 @@ namespace UnitTests.Grains
     internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain, IDebuggerHelperTestGrain
     {
         private readonly IInternalGrainFactory internalGrainFactory;
+        private readonly IGrainContext _grainContext;
         private ILogger logger;
 
-        public EchoTaskGrain(IInternalGrainFactory internalGrainFactory, ILogger<EchoTaskGrain> logger)
+        public EchoTaskGrain(IInternalGrainFactory internalGrainFactory, ILogger<EchoTaskGrain> logger, IGrainContext grainContext)
         {
             this.internalGrainFactory = internalGrainFactory;
             this.logger = logger;
+            _grainContext = grainContext;
         }
 
-        public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); } 
+        public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); }
         public Task<string> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -142,7 +144,7 @@ namespace UnitTests.Grains
         public Task PingLocalSiloAsync()
         {
             logger.Info("IEchoGrainAsync.PingLocal");
-            SiloAddress mySilo = Data.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress;
             return GetSiloControlReference(mySilo).Ping("PingLocal");
         }
 
@@ -155,7 +157,7 @@ namespace UnitTests.Grains
         public async Task PingOtherSiloAsync()
         {
             logger.Info("IEchoGrainAsync.PingOtherSilo");
-            SiloAddress mySilo = Data.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
@@ -170,7 +172,7 @@ namespace UnitTests.Grains
         public async Task PingClusterMemberAsync()
         {
             logger.Info("IEchoGrainAsync.PingClusterMemberAsync");
-            SiloAddress mySilo = Data.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
@@ -292,7 +294,7 @@ namespace UnitTests.Grains
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;
-            
+
             logger.Info(name + " Result=" + result);
             return result;
         }
@@ -385,7 +387,7 @@ namespace UnitTests.Grains
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;
-            
+
             logger.Info(name + " Result=" + result);
             return result;
         }

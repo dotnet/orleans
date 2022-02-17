@@ -52,7 +52,7 @@ $ExecuteCmd =
 {
     param([string] $args1, [string] $path)
 
-    Set-Location -Path $path
+    Set-Location -Path "$path"
 
     $cmdline = "& dotnet " + $args1
 
@@ -83,7 +83,7 @@ foreach ($d in $directories)
     $jobName = $([System.IO.Path]::GetFileName($d))
     $cmdLine = 'test --blame-hang-timeout 10m --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
     Write-Host $jobName dotnet $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList @($cmdLine, $d) -Name $jobName | Out-Null
+    Start-Job $ExecuteCmd -ArgumentList @($cmdLine, "$d") -Name $jobName | Out-Null
     Write-Host ''
 }
 

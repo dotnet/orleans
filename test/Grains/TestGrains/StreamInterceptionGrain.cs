@@ -10,7 +10,7 @@ namespace UnitTests.Grains
     public class StreamInterceptionGrain : Grain, IStreamInterceptionGrain, IIncomingGrainCallFilter
     {
         private int lastStreamValue;
-        
+
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var streams = this.GetStreamProvider("SMSProvider");

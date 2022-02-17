@@ -6,7 +6,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ActivityGrain : Grain, IActivityGrain
+    public class ActivityGrain : IActivityGrain
     {
         public Task<ActivityData> GetActivityId()
         {

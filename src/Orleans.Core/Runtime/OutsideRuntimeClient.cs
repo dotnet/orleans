@@ -170,16 +170,21 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(CancellationToken cancellationToken)
         {
-            var retryFilterInterface = ServiceProvider.GetService<IClientConnectionRetryFilter>();
-            Func<Exception, CancellationToken, Task<bool>> retryFilter = RetryFilter; 
+            var retryFilter = ServiceProvider.GetService<IClientConnectionRetryFilter>();
 
             var gatewayManager = this.ServiceProvider.GetRequiredService<GatewayManager>();
-            await ExecuteWithRetries(async () => await gatewayManager.StartAsync(cancellationToken), retryFilter);
+            await ExecuteWithRetries(
+                async () => await gatewayManager.StartAsync(cancellationToken),
+                retryFilter,
+                cancellationToken);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
-            MessageCenter.Start();
+            await ExecuteWithRetries(
+                async () => await MessageCenter.StartAsync(cancellationToken),
+                retryFilter,
+                cancellationToken);
             CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
@@ -187,44 +192,30 @@ namespace Orleans
 
             await ExecuteWithRetries(
                 async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
-                retryFilter);
+                retryFilter,
+                cancellationToken);
 
             ClientStatistics.Start(MessageCenter, clientId.GrainId);
 
-            async Task ExecuteWithRetries(Func<Task> task, Func<Exception, CancellationToken, Task<bool>> shouldRetry)
+            static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter retryFilter, CancellationToken cancellationToken)
             {
-                while (true)
+                do
                 {
                     try
                     {
                         await task();
                         return;
                     }
-                    catch (Exception exception) when (shouldRetry != null)
+                    catch (Exception exception) when (retryFilter is not null && !cancellationToken.IsCancellationRequested)
                     {
-                        var retry = await shouldRetry(exception, cancellationToken);
-                        if (!retry) throw;
+                        var shouldRetry = await retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested || !shouldRetry)
+                        {
+                            throw;
+                        }
                     }
                 }
-            }
-
-            async Task<bool> RetryFilter(Exception exception, CancellationToken cancellationToken)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return false;
-                }
-
-                if (retryFilterInterface is { })
-                {
-                    var result = await retryFilterInterface.ShouldRetryConnectionAttempt(exception, cancellationToken);
-                    return result && !cancellationToken.IsCancellationRequested;
-                }
-                else
-                {
-                    // Do not re-attempt connection by default, prefering to fail promptly.
-                    return false;
-                }
+                while (!cancellationToken.IsCancellationRequested);
             }
         }
 
@@ -421,7 +412,7 @@ namespace Orleans
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
 
-            if (obj is Grain)
+            if (obj is IGrainBase)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             var observerId = obj is ClientObserver clientObserver

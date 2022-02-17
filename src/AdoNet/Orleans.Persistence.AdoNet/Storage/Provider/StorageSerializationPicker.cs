@@ -65,7 +65,7 @@ namespace Orleans.Storage
         /// Picks a serializer using the given parameters.
         /// <see cref="IStorageSerializationPicker.PickSerializer"/>
         /// </summary>
-        public SerializationChoice PickSerializer<T>(string servideId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
+        public SerializationChoice PickSerializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {
             var serializer = Serializers.FirstOrDefault(i => i.Tag == tag);
             return new SerializationChoice(false, null, serializer ?? Serializers.FirstOrDefault());

@@ -128,6 +128,24 @@ namespace Orleans.Runtime
             return keyIndex == 0 ? "null/" + key : this.GetNamespace() + "/" + key;
         }
 
+        public static StreamId Parse(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                ThrowInvalidInternalStreamId(value);
+            }
+
+            var i = value.IndexOf('/');
+            if (i < 0)
+            {
+                ThrowInvalidInternalStreamId(value);
+            }
+
+            return Create(value.Substring(0, i), value.Substring(i + 1));
+        }
+
+        private static void ThrowInvalidInternalStreamId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a stream id");
+
         public override int GetHashCode() => this.hash;
 
         public string GetKeyAsString() => Encoding.UTF8.GetString(fullKey, keyIndex, fullKey.Length - keyIndex);

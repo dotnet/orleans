@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
@@ -103,14 +106,65 @@ namespace Orleans.Messaging
             }
         }
 
-        public void Start()
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            Running = true;
+            await EstablishInitialConnection(cancellationToken);
+
             if (this.statisticsLevel.CollectQueueStats())
             {
                 queueTracking.OnStartExecution();
             }
+
+            Running = true;
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
+        }
+
+        private async Task EstablishInitialConnection(CancellationToken cancellationToken)
+        {
+            var cancellationTask = cancellationToken.WhenCancelled();
+            var liveGateways = gatewayManager.GetLiveGateways();
+
+            if (liveGateways.Count == 0)
+            {
+                throw new ConnectionFailedException("There are no available gateways");
+            }
+
+            var pendingTasks = new List<Task>(liveGateways.Count + 1);
+            pendingTasks.Add(cancellationTask);
+            foreach (var gateway in liveGateways)
+            {
+                pendingTasks.Add(connectionManager.GetConnection(gateway).AsTask());
+            }
+
+            try
+            {
+                // There will always be one task to represent cancellation.
+                while (pendingTasks.Count > 1)
+                {
+                    var completedTask = await Task.WhenAny(pendingTasks);
+                    pendingTasks.Remove(completedTask);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // If at least one gateway connection has been established, break out of the loop and continue startup.
+                    if (completedTask.IsCompletedSuccessfully)
+                    {
+                        break;
+                    }
+
+                    // If there are no more gateways, observe the most recent exception and bail out.
+                    if (pendingTasks.Count == 1)
+                    {
+                        await completedTask;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                throw new ConnectionFailedException(
+                    $"Unable to connect to any of the {liveGateways.Count} available gateways.",
+                    exception);
+            }
         }
 
         public void Stop()

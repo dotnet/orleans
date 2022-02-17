@@ -59,6 +59,25 @@ namespace Orleans.Runtime
             return $"{ProviderName}/{StreamId.ToString()}";
         }
 
+        public static InternalStreamId Parse(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                ThrowInvalidInternalStreamId(value);
+            }
+
+            var i = value.IndexOf('/');
+            if (i < 0)
+            {
+                ThrowInvalidInternalStreamId(value);
+            }
+
+            return new InternalStreamId(value.Substring(0, i), StreamId.Parse(value.Substring(i + 1)));
+        }
+
+        private static void ThrowInvalidInternalStreamId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a stream id");
+
+
         internal string GetNamespace() => StreamId.GetNamespace();
     }
 }

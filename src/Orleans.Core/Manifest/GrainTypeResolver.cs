@@ -33,9 +33,9 @@ namespace Orleans.Metadata
         /// <returns>The grain type for the provided class.</returns>
         public GrainType GetGrainType(Type type)
         {
-            if (!type.IsClass)
+            if (!type.IsClass || type.IsAbstract)
             {
-                throw new ArgumentException($"Argument {nameof(type)} must be a class. Provided value, \"{type}\", is not a class.", nameof(type));
+                throw new ArgumentException($"Argument {nameof(type)} must be a non-abstract class. Provided value, \"{type}\", is not a class.", nameof(type));
             }
 
             // Configured providers take precedence

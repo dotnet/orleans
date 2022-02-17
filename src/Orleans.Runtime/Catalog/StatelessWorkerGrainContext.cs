@@ -51,7 +51,7 @@ namespace Orleans.Runtime
 
         public GrainId GrainId => _address.GrainId;
 
-        public IAddressable GrainInstance => null;
+        public object GrainInstance => null;
 
         public ActivationId ActivationId => _address.ActivationId;
 

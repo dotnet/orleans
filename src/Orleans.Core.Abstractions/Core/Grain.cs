@@ -14,17 +14,15 @@ namespace Orleans
     /// </summary>
     public abstract class Grain : IGrainBase, IAddressable
     {
-        private readonly IGrainContext _grainContext;
-
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
-        internal IActivationData Data => _grainContext as IActivationData;
+        internal IGrainContext GrainContext { get; private set; }
 
-        IGrainContext IGrainBase.GrainContext => _grainContext;
+        IGrainContext IGrainBase.GrainContext => GrainContext;
 
-        public GrainReference GrainReference { get { return _grainContext.GrainReference; } }
+        public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; }
 
@@ -41,10 +39,10 @@ namespace Orleans
         /// </summary>
         protected internal IServiceProvider ServiceProvider
         {
-            get { return _grainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
+            get { return GrainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
         }
 
-        internal GrainId GrainId => _grainContext.GrainId;
+        internal GrainId GrainId => GrainContext.GrainId;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
@@ -61,7 +59,7 @@ namespace Orleans
         /// </summary>
         protected Grain(IGrainContext grainContext, IGrainRuntime grainRuntime = null)
         {
-            _grainContext = grainContext;
+            GrainContext = grainContext;
             Runtime = grainRuntime ?? grainContext?.ActivationServices.GetRequiredService<IGrainRuntime>();
         }
 
@@ -113,7 +111,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(asyncCallback));
 
             EnsureRuntime();
-            return Runtime.TimerRegistry.RegisterTimer(_grainContext ?? RuntimeContext.Current, asyncCallback, state, dueTime, period);
+            return Runtime.TimerRegistry.RegisterTimer(GrainContext ?? RuntimeContext.Current, asyncCallback, state, dueTime, period);
         }
 
         /// <summary>
@@ -184,7 +182,7 @@ namespace Orleans
         protected void DeactivateOnIdle()
         {
             EnsureRuntime();
-            Runtime.DeactivateOnIdle(_grainContext ?? RuntimeContext.Current);
+            Runtime.DeactivateOnIdle(GrainContext ?? RuntimeContext.Current);
         }
 
         /// <summary>
@@ -197,7 +195,7 @@ namespace Orleans
         protected void DelayDeactivation(TimeSpan timeSpan)
         {
             EnsureRuntime();
-            Runtime.DelayDeactivation(_grainContext ?? RuntimeContext.Current, timeSpan);
+            Runtime.DelayDeactivation(GrainContext ?? RuntimeContext.Current, timeSpan);
         }
 
         /// <summary>
@@ -287,7 +285,7 @@ namespace Orleans
         {
             if (ct.IsCancellationRequested)
                 return Task.CompletedTask;
-            this.storage = this.Runtime.GetStorage<TGrainState>(Data);
+            this.storage = this.Runtime.GetStorage<TGrainState>(GrainContext);
             return this.ReadStateAsync();
         }
     }

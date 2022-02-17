@@ -108,7 +108,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
-            
+
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
@@ -118,9 +118,9 @@ namespace Orleans.Runtime.GrainDirectory
             // add myself to the list of members
             AddServer(MyAddress);
 
-            Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) => 
+            Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) =>
                 String.Format("{0}/{1:X}", addr.ToLongString(), addr.GetConsistentHashCode());
-            
+
             localLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
             localSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
             fullLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_FULL_ISSUED);
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.GrainDirectory
                     long delta1, delta2;
                     long curr1 = cacheSuccesses.GetCurrentValueAndDelta(out delta1);
                     long curr2 = cacheLookups.GetCurrentValueAndDelta(out delta2);
-                    return String.Format("{0}, Delta={1}", 
+                    return String.Format("{0}, Delta={1}",
                         (curr2 != 0 ? (float)curr1 / (float)curr2 : 0)
                         ,(delta2 !=0 ? (float)delta1 / (float)delta2 : 0));
                 });
@@ -190,11 +190,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised. 
-        // This means that there may be a short period during which no silo believes that it is the owner of directory information for a set of 
-        // grains (for update purposes), which could cause application requests that require a new activation to be created to time out. 
-        // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes 
-        // would receive successful responses but would not be reflected in the eventual state of the directory. 
+        // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised.
+        // This means that there may be a short period during which no silo believes that it is the owner of directory information for a set of
+        // grains (for update purposes), which could cause application requests that require a new activation to be created to time out.
+        // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
+        // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
         public void Stop()
         {
@@ -323,13 +323,13 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// Adjust local cache following the removal of a silo by dropping:
-        /// 1) entries that point to activations located on the removed silo 
+        /// 1) entries that point to activations located on the removed silo
         /// 2) entries for grains that are now owned by this silo (me)
         /// 3) entries for grains that were owned by this removed silo - we currently do NOT do that.
         ///     If we did 3, we need to do that BEFORE we change the membershipRingList (based on old Membership).
-        ///     We don't do that since first cache refresh handles that. 
+        ///     We don't do that since first cache refresh handles that.
         ///     Second, since Membership events are not guaranteed to be ordered, we may remove a cache entry that does not really point to a failed silo.
-        ///     To do that properly, we need to store for each cache entry who was the directory owner that registered this activation (the original partition owner). 
+        ///     To do that properly, we need to store for each cache entry who was the directory owner that registered this activation (the original partition owner).
         protected void AdjustLocalCache(SiloAddress silo, bool dead)
         {
             // remove all records of activations located on the removed silo
@@ -401,18 +401,18 @@ namespace Orleans.Runtime.GrainDirectory
                 if (status.IsTerminating())
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    CacheValidator.Scheduler.QueueAction(() => RemoveServer(updatedSilo, status));
+                    CacheValidator.WorkItemGroup.QueueAction(() => RemoveServer(updatedSilo, status));
                 }
                 else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    CacheValidator.Scheduler.QueueAction(() => AddServer(updatedSilo));
+                    CacheValidator.WorkItemGroup.QueueAction(() => AddServer(updatedSilo));
                 }
             }
         }
 
         private bool IsValidSilo(SiloAddress silo)
-        { 
+        {
             return this.siloStatusOracle.IsFunctionalDirectory(silo);
         }
 
@@ -449,8 +449,8 @@ namespace Orleans.Runtime.GrainDirectory
             int hash = unchecked((int)grainId.GetUniformHashCode());
 
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-            // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag 
-            // is doing something valuable. 
+            // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag
+            // is doing something valuable.
             bool excludeMySelf = !Running;
 
             var existing = this.directoryMembership;
@@ -470,7 +470,7 @@ namespace Orleans.Runtime.GrainDirectory
                     break;
                 }
             }
-                
+
             if (siloAddress == null)
             {
                 // If not found in the traversal, last silo will do (we are on a ring).
@@ -549,7 +549,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // otherwise, notify the owner
                 AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, hopCount + 1);
 
-                // Caching optimization: 
+                // Caching optimization:
                 // cache the result of a successfull RegisterSingleActivation call, only if it is not a duplicate activation.
                 // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
                 if (result.Address == null) return result;
@@ -615,7 +615,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void AddToDictionary<K,V>(ref Dictionary<K, List<V>> dictionary, K key, V value)
         {
-            if (dictionary == null) 
+            if (dictionary == null)
                dictionary = new Dictionary<K,List<V>>();
             List<V> list;
             if (! dictionary.TryGetValue(key, out list))
@@ -725,7 +725,7 @@ namespace Orleans.Runtime.GrainDirectory
                 result = GetLocalDirectoryData(grain);
                 if (result.Address == null)
                 {
-                    // it can happen that we cannot find the grain in our partition if there were 
+                    // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
                     return false;
@@ -782,7 +782,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var localResult = DirectoryPartition.LookUpActivation(grainId);
                 if (localResult.Address == null)
                 {
-                    // it can happen that we cannot find the grain in our partition if there were 
+                    // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}=none", grainId);
                     localResult.Address = default;
@@ -884,14 +884,14 @@ namespace Orleans.Runtime.GrainDirectory
             sb.AppendFormat("      Local found: {0}", localLookupsSucceededDelta).AppendLine();
             if (localLookupsDelta > 0)
                 sb.AppendFormat("      Hit rate: {0:F1}%", (100.0 * localLookupsSucceededDelta) / localLookupsDelta).AppendLine();
-            
+
             sb.AppendFormat("      Full lookups: {0}", fullLookupsDelta).AppendLine();
             sb.AppendLine("   Since start:");
             sb.AppendFormat("      Local lookups: {0}", localLookupsCurrent).AppendLine();
             sb.AppendFormat("      Local found: {0}", localLookupsSucceededCurrent).AppendLine();
             if (localLookupsCurrent > 0)
                 sb.AppendFormat("      Hit rate: {0:F1}%", (100.0 * localLookupsSucceededCurrent) / localLookupsCurrent).AppendLine();
-            
+
             sb.AppendFormat("      Full lookups: {0}", fullLookupsCurrent).AppendLine();
             sb.Append(DirectoryCache.ToString());
 

@@ -199,7 +199,10 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.StartConnection(address, connection);
+
+                await connection.Initialized.WithCancellation(openConnectionCancellation.Token);
                 this.OnConnected(address, connection, entry);
+
                 return connection;
             }
             catch (Exception exception)

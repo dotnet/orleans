@@ -1,23 +1,10 @@
 using Orleans.Concurrency;
-using System;
 
-namespace BlazorServer.Models
-{
-    [Immutable]
-    [Serializable]
-    public class WeatherInfo
-    {
-        public WeatherInfo(DateTime date, int temperatureC, string summary, int temperatureF)
-        {
-            Date = date;
-            TemperatureC = temperatureC;
-            Summary = summary;
-            TemperatureF = temperatureF;
-        }
+namespace BlazorServer.Models;
 
-        public DateTime Date { get; }
-        public int TemperatureC { get; }
-        public string Summary { get; }
-        public int TemperatureF { get; }
-    }
-}
+[Immutable, Serializable]
+public record class WeatherInfo(
+    DateTime Date,
+    int TemperatureC,
+    string Summary,
+    int TemperatureF);
