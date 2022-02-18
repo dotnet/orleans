@@ -3,6 +3,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Extension methods for <see cref="IAsyncObservable{T}"/>.
+    /// </summary>
     public static class AsyncObservableExtensions
     {
         private static readonly Func<Exception, Task> DefaultOnError = _ => Task.CompletedTask;

@@ -4,6 +4,9 @@ using Orleans.Streams;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Extension methods for accessing stream providers from a <see cref="Grain"/> or <see cref="IGrainBase"/> implementation.
+    /// </summary>
     public static class GrainStreamingExtensions
     {
         public static IStreamProvider GetStreamProvider(this Grain grain, string name)
@@ -20,6 +23,9 @@ namespace Orleans
         }
     }
 
+    /// <summary>
+    /// Extension methods for accessing stream providers from a client.
+    /// </summary>
     public static class ClientStreamingExtensions
     {
         /// <inheritdoc />

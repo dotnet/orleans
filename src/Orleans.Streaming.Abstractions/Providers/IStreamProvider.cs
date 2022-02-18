@@ -3,11 +3,23 @@ using System;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Functionality for providing streams to consumers and producers.
+    /// </summary>
     public interface IStreamProvider
     {
-        /// <summary>Name of the stream provider.</summary>
+        /// <summary>
+        /// Gets the name of the stream provider.
+        /// </summary>
+        /// <value>The name.</value>
         string Name { get; }
 
+        /// <summary>
+        /// Gets the stream with the specified identity.
+        /// </summary>
+        /// <typeparam name="T">The stream element type.</typeparam>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <returns>The stream.</returns>
         IAsyncStream<T> GetStream<T>(StreamId streamId);
         /// <summary>
         /// Determines whether this is a rewindable provider - supports creating rewindable streams 
@@ -17,9 +29,19 @@ namespace Orleans.Streams
         bool IsRewindable { get; }
     }
 
+    /// <summary>
+    /// Extensions for <see cref="IStreamProvider"/>.
+    /// </summary>
     public static class StreamProviderExtensions
     {
-        // For compatibility
+        /// <summary>
+        /// Gets the stream with the specified identity and namespace.
+        /// </summary>
+        /// <typeparam name="T">The stream element type.</typeparam>
+        /// <param name="streamProvider">The stream provider.</param>
+        /// <param name="id">The identifier.</param>
+        /// <param name="ns">The namespace.</param>
+        /// <returns>The stream.</returns>
         public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, Guid id, string ns) => streamProvider.GetStream<T>(StreamId.Create(ns, id));
     }
 }

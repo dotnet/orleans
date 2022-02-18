@@ -9,7 +9,7 @@ using Orleans.Streams;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Identify a Stream within a provider
+    /// Identifies a Stream within a provider
     /// </summary>
     [Immutable]
     [Serializable]
@@ -26,10 +26,22 @@ namespace Orleans.Runtime
         [Id(2)]
         private readonly int hash;
 
+        /// <summary>
+        /// Gets the full key.
+        /// </summary>
+        /// <value>The full key.</value>
         public ReadOnlyMemory<byte> FullKey => fullKey;
 
+        /// <summary>
+        /// Gets the namespace.
+        /// </summary>
+        /// <value>The namespace.</value>
         public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, this.keyIndex);
 
+        /// <summary>
+        /// Gets the key.
+        /// </summary>
+        /// <value>The key.</value>
         public ReadOnlyMemory<byte> Key => fullKey.AsMemory(this.keyIndex);
 
         private StreamId(byte[] fullKey, ushort keyIndex, int hash)
@@ -51,7 +63,12 @@ namespace Orleans.Runtime
             this.hash = info.GetInt32("fh");
         }
 
-
+        
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamId"/> struct.
+        /// </summary>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="key">The key.</param>
         public static StreamId Create(byte[] ns, byte[] key)
         {
             if (key == null)
@@ -70,6 +87,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamId"/> struct.
+        /// </summary>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="key">The key.</param>
         public static StreamId Create(string ns, Guid key)
         {
             if (ns is null)
@@ -90,6 +112,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamId"/> struct.
+        /// </summary>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="key">The key.</param>
         public static StreamId Create(string ns, string key)
         {
             if (ns is null)
@@ -103,18 +130,38 @@ namespace Orleans.Runtime
             return new StreamId(buf, (ushort)nsLen);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamId"/> struct.
+        /// </summary>
+        /// <param name="streamIdentity">The stream identity.</param>
         public static StreamId Create(IStreamIdentity streamIdentity) => Create(streamIdentity.Namespace, streamIdentity.Guid);
 
+        /// <inheritdoc/>
         public int CompareTo(StreamId other) => fullKey.AsSpan().SequenceCompareTo(other.fullKey);
 
+        /// <inheritdoc/>
         public bool Equals(StreamId other) => fullKey.AsSpan().SequenceEqual(other.fullKey);
 
+        /// <inheritdoc/>
         public override bool Equals(object obj) => obj is StreamId other ? this.Equals(other) : false;
 
+        /// <summary>
+        /// Compares two <see cref="StreamId"/> instances for equality.
+        /// </summary>
+        /// <param name="s1">The first stream identity.</param>
+        /// <param name="s2">The second stream identity.</param>
+        /// <returns>The result of the operator.</returns>
         public static bool operator ==(StreamId s1, StreamId s2) => s1.Equals(s2);
 
+        /// <summary>
+        /// Compares two <see cref="StreamId"/> instances for equality.
+        /// </summary>
+        /// <param name="s1">The first stream identity.</param>
+        /// <param name="s2">The second stream identity.</param>
+        /// <returns>The result of the operator.</returns>
         public static bool operator !=(StreamId s1, StreamId s2) => !s2.Equals(s1);
 
+        /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("fk", fullKey);
@@ -122,12 +169,18 @@ namespace Orleans.Runtime
             info.AddValue("fh", this.hash);
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             var key = this.GetKeyAsString();
             return keyIndex == 0 ? "null/" + key : this.GetNamespace() + "/" + key;
         }
 
+        /// <summary>
+        /// Parses a <see cref="StreamId"/> instance from a <see cref="string"/>.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The parsed stream identity.</returns>
         public static StreamId Parse(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -146,10 +199,19 @@ namespace Orleans.Runtime
 
         private static void ThrowInvalidInternalStreamId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a stream id");
 
+        /// <inheritdoc/>
         public override int GetHashCode() => this.hash;
 
+        /// <summary>
+        /// Returns the <see cref="Key"/> component of this instance as a string.
+        /// </summary>
+        /// <returns>The key component of this instance.</returns>
         public string GetKeyAsString() => Encoding.UTF8.GetString(fullKey, keyIndex, fullKey.Length - keyIndex);
 
+        /// <summary>
+        /// Returns the <see cref="Namespace"/> component of this instance as a string.
+        /// </summary>
+        /// <returns>The namespace component of this instance.</returns>
         public string GetNamespace() => keyIndex == 0 ? null : Encoding.UTF8.GetString(fullKey, 0, keyIndex);
     }
 }

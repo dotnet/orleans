@@ -17,6 +17,10 @@ namespace Orleans
         /// </summary>
         public IStreamNamespacePredicate Predicate { get; }
 
+        /// <summary>
+        /// Gets the name of the stream identifier mapper.
+        /// </summary>
+        /// <value>The name of the stream identifier mapper.</value>
         public string StreamIdMapper { get; }
 
         /// <summary>
@@ -43,7 +47,7 @@ namespace Orleans
         /// must have a constructor without parameters.
         /// </summary>
         /// <param name="predicateType">The stream namespace predicate type.</param>
-        /// <param name="streamIdMapper"></param>
+        /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
         public ImplicitStreamSubscriptionAttribute(Type predicateType, string streamIdMapper = null)
         {
             Predicate = (IStreamNamespacePredicate) Activator.CreateInstance(predicateType);
@@ -55,7 +59,7 @@ namespace Orleans
         /// via inheriting attributes.
         /// </summary>
         /// <param name="predicate">The stream namespace predicate.</param>
-        /// <param name="streamIdMapper"></param>
+        /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
         public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate, string streamIdMapper = null)
         {
             Predicate = predicate;

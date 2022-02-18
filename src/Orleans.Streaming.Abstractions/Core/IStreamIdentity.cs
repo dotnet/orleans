@@ -1,13 +1,26 @@
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Uniquely identifies a stream.
+    /// </summary>
+    /// <remarks>
+    /// Use <see cref="StreamId"/> instead, where possible.
+    /// </remarks>
     public interface IStreamIdentity
     {
-        /// <summary> Stream primary key guid. </summary>
+        /// <summary>
+        /// Gets the unique identifier.
+        /// </summary>
+        /// <value>The unique identifier.</value>
         Guid Guid { get; }
 
-        /// <summary> Stream namespace. </summary>
+        /// <summary>
+        /// Gets the namespace.
+        /// </summary>
+        /// <value>The namespace.</value>
         string Namespace { get; }
     }
 }
