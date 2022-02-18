@@ -49,6 +49,7 @@ namespace Orleans.ServiceBus.Providers
             var connection = options.CreateConnection(options.ConnectionOptions);
             this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
 
+
             EventPosition GetEventPosition()
             {
                 EventPosition eventPosition;
