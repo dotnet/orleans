@@ -103,6 +103,30 @@ namespace Orleans.Runtime
             return true;
         }
 
+        public bool TryRemove<T>(TKey key, Func<T, TValue, bool> predicate, T context)
+        {
+            if (!cache.TryGetValue(key, out var timestampedValue))
+            {
+                return false;
+            }
+
+            if (predicate(context, timestampedValue.Value) && TryRemove(key, timestampedValue))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryRemove(TKey key, TimestampedValue value)
+        {
+            var entry = new KeyValuePair<TKey, TimestampedValue>(key, value);
+
+            // Cast the dictionary to its interface type to access the explicitly implemented Remove method.
+            var cacheDictionary = (IDictionary<TKey, TimestampedValue>)cache;
+            return cacheDictionary.Remove(entry);
+        }
+
         public void Clear()
         {
             foreach (var pair in cache)

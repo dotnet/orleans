@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -44,10 +45,10 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool Remove(GrainId key)
-        {
-            return false;
-        }
+        public bool Remove(GrainId key) => false;
+
+        public bool Remove(ActivationAddress key) => false;
+
 
         public void Clear()
         {
@@ -59,6 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
             version = default(int);
             return false;
         }
+
 
         public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
         {

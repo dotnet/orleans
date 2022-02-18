@@ -175,5 +175,20 @@ namespace Orleans.Runtime.GrainDirectory
 
             return sb.ToString();
         }
+
+        public bool Remove(ActivationAddress activationAddress)
+        {
+            return cache.TryRemove(activationAddress.Grain, ActivationAddressEqual, activationAddress.Activation);
+
+            static bool ActivationAddressEqual(ActivationId activationId, GrainDirectoryCacheEntry entry)
+            {
+                // entry.Value should always be == 1, but to be safe ask to remove the entry if the count is zero
+                if (entry.Value.Count == 0 || activationId.Equals(entry.Value[0].Item2))
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
     }
 }

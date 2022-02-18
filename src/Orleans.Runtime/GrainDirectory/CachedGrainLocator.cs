@@ -142,7 +142,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             finally
             {
-                this.cache.Remove(address.Grain);
+                this.cache.Remove(address);
             }
         }
 
