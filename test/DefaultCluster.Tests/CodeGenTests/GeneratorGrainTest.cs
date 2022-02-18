@@ -204,7 +204,7 @@ namespace Tester.CodeGenTests
             var localObject = new ObserverWithGenericMethods();
 
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
-            var observer = await this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
+            var observer = this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
             await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
             Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
         }

@@ -61,7 +61,7 @@ namespace Orleans
         /// </typeparam>
         /// <param name="obj">The object to create a reference to.</param>
         /// <returns>The reference to <paramref name="obj"/>.</returns>
-        Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
+        TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         /// <summary>
         /// Deletes the provided object reference.
@@ -71,7 +71,7 @@ namespace Orleans
         /// </typeparam>
         /// <param name="obj">The reference being deleted.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
+        void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         /// <summary>
         /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to

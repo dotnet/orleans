@@ -154,14 +154,14 @@ namespace DefaultCluster.Tests.General
                 },
                 handle,
                 client.ServiceProvider.GetRequiredService<ILogger<ISimpleGrainObserver>>());
-            var reference = await client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var reference = client.CreateObjectReference<ISimpleGrainObserver>(observer);
             await grain.Subscribe(reference);
             await grain.SetA(3);
             await grain.SetB(2);
 
             Assert.True(await handle.WaitForFinished(_timeout));
 
-            await client.DeleteObjectReference<ISimpleGrainObserver>(reference);
+            client.DeleteObjectReference<ISimpleGrainObserver>(reference);
             Assert.NotNull(observer);
         }
 

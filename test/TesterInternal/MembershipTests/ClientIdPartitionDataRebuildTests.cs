@@ -54,7 +54,7 @@ namespace UnitTests.MembershipTests
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
             var grain = await SetupTestAndPickGrain<ISimpleObserverableGrain>(g => g.GetRuntimeInstanceId());
             var observer = new Observer();
-            var reference = await this.hostedCluster.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var reference = this.hostedCluster.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
 
             await grain.Subscribe(reference);
 

@@ -111,11 +111,11 @@ namespace Orleans
             where TGrainInterface : IGrainWithIntegerCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver => ((IGrainFactory)_runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
-        public Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
+        public void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
