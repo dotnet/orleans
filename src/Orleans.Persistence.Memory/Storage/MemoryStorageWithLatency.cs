@@ -8,10 +8,26 @@ using Orleans.Configuration;
 namespace Orleans.Storage
 {
 
+    /// <summary>
+    /// Options for the <see cref="MemoryGrainStorageWithLatency"/> storage provider.
+    /// </summary>
     public class MemoryStorageWithLatencyOptions : MemoryGrainStorageOptions
     {
+        /// <summary>
+        /// The default latency.
+        /// </summary>
         public static readonly TimeSpan DefaultLatency = TimeSpan.FromMilliseconds(200);
+
+        /// <summary>
+        /// Gets or sets the latency.
+        /// </summary>
+        /// <value>The latency.</value>
         public TimeSpan Latency { get; set; } = DefaultLatency;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to mock calls instead of issuing real storage calls.
+        /// </summary>
+        /// <value><see langword="true" /> if the provider should mock calls; otherwise, <see langword="false" />.</value>
         public bool MockCallsOnly { get;set; }
     }
 
@@ -25,16 +41,6 @@ namespace Orleans.Storage
     ///  because [by-design] it does not provide any resilience 
     ///  or long-term persistence capabilities.
     /// </remarks>
-    /// <example>
-    /// Example configuration for this storage provider in OrleansConfiguration.xml file:
-    /// <code>
-    /// &lt;OrleansConfiguration xmlns="urn:orleans">
-    ///   &lt;Globals>
-    ///     &lt;StorageProviders>
-    ///       &lt;Provider Type="Orleans.Storage.MemoryStorageWithLatency" Name="MemoryStoreWithLatency" Latency="00:00:00.500"/>
-    ///   &lt;/StorageProviders>
-    /// </code>
-    /// </example>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
     public class MemoryGrainStorageWithLatency :IGrainStorage
     {
