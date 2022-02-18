@@ -22,7 +22,7 @@ namespace Microsoft.Extensions.Hosting
         /// Note that this method should not be used in conjunction with IHostBuilder.UseOrleans, since UseOrleans includes a client automatically.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="hostBuilder"/> was null or <paramref name="configureDelegate"/> was null.</exception>
-        public static IHostBuilder UseOrleansClient(this IHostBuilder hostBuilder, Action<IClientBuilder> configureDelegate)
+        public static IHostBuilder UseOrleansClient(this IHostBuilder hostBuilder, Action<HostBuilderContext, IClientBuilder> configureDelegate)
         {
             if (hostBuilder == null) throw new ArgumentNullException(nameof(hostBuilder));
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
@@ -32,7 +32,7 @@ namespace Microsoft.Extensions.Hosting
             }
 
             hostBuilder.Properties["HasOrleansClientBuilder"] = "true";
-            return hostBuilder.ConfigureServices((ctx, services) => services.AddOrleansClient(configureDelegate));
+            return hostBuilder.ConfigureServices((ctx, services) => configureDelegate(ctx, AddOrleansClient(services)));
         }
 
         /// <summary>
@@ -50,6 +50,13 @@ namespace Microsoft.Extensions.Hosting
         public static IServiceCollection AddOrleansClient(this IServiceCollection services, Action<IClientBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            var clientBuilder = AddOrleansClient(services);
+            configureDelegate(clientBuilder);
+            return services;
+        }
+
+        private static IClientBuilder AddOrleansClient(IServiceCollection services)
+        {
             IClientBuilder clientBuilder = default;
             foreach (var descriptor in services)
             {
@@ -70,8 +77,7 @@ namespace Microsoft.Extensions.Hosting
                 services.Add(new(typeof(OrleansBuilderMarker), new OrleansBuilderMarker(clientBuilder)));
             }
 
-            configureDelegate(clientBuilder);
-            return services;
+            return clientBuilder;
         }
 
         private static OrleansConfigurationException GetOrleansSiloAddedException() => new("Do not use UseOrleans with UseOrleansClient. If you want a client and server in the same process, only UseOrleans is necessary and the UseOrleansClient call can be removed.");

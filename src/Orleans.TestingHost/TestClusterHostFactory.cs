@@ -39,7 +39,7 @@ namespace Orleans.TestingHost
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
-            hostBuilder.UseOrleans(siloBuilder =>
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
                     .Configure<ClusterOptions>(configuration)
@@ -91,7 +91,7 @@ namespace Orleans.TestingHost
             var hostBuilder = new HostBuilder();
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClusterOptions>(configuration);
                     ConfigureAppServices(configuration, clientBuilder);
@@ -172,7 +172,7 @@ namespace Orleans.TestingHost
                     var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
 
                     (configurator as IHostConfigurator)?.Configure(hostBuilder);
-                    hostBuilder.UseOrleans(siloBuilder => (configurator as ISiloConfigurator)?.Configure(siloBuilder));
+                    hostBuilder.UseOrleans((ctx, siloBuilder) => (configurator as ISiloConfigurator)?.Configure(siloBuilder));
                 }
             }
         }

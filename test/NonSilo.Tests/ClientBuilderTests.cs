@@ -47,7 +47,7 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() =>
             {
                 var host = new HostBuilder()
-                    .UseOrleansClient(clientBuilder =>
+                    .UseOrleansClient((ctx, clientBuilder) =>
                     {
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
@@ -66,7 +66,7 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() =>
             {
                 var host = new HostBuilder()
-                    .UseOrleansClient(clientBuilder =>
+                    .UseOrleansClient((ctx, clientBuilder) =>
                     {
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
@@ -85,7 +85,7 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() =>
             {
                 var host = new HostBuilder()
-                    .UseOrleansClient(clientBuilder =>
+                    .UseOrleansClient((ctx, clientBuilder) =>
                     {
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
@@ -102,7 +102,7 @@ namespace NonSilo.Tests
             });
 
             var host = new HostBuilder()
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClusterOptions>(options =>
                     {
@@ -125,7 +125,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_NoSpecifiedConfigurationTest()
         {
             var hostBuilder = new HostBuilder()
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
                 })
@@ -142,7 +142,7 @@ namespace NonSilo.Tests
         {
             // Add only an assembly with generated serializers but no grain interfaces
             var hostBuilder = new HostBuilder()
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder
                         .UseLocalhostClustering()
@@ -165,7 +165,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_ServiceProviderTest()
         {
             var hostBuilder = new HostBuilder()
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
                 })
@@ -215,11 +215,11 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() =>
             {
                 _ = new HostBuilder()
-                    .UseOrleans(siloBuilder =>
+                    .UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder.UseLocalhostClustering();
                     })
-                    .UseOrleansClient(clientBuilder =>
+                    .UseOrleansClient((ctx, clientBuilder) =>
                     {
                         clientBuilder.UseLocalhostClustering();
                     });

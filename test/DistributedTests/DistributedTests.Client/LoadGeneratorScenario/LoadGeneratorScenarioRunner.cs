@@ -41,7 +41,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
         public async Task Run(ClientParameters clientParams, LoadGeneratorParameters loadParams)
         {
             var secrets = SecretConfiguration.Load(clientParams.SecretSource);
-            var hostBuilder = new HostBuilder().UseOrleansClient(builder =>
+            var hostBuilder = new HostBuilder().UseOrleansClient((ctx, builder) =>
                 builder.Configure<ClusterOptions>(options => { options.ClusterId = clientParams.ClusterId; options.ServiceId = clientParams.ServiceId; })
                        .Configure<ConnectionOptions>(options => clientParams.ConnectionsPerEndpoint = 2)
                        .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(secrets.ClusteringConnectionString)));

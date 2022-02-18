@@ -14,7 +14,7 @@ namespace TestExtensions
         public SerializationTestEnvironment(Action<IClientBuilder> configureClientBuilder = null)
         {
             var host = new HostBuilder()
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.UseLocalhostClustering();
                     configureClientBuilder?.Invoke(clientBuilder);
