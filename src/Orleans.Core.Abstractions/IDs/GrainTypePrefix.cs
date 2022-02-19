@@ -42,6 +42,10 @@ namespace Orleans.Runtime
         /// A span representation of <see cref="ClientPrefix" />.
         /// </summary>
         public static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(ClientPrefix);
+
+        /// <summary>
+        /// The prefix used to represent a grain client.
+        /// </summary>
         public static readonly GrainType ClientGrainType = GrainType.Create(ClientPrefix);
 
         /// <summary>
@@ -57,31 +61,43 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="type">The grain type.</param>
+        /// <returns><see langword="true"/> if the type is a client, <see langword="false"/> if not.</returns>
         public static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="type">The grain type.</param>
+        /// <returns><see langword="true"/> if the type is a system target, <see langword="false"/> if not.</returns>
         public static bool IsSystemTarget(this in GrainType type) => type.AsSpan().StartsWith(SystemTargetPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="type">The grain type.</param>
+        /// <returns><see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.</returns>
         public static bool IsLegacyGrain(this in GrainType type) => type.AsSpan().StartsWith(LegacyGrainPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a grain service, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="type">The grain type.</param>
+        /// <returns><see langword="true"/> if the type is a grain service, <see langword="false"/> if not.</returns>
         public static bool IsGrainService(this in GrainType type) => type.AsSpan().StartsWith(GrainServicePrefixBytes.Span);
 
         /// <summary>
-        /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
+        /// Returns <see langword="true"/> if the id represents a client, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="id">The grain id.</param>
+        /// <returns><see langword="true"/> if the type is a client, <see langword="false"/> if not.</returns>
         public static bool IsClient(this in GrainId id) => id.Type.IsClient();
 
         /// <summary>
-        /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
+        /// Returns <see langword="true"/> if the id represents a system target, <see langword="false"/> if not.
         /// </summary>
+        /// <param name="id">The grain id.</param>
+        /// <returns><see langword="true"/> if the type is a system target, <see langword="false"/> if not.</returns>
         public static bool IsSystemTarget(this in GrainId id) => id.Type.IsSystemTarget();
     }
 }

@@ -13,15 +13,15 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Converts a cached message to a batch container for delivery
         /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <returns>The batch container.</returns>
         IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage);
 
         /// <summary>
         /// Gets the stream sequence token from a cached message.
         /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <returns>The sequence token.</returns>
         StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage);
     }
 }

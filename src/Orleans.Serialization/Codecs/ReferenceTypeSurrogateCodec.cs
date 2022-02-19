@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
@@ -18,11 +18,16 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReferenceTypeSurrogateCodec{TField, TSurrogate}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The surrogate serializer.</param>
         protected ReferenceTypeSurrogateCodec(IValueSerializer<TSurrogate> surrogateSerializer)
         {
             _surrogateSerializer = surrogateSerializer;
         }
 
+        /// <inheritdoc/>
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -52,6 +57,7 @@ namespace Orleans.Serialization.Codecs
             return null;
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -88,8 +94,18 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Converts a surrogate value to the field type.
+        /// </summary>
+        /// <param name="surrogate">The surrogate.</param>
+        /// <returns>The value.</returns>
         public abstract TField ConvertFromSurrogate(ref TSurrogate surrogate);
 
+        /// <summary>
+        /// Converts a value to the surrogate type.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="surrogate">The surrogate.</param>
         public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate); 
 
         [MethodImpl(MethodImplOptions.NoInlining)]

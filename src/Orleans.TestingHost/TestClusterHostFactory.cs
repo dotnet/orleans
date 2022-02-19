@@ -72,6 +72,12 @@ namespace Orleans.TestingHost
             return silo;
         }
 
+        /// <summary>
+        /// Creates the cluster client.
+        /// </summary>
+        /// <param name="hostName">Name of the host.</param>
+        /// <param name="configurationSources">The configuration sources.</param>
+        /// <returns>The cluster client host.</returns>
         public static IHost CreateClusterClient(string hostName, IEnumerable<IConfigurationSource> configurationSources)
         {
             var configBuilder = new ConfigurationBuilder();
@@ -101,6 +107,11 @@ namespace Orleans.TestingHost
             return host;
         }
 
+        /// <summary>
+        /// Serializes configuration to a string.
+        /// </summary>
+        /// <param name="configuration">The configuration.</param>
+        /// <returns>The serialized configuration.</returns>
         public static string SerializeConfiguration(IConfiguration configuration)
         {
             var settings = new JsonSerializerSettings
@@ -113,6 +124,11 @@ namespace Orleans.TestingHost
             return JsonConvert.SerializeObject(enumerated, settings);
         }
 
+        /// <summary>
+        /// Deserializes a configuration string.
+        /// </summary>
+        /// <param name="serializedSources">The serialized sources.</param>
+        /// <returns>The deserialzied configuration.</returns>
         public static IConfiguration DeserializeConfiguration(string serializedSources)
         {
             var settings = new JsonSerializerSettings

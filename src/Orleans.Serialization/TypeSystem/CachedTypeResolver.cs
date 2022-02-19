@@ -5,6 +5,9 @@ using System.Reflection;
 
 namespace Orleans.Serialization.TypeSystem
 {
+    /// <summary>
+    /// Type resolver which caches results.
+    /// </summary>
     public sealed class CachedTypeResolver : TypeResolver
     {
         private readonly ConcurrentDictionary<string, Type> _typeCache = new ConcurrentDictionary<string, Type>();

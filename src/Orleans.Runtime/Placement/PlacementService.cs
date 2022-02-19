@@ -279,10 +279,20 @@ namespace Orleans.Runtime.Placement
                 {
                     foreach (var message in messages)
                     {
-                        message.Completion.TrySetException(resultTask.Exception.OriginalException());
+                        message.Completion.TrySetException(OriginalException(resultTask.Exception));
                     }
 
                     messages.Clear();
+                }
+
+                static Exception OriginalException(AggregateException exception)
+                {
+                    if (exception.InnerExceptions.Count == 1)
+                    {
+                        return exception.InnerException;
+                    }
+
+                    return exception;
                 }
             }
 

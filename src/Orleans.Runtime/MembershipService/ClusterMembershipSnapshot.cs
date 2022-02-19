@@ -4,22 +4,43 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents a snapshot of cluster membership.
+    /// </summary>
     [Serializable]
     [GenerateSerializer]
     public sealed class ClusterMembershipSnapshot
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClusterMembershipSnapshot"/> class.
+        /// </summary>
+        /// <param name="members">The cluster members.</param>
+        /// <param name="version">The cluster membership version.</param>
         public ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version)
         {
             this.Members = members;
             this.Version = version;
         }
 
+        /// <summary>
+        /// Gets the cluster members.
+        /// </summary>
+        /// <value>The cluster members.</value>
         [Id(1)]
         public ImmutableDictionary<SiloAddress, ClusterMember> Members { get; }
 
+        /// <summary>
+        /// Gets the cluster membership version.
+        /// </summary>
+        /// <value>The cluster membership version.</value>
         [Id(2)]
         public MembershipVersion Version { get; }
 
+        /// <summary>
+        /// Gets status of the specified silo.
+        /// </summary>
+        /// <param name="silo">The silo.</param>
+        /// <returns>The status of the specified silo.</returns>
         public SiloStatus GetSiloStatus(SiloAddress silo)
         {
             var status = this.Members.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
@@ -38,8 +59,16 @@ namespace Orleans.Runtime
             return status;
         }
 
+        /// <summary>
+        /// Returns a <see cref="ClusterMembershipUpdate"/> which represents this instance.
+        /// </summary>
+        /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents this instance.</returns>
         public ClusterMembershipUpdate AsUpdate() => new ClusterMembershipUpdate(this, this.Members.Values.ToImmutableArray());
-
+        
+        /// <summary>
+        /// Returns a <see cref="ClusterMembershipUpdate"/> which represents the change in cluster membership from the provided snapshot to this instance.
+        /// </summary>
+        /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents the change in cluster membership from the provided snapshot to this instance.</returns>
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous)
         {
             if (previous is null) throw new ArgumentNullException(nameof(previous));
@@ -75,6 +104,7 @@ namespace Orleans.Runtime
             return new ClusterMembershipUpdate(this, changes.ToImmutableArray());
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             var sb = new StringBuilder();

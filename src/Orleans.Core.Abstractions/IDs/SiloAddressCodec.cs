@@ -12,6 +12,9 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Serialization
 {
+    /// <summary>
+    /// Serializer and deserializer for <see cref="SiloAddress"/> instances.
+    /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
     public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>, IDeepCopier<SiloAddress>
@@ -20,6 +23,7 @@ namespace Orleans.Runtime.Serialization
         private static readonly Type _int32Type = typeof(int);
         private static readonly Type _codecFieldType = typeof(SiloAddress);
 
+        /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
         {
@@ -36,6 +40,7 @@ namespace Orleans.Runtime.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SiloAddress ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)
         {
@@ -75,6 +80,7 @@ namespace Orleans.Runtime.Serialization
             return SiloAddress.New(endpoint, generation);
         }
 
+        /// <inheritdoc />
         public SiloAddress DeepCopy(SiloAddress input, CopyContext context) => input;
     }
 }

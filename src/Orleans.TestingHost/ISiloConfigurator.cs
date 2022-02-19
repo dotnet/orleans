@@ -1,4 +1,4 @@
-﻿using Orleans.Hosting;
+using Orleans.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -10,6 +10,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Configures the silo builder.
         /// </summary>
+        /// <param name="siloBuilder">The silo builder.</param>
         void Configure(ISiloBuilder siloBuilder);
     }
 }

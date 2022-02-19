@@ -1,9 +1,9 @@
-﻿#define COLLECT_AVERAGE
+#define COLLECT_AVERAGE
 using System;
 
 namespace Orleans.Runtime
 {
-    class AverageValueStatistic
+    internal class AverageValueStatistic
     {
 #if COLLECT_AVERAGE
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1823:AvoidUnusedPrivateFields")]

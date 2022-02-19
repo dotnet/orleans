@@ -34,26 +34,17 @@ namespace Orleans.Runtime
                 sender,
                 context);
 
-            if (!this.clusterMembershipOptions.IsRunningAsUnitTest)
-            {
-                var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. "
-                    + $"Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\n"
-                    + $"Current stack: {Environment.StackTrace}";
-                Console.Error.WriteLine(msg);
+            var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. "
+                + $"Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\n"
+                + $"Current stack: {Environment.StackTrace}";
+            Console.Error.WriteLine(msg);
 
-                // Allow some time for loggers to flush.
-                Thread.Sleep(2000);
+            // Allow some time for loggers to flush.
+            Thread.Sleep(2000);
 
-                if (Debugger.IsAttached) Debugger.Break();
+            if (Debugger.IsAttached) Debugger.Break();
 
-                Environment.FailFast(msg, exception);
-            }
-            else
-            {
-                this.log.LogWarning(
-                    $"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.IsRunningAsUnitTest)} is set."
-                    + " The process will not be terminated.");
-            }
+            Environment.FailFast(msg, exception);
         }
     }
 }

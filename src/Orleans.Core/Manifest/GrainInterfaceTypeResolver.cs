@@ -15,8 +15,14 @@ namespace Orleans.Metadata
         private readonly TypeConverter _typeConverter;
 
         /// <summary>
-        /// Creates a <see cref="GrainInterfaceTypeResolver"/> instance.
+        /// Initializes a new instance of the <see cref="GrainInterfaceTypeResolver"/> class.
         /// </summary>
+        /// <param name="providers">
+        /// The collection of grain interface type providers.
+        /// </param>
+        /// <param name="typeConverter">
+        /// The type converter, used for generic parameter names.
+        /// </param>
         public GrainInterfaceTypeResolver(
             IEnumerable<IGrainInterfaceTypeProvider> providers,
             TypeConverter typeConverter)
@@ -51,6 +57,11 @@ namespace Orleans.Metadata
             return GetGrainInterfaceTypeByConvention(type);
         }
 
+        /// <summary>
+        /// Gets a grain interface type based upon the default conventions.
+        /// </summary>
+        /// <param name="type">The grain interface type.</param>
+        /// <returns>The grain interface type name.</returns>
         public GrainInterfaceType GetGrainInterfaceTypeByConvention(Type type)
         {
             var result = GrainInterfaceType.Create(_typeConverter.Format(type, input => input switch

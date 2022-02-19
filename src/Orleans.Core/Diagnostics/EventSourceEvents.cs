@@ -2,11 +2,18 @@ using System.Diagnostics.Tracing;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Event source for <see cref="CallbackData"/>.
+    /// </summary>
     [EventSource(Name = "Microsoft-Orleans-CallBackData")]
     internal sealed class OrleansCallBackDataEvent : EventSource
     {
         public static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
 
+        /// <summary>
+        /// Indicates that a request timeout occurred.
+        /// </summary>
+        /// <param name="message">The message.</param>
         [NonEvent]
         public void OnTimeout(Message message)
         {
@@ -16,9 +23,16 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Indicates that a request timeout occurred.
+        /// </summary>
         [Event(1, Level = EventLevel.Warning)]
         private void OnTimeout() => this.WriteEvent(1);
 
+        /// <summary>
+        /// Indicates that a target silo failed.
+        /// </summary>
+        /// <param name="message">A message addressed to the target silo.</param>
         [NonEvent]
         public void OnTargetSiloFail(Message message)
         {
@@ -28,9 +42,15 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Indicates that a target silo failed.
+        /// </summary>
         [Event(2, Level = EventLevel.Warning)]
         private void OnTargetSiloFail() => this.WriteEvent(2);
 
+        /// <summary>
+        /// Indicates that a request completed.
+        /// </summary>
         [NonEvent]
         public void DoCallback(Message message)
         {
@@ -40,6 +60,9 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Indicates that a request completed.
+        /// </summary>
         [Event(3, Level = EventLevel.Verbose)]
         private void DoCallback() => this.WriteEvent(3);
     }

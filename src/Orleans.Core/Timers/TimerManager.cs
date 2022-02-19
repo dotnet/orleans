@@ -7,8 +7,17 @@ using Orleans.Threading;
 
 namespace Orleans.Timers.Internal
 {
+    /// <summary>
+    /// Provides functionality for managing single-shot timers.
+    /// </summary>
     public interface ITimerManager
     {
+        /// <summary>
+        /// Returns a task which will complete when the specified timespan elapses or the provided cancellation token is canceled.
+        /// </summary>
+        /// <param name="timeSpan">The time span.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><see langword="true"/> if the timer ran to completion; otherwise <see langword="false"/>.</returns>
         Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken));
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -36,19 +37,16 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// The grain type.
+        /// Gets the grain type.
         /// </summary>
         [Id(1)]
         public GrainType Type { get; }
 
         /// <summary>
-        /// The key.
+        /// Gets the grain key.
         /// </summary>
         [Id(2)]
         public IdSpan Key { get; }
-
-        // TODO: remove implicit conversion (potentially make explicit to start with)
-        //public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -73,6 +71,9 @@ namespace Orleans.Runtime
             if (!TryParse(value, out var result))
             {
                 ThrowInvalidGrainId(value);
+
+                [MethodImpl(MethodImplOptions.NoInlining)]
+                static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
             }
 
             return result;
@@ -115,7 +116,7 @@ namespace Orleans.Runtime
         public override int GetHashCode() => HashCode.Combine(this.Type, this.Key);
 
         /// <summary>
-        /// Generates uniform, stable hash code for GrainReference
+        /// Generates a uniform, stable hash code for a grain id.
         /// </summary>
         public uint GetUniformHashCode()
         {
@@ -148,19 +149,27 @@ namespace Orleans.Runtime
             return Key.CompareTo(other.Key);
         }
 
-        /// <inheritdoc/>
-        public static bool operator ==(GrainId a, GrainId b) => a.Equals(b);
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator ==(GrainId left, GrainId right) => left.Equals(right);
 
-        /// <inheritdoc/>
-        public static bool operator !=(GrainId a, GrainId b) => !a.Equals(b);
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator !=(GrainId left, GrainId right) => !left.Equals(right);
 
         /// <inheritdoc/>
         public override string ToString()
         {
             return $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
         }
-
-        private static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
 
         /// <summary>
         /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainId"/>.
@@ -183,11 +192,15 @@ namespace Orleans.Runtime
         }
     }
 
-    // Serialize to string
+    /// <summary>
+    /// Functionality for converting a <see cref="GrainId"/> to and from a JSON string.
+    /// </summary>
     public class GrainIdJsonConverter : JsonConverter<GrainId>
     {
+        /// <inheritdoc />
         public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString());
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
     }
 }

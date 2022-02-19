@@ -8,7 +8,7 @@ namespace Orleans.Streams
     public interface IBatchContainerBatch : IBatchContainer
     {
         /// <summary>
-        /// Batch containers comprising this batch
+        /// Gets the batch containers comprising this batch
         /// </summary>
         List<IBatchContainer> BatchContainers { get; }
     }

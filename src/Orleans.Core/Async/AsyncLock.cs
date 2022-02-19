@@ -49,11 +49,18 @@ namespace Orleans
     {
         private readonly SemaphoreSlim semaphore;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AsyncLock"/> class.
+        /// </summary>
         public AsyncLock()
         {
             semaphore = new SemaphoreSlim(1);
         }
 
+        /// <summary>
+        /// Acquires the lock asynchronously.
+        /// </summary>
+        /// <returns>An <see cref="IDisposable"/> which must be used to release the lock.</returns>
         public ValueTask<IDisposable> LockAsync()
         {
             Task wait = semaphore.WaitAsync();

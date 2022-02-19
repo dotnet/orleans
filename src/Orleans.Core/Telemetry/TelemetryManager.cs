@@ -7,6 +7,11 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Manages telemetry consumers and exposes an interface to produce telemetry.
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.ITelemetryProducer" />
+    /// <seealso cref="System.IDisposable" />
     public class TelemetryManager : ITelemetryProducer, IDisposable
     {
         internal const string ObsoleteMessageTelemetry = "This method might be removed in the future in favor of a non Orleans-owned abstraction for APMs.";
@@ -15,8 +20,17 @@ namespace Orleans.Runtime
         private List<IMetricTelemetryConsumer> metricTelemetryConsumers = new List<IMetricTelemetryConsumer>();
         private List<ITraceTelemetryConsumer> traceTelemetryConsumers = new List<ITraceTelemetryConsumer>();
 
+        /// <summary>
+        /// Gets the telemetry consumers.
+        /// </summary>
+        /// <value>The telemetry consumers.</value>
         public IEnumerable<ITelemetryConsumer> TelemetryConsumers => this.consumers;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TelemetryManager"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="options">The options.</param>
         public TelemetryManager(IServiceProvider serviceProvider, IOptions<TelemetryOptions> options)
         {
             var newConsumers = new List<ITelemetryConsumer>(options.Value.Consumers.Count);
@@ -28,6 +42,10 @@ namespace Orleans.Runtime
             this.AddConsumers(newConsumers);
         }
 
+        /// <summary>
+        /// Adds a collection of telemetry consumers.
+        /// </summary>
+        /// <param name="newConsumers">The new consumers.</param>
         public void AddConsumers(IEnumerable<ITelemetryConsumer> newConsumers)
         {
             this.consumers = new List<ITelemetryConsumer>(this.consumers.Union(newConsumers));
@@ -47,6 +65,7 @@ namespace Orleans.Runtime
             return consumer;
         }
 
+        /// <inheritdoc/>
         public void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -55,6 +74,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -63,6 +83,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void IncrementMetric(string name)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -71,6 +92,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void IncrementMetric(string name, double value)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -79,6 +101,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void DecrementMetric(string name)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -87,6 +110,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void DecrementMetric(string name, double value)
         {
             foreach (var tc in this.metricTelemetryConsumers)
@@ -95,6 +119,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
         {
             foreach (var tc in this.consumers.OfType<IDependencyTelemetryConsumer>())
@@ -103,6 +128,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackEvent(string name, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
         {
             foreach (var tc in this.consumers.OfType<IEventTelemetryConsumer>())
@@ -111,6 +137,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
         {
             foreach (var tc in this.consumers.OfType<IRequestTelemetryConsumer>())
@@ -119,6 +146,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
         {
             foreach (var tc in this.consumers.OfType<IExceptionTelemetryConsumer>())
@@ -127,6 +155,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message)
         {
             foreach (var tc in this.traceTelemetryConsumers)
@@ -135,6 +164,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severity)
         {
             foreach (var tc in this.traceTelemetryConsumers)
@@ -143,6 +173,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
         {
             foreach (var tc in this.traceTelemetryConsumers)
@@ -151,6 +182,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, IDictionary<string, string> properties)
         {
             foreach (var tc in this.traceTelemetryConsumers)
@@ -159,6 +191,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void Flush()
         {
             List<Exception> exceptions = null;
@@ -181,6 +214,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public void Close()
         {
             List<Exception> exceptions = null;
@@ -230,13 +264,7 @@ namespace Orleans.Runtime
             }
         }
 
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-        // ~TelemetryManager() {
-        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-        //   Dispose(false);
-        // }
-
-        // This code added to correctly implement the disposable pattern.
+        /// <inheritdoc/>
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.

@@ -96,7 +96,7 @@ namespace Orleans.Runtime
 
         public static void Debug(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogDebug(LoggingUtils.CreateEventId(logCode), format, args);
+            logger.LogDebug(new EventId((int)logCode), format, args);
         }
 
         /// <summary>
@@ -112,7 +112,7 @@ namespace Orleans.Runtime
 
         public static void Debug(this ILogger logger, ErrorCode logCode, string message)
         {
-            logger.LogDebug(LoggingUtils.CreateEventId(logCode), message);
+            logger.LogDebug(new EventId((int)logCode), message);
         }
 
         /// <summary>
@@ -131,7 +131,7 @@ namespace Orleans.Runtime
 
         public static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogTrace(LoggingUtils.CreateEventId(logCode), format, args);
+            logger.LogTrace(new EventId((int)logCode), format, args);
         }
 
         /// <summary>
@@ -147,7 +147,7 @@ namespace Orleans.Runtime
 
         public static void Trace(this ILogger logger, ErrorCode logCode, string message)
         {
-            logger.LogTrace(LoggingUtils.CreateEventId(logCode), message);
+            logger.LogTrace(new EventId((int)logCode), message);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace Orleans.Runtime
 
         public static void Info(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogInformation(LoggingUtils.CreateEventId(logCode), format, args);
+            logger.LogInformation(new EventId((int)logCode), format, args);
         }
 
         /// <summary>
@@ -182,7 +182,7 @@ namespace Orleans.Runtime
 
         public static void Info(this ILogger logger, ErrorCode logCode, string message)
         {
-            logger.LogInformation(LoggingUtils.CreateEventId(logCode), message);
+            logger.LogInformation(new EventId((int)logCode), message);
         }
 
         /// <summary>
@@ -201,7 +201,7 @@ namespace Orleans.Runtime
 
         public static void Warn(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogWarning(LoggingUtils.CreateEventId(logCode), format, args);
+            logger.LogWarning(new EventId((int)logCode), format, args);
         }
 
         /// <summary>
@@ -218,7 +218,7 @@ namespace Orleans.Runtime
 
         public static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
-            logger.LogWarning(LoggingUtils.CreateEventId(logCode), exception, message);
+            logger.LogWarning(new EventId((int)logCode), exception, message);
         }
 
         /// <summary>
@@ -235,7 +235,7 @@ namespace Orleans.Runtime
 
         public static void Error(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
-            logger.LogError(LoggingUtils.CreateEventId(logCode), exception, message);
+            logger.LogError(new EventId((int)logCode), exception, message);
         }
     }
 }

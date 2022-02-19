@@ -7,8 +7,11 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, Immutable]
     [GenerateSerializer]
-    public readonly struct GrainInterfaceType : IEquatable<GrainInterfaceType>
+    public struct GrainInterfaceType : IEquatable<GrainInterfaceType>
     {
+        /// <summary>
+        /// The underlying value.
+        /// </summary>
         [Id(1)]
         private readonly IdSpan _value;
 
@@ -40,6 +43,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override bool Equals(object obj) => obj is GrainInterfaceType id && this.Equals(id);
 
+        /// <inheritdoc />
         public bool Equals(GrainInterfaceType other) => _value.Equals(other._value);
 
         /// <inheritdoc />
@@ -48,9 +52,26 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override string ToString() => _value.ToStringUtf8();
 
+        /// <summary>
+        /// Returns a UTF8 interpretation of the current instance.
+        /// </summary>
+        /// <returns></returns>
         public string ToStringUtf8() => _value.ToStringUtf8();
 
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
         public static bool operator ==(GrainInterfaceType left, GrainInterfaceType right) => left.Equals(right);
+
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(GrainInterfaceType left, GrainInterfaceType right) => !left.Equals(right);
     }
 
@@ -62,6 +83,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the <see cref="GrainInterfaceType"/> corresponding to the specified <paramref name="type"/>.
         /// </summary>
+        /// <param name="type">The grain interface type instance.</param>
+        /// <param name="grainInterfaceType">The resulting grain interface type identifier.</param>
+        /// <returns>
+        /// <see langword="true"/> if a <see cref="GrainInterfaceType"/> corresponding to the provided type was found, otherwise <see langword="false"/>.
+        /// </returns>
         bool TryGetGrainInterfaceType(Type type, out GrainInterfaceType grainInterfaceType);
     }
 
@@ -70,14 +96,17 @@ namespace Orleans.Runtime
     /// </summary>
     public class AttributeGrainInterfaceTypeProvider : IGrainInterfaceTypeProvider
     {
-        private readonly IServiceProvider serviceProvider;
+        /// <summary>
+        /// The service provider.
+        /// </summary>
+        private readonly IServiceProvider _serviceProvider;
 
         /// <summary>
         /// Creates a <see cref="AttributeGrainInterfaceTypeProvider"/> instance.
         /// </summary>
         public AttributeGrainInterfaceTypeProvider(IServiceProvider serviceProvider)
         {
-            this.serviceProvider = serviceProvider;
+            _serviceProvider = serviceProvider;
         }
 
         /// <inheritdoc />
@@ -87,7 +116,7 @@ namespace Orleans.Runtime
             {
                 if (attr is IGrainInterfaceTypeProviderAttribute provider)
                 {
-                    grainInterfaceType = provider.GetGrainInterfaceType(this.serviceProvider, type);
+                    grainInterfaceType = provider.GetGrainInterfaceType(this._serviceProvider, type);
                     return true;
                 }
             }
@@ -106,26 +135,34 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain interface identifier.
         /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="type">The grain interface type.</param>
+        /// <returns>
+        /// The <see cref="GrainInterfaceType"/> corresponding to the provided type.
+        /// </returns>
         GrainInterfaceType GetGrainInterfaceType(IServiceProvider services, Type type);
     }
 
     /// <summary>
-    /// Specifies the <see cref="GrainInterfaceType"/> of the type which it is attached to.
+    /// When applied to a grain interface, specifies the <see cref="GrainInterfaceType"/>.
     /// </summary>
     [AttributeUsage(AttributeTargets.Interface, AllowMultiple = false)]
     public sealed class GrainInterfaceTypeAttribute : Attribute, IGrainInterfaceTypeProviderAttribute
     {
-        private readonly GrainInterfaceType value;
+        /// <summary>
+        /// The grain interface type.
+        /// </summary>
+        private readonly GrainInterfaceType _value;
 
         /// <summary>
         /// Creates a <see cref="GrainInterfaceTypeAttribute"/> instance.
         /// </summary>
         public GrainInterfaceTypeAttribute(string value)
         {
-            this.value = GrainInterfaceType.Create(value);
+            _value = GrainInterfaceType.Create(value);
         }
 
         /// <inheritdoc />
-        public GrainInterfaceType GetGrainInterfaceType(IServiceProvider services, Type type) => this.value;
+        public GrainInterfaceType GetGrainInterfaceType(IServiceProvider services, Type type) => _value;
     }
 }

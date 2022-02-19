@@ -47,7 +47,7 @@ namespace Orleans.Configuration.Internal
         /// <param name="services">The service collection.</param>
         public static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
-            if (!services.Any(service => service.ServiceType == typeof(TService)))
+            if (services.All(service => service.ServiceType != typeof(TService)))
             {
                 services.AddFromExisting<TService, TImplementation>();
             }

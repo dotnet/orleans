@@ -16,11 +16,11 @@ namespace Orleans.TestingHost.Utils
         private static long uniquifier = Stopwatch.GetTimestamp();
 
         /// <summary>
-        /// Configure <paramref name="builder"/> with a <see cref="FileLoggerProvider"/> which logs to <paramref name="filePath"/>
+        /// Configure <paramref name="builder" /> with a <see cref="FileLoggerProvider" /> which logs to <paramref name="filePath" />
         /// by default;
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="filePath"></param>
+        /// <param name="builder">The builder.</param>
+        /// <param name="filePath">The file path.</param>
         public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
         {
             builder.AddFile(filePath);
@@ -29,9 +29,9 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Create trace file name for a specific node or client in a specific deployment
         /// </summary>
-        /// <param name="nodeName"></param>
-        /// <param name="clusterId"></param>
-        /// <returns></returns>
+        /// <param name="nodeName">Name of the node.</param>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <returns>The new trace file name.</returns>
         public static string CreateTraceFileName(string nodeName, string clusterId)
         {
             const string traceFileFolder = "logs";
@@ -47,11 +47,11 @@ namespace Orleans.TestingHost.Utils
         }
 
         /// <summary>
-        /// Create the default logger factory, which would configure logger factory with a <see cref="FileLoggerProvider"/> that writes logs to <paramref name="filePath"/> and console.
+        /// Create the default logger factory, which would configure logger factory with a <see cref="FileLoggerProvider" /> that writes logs to <paramref name="filePath" /> and console.
         /// by default;
         /// </summary>
-        /// <param name="filePath">the logger file path</param>
-        /// <returns></returns>
+        /// <param name="filePath">The file path.</param>
+        /// <returns>ILoggerFactory.</returns>
         public static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
         {
             return CreateDefaultLoggerFactory(filePath, new LoggerFilterOptions());
@@ -108,7 +108,12 @@ namespace Orleans.TestingHost.Utils
             await task;
         }
 
-        /// <summary> Multiply a timeout by a value </summary>
+        /// <summary>
+        /// Multiply a timeout by a value
+        /// </summary>
+        /// <param name="time">The time.</param>
+        /// <param name="value">The value.</param>
+        /// <returns>The resulting time span value.</returns>
         public static TimeSpan Multiply(TimeSpan time, double value)
         {
             double ticksD = checked(time.Ticks * value);
@@ -116,7 +121,10 @@ namespace Orleans.TestingHost.Utils
             return TimeSpan.FromTicks(ticks);
         }
 
-        /// <summary> Configure the ThreadPool and the ServicePointManager for tests </summary>
+        /// <summary>
+        /// Configures the <see cref="ThreadPool"/> and the <see cref="ServicePointManager"/> for tests.
+        /// </summary>
+        /// <param name="numDotNetPoolThreads">The minimum number of <see cref="ThreadPool"/> threads.</param>
         public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200)
         {
             ThreadPool.SetMinThreads(numDotNetPoolThreads, numDotNetPoolThreads);

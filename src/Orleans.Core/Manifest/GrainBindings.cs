@@ -14,6 +14,11 @@ namespace Orleans.Metadata
     /// </remarks>
     public class GrainBindings
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainBindings"/> class.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="bindings">The bindings for the specified grain type.</param>
         public GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
         {
             this.GrainType = grainType;
@@ -21,12 +26,12 @@ namespace Orleans.Metadata
         }
 
         /// <summary>
-        /// The grain type.
+        /// Gets the grain type.
         /// </summary>
         public GrainType GrainType { get; }
 
         /// <summary>
-        /// The bindings for the specified grain type.
+        /// Gets the bindings for the specified grain type.
         /// </summary>
         public ImmutableArray<ImmutableDictionary<string, string>> Bindings { get; }
     }
@@ -44,8 +49,11 @@ namespace Orleans.Metadata
         private Cache _cache;
 
         /// <summary>
-        /// Creates a new <see cref="GrainBindingsResolver"/> instance.
+        /// Initializes a new instance of the <see cref="GrainBindingsResolver"/> class.
         /// </summary>
+        /// <param name="clusterManifestProvider">
+        /// The cluster manifest provider.
+        /// </param>
         public GrainBindingsResolver(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
@@ -55,6 +63,10 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets bindings for the provided grain type.
         /// </summary>
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
+        /// <returns>The grain bindings.</returns>
         public GrainBindings GetBindings(GrainType grainType)
         {
             GrainType lookupType;
@@ -82,6 +94,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets all bindings.
         /// </summary>
+        /// <returns>The colleciton of all grain bindings.</returns>
         public (MajorMinorVersion Version, ImmutableDictionary<GrainType, GrainBindings> Bindings) GetAllBindings()
         {
             var cache = GetCache();
@@ -179,6 +192,7 @@ namespace Orleans.Metadata
             }
 
             public MajorMinorVersion Version { get; }
+
             public ImmutableDictionary<GrainType, GrainBindings> Map { get; }
         }
     }

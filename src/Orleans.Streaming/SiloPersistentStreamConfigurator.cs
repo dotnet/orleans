@@ -9,17 +9,26 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Validates <see cref="StreamPubSubOptions"/>.
+    /// </summary>
     public class PersistentStreamStorageConfigurationValidator : IConfigurationValidator
     {
         private IServiceProvider services;
         private string streamProviderName;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PersistentStreamStorageConfigurationValidator"/> class.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="streamProviderName">Name of the stream provider.</param>
         private PersistentStreamStorageConfigurationValidator(IServiceProvider services, string streamProviderName)
         {
             this.services = services;
             this.streamProviderName = streamProviderName;
         }
 
+        /// <inheritdoc/>
         public void ValidateConfiguration()
         {
             var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
@@ -33,14 +42,29 @@ namespace Orleans.Hosting
             }
         }
 
+        /// <summary>
+        /// Creates a new <see cref="PersistentStreamStorageConfigurationValidator"/> instance.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="name">The name.</param>
+        /// <returns>The newly created instance.</returns>
         public static IConfigurationValidator Create(IServiceProvider services, string name)
         {
             return new PersistentStreamStorageConfigurationValidator(services, name);
         }
     }
 
+    /// <summary>
+    /// Configures persistent streams.
+    /// </summary>
     public class SiloPersistentStreamConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloPersistentStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configureDelegate">The configuration delegate.</param>
+        /// <param name="adapterFactory">The adapter factory.</param>
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate)
         {

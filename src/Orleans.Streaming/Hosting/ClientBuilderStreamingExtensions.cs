@@ -8,19 +8,23 @@ using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Configuration.Internal;
 using System.Linq;
+using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace Orleans.Hosting
 {
     public static class ClientBuilderStreamingExtensions
     {
         /// <summary>
-        /// Add support for streaming to this client.
+        /// Adds support for streaming to this client.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(AddClientStreaming);
 
         /// <summary>
         /// Add support for streaming to this client.
         /// </summary>
+        /// <param name="services">The services.</param>
         public static void AddClientStreaming(this IServiceCollection services)
         {
             if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
@@ -39,8 +43,13 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure cluster client to use memory streams. This return a configurator for further configuration
+        /// Adds a new in-memory stream provider to the client.
         /// </summary>
+        /// <typeparam name="TSerializer">The type of the t serializer.</typeparam>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configure">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddMemoryStreams<TSerializer>(
             this IClientBuilder builder,
             string name,
@@ -53,6 +62,14 @@ namespace Orleans.Hosting
             return builder;
         }
 
+        /// <summary>
+        /// Adds a new persistent streams provider to the client.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="adapterFactory">The adapter factory.</param>
+        /// <param name="configureStream">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddPersistentStreams(
             this IClientBuilder builder,
             string name,
@@ -66,8 +83,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use SimpleMessageProvider
+        /// Adds a new simple message streams provider to the client.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureStream">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddSimpleMessageStreamProvider(
             this IClientBuilder builder,
             string name,
@@ -80,8 +101,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use SimpleMessageProvider
+        /// Adds a new simple message streams provider to the client.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureOptions">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddSimpleMessageStreamProvider(
             this IClientBuilder builder,
             string name,
@@ -92,8 +117,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use SimpleMessageProvider
+        /// Adds a new simple message streams provider to the client.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureOptions">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddSimpleMessageStreamProvider(
             this IClientBuilder builder,
             string name,

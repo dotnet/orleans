@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Extension methods for <see cref="StreamSubscriptionHandle{T}"/>.
+    /// </summary>
     public static class StreamSubscriptionHandleExtensions
     {
         private static readonly Func<Exception, Task> DefaultOnError = _ => Task.CompletedTask;

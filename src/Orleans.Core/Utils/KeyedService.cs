@@ -6,27 +6,49 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents a service which is identified by a key.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TService">The type of the service.</typeparam>
+    /// <seealso cref="Orleans.Runtime.IKeyedService{TKey, TService}" />
     public class KeyedService<TKey, TService> : IKeyedService<TKey, TService>
         where TService : class
     {
         private readonly Func<IServiceProvider, TKey, TService> factory;
 
+        /// <inheritdoc/>
         public TKey Key { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KeyedService{TKey, TService}"/> class.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="services">The services.</param>
+        /// <param name="factory">The factory.</param>
         public KeyedService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
         {
             this.Key = key;
             this.factory = factory;
         }
 
+        /// <inheritdoc/>
         public TService GetService(IServiceProvider services) => factory(services,Key);
 
+        /// <inheritdoc/>
         public bool Equals(TKey other)
         {
             return Equals(Key, other);
         }
     }
 
+    /// <summary>
+    /// Represents a service which is identified by a key.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TService">The type of the service.</typeparam>
+    /// <typeparam name="TInstance">The type of the implementation instance.</typeparam>
+    /// <seealso cref="Orleans.Runtime.IKeyedService{TKey, TService}" />
     public class KeyedService<TKey, TService, TInstance> : KeyedService<TKey, TService>
         where TInstance : TService
         where TService : class
@@ -37,27 +59,48 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Represents a singleton service which is identified by a key.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TService">The type of the service.</typeparam>
     public class KeyedSingletonService<TKey, TService> : IKeyedService<TKey, TService>
     where TService : class
     {
         private readonly Lazy<TService> instance;
 
+        /// <inheritdoc/>
         public TKey Key { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KeyedSingletonService{TKey, TService}"/> class.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="services">The services.</param>
+        /// <param name="factory">The factory.</param>
         public KeyedSingletonService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
         {
             this.Key = key;
             this.instance = new Lazy<TService>(() => factory(services, Key));
         }
 
+        /// <inheritdoc/>
         public TService GetService(IServiceProvider services) => this.instance.Value;
 
+        /// <inheritdoc/>
         public bool Equals(TKey other)
         {
             return Equals(Key, other);
         }
     }
 
+    /// <summary>
+    /// Represents a singleton keyed service.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TService">The type of the service.</typeparam>
+    /// <typeparam name="TInstance">The type of the instance.</typeparam>
+    /// <seealso cref="Orleans.Runtime.KeyedSingletonService{TKey, TService}" />
     public class KeyedSingletonService<TKey, TService, TInstance> : KeyedSingletonService<TKey, TService>
         where TInstance : TService
         where TService : class
@@ -68,20 +111,31 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Represents a collection of services with a given key type.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TService">The type of the service.</typeparam>
+    /// <seealso cref="Orleans.Runtime.IKeyedServiceCollection{TKey, TService}" />
     public class KeyedServiceCollection<TKey, TService> : IKeyedServiceCollection<TKey, TService>
         where TService : class
     {
+        /// <inheritdoc/>
         public TService GetService(IServiceProvider services, TKey key)
         {
             return this.GetServices(services).FirstOrDefault(s => s.Equals(key))?.GetService(services);
         }
 
+        /// <inheritdoc/>
         public IEnumerable<IKeyedService<TKey, TService>> GetServices(IServiceProvider services)
         {
             return services.GetServices<IKeyedService<TKey, TService>>();
         }
     }
 
+    /// <summary>
+    /// Extensions for working with keyed services.
+    /// </summary>
     public static class KeyedServiceExtensions
     {
         /// <summary>

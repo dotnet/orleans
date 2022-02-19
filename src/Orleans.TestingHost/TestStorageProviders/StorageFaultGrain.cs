@@ -19,11 +19,7 @@ namespace Orleans.TestingHost
         private Dictionary<GrainReference, Exception> writeFaults;
         private Dictionary<GrainReference, Exception> clearfaults;
 
-        /// <summary>
-        /// This method is called at the end of the process of activating a grain.
-        /// It is called before any messages have been dispatched to the grain.
-        /// For grains with declared persistent state, this method is called after the State property has been populated.
-        /// </summary>
+        /// <inheritdoc />
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
@@ -34,12 +30,7 @@ namespace Orleans.TestingHost
             logger.Info("Activate.");
         }
 
-        /// <summary>
-        /// Adds a storage exception to be thrown when the referenced grain reads state from a storage provider
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <param name="exception"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task AddFaultOnRead(GrainReference grainReference, Exception exception)
         {
             readFaults.Add(grainReference, exception);
@@ -47,12 +38,7 @@ namespace Orleans.TestingHost
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Adds a storage exception to be thrown when the referenced grain writes state to a storage provider
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <param name="exception"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task AddFaultOnWrite(GrainReference grainReference, Exception exception)
         {
             writeFaults.Add(grainReference, exception);
@@ -60,12 +46,7 @@ namespace Orleans.TestingHost
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Adds a storage exception to be thrown when the referenced grain clears state in a storage provider
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <param name="exception"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task AddFaultOnClear(GrainReference grainReference, Exception exception)
         {
             clearfaults.Add(grainReference, exception);
@@ -73,11 +54,7 @@ namespace Orleans.TestingHost
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Throws a storage exception if one has been added for the grain reference for reading.
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task OnRead(GrainReference grainReference)
         {
             Exception exception;
@@ -89,11 +66,7 @@ namespace Orleans.TestingHost
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Throws a storage exception if one has been added for the grain reference for writing.
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task OnWrite(GrainReference grainReference)
         {
             Exception exception;
@@ -105,11 +78,7 @@ namespace Orleans.TestingHost
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Throws a storage exception if one has been added for the grain reference for clearing state.
-        /// </summary>
-        /// <param name="grainReference"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task OnClear(GrainReference grainReference)
         {
             Exception exception;

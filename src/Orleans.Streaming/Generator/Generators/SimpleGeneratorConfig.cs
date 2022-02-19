@@ -15,59 +15,28 @@ namespace Orleans.Hosting
     public class SimpleGeneratorOptions : IStreamGeneratorConfig
     {
         /// <summary>
-        /// Stream namespace
+        /// Gets or sets the stream namespace.
         /// </summary>
+        /// <value>The stream namespace.</value>
         [Id(0)]
         public string StreamNamespace { get; set; }
 
         /// <summary>
-        /// Stream generator type
+        /// Gets the stream generator type
         /// </summary>
+        /// <value>The type of the stream generator.</value>
         public Type StreamGeneratorType => typeof (SimpleGenerator);
 
         /// <summary>
-        /// Nuber of events to generate on this stream
+        /// Gets or sets the number of events to generate.
         /// </summary>
+        /// <value>The number of events to generate.</value>
         [Id(1)]
         public int EventsInStream { get; set; } = DEFAULT_EVENTS_IN_STREAM;
+
+        /// <summary>
+        /// The default number of events to generate.
+        /// </summary>
         public const int DEFAULT_EVENTS_IN_STREAM = 100;
-    }
-
-    public class SimpleGeneratorOptionsFormatterResolver : IOptionFormatterResolver<SimpleGeneratorOptions>
-    {
-        private IOptionsMonitor<SimpleGeneratorOptions> optionsMonitor;
-
-        public SimpleGeneratorOptionsFormatterResolver(IOptionsMonitor<SimpleGeneratorOptions> optionsMonitor)
-        {
-            this.optionsMonitor = optionsMonitor;
-        }
-
-        public IOptionFormatter<SimpleGeneratorOptions> Resolve(string name)
-        {
-            return new Formatter(name, this.optionsMonitor.Get(name));
-        }
-
-        private class Formatter : IOptionFormatter<SimpleGeneratorOptions>
-        {
-            private SimpleGeneratorOptions options;
-
-            public string Name { get; }
-
-            public Formatter(string name, SimpleGeneratorOptions options)
-            {
-                this.options = options;
-                this.Name = OptionFormattingUtilities.Name<SimpleGeneratorOptions>(name);
-            }
-
-            public IEnumerable<string> Format()
-            {
-                return new List<string> 
-                {
-                    OptionFormattingUtilities.Format(nameof(this.options.StreamNamespace), this.options.StreamNamespace),
-                    OptionFormattingUtilities.Format(nameof(this.options.StreamGeneratorType), this.options.StreamGeneratorType),
-                    OptionFormattingUtilities.Format(nameof(this.options.EventsInStream), this.options.EventsInStream),
-                };
-            }
-        }
     }
 }

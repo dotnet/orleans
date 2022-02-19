@@ -9,11 +9,14 @@ namespace Orleans.Configuration
     public class ActivationCountBasedPlacementOptions
     {
         /// <summary>
-        /// Number of silos randomly selected for consideration when using activation count placement policy.
+        /// Gets or sets the number of silos randomly selected for consideration when using activation count placement policy.
         /// Only used with Activation Count placement policy.
         /// </summary>
         public int ChooseOutOf { get; set; } = DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
 
+        /// <summary>
+        /// The default number of silos to choose from when making placement decisions.
+        /// </summary>
         public const int DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF = 2;
     }
 

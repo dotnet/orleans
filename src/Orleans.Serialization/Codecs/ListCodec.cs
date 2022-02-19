@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Codec for <see cref="List{T}"/>.
+    /// Serializer for <see cref="List{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -22,12 +22,18 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly ListActivator<T> _activator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ListCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
+        /// <param name="activator">The activator.</param>
         public ListCodec(IFieldCodec<T> fieldCodec, ListActivator<T> activator)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
             _activator = activator;
         }
 
+        /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
@@ -49,6 +55,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public List<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -126,16 +133,25 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="List{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class ListCopier<T> : IDeepCopier<List<T>>, IBaseCopier<List<T>>
     {
         private readonly IDeepCopier<T> _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ListCopier{T}"/> class.
+        /// </summary>
+        /// <param name="valueCopier">The value copier.</param>
         public ListCopier(IDeepCopier<T> valueCopier)
         {
             _copier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public List<T> DeepCopy(List<T> input, CopyContext context)
         {
             if (context.TryGetCopy<List<T>>(input, out var result))
@@ -158,6 +174,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(List<T> input, List<T> output, CopyContext context)
         {
             foreach (var item in input)

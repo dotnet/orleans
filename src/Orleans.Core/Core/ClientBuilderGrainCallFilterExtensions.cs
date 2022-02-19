@@ -12,7 +12,7 @@ namespace Orleans
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
+        /// <returns>The <see cref="IClientBuilder"/>.</returns>
         public static IClientBuilder AddOutgoingGrainCallFilter(this IClientBuilder builder, IOutgoingGrainCallFilter filter)
         {
             return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
@@ -23,7 +23,7 @@ namespace Orleans
         /// </summary>
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="builder">The builder.</param>
-        /// <returns>The builder.</returns>
+        /// <returns>The <see cref="IClientBuilder"/>.</returns>
         public static IClientBuilder AddOutgoingGrainCallFilter<TImplementation>(this IClientBuilder builder)
             where TImplementation : class, IOutgoingGrainCallFilter
         {
@@ -35,7 +35,7 @@ namespace Orleans
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
+        /// <returns>The <see cref="IClientBuilder"/>.</returns>
         public static IClientBuilder AddOutgoingGrainCallFilter(this IClientBuilder builder, OutgoingGrainCallFilterDelegate filter)
         {
             return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));

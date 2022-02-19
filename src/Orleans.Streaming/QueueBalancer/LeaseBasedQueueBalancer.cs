@@ -43,9 +43,21 @@ namespace Orleans.Streams
         private int leaseOrder;
 
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="LeaseBasedQueueBalancer"/> class.
         /// </summary>
-        public LeaseBasedQueueBalancer(string name, LeaseBasedQueueBalancerOptions options, ILeaseProvider leaseProvider, ITimerRegistry timerRegistry, IServiceProvider services, ILoggerFactory loggerFactory)
+        /// <param name="name">The name.</param>
+        /// <param name="options">The options.</param>
+        /// <param name="leaseProvider">The lease provider.</param>
+        /// <param name="timerRegistry">The timer registry.</param>
+        /// <param name="services">The services.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        public LeaseBasedQueueBalancer(
+            string name,
+            LeaseBasedQueueBalancerOptions options,
+            ILeaseProvider leaseProvider,
+            ITimerRegistry timerRegistry,
+            IServiceProvider services,
+            ILoggerFactory loggerFactory)
             : base(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}"))
         {
             this.options = options;
@@ -53,6 +65,12 @@ namespace Orleans.Streams
             this.timerRegistry = timerRegistry;
         }
 
+        /// <summary>
+        /// Creates a new <see cref="LeaseBasedQueueBalancer"/> instance.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="name">The name.</param>
+        /// <returns>The new <see cref="LeaseBasedQueueBalancer"/> instance.</returns>
         public static IStreamQueueBalancer Create(IServiceProvider services, string name)
         {
             var options = services.GetOptionsByName<LeaseBasedQueueBalancerOptions>(name);
@@ -356,6 +374,7 @@ namespace Orleans.Streams
                 : Task.CompletedTask;
         }
 
+        /// <inheritdoc/>
         protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {
             if (base.Cancellation.IsCancellationRequested) return;

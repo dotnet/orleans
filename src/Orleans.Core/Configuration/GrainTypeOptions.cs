@@ -22,12 +22,20 @@ namespace Orleans.Configuration
         public HashSet<Type> Interfaces { get; } = new ();
     }
 
+    /// <summary>
+    /// The default configuration provider for <see cref="GrainTypeOptions"/>.
+    /// </summary>
     internal sealed class DefaultGrainTypeOptionsProvider : IConfigureOptions<GrainTypeOptions>
     {
         private readonly TypeManifestOptions _typeManifestOptions;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultGrainTypeOptionsProvider"/> class.
+        /// </summary>
+        /// <param name="typeManifestOptions">The type manifest options.</param>
         public DefaultGrainTypeOptionsProvider(IOptions<TypeManifestOptions> typeManifestOptions) => _typeManifestOptions = typeManifestOptions.Value;
 
+        /// <inheritdoc />
         public void Configure(GrainTypeOptions options)
         {
             foreach (var type in _typeManifestOptions.Interfaces)
@@ -67,17 +75,26 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Validates <see cref="GrainTypeOptions"/>.
+    /// </summary>
     public sealed class GrainTypeOptionsValidator : IConfigurationValidator
     {
         private readonly IOptions<GrainTypeOptions> _options;
         private readonly IServiceProvider _serviceProvider;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainTypeOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options.</param>
+        /// <param name="serviceProvider">The service provider.</param>
         public GrainTypeOptionsValidator(IOptions<GrainTypeOptions> options, IServiceProvider serviceProvider)
         {
             _options = options;
             _serviceProvider = serviceProvider;
         }
 
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             if (_options.Value.Interfaces is not { Count: > 0 })

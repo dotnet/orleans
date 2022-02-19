@@ -7,6 +7,7 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public sealed class DefaultTypeFilter : ITypeFilter
     {
+        /// <inheritdoc/>
         public bool? IsTypeNameAllowed(string typeName, string assemblyName)
         {
             if (assemblyName is { } && assemblyName.Contains("Orleans.Serialization", StringComparison.Ordinal))

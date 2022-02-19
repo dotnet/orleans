@@ -39,7 +39,13 @@ namespace Orleans.Storage
         /// <summary> Name of this storage provider instance. </summary>
         private readonly string name;
 
-        /// <summary> Default constructor. </summary>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MemoryGrainStorage"/> class.
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <param name="options">The options.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="grainFactory">The grain factory.</param>
         public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory)
         {
             this.name = name;
@@ -56,8 +62,7 @@ namespace Orleans.Storage
             }
         }
 
-        /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync"/>
+        /// <inheritdoc/>
         public virtual async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
@@ -75,8 +80,7 @@ namespace Orleans.Storage
             }
         }
 
-        /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync"/>
+        /// <inheritdoc/>
         public virtual async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
@@ -94,8 +98,7 @@ namespace Orleans.Storage
             }
         }
 
-        /// <summary> Delete / Clear state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ClearStateAsync"/>
+        /// <inheritdoc/>
         public virtual async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
@@ -130,6 +133,7 @@ namespace Orleans.Storage
             return storageGrain;
         }
 
+        /// <inheritdoc/>
         public void Dispose() => storageGrains = null;
     }
 
@@ -138,6 +142,12 @@ namespace Orleans.Storage
     /// </summary>
     public static class MemoryGrainStorageFactory
     {
+        /// <summary>
+        /// Creates a new <see cref="MemoryGrainStorage"/> instance.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="name">The name.</param>
+        /// <returns>The storage.</returns>
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             return ActivatorUtilities.CreateInstance<MemoryGrainStorage>(services,

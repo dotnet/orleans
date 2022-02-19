@@ -7,11 +7,16 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="DateTimeOffset"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class DateTimeOffsetCodec : IFieldCodec<DateTimeOffset>
     {
+        /// <inheritdoc/>
         void IFieldCodec<DateTimeOffset>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <inheritdoc/>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
@@ -21,8 +26,10 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         DateTimeOffset IFieldCodec<DateTimeOffset>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <inheritdoc/>
         public static DateTimeOffset ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -65,9 +72,13 @@ namespace Orleans.Serialization.Codecs
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(DateTimeOffset)} fields. {field}");
     }
 
+    /// <summary>
+    /// Copier for <see cref="DateTimeOffset"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class DateTimeOffsetCopier : IDeepCopier<DateTimeOffset>
     {
+        /// <inheritdoc/>
         public DateTimeOffset DeepCopy(DateTimeOffset input, CopyContext _) => input;
     }
 }

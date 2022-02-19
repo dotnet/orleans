@@ -19,12 +19,18 @@ namespace Orleans.Serialization.Serializers
         private readonly IActivator<TField> _activator;
         private readonly TBaseCodec _serializer;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConcreteTypeSerializer{TField, TBaseCodec}"/> class.
+        /// </summary>
+        /// <param name="activator">The activator.</param>
+        /// <param name="serializer">The serializer.</param>
         public ConcreteTypeSerializer(IActivator<TField> activator, TBaseCodec serializer)
         {
             _activator = activator;
             _serializer = serializer;
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
         {
             var fieldType = value?.GetType();
@@ -45,6 +51,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        /// <inheritdoc/>
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)

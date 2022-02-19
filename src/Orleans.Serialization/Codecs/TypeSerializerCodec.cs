@@ -7,6 +7,9 @@ using System.Buffers;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serialzier for <see cref="Type"/>.
+    /// </summary>
     [RegisterSerializer]
     public sealed class TypeSerializerCodec : IFieldCodec<Type>, IDerivedTypeCodec
     {
@@ -15,8 +18,17 @@ namespace Orleans.Serialization.Codecs
         private static readonly Type ByteArrayType = typeof(byte[]);
         private static readonly Type UIntType = typeof(uint);
 
+        /// <inheritdoc />
         void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -50,8 +62,16 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         Type IFieldCodec<Type>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
         public static Type ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -145,9 +165,13 @@ namespace Orleans.Serialization.Codecs
         private static Type ThrowMissingType() => throw new TypeMissingException();
     }
 
+    /// <summary>
+    /// Copier for <see cref="Type"/>.
+    /// </summary>
     [RegisterCopier]
     public sealed class TypeCopier : IDeepCopier<Type>, IDerivedTypeCopier
     {
+        /// <inheritdoc />
         public Type DeepCopy(Type input, CopyContext context) => input;
     }
 }

@@ -65,6 +65,7 @@ namespace Orleans.TestingHost
             Dispose(false);
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return SiloAddress.ToString();

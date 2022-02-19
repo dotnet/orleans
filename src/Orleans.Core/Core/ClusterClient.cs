@@ -68,12 +68,14 @@ namespace Orleans
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => _runtimeClient.ServiceProvider;
 
+        /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await _runtimeClient.Start(cancellationToken).ConfigureAwait(false);
             await _clusterClientLifecycle.OnStart(cancellationToken).ConfigureAwait(false);
         }
 
+        /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             try
@@ -159,6 +161,7 @@ namespace Orleans
         public object Cast(IAddressable grain, Type outputGrainInterfaceType)
             => _runtimeClient.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
 
+        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
     }

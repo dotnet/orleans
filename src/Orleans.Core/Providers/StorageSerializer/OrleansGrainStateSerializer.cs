@@ -6,20 +6,22 @@ using Orleans.Serialization;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Grain storage serializer that uses the Orleans <see cref="Serializer"/>
+    /// Grain storage serializer that uses the Orleans <see cref="Serializer"/>.
     /// </summary>
     public class OrleansGrainStorageSerializer : IGrainStorageSerializer
     {
         private readonly Serializer serializer;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansGrainStorageSerializer"/> class.
+        /// </summary>
+        /// <param name="serializer">The serializer.</param>
         public OrleansGrainStorageSerializer(Serializer serializer)
         {
             this.serializer = serializer;
         }
 
-        /// <summary>
         /// <inheritdoc/>
-        /// </summary>
         public BinaryData Serialize<T>(T value)
         {
             var buffer = new ArrayBufferWriter<byte>();
@@ -27,9 +29,7 @@ namespace Orleans.Storage
             return new BinaryData(buffer.WrittenMemory);
         }
 
-        /// <summary>
         /// <inheritdoc/>
-        /// </summary>
         public T Deserialize<T>(BinaryData input)
         {
             return this.serializer.Deserialize<T>(input.ToMemory());

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -298,19 +298,6 @@ namespace Orleans.Tests.SqlUtils
             internal const string StatValue = nameof(StatValue);
             internal const string Statistic = nameof(Statistic);
 
-            internal List<ICounter> Counters
-            {
-                set
-                {
-                    for (int i = 0; i < value.Count; ++i)
-                    {
-                        Add($"{IsValueDelta}{i}", value[i].IsValueDelta);
-                        Add($"{StatValue}{i}", value[i].IsValueDelta ? value[i].GetDeltaString() : value[i].GetValueString());
-                        Add($"{Statistic}{i}", value[i].Name);
-                    }
-                }
-            }
-            
             internal SiloAddress SiloAddress
             {
                 set

@@ -11,6 +11,7 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
+
         /// <summary>
         /// Buffers which are currently in use in the cache
         /// Protected for test purposes
@@ -20,14 +21,14 @@ namespace Orleans.Providers.Streams.Common
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
         private long cacheSizeInByte;
-
+        
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="ChronologicalEvictionStrategy"/> class.
         /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="timePurage"></param>
-        /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval">"Interval to write periodic statistics.  Only triggered for active caches.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="timePurage">The time-based purge predicate.</param>
+        /// <param name="cacheMonitor">The cache monitor.</param>
+        /// <param name="monitorWriteInterval">"Interval to write periodic statistics. Only triggered for active caches.</param>
         public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             if (logger == null) throw new ArgumentException(nameof(logger));
@@ -54,11 +55,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public IPurgeObservable PurgeObservable { private get; set; }
 
-        /// <summary>
-        /// Called with the newest item in the cache and last item purged after a cache purge has run.
-        /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
-        ///   of every set of events that get purged.
-        /// </summary>
+        /// <inheritdoc />
         public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
 
         /// <inheritdoc />
@@ -84,15 +81,19 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Given a purge cached message, indicates whether it should be purged from the cache.
+        /// Given a cached message, indicates whether it should be purged from the cache.
         /// </summary>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <param name="newestCachedMessage">The newest cached message.</param>
+        /// <param name="nowUtc">The current time (UTC).</param>
+        /// <returns><see langword="true" /> if the message should be purged, <see langword="false" /> otherwise.</returns>
         protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
         {
             TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.
             TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
 
-            return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
+            return timePurge.ShouldPurgeFromTime(timeInCache, relativeAge);
         }
 
         private void PerformPurgeInternal(DateTime nowUtc)
@@ -159,9 +160,9 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Logs cache purge activity
         /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="purgeObservable"></param>
-        /// <param name="itemsPurged"></param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="purgeObservable">The purge observable.</param>
+        /// <param name="itemsPurged">The items purged.</param>
         private static void ReportPurge(ILogger logger, IPurgeObservable purgeObservable, int itemsPurged)
         {
             if (!logger.IsEnabled(LogLevel.Debug))

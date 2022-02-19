@@ -10,6 +10,11 @@ namespace Orleans.Streams
     /// </summary>
     public interface IConsistentRingStreamQueueMapper : IStreamQueueMapper
     {
+        /// <summary>
+        /// Gets the queues which map to the specified range.
+        /// </summary>
+        /// <param name="range">The range.</param>
+        /// <returns>The queues which map to the specified range.</returns>
         IEnumerable<QueueId> GetQueuesForRange(IRingRange range);
     }
 }

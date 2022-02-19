@@ -13,6 +13,9 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for well-known <see cref="StringComparer"/> types.
+    /// </summary>
     [WellKnownAlias("StringComparer")]
     public sealed class WellKnownStringComparerCodec : IGeneralizedCodec
     {
@@ -28,6 +31,9 @@ namespace Orleans.Serialization.Codecs
         private readonly FormatterConverter _formatterConverter;
 #endif
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WellKnownStringComparerCodec"/> class.
+        /// </summary>
         public WellKnownStringComparerCodec()
         {
             _ordinalComparer = StringComparer.Ordinal;
@@ -43,6 +49,7 @@ namespace Orleans.Serialization.Codecs
 #endif
         }
 
+        /// <inheritdoc />
         public bool IsSupportedType(Type type) =>
             type == CodecType
             || type == _ordinalType
@@ -50,6 +57,7 @@ namespace Orleans.Serialization.Codecs
             || type == _defaultEqualityType
             || !type.IsAbstract && typeof(IEqualityComparer<string>).IsAssignableFrom(type) && type.Assembly.Equals(typeof(IEqualityComparer<string>).Assembly);
 
+        /// <inheritdoc />
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -123,6 +131,7 @@ namespace Orleans.Serialization.Codecs
             return null;
         }
 
+        /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             uint type;
@@ -243,12 +252,18 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowNotSupported(Type type) => throw new NotSupportedException($"Values of type {type} are not supported");
     }
 
+    /// <summary>
+    /// Serializer for <see cref="EqualityComparer{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     [RegisterSerializer]
     public class EqualityComparerBaseCodec<T> : IBaseCodec<EqualityComparer<T>>, IBaseCopier<EqualityComparer<T>>
     {
+        /// <inheritdoc />
         public void DeepCopy(EqualityComparer<T> input, EqualityComparer<T> output, CopyContext context) { }
 
+        /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, EqualityComparer<T> value)
         {
             while (true)
@@ -263,17 +278,24 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, EqualityComparer<T> value) where TBufferWriter : IBufferWriter<byte>
         {
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Comparer{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     [RegisterSerializer]
     public class ComparerBaseCodec<T> : IBaseCodec<Comparer<T>>, IBaseCopier<Comparer<T>>
     {
+        /// <inheritdoc />
         public void DeepCopy(Comparer<T> input, Comparer<T> output, CopyContext context) { }
 
+        /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, Comparer<T> value)
         {
             while (true)
@@ -288,6 +310,7 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Comparer<T> value) where TBufferWriter : IBufferWriter<byte>
         {
         }

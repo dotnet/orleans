@@ -19,7 +19,7 @@ namespace Orleans.Serialization.TypeSystem
         /// </summary>
         /// <param name="name">The type name.</param>
         /// <param name="type">The resolved type.</param>
-        /// <returns>true if resolution succeeded and false otherwise.</returns>
+        /// <returns><see langword="true"/> if resolution succeeded; <see langword="false"/> otherwise.</returns>
         public abstract bool TryResolveType(string name, out Type type);
     }
 }

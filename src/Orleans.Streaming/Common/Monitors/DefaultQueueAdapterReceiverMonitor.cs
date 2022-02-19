@@ -12,11 +12,20 @@ namespace Orleans.Providers.Streams.Common
         protected readonly ITelemetryProducer TelemetryProducer;
         protected Dictionary<string, string> LogProperties;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultQueueAdapterReceiverMonitor"/> class.
+        /// </summary>
+        /// <param name="telemetryProducer">The telemetry producer.</param>
         public DefaultQueueAdapterReceiverMonitor(ITelemetryProducer telemetryProducer)
         {
             this.TelemetryProducer = telemetryProducer;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultQueueAdapterReceiverMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The dimensions.</param>
+        /// <param name="telemetryProducer">The telemetry producer.</param>
         public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, ITelemetryProducer telemetryProducer)
             :this(telemetryProducer)
         {
@@ -25,12 +34,8 @@ namespace Orleans.Providers.Streams.Common
                 {"QueueId", dimensions.QueueId},
             };
         }
-        /// <summary>
-        /// Track attempts to initialize the receiver.
-        /// </summary>
-        /// <param name="success">True if read succeeded, false if read failed.</param>
-        /// <param name="callTime"></param>
-        /// <param name="exception"></param>
+
+        /// <inheritdoc />
         public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
             this.TelemetryProducer.TrackMetric("InitializationFailure", success ? 0 : 1, this.LogProperties);
@@ -38,12 +43,7 @@ namespace Orleans.Providers.Streams.Common
             this.TelemetryProducer.TrackMetric("InitializationException", exception == null ? 0 : 1, this.LogProperties);
         }
 
-        /// <summary>
-        /// Track attempts to read from the queue.    Tracked per queue read operation.
-        /// </summary>
-        /// <param name="success">True if read succeeded, false if read failed.</param>
-        /// <param name="callTime"></param>
-        /// <param name="exception"></param>
+        /// <inheritdoc />
         public void TrackRead(bool success, TimeSpan callTime, Exception exception)
         {
             this.TelemetryProducer.TrackMetric("ReadFailure", success ? 0 : 1, this.LogProperties);
@@ -51,12 +51,7 @@ namespace Orleans.Providers.Streams.Common
             this.TelemetryProducer.TrackMetric("ReadException", exception == null ? 0 : 1, this.LogProperties);
         }
 
-        /// <summary>
-        /// Tracks messages read and time taken per successful read.  Tracked per successful queue read operation.
-        /// </summary>
-        /// <param name="count">Messages read.</param>
-        /// <param name="oldestMessageEnqueueTimeUtc"></param>
-        /// <param name="newestMessageEnqueueTimeUtc"></param>
+        /// <inheritdoc />
         public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             var now = DateTime.UtcNow;
@@ -67,12 +62,7 @@ namespace Orleans.Providers.Streams.Common
                 this.TelemetryProducer.TrackMetric("NewestMessageReadEnqueueTimeToNow", now - newestMessageEnqueueTimeUtc.Value, this.LogProperties);
         }
 
-        /// <summary>
-        /// Track attempts to shutdown the receiver.
-        /// </summary>
-        /// <param name="success">True if read succeeded, false if read failed.</param>
-        /// <param name="callTime"></param>
-        /// <param name="exception"></param>
+        /// <inheritdoc />
         public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
         {
             this.TelemetryProducer.TrackMetric("ShutdownFailure", success ? 0 : 1, this.LogProperties);

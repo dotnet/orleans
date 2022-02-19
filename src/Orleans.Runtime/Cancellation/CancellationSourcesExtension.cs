@@ -22,6 +22,11 @@ namespace Orleans.Runtime
         private readonly Func<Guid, Entry> _createToken;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CancellationSourcesExtension"/> class.
+        /// </summary>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="cancellationRuntime">The cancellation runtime.</param>
         public CancellationSourcesExtension(ILoggerFactory loggerFactory, IGrainCancellationTokenRuntime cancellationRuntime)
         {
             _logger = loggerFactory.CreateLogger<CancellationSourcesExtension>();
@@ -30,6 +35,7 @@ namespace Orleans.Runtime
             _createToken = id => new Entry(new GrainCancellationToken(id, false, _cancellationTokenRuntime));
         }
 
+        /// <inheritdoc />
         public Task CancelRemoteToken(Guid tokenId)
         {
             if (!_cancellationTokens.TryGetValue(tokenId, out var entry))
@@ -47,8 +53,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Adds CancellationToken to the grain extension
-        /// so that it can be canceled through remote call to the CancellationSourcesExtension.
+        /// Adds <see cref="CancellationToken"/> to the grain extension so that it can be canceled through remote call to the CancellationSourcesExtension.
         /// </summary>
         /// <param name="target"></param>
         /// <param name="request"></param>
@@ -100,6 +105,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             _cleanupTimer.Dispose();

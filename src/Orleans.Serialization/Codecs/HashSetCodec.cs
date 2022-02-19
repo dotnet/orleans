@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Session;
@@ -11,7 +11,7 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Codec for <see cref="HashSet{T}"/>.
+    /// Serializer for <see cref="HashSet{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -22,12 +22,18 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly IFieldCodec<IEqualityComparer<T>> _comparerCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HashSetCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
+        /// <param name="comparerCodec">The comparer codec.</param>
         public HashSetCodec(IFieldCodec<T> fieldCodec, IFieldCodec<IEqualityComparer<T>> comparerCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
             _comparerCodec = comparerCodec;
         }
 
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -54,6 +60,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public HashSet<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -122,16 +129,25 @@ namespace Orleans.Serialization.Codecs
             $"Declared length of {typeof(HashSet<T>)}, {length}, is greater than total length of input.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="HashSet{T}"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     [RegisterCopier]
     public sealed class HashSetCopier<T> : IDeepCopier<HashSet<T>>, IBaseCopier<HashSet<T>>
     {
         private readonly IDeepCopier<T> _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HashSetCopier{T}"/> class.
+        /// </summary>
+        /// <param name="valueCopier">The value copier.</param>
         public HashSetCopier(IDeepCopier<T> valueCopier)
         {
             _copier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public HashSet<T> DeepCopy(HashSet<T> input, CopyContext context)
         {
             if (context.TryGetCopy<HashSet<T>>(input, out var result))
@@ -154,6 +170,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(HashSet<T> input, HashSet<T> output, CopyContext context)
         {
             foreach (var item in input)

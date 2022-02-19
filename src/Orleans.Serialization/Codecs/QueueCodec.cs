@@ -9,20 +9,28 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Codec for <see cref="Queue{T}"/>.
+    /// Serializer for <see cref="Queue{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
     public sealed class QueueCodec<T> : IFieldCodec<Queue<T>>
     {
+        /// <summary>
+        /// The codec element type
+        /// </summary>
         public static readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="QueueCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public QueueCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<Queue<T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Queue<T> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -43,6 +51,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         Queue<T> IFieldCodec<Queue<T>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -110,16 +119,25 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Queue{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class QueueCopier<T> : IDeepCopier<Queue<T>>, IBaseCopier<Queue<T>>
     {
         private readonly IDeepCopier<T> _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="QueueCopier{T}"/> class.
+        /// </summary>
+        /// <param name="valueCopier">The value copier.</param>
         public QueueCopier(IDeepCopier<T> valueCopier)
         {
             _copier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public Queue<T> DeepCopy(Queue<T> input, CopyContext context)
         {
             if (context.TryGetCopy<Queue<T>>(input, out var result))
@@ -142,6 +160,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(Queue<T> input, Queue<T> output, CopyContext context)
         {
             foreach (var item in input)

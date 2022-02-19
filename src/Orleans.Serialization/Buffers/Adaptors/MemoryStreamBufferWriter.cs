@@ -12,6 +12,10 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private readonly MemoryStream _stream;
         private const int MinRequestSize = 256;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MemoryStreamBufferWriter"/> struct.
+        /// </summary>
+        /// <param name="stream">The stream.</param>
         public MemoryStreamBufferWriter(MemoryStream stream)
         {
             _stream = stream;

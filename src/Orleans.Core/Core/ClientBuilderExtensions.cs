@@ -133,10 +133,21 @@ namespace Orleans
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="gatewayPort">The local silo's gateway port.</param>
-        /// <param name="serviceId">The service id.</param>
-        /// <param name="clusterId">The cluster id.</param>
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="gatewayPort">
+        /// The local silo's gateway port.
+        /// </param>
+        /// <param name="serviceId">
+        /// The service id.
+        /// </param>
+        /// <param name="clusterId">
+        /// The cluster id.
+        /// </param>
+        /// <returns>
+        /// The <see cref="IClientBuilder"/>.
+        /// </returns>
         public static IClientBuilder UseLocalhostClustering(
             this IClientBuilder builder,
             int gatewayPort = 30000,
@@ -149,10 +160,21 @@ namespace Orleans
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="gatewayPorts">The local silo gateway ports.</param>
-        /// <param name="serviceId">The service id.</param>
-        /// <param name="clusterId">The cluster id.</param>
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="gatewayPorts">
+        /// The local silo gateway ports.
+        /// </param>
+        /// <param name="serviceId">
+        /// The service id.
+        /// </param>
+        /// <param name="clusterId">
+        /// The cluster id.
+        /// </param>
+        /// <returns>
+        /// The <see cref="IClientBuilder"/>.
+        /// </returns>
         public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder,
             int[] gatewayPorts,
             string serviceId = ClusterOptions.DevelopmentServiceId,
@@ -184,8 +206,15 @@ namespace Orleans
         /// <summary>
         /// Configures the client to use static clustering.
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="endpoints">The gateway endpoints.</param>
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="endpoints">
+        /// The gateway endpoints.
+        /// </param>
+        /// <returns>
+        /// The <see cref="IClientBuilder"/>.
+        /// </returns>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
         {
             return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
@@ -194,6 +223,15 @@ namespace Orleans
         /// <summary>
         /// Configures the client to use static clustering.
         /// </summary>
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configure Options.
+        /// </param>
+        /// <returns>
+        /// The <see cref="IClientBuilder"/>.
+        /// </returns>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
         {
             return builder.ConfigureServices(
@@ -212,6 +250,15 @@ namespace Orleans
         /// <summary>
         /// Configures the client to use static clustering.
         /// </summary>
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configure Options.
+        /// </param>
+        /// <returns>
+        /// The <see cref="IClientBuilder"/>.
+        /// </returns>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
             return builder.ConfigureServices(

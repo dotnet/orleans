@@ -11,6 +11,9 @@ namespace Orleans
     /// </summary>
     internal class InterfaceToImplementationMappingCache
     {
+        /// <summary>
+        /// Maps a grain interface method's <see cref="MethodInfo"/> to an implementation's <see cref="MethodInfo"/>.
+        /// </summary>
         public readonly struct Entry
         {
             public Entry(MethodInfo implementationMethod, MethodInfo interfaceMethod)
@@ -19,7 +22,14 @@ namespace Orleans
                 InterfaceMethod = interfaceMethod;
             }
 
+            /// <summary>
+            /// Gets the grain implmentation <see cref="MethodInfo"/>.
+            /// </summary>
             public MethodInfo ImplementationMethod { get; }
+
+            /// <summary>
+            /// Gets the grain interface <see cref="MethodInfo"/>.
+            /// </summary>
             public MethodInfo InterfaceMethod { get; }
         }
 

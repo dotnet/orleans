@@ -7,6 +7,11 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     internal static class RuntimeTypeNameRewriter
     {
+        /// <summary>
+        /// Signature for a delegate which rewrites a <see cref="QualifiedType"/>.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <returns>The rewritten qualified type.</returns>
         public delegate QualifiedType Rewriter(in QualifiedType input);
 
         /// <summary>

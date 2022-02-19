@@ -13,8 +13,8 @@ namespace Orleans.Streams
         /// <summary>
         /// Stream position consists of the stream identity and the sequence token
         /// </summary>
-        /// <param name="streamId"></param>
-        /// <param name="sequenceToken"></param>
+        /// <param name="streamId">The stream identity.</param>
+        /// <param name="sequenceToken">The stream sequence token.</param>
         public StreamPosition(StreamId streamId, StreamSequenceToken sequenceToken)
         {
             if (sequenceToken == null)
@@ -24,13 +24,14 @@ namespace Orleans.Streams
             StreamId = streamId;
             SequenceToken = sequenceToken;
         }
+
         /// <summary>
-        /// Identity of the stream
+        /// Gets the identity of the stream
         /// </summary>
         public StreamId StreamId { get; }
 
         /// <summary>
-        /// Position in the stream
+        /// Gets the position in the stream
         /// </summary>
         public StreamSequenceToken SequenceToken { get; }
     }

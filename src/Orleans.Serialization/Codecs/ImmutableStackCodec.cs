@@ -11,19 +11,29 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="ImmutableStack{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
     public sealed class ImmutableStackCodec<T> : GeneralizedReferenceTypeSurrogateCodec<ImmutableStack<T>, ImmutableStackSurrogate<T>>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ImmutableStackCodec{T}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The surrogate serializer.</param>
         public ImmutableStackCodec(IValueSerializer<ImmutableStackSurrogate<T>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         public override ImmutableStack<T> ConvertFromSurrogate(ref ImmutableStackSurrogate<T> surrogate) => surrogate.Values switch
         {
             null => default,
             object => ImmutableStack.CreateRange(surrogate.Values)
         };
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableStack<T> value, ref ImmutableStackSurrogate<T> surrogate) => surrogate = value switch
         {
             null => default,
@@ -34,21 +44,34 @@ namespace Orleans.Serialization.Codecs
         };
     }
 
+    /// <summary>
+    /// Surrogate type for <see cref="ImmutableStackCodec{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
     public struct ImmutableStackSurrogate<T>
     {
+        /// <summary>
+        /// Gets or sets the values.
+        /// </summary>
+        /// <value>The values.</value>
         [Id(1)]
         public List<T> Values { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="ImmutableStack{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class ImmutableStackCopier<T> : IDeepCopier<ImmutableStack<T>>
     {
+        /// <inheritdoc/>
         public ImmutableStack<T> DeepCopy(ImmutableStack<T> input, CopyContext _) => input;
     }
 
     /// <summary>
-    /// Codec for <see cref="Stack{T}"/>.
+    /// Serializer for <see cref="Stack{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
@@ -58,11 +81,16 @@ namespace Orleans.Serialization.Codecs
 
         private readonly IFieldCodec<T> _fieldCodec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StackCodec{T}"/> class.
+        /// </summary>
+        /// <param name="fieldCodec">The field codec.</param>
         public StackCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
         }
 
+        /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Stack<T> value) where TBufferWriter : IBufferWriter<byte>
         {
@@ -84,6 +112,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public Stack<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -160,16 +189,25 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
+    /// <summary>
+    /// Copier for <see cref="Stack{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>>
     {
         private readonly IDeepCopier<T> _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StackCopier{T}"/> class.
+        /// </summary>
+        /// <param name="valueCopier">The value copier.</param>
         public StackCopier(IDeepCopier<T> valueCopier)
         {
             _copier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
         {
             if (context.TryGetCopy<Stack<T>>(input, out var result))
@@ -192,6 +230,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        /// <inheritdoc/>
         public void DeepCopy(Stack<T> input, Stack<T> output, CopyContext context)
         {
             foreach (var item in input)

@@ -7,7 +7,7 @@ namespace Orleans.Streams
 {
     /// <summary>
     /// Flow control triggered by silo load shedding.
-    /// All or nothing trigger.  Will request maxint, or 0.
+    /// This is an all-or-nothing trigger which will request <see cref="int.MaxValue"/>, or <c>0</c>.
     /// </summary>
     public class LoadShedQueueFlowController : IQueueFlowController
     {
@@ -22,8 +22,8 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="options">The silo statistics options.</param>
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
-        /// <returns></returns>
-        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, int percentOfSiloSheddingLimit = LoadSheddingOptions.DEFAULT_LOAD_SHEDDING_LIMIT)
+        /// <returns>The flow controller.</returns>
+        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultLoadSheddingLimit)
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
@@ -36,18 +36,13 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="loadSheddingLimit">Percentage of CPU which triggers queue read rate reduction</param>
         /// <param name="options">The silo statistics options.</param>
-        /// <returns></returns>
+        /// <returns>The flow controller.</returns>
         public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options)
         {
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
             return new LoadShedQueueFlowController(loadSheddingLimit, options);
         }
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="loadSheddingLimit"></param>
-        /// <param name="options"></param>
         private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options)
         {
             this.options = options;
@@ -55,9 +50,7 @@ namespace Orleans.Streams
             this.loadSheddingLimit = loadSheddingLimit != 0 ? loadSheddingLimit : int.MaxValue;
         }
 
-        /// <summary>
-        /// The limit of the maximum number of items that can be added
-        /// </summary>
+        /// <inheritdoc/>
         public int GetMaxAddCount()
         {
             return options.LoadSheddingEnabled && GetCpuUsage() > loadSheddingLimit ? 0 : int.MaxValue;

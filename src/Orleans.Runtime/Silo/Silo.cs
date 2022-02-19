@@ -27,7 +27,7 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo
     {
-        /// <summary> Standard name for Primary silo. </summary>
+        /// <summary>Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
@@ -63,9 +63,12 @@ namespace Orleans.Runtime
 
         internal IServiceProvider Services { get; }
 
-        /// <summary> SiloAddress for this silo. </summary>
+        /// <summary>Gets the address of this silo.</summary>
         public SiloAddress SiloAddress => this.siloDetails.SiloAddress;
 
+        /// <summary>
+        /// Gets a <see cref="Task"/> which completes once the silo has terminated.
+        /// </summary>
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
@@ -187,6 +190,11 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
 
+        /// <summary>
+        /// Starts the silo.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token which can be used to cancel the operation.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             // SystemTarget for provider init calls
@@ -456,6 +464,10 @@ namespace Orleans.Runtime
         /// Gracefully stop the run time system only, but not the application.
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
+        /// <param name="cancellationToken">
+        /// A cancellation token which can be used to promptly terminate the silo.
+        /// </param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo shutting down");
@@ -630,7 +642,7 @@ namespace Orleans.Runtime
 
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
 
-        /// <summary> Object.ToString override -- summary info for this silo. </summary>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return localGrainDirectory.ToString();

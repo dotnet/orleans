@@ -3,15 +3,27 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    // This is the public interface to be used by the consistent ring
+    /// <summary>
+    /// Represents a range or set of ranges around a virtual ring where points along the ring are identified using <see cref="uint"/> values.
+    /// </summary>
     public interface IRingRange
     {
         /// <summary>
-        /// Check if <paramref name="n"/> is our responsibility to serve
+        /// Returns a value indicating whether <paramref name="value"/> is within this ring range.
         /// </summary>
-        /// <returns>true if the reminder is in our responsibility range, false otherwise</returns>
-        bool InRange(uint n);
+        /// <param name="value">
+        /// The value to check.
+        /// </param>
+        /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
+        bool InRange(uint value);
 
+        /// <summary>
+        /// Returns a value indicating whether <paramref name="grainReference"/> is within this ring range.
+        /// </summary>
+        /// <param name="grainReference">
+        /// The value to check.
+        /// </param>
+        /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
         bool InRange(GrainReference grainReference);
     }
 
@@ -23,14 +35,19 @@ namespace Orleans.Runtime
         string ToFullString();
     }
 
+    /// <summary>
+    /// Represents a single, contiguous range round a virtual ring where points along the ring are identified using <see cref="uint"/> values.
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.IRingRange" />
     public interface ISingleRange : IRingRange
     {
         /// <summary>
-        /// Exclusive
+        /// Gets the exclusive lower bound of the range.
         /// </summary>
         uint Begin { get; }
+        
         /// <summary>
-        /// Inclusive
+        /// Gets the inclusive upper bound of the range.
         /// </summary>
         uint End { get; }
     }
@@ -170,16 +187,44 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Utility class for creating <see cref="IRingRange" /> values.
+    /// </summary>
     public static class RangeFactory
     {
+        /// <summary>
+        /// The ring size.
+        /// </summary>
         public const long RING_SIZE = ((long)uint.MaxValue) + 1;
+
+        /// <summary>
+        /// Represents an empty range.
+        /// </summary>
         private static readonly GeneralMultiRange EmptyRange = new(new());
+        /// <summary>
+        /// Represents a full range.
+        /// </summary>
         internal static readonly SingleRange FullRange = new(0, 0);
 
+        /// <summary>
+        /// Creates the full range.
+        /// </summary>
+        /// <returns>IRingRange.</returns>
         public static IRingRange CreateFullRange() => FullRange;
 
+        /// <summary>
+        /// Creates a new <see cref="IRingRange"/> representing the values between the exclusive lower bound, <paramref name="begin"/>, and the inclusive upper bound, <paramref name="end"/>.
+        /// </summary>
+        /// <param name="begin">The exclusive lower bound.</param>
+        /// <param name="end">The inclusive upper bound.</param>
+        /// <returns>A new <see cref="IRingRange"/> representing the values between the exclusive lower bound, <paramref name="begin"/>, and the inclusive upper bound, <paramref name="end"/>.</returns>
         public static IRingRange CreateRange(uint begin, uint end) => new SingleRange(begin, end);
 
+        /// <summary>
+        /// Creates a new <see cref="IRingRange"/> representing the union of all provided ranges.
+        /// </summary>
+        /// <param name="inRanges">The ranges.</param>
+        /// <returns>A new <see cref="IRingRange"/> representing the union of all provided ranges.</returns>
         public static IRingRange CreateRange(List<IRingRange> inRanges) => inRanges.Count switch
         {
             0 => EmptyRange,
@@ -187,9 +232,21 @@ namespace Orleans.Runtime
             _ => GeneralMultiRange.Create(inRanges)
         };
 
+        /// <summary>
+        /// Creates equally divided sub-ranges from the provided range and returns one sub-range from that range.
+        /// </summary>
+        /// <param name="range">The range.</param>
+        /// <param name="numSubRanges">The number of sub-ranges.</param>
+        /// <param name="mySubRangeIndex">The index of the sub-range to return.</param>
+        /// <returns>The identified sub-range.</returns>
         internal static IRingRange GetEquallyDividedSubRange(IRingRange range, int numSubRanges, int mySubRangeIndex)
             => EquallyDividedMultiRange.GetEquallyDividedSubRange(range, numSubRanges, mySubRangeIndex);
 
+        /// <summary>
+        /// Gets the contiguous sub-ranges represented by the provided range.
+        /// </summary>
+        /// <param name="range">The range.</param>
+        /// <returns>The contiguous sub-ranges represented by the provided range.</returns>
         public static IEnumerable<ISingleRange> GetSubRanges(IRingRange range) => range switch
         {
             ISingleRange single => new[] { single },

@@ -76,9 +76,20 @@ namespace Microsoft.Extensions.Hosting
 
         private static OrleansConfigurationException GetOrleansSiloAddedException() => new("Do not use UseOrleans with UseOrleansClient. If you want a client and server in the same process, only UseOrleans is necessary and the UseOrleansClient call can be removed.");
 
+        /// <summary>
+        /// Marker type used for storing a client builder in a service collection.
+        /// </summary>
         internal class OrleansBuilderMarker
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="OrleansBuilderMarker"/> class.
+            /// </summary>
+            /// <param name="builderInstance">The builder instance.</param>
             public OrleansBuilderMarker(object builderInstance) => Instance = builderInstance;
+
+            /// <summary>
+            /// Gets the builder instance.
+            /// </summary>
             public object Instance { get; }
         }
     }

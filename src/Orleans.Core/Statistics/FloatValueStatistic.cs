@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Orleans.Runtime
 {
-    public class FloatValueStatistic : ICounter<float>
+    internal class FloatValueStatistic : ICounter<float>
     {
         private static readonly Dictionary<string, FloatValueStatistic> dict = new Dictionary<string, FloatValueStatistic>();
 

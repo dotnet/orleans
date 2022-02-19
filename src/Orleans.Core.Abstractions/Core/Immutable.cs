@@ -35,7 +35,7 @@ namespace Orleans.Concurrency
     /// <summary>
     /// Utility class to add the .AsImmutable method to all objects.
     /// </summary>
-    public static class ImmutableExt
+    public static class ImmutableExtensions
     {
         /// <summary>
         /// Extension method to return this value wrapped in <c>Immutable</c>.

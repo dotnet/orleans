@@ -4,29 +4,28 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// The StatisticsOptions type contains various statistics output related options.
+    /// Options for configuring statistics collection and logging.
     /// </summary>
     public class StatisticsOptions
     {
         /// <summary>
-        /// The PerfCounterWriteInterval property specifies the frequency of updating the windows performance counters.
-        /// The default is 30 seconds.
+        /// Gets or sets the period of time between publishing statistics.
         /// </summary>
-        public TimeSpan PerfCountersWriteInterval { get; set; } = DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
-        public static readonly TimeSpan DEFAULT_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
+        /// <value>Statistics values are published every 30 seconds by default.</value>
+        public TimeSpan PerfCountersWriteInterval { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>
-        /// The LogWriteInterval property specifies the frequency of updating the statistics in the log file.
-        /// The default is 5 minutes.
+        /// Gets or sets the period of time between logging statistics
         /// </summary>
-        public TimeSpan LogWriteInterval { get; set; } = DEFAULT_LOG_WRITE_PERIOD;
-        public static readonly TimeSpan DEFAULT_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
-        
+        /// <value>Statistics are logged every 5 minutes by default.</value>
+        public TimeSpan LogWriteInterval { get; set; } = TimeSpan.FromMinutes(5);
 
         /// <summary>
-        /// The CollectionLevel property specifies the verbosity level of statistics to collect. The default is Info.
+        /// Gets or sets the statistics collection level.
         /// </summary>
-        public StatisticsLevel CollectionLevel { get; set; } = DEFAULT_COLLECTION_LEVEL;
-        public static readonly StatisticsLevel DEFAULT_COLLECTION_LEVEL = StatisticsLevel.Info;
+        /// <value>
+        /// Statistics are logged at collected at the <see cref="StatisticsLevel.Info"/> level by default.
+        /// </value>
+        public StatisticsLevel CollectionLevel { get; set; } = StatisticsLevel.Info;
     }
 }

@@ -87,8 +87,8 @@ namespace Orleans.Streams
                         throw new KeyNotFoundException(
                            $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamIdMapperKey}\" value");
                     }
-                    var streamIdMapper = _serviceProvider.GetServiceByName<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
 
+                    var streamIdMapper = _serviceProvider.GetServiceByName<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
                     var subscriber = new StreamSubscriber(binding, streamIdMapper);
                     newPredicates.Add(new StreamSubscriberPredicate(subscriber, predicate));
                 }

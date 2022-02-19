@@ -35,6 +35,9 @@ namespace Orleans.Streams
     /// </summary>
     public class ConstructorStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
     {
+        /// <summary>
+        /// The prefix used to identify this predicate provider.
+        /// </summary>
         public const string Prefix = "ctor";
 
         /// <summary>

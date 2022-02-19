@@ -16,8 +16,14 @@ namespace Orleans.Metadata
         private readonly TypeConverter _typeConverter;
 
         /// <summary>
-        /// Creates a <see cref="GrainTypeResolver"/> instance.
+        /// Initializes a new instance of the <see cref="GrainTypeResolver"/> class.
         /// </summary>
+        /// <param name="resolvers">
+        /// The grain type name providers.
+        /// </param>
+        /// <param name="argumentFormatter">
+        /// The type converter, used to format generic parameters.
+        /// </param>
         public GrainTypeResolver(
             IEnumerable<IGrainTypeProvider> resolvers,
             TypeConverter argumentFormatter)

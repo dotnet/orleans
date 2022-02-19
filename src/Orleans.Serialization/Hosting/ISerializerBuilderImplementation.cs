@@ -4,6 +4,8 @@ using System.Collections.Generic;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// </summary>
     public interface ISerializerBuilderImplementation : ISerializerBuilder
     {
         ISerializerBuilderImplementation ConfigureServices(Action<IServiceCollection> configureDelegate);

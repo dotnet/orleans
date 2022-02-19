@@ -32,10 +32,13 @@ namespace Orleans
         private Task? nextWorkCycle;
 
         /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
+        /// <returns>>
+        /// A <see cref="Task"/>
+        /// </returns>
         protected abstract Task Work();
 
         /// <summary>
-        /// The cancellation used to cancel this batch worker.
+        /// Gets or sets the cancellation used to cancel this batch worker.
         /// </summary>
         protected CancellationToken CancellationToken { get; set; }
 
@@ -198,16 +201,25 @@ namespace Orleans
         }
     }
 
+    /// <summary>
+    /// A <see cref="BatchWorker"/> implementation which executes a provided delegate as its <see cref="BatchWorker.Work"/> implementation.
+    /// </summary>
     public class BatchWorkerFromDelegate : BatchWorker
     {
         private readonly Func<Task> work;
 
+        /// <summary>
+        /// Initializes a new <see cref="BatchWorkerFromDelegate"/> instance.
+        /// </summary>
+        /// <param name="work">The delegate to invoke when <see cref="BatchWorker.Work"/> is invoked.</param>
+        /// <param name="cancellationToken">The cancellation token used to stop the worker.</param>
         public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default(CancellationToken))
         {
             this.work = work;
             this.CancellationToken = cancellationToken;
         }
 
+        /// <inheritdoc />
         protected override Task Work()
         {
             return work();

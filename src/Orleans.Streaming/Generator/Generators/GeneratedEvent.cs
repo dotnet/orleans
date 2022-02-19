@@ -15,9 +15,10 @@ namespace Orleans.Providers.Streams.Generator
         public enum GeneratedEventType
         {
             /// <summary>
-            /// filler event
+            /// Filler event
             /// </summary>
             Fill,
+
             /// <summary>
             /// Event that should trigger reporting
             /// </summary>
@@ -25,13 +26,13 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Event type
+        /// Gets or sets the event type.
         /// </summary>
         [Id(0)]
         public GeneratedEventType EventType { get; set; }
 
         /// <summary>
-        /// Event payload
+        /// Gets or sets the payload.
         /// </summary>
         [Id(1)]
         public int[] Payload { get; set; }

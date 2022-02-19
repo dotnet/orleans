@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -15,6 +15,11 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private int _bytesWritten;
         private const int MinRequestSize = 256;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PoolingStreamBufferWriter"/> struct.
+        /// </summary>
+        /// <param name="stream">The stream.</param>
+        /// <param name="sizeHint">The size hint.</param>
         internal PoolingStreamBufferWriter(Stream stream, int sizeHint)
         {
             _stream = stream;

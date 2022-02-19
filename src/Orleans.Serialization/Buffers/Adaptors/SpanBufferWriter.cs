@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
@@ -12,12 +12,20 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private readonly int _maxLength;
         private int _bytesWritten;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SpanBufferWriter"/> struct.
+        /// </summary>
+        /// <param name="buffer">The buffer.</param>
         internal SpanBufferWriter(Span<byte> buffer)
         {
             _maxLength = buffer.Length;
             _bytesWritten = 0;
         }
 
+        /// <summary>
+        /// Gets the number of bytes written.
+        /// </summary>
+        /// <value>The number of bytes written.</value>
         public int BytesWritten => _bytesWritten;
 
         /// <inheritdoc />

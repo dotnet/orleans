@@ -10,14 +10,22 @@ namespace Orleans.Runtime
     {
         private readonly GrainReferenceActivator _activator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceKeyStringConverter"/> class.
+        /// </summary>
+        /// <param name="activator">The grain reference activator.</param>
         public GrainReferenceKeyStringConverter(GrainReferenceActivator activator)
         {
             _activator = activator;
-        }
-
+        }        
+                
         /// <summary>
-        /// Converts the provided value into a <see cref="GrainReference"/>.
+        /// Converts the provided grain reference key <see cref="string"/> into a <see cref="GrainReference"/>.
         /// </summary>
+        /// <param name="referenceString">
+        /// The string representation of a grain reference.
+        /// </param>
+        /// <returns>The grain reference.</returns>
         public GrainReference FromKeyString(string referenceString)
         {
             var i = referenceString.IndexOf('_');
@@ -29,8 +37,12 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Converts the provided reference into a string.
+        /// Converts the provided <see cref="GrainReference"/> to a string which can be parsed by <see cref="GrainReferenceKeyStringConverter"/>.
         /// </summary>
+        /// <param name="grainReference">
+        /// The grain reference.
+        /// </param>
+        /// <returns>The key string.</returns>
         public string ToKeyString(GrainReference grainReference) => grainReference.ToKeyString();
     }
 
@@ -42,6 +54,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Converts the provided <see cref="GrainReference"/> to a string which can be parsed by <see cref="GrainReferenceKeyStringConverter"/>.
         /// </summary>
+        /// <param name="grainReference">
+        /// The grain reference.
+        /// </param>
+        /// <returns>The key string.</returns>
         public static string ToKeyString(this GrainReference grainReference)
         {
             var id = grainReference.GrainId;

@@ -2,10 +2,16 @@ using System;
 
 namespace Orleans.Versions.Selector
 {
+    /// <summary>
+    /// Grain interface version selector which always selects the lowest compatible version.
+    /// </summary>
     [Serializable]
     [GenerateSerializer]
     public class MinimumVersion : VersionSelectorStrategy
     {
+        /// <summary>
+        /// Gets the singleton instance of this class.
+        /// </summary>
         public static MinimumVersion Singleton { get; } = new MinimumVersion();
     }
 }

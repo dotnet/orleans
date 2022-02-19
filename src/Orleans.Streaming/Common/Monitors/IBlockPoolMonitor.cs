@@ -1,4 +1,4 @@
-﻿namespace Orleans.Providers.Streams.Common
+namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Monitor track block pool related metrics. Block pool is used in cache system for memory management 
@@ -6,23 +6,23 @@
     public interface IBlockPoolMonitor
     {
         /// <summary>
-        /// Track memory newly allocated by cache
+        /// Called when memory is newly allocated by the cache.
         /// </summary>
-        /// <param name="allocatedMemoryInByte"></param>
-        void TrackMemoryAllocated(long allocatedMemoryInByte);
+        /// <param name="allocatedMemoryInBytes">The allocated memory, in bytes.</param>
+        void TrackMemoryAllocated(long allocatedMemoryInBytes);
 
         /// <summary>
-        /// Track memory released from cache
+        /// Called when memory is released by the cache.
         /// </summary>
-        /// <param name="releasedMemoryInByte"></param>
-        void TrackMemoryReleased(long releasedMemoryInByte);
+        /// <param name="releasedMemoryInBytes">The released memory, in bytes.</param>
+        void TrackMemoryReleased(long releasedMemoryInBytes);
 
         /// <summary>
         /// Periodically report block pool status
         /// </summary>
-        /// <param name="totalSizeInByte">total memory this block pool allocated</param>
-        /// <param name="availableMemoryInByte">memory which is available for allocating to caches</param>
-        /// <param name="claimedMemoryInByte">memory is in use by caches</param>
+        /// <param name="totalSizeInByte">Total memory this block pool allocated.</param>
+        /// <param name="availableMemoryInByte">Memory which is available for allocating to caches.</param>
+        /// <param name="claimedMemoryInByte">Memory in use by caches.</param>
         void Report(long totalSizeInByte, long availableMemoryInByte, long claimedMemoryInByte);
     }
 
@@ -35,47 +35,39 @@
     public class ObjectPoolMonitorBridge : IObjectPoolMonitor
     {
         private IBlockPoolMonitor blockPoolMonitor;
-        private int blockSizeInByte;
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="blockPoolMonitor"></param>
-        /// <param name="blockSizeInByte"></param>
-        public ObjectPoolMonitorBridge(IBlockPoolMonitor blockPoolMonitor, int blockSizeInByte)
-        {
-            this.blockPoolMonitor = blockPoolMonitor;
-            this.blockSizeInByte = blockSizeInByte;
-        }
+        private int blockSizeInBytes;
 
         /// <summary>
-        /// Track object allocated event and also call its blcokPoolMonitor to report TrackMemoryAllocatedByCache
+        /// Initializes a new instance of the <see cref="ObjectPoolMonitorBridge"/> class.
         /// </summary>
+        /// <param name="blockPoolMonitor">The block pool monitor.</param>
+        /// <param name="blockSizeInBytes">The block size in bytes.</param>
+        public ObjectPoolMonitorBridge(IBlockPoolMonitor blockPoolMonitor, int blockSizeInBytes)
+        {
+            this.blockPoolMonitor = blockPoolMonitor;
+            this.blockSizeInBytes = blockSizeInBytes;
+        }
+
+        /// <inheritdoc />
         public void TrackObjectAllocated()
         {
-            long memoryAllocatedInByte = blockSizeInByte;
+            long memoryAllocatedInByte = blockSizeInBytes;
             this.blockPoolMonitor.TrackMemoryAllocated(memoryAllocatedInByte);
         }
 
-        /// <summary>
-        /// Track object released, and also call its blockPoolMonitor to report TrackMemoryReleasedFromCache
-        /// </summary>
+        /// <inheritdoc />
         public void TrackObjectReleased()
         {
-            long memoryReleasedInByte = blockSizeInByte;
+            long memoryReleasedInByte = blockSizeInBytes;
             this.blockPoolMonitor.TrackMemoryReleased(memoryReleasedInByte);
         }
 
-        /// <summary>
-        /// Periodically report object pool status, and also call its blockPoolMonitor to report its counter part metrics 
-        /// </summary>
-        /// <param name="totalObjects"></param>
-        /// <param name="availableObjects"></param>
-        /// <param name="claimedObjects"></param>
+        /// <inheritdoc />
         public void Report(long totalObjects, long availableObjects, long claimedObjects)
         {
-            var totalMemoryInByte = totalObjects * this.blockSizeInByte;
-            var availableMemoryInByte = availableObjects * this.blockSizeInByte;
-            var claimedMemoryInByte = claimedObjects * this.blockSizeInByte;
+            var totalMemoryInByte = totalObjects * this.blockSizeInBytes;
+            var availableMemoryInByte = availableObjects * this.blockSizeInBytes;
+            var claimedMemoryInByte = claimedObjects * this.blockSizeInBytes;
             this.blockPoolMonitor.Report(totalMemoryInByte, availableMemoryInByte, claimedMemoryInByte);
         }
     }

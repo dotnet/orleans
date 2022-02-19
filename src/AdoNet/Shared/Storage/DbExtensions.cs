@@ -26,9 +26,6 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// An explicit map of type CLR viz database type conversions.
         /// </summary>
-        /// <summary>
-        /// An explicit map of type CLR viz database type conversions.
-        /// </summary>
         static readonly ReadOnlyDictionary<Type, DbType> typeMap = new ReadOnlyDictionary<Type, DbType>(new Dictionary<Type, DbType>
         {
             { typeof(object),   DbType.Object },
@@ -71,7 +68,6 @@ namespace Orleans.Tests.SqlUtils
             { typeof(DateTimeOffset?),  DbType.DateTimeOffset },
         });
 
-
         /// <summary>
         /// Creates a new SQL parameter using the given arguments.
         /// </summary>
@@ -102,12 +98,11 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <typeparam name="T">The type of the parameter.</typeparam>
         /// <param name="command">The command to use to create the parameter.</param>
-        /// <param name="direction">The direction of the parameter.</param>
         /// <param name="parameterName">The name of the parameter.</param>
         /// <param name="value">The value of the parameter.</param>
+        /// <param name="direction">The direction of the parameter.</param>
         /// <param name="size">The size of the parameter value.</param>
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
-        /// <returns>A parameter created using the given arguments.</returns>
         public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
         {
             command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
@@ -122,7 +117,6 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="fieldName">The name of the field to retrieve.</param>
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
-        /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
         public static TValue GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue @default = default(TValue))
         {

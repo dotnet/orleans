@@ -42,10 +42,24 @@ namespace Orleans.Streams
             IQueueAdapter queueAdapter);
     }
 
+    /// <summary>
+    /// Identifies the publish/subscribe system types which stream providers can use.
+    /// </summary>
     public enum StreamPubSubType
-    {
+    {        
+        /// <summary>
+        /// Explicit and implicit pub/sub.
+        /// </summary>
         ExplicitGrainBasedAndImplicit,
+
+        /// <summary>
+        /// Explicit pub/sub.
+        /// </summary>
         ExplicitGrainBasedOnly,
+
+        /// <summary>
+        /// Implicit pub/sub.
+        /// </summary>
         ImplicitOnly,
     }
 

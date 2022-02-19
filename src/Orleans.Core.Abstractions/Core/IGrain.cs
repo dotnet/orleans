@@ -19,14 +19,14 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Marker interface for grains with <see cref="Int64"/> keys.
+    /// Marker interface for grains with <see cref="long"/> keys.
     /// </summary>
     public interface IGrainWithIntegerKey : IGrain
     {
     }
 
     /// <summary>
-    /// Marker interface for grains with <see cref="String"/> keys.
+    /// Marker interface for grains with <see cref="string"/> keys.
     /// </summary>
     public interface IGrainWithStringKey : IGrain
     {

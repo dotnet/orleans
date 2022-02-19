@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
+    /// <summary>
+    /// Caches grain directory entries.
+    /// </summary>
     public interface IGrainDirectoryCache
     {
         /// <summary>

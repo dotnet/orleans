@@ -8,6 +8,12 @@ namespace Orleans
         /// <summary>
         /// Notifies this client that the number of connected gateways has changed
         /// </summary>
+        /// <param name="currentNumberOfGateways">
+        /// The current number of gateways.
+        /// </param>
+        /// <param name="previousNumberOfGateways">
+        /// The previous number of gateways.
+        /// </param>
         void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways);
 
         /// <summary>

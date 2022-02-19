@@ -4,15 +4,33 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Represents a stream item within a sequence.
+    /// </summary>
+    /// <typeparam name="T">The item type.</typeparam>
     public class SequentialItem<T>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SequentialItem{T}"/> class.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <param name="token">The token.</param>
         public SequentialItem(T item, StreamSequenceToken token)
         {
             this.Item = item;
             this.Token = token;
         }
 
+        /// <summary>
+        /// Gets the item.
+        /// </summary>
+        /// <value>The item.</value>
         public T Item { get; }
+
+        /// <summary>
+        /// Gets the token.
+        /// </summary>
+        /// <value>The token.</value>
         public StreamSequenceToken Token { get; }
     }
 

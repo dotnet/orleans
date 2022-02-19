@@ -17,14 +17,21 @@ namespace Orleans.Streams
         IAsyncBatchProducer<T> // observers
     {
         /// <summary>
-        /// Determines whether this is a rewindable stream - supports subscribing from previous point in time.
+        /// Gets a value indicating whether this is a rewindable stream - supports subscribing from previous point in time.
         /// </summary>
         /// <returns>True if this is a rewindable stream, false otherwise.</returns>
         bool IsRewindable { get; }
 
-        /// <summary> Stream Provider Name. </summary>
+        /// <summary>
+        /// Gets the name of the provider.
+        /// </summary>
+        /// <value>The name of the provider.</value>
         string ProviderName { get; }
 
+        /// <summary>
+        /// Gets the stream identifier.
+        /// </summary>
+        /// <value>The stream identifier.</value>
         StreamId StreamId { get; }
 
         /// <summary>

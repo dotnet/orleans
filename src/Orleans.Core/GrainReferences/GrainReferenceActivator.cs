@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -26,6 +27,11 @@ namespace Orleans.GrainReferences
         private readonly IGrainReferenceActivatorProvider[] _providers;
         private Dictionary<(GrainType, GrainInterfaceType), Entry> _activators = new Dictionary<(GrainType, GrainInterfaceType), Entry>();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="providers">The collection of grain reference activator providers.</param>
         public GrainReferenceActivator(
             IServiceProvider serviceProvider,
             IEnumerable<IGrainReferenceActivatorProvider> providers)
@@ -34,6 +40,12 @@ namespace Orleans.GrainReferences
             _providers = providers.ToArray();
         }
 
+        /// <summary>
+        /// Creates a grain reference pointing to the specified grain id and implementing the specified grain interface type.
+        /// </summary>
+        /// <param name="grainId">The grain id.</param>
+        /// <param name="interfaceType">The grain interface type.</param>
+        /// <returns>A new grain reference.</returns>
         public GrainReference CreateReference(GrainId grainId, GrainInterfaceType interfaceType)
         {
             if (!_activators.TryGetValue((grainId.Type, interfaceType), out var entry))
@@ -45,6 +57,13 @@ namespace Orleans.GrainReferences
             return result;
         }
 
+        /// <summary>
+        /// Creates a grain reference activator for the provided arguments.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="interfaceType">the grain interface type.</param>
+        /// <returns>An activator for the provided arguments.</returns>
+        /// <exception cref="InvalidOperationException">No suitable activator was found.</exception>
         private Entry CreateActivator(GrainType grainType, GrainInterfaceType interfaceType)
         {
             lock (_lockObj)
@@ -73,29 +92,48 @@ namespace Orleans.GrainReferences
             }
         }
 
+        /// <summary>
+        /// Holds a grain reference activator.
+        /// </summary>
         private readonly struct Entry
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Entry"/> struct.
+            /// </summary>
+            /// <param name="activator">The activator.</param>
             public Entry(IGrainReferenceActivator activator)
             {
                 this.Activator = activator;
             }
 
+            /// <summary>
+            /// Gets the grain reference activator.
+            /// </summary>
             public IGrainReferenceActivator Activator { get; }
         }
     }
 
+    /// <summary>
+    /// Creates grain references which do not have any specified grain interface, only a target grain id.
+    /// </summary>
     internal class UntypedGrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
     {
         private readonly GrainVersionManifest _versionManifest;
         private readonly IServiceProvider _serviceProvider;
         private IGrainReferenceRuntime _grainReferenceRuntime;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UntypedGrainReferenceActivatorProvider"/> class.
+        /// </summary>
+        /// <param name="manifest">The grain version manifest.</param>
+        /// <param name="serviceProvider">The service provider.</param>
         public UntypedGrainReferenceActivatorProvider(GrainVersionManifest manifest, IServiceProvider serviceProvider)
         {
             _versionManifest = manifest;
             _serviceProvider = serviceProvider;
         }
 
+        /// <inheritdoc />
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
             if (!interfaceType.IsDefault)
@@ -112,15 +150,23 @@ namespace Orleans.GrainReferences
             return true;
         }
 
+        /// <summary>
+        /// Activator for grain references which have no specified grain interface, only a target grain id.
+        /// </summary>
         private class UntypedGrainReferenceActivator : IGrainReferenceActivator
         {
             private readonly GrainReferenceShared _shared;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="UntypedGrainReferenceActivator "/> class.
+            /// </summary>
+            /// <param name="shared">The shared functionality for all grains of a given type.</param>
             public UntypedGrainReferenceActivator(GrainReferenceShared shared)
             {
                 _shared = shared;
             }
 
+            /// <inheritdoc />
             public GrainReference CreateReference(GrainId grainId)
             {
                 return GrainReference.FromGrainId(_shared, grainId);
@@ -128,11 +174,20 @@ namespace Orleans.GrainReferences
         }
     }
 
+    /// <summary>
+    /// Provides functionality for mapping from a <see cref="GrainInterfaceType"/> to the corresponding generated proxy type.
+    /// </summary>
     internal class RpcProvider
     {
         private readonly TypeConverter _typeConverter;
         private readonly Dictionary<GrainInterfaceType, Type> _mapping;
 
+        /// <summary>
+        /// Initializes a new  instance of the <see cref="RpcProvider"/> class.
+        /// </summary>
+        /// <param name="config">The local type manifest.</param>
+        /// <param name="resolver">The grain interface type to grain type resolver.</param>
+        /// <param name="typeConverter">The type converter, for generic parameter.</param>
         public RpcProvider(
             IOptions<TypeManifestOptions> config,
             GrainInterfaceTypeResolver resolver,
@@ -186,7 +241,13 @@ namespace Orleans.GrainReferences
             }
         }
 
-        public bool TryGet(GrainInterfaceType interfaceType, out Type result)
+        /// <summary>
+        /// Gets the generated proxy object type corresponding to the specified <see cref="GrainInterfaceType"/>.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type.</param>
+        /// <param name="result">The proxy object type.</param>
+        /// <returns>A value indicating whether a suitable type was found and was able to be constructed.</returns>
+        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type result)
         {
             GrainInterfaceType lookupId;
             Type[] args;
@@ -215,6 +276,9 @@ namespace Orleans.GrainReferences
         }
     }
 
+    /// <summary>
+    /// Creates grain references using generated proxy objects.
+    /// </summary>
     internal class GrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
     {
         private readonly IServiceProvider _serviceProvider;
@@ -223,6 +287,13 @@ namespace Orleans.GrainReferences
         private readonly GrainVersionManifest _grainVersionManifest;
         private IGrainReferenceRuntime _grainReferenceRuntime;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceActivatorProvider"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="propertiesResolver">The grain property resolver.</param>
+        /// <param name="rpcProvider">The proxy object type provider.</param>
+        /// <param name="grainVersionManifest">The grain version manifest.</param>
         public GrainReferenceActivatorProvider(
             IServiceProvider serviceProvider,
             GrainPropertiesResolver propertiesResolver,
@@ -235,6 +306,7 @@ namespace Orleans.GrainReferences
             _grainVersionManifest = grainVersionManifest;
         }
 
+        /// <inheritdoc />
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
             if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
@@ -260,17 +332,26 @@ namespace Orleans.GrainReferences
             return true;
         }
 
+        /// <summary>
+        /// Creates grain references for a given grain type and grain interface type.
+        /// </summary>
         private class GrainReferenceActivator : IGrainReferenceActivator
         {
             private readonly Type _referenceType;
             private readonly GrainReferenceShared _shared;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
+            /// </summary>
+            /// <param name="referenceType">The generated proxy object type.</param>
+            /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
             public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
             {
                 _referenceType = referenceType;
                 _shared = shared;
             }
 
+            /// <inheritdoc />
             public GrainReference CreateReference(GrainId grainId)
             {
                 return (GrainReference)Activator.CreateInstance(
@@ -283,13 +364,31 @@ namespace Orleans.GrainReferences
         }
     }
 
+    /// <summary>
+    /// Functionality for getting the appropriate <see cref="IGrainReferenceActivator"/> for a given <see cref="GrainType"/> and <see cref="GrainInterfaceType"/>.
+    /// </summary>
     public interface IGrainReferenceActivatorProvider
     {
-        bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator);
+        /// <summary>
+        /// Gets a grain reference activator for the provided arguments.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="interfaceType">The grain interface type.</param>
+        /// <param name="activator">The grain activator.</param>
+        /// <returns>A value indicating whether a suitable grain activator was found.</returns>
+        bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator activator);
     }
 
+    /// <summary>
+    /// Creates grain references.
+    /// </summary>
     public interface IGrainReferenceActivator
     {
+        /// <summary>
+        /// Creates a new grain reference.
+        /// </summary>
+        /// <param name="grainId">The grain id.</param>
+        /// <returns>A new grain reference.</returns>
         public GrainReference CreateReference(GrainId grainId);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -15,15 +16,13 @@ namespace Orleans.Runtime
     /// request that led to the current processing.
     /// </para>
     /// <para>
-    /// Information stored in RequestContext is propagated from 
-    /// Orleans clients to Orleans grains automatically 
-    /// by the Orleans runtime.
+    /// Information stored in <see cref="RequestContext"/> is propagated from Orleans clients to Orleans grains automatically by the Orleans runtime.
     /// </para>
     /// </remarks>
     public static class RequestContext
     {
         /// <summary>
-        /// Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
+        /// Gets or sets a value indicating whether <c>Trace.CorrelationManager.ActivityId</c> settings should be propagated into grain calls.
         /// </summary>
         public static bool PropagateActivityId { get; set; }
 
@@ -51,11 +50,12 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Retrieve a value from the RequestContext key-value bag.
+        /// Retrieves a value from the request context.
         /// </summary>
         /// <param name="key">The key for the value to be retrieved.</param>
-        /// <returns>The value currently in the RequestContext for the specified key, 
-        /// otherwise returns <c>null</c> if no data is present for that key.</returns>
+        /// <returns>
+        /// The value currently associated with the provided key, otherwise <see langword="null"/> if no data is present for that key.
+        /// </returns>
         public static object Get(string key)
         {
             var values = CallContextData.Value;
@@ -64,14 +64,15 @@ namespace Orleans.Runtime
             {
                 return result;
             }
+
             return null;
         }
 
         /// <summary>
-        /// Sets a value into the RequestContext key-value bag.
+        /// Sets a value in the request context.
         /// </summary>
-        /// <param name="key">The key for the value to be updated / added.</param>
-        /// <param name="value">The value to be stored into RequestContext.</param>
+        /// <param name="key">The key for the value to be updated or added.</param>
+        /// <param name="value">The value to be stored into the request context.</param>
         public static void Set(string key, object value)
         {
             var values = CallContextData.Value;
@@ -99,10 +100,10 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Remove a value from the RequestContext key-value bag.
+        /// Remove a value from the request context.
         /// </summary>
         /// <param name="key">The key for the value to be removed.</param>
-        /// <returns>Boolean <c>True</c> if the value was previously in the RequestContext key-value bag and has now been removed, otherwise returns <c>False</c>.</returns>
+        /// <returns><see langword="true"/> if the value was previously in the request context and has now been removed, otherwise <see langword="false"/>.</returns>
         public static bool Remove(string key)
         {
             var values = CallContextData.Value;
@@ -126,6 +127,9 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Clears the current request context.
+        /// </summary>
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on

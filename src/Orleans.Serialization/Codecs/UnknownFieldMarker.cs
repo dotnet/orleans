@@ -7,6 +7,11 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     public class UnknownFieldMarker
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnknownFieldMarker"/> class.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <param name="position">The position.</param>
         public UnknownFieldMarker(Field field, long position)
         {
             Field = field;

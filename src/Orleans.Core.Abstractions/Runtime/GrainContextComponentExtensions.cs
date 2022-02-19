@@ -10,6 +10,15 @@ namespace Orleans
         /// <summary>
         /// Used by generated code for <see cref="IGrainExtension" /> interfaces.
         /// </summary>
+        /// <typeparam name="TComponent">
+        /// The type of the component to get.
+        /// </typeparam>
+        /// <param name="context">
+        /// The grain context.
+        /// </param>
+        /// <returns>
+        /// The grain extension.
+        /// </returns>
         public static TComponent GetGrainExtension<TComponent>(this IGrainContext context)
             where TComponent : IGrainExtension
         {

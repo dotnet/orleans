@@ -111,27 +111,51 @@ namespace Orleans.Hosting
             return services.AddSingleton<IOutgoingGrainCallFilter>(new OutgoingGrainCallFilterWrapper(filter));
         }
 
+        /// <summary>
+        /// Adapts <see cref="OutgoingGrainCallFilterDelegate"/> delegates to the <see cref="IOutgoingGrainCallFilter"/> interface.
+        /// </summary>
         private class OutgoingGrainCallFilterWrapper : IOutgoingGrainCallFilter
         {
             private readonly OutgoingGrainCallFilterDelegate interceptor;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="OutgoingGrainCallFilterWrapper"/> class.
+            /// </summary>
+            /// <param name="interceptor">
+            /// The interceptor.
+            /// </param>
             public OutgoingGrainCallFilterWrapper(OutgoingGrainCallFilterDelegate interceptor)
             {
                 this.interceptor = interceptor;
             }
 
+            /// <inheritdoc />
             public Task Invoke(IOutgoingGrainCallContext context) => this.interceptor.Invoke(context);
         }
 
+        /// <summary>
+        /// Implements <see cref="IIncomingGrainCallFilter"/> by delegating all <see cref="IIncomingGrainCallFilter.Invoke"/> calls to the provided delegate.
+        /// </summary>
         private class IncomingGrainCallFilterWrapper : IIncomingGrainCallFilter
         {
             private readonly IncomingGrainCallFilterDelegate interceptor;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="IncomingGrainCallFilterWrapper"/> class.
+            /// </summary>
+            /// <param name="interceptor">
+            /// The interceptor.
+            /// </param>
             public IncomingGrainCallFilterWrapper(IncomingGrainCallFilterDelegate interceptor)
             {
                 this.interceptor = interceptor;
             }
 
+            /// <summary>
+            /// Invokes this filter.
+            /// </summary>
+            /// <param name="context">The grain call context.</param>
+            /// <returns>A <see cref="Task"/> representing the work performed.</returns>
             public Task Invoke(IIncomingGrainCallContext context) => this.interceptor.Invoke(context);
         }
     }

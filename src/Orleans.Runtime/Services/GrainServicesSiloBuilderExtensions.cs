@@ -7,11 +7,17 @@ using System.Linq;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for registering grain services.
+    /// </summary>
     public static class GrainServicesSiloBuilderExtensions
     {
         /// <summary>
         /// Registers an application grain service to be started with the silo.
         /// </summary>
+        /// <typeparam name="T">The grain service implementation type.</typeparam>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddGrainService<T>(this ISiloBuilder builder)
             where T : GrainService
         {
@@ -35,6 +41,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Registers an application grain service to be started with the silo.
         /// </summary>
+        /// <typeparam name="T">The grain service implementation type.</typeparam>
+        /// <param name="services">The service collection.</param>
+        /// <returns>The service collection.</returns>
         public static IServiceCollection AddGrainService<T>(this IServiceCollection services)
         {
             return services.AddGrainService(typeof(T));
@@ -43,6 +52,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Registers an application grain service to be started with the silo.
         /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="grainServiceType">The grain service implementation type.</param>
+        /// <returns>The service collection.</returns>
         public static IServiceCollection AddGrainService(this IServiceCollection services, Type grainServiceType)
         {
             return services.AddSingleton<IGrainService>(sp => GrainServiceFactory(grainServiceType, sp));

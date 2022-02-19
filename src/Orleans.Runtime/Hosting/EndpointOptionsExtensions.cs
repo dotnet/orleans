@@ -6,6 +6,9 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring <see cref="EndpointOptions"/>.
+    /// </summary>
     public static class EndpointOptionsExtensions
     {
         /// <summary>

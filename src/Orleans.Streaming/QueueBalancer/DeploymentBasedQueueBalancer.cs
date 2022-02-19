@@ -26,7 +26,7 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private List<QueueId> allQueues;
         private bool isStarting;
-
+        
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,

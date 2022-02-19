@@ -6,10 +6,29 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public enum StatisticsLevel
     {
+        /// <summary>
+        /// Critical statistics.
+        /// </summary>
         Critical,
+
+        /// <summary>
+        /// Informational statistics.
+        /// </summary>
         Info,
+
+        /// <summary>
+        /// Verbose statistics.
+        /// </summary>
         Verbose,
+
+        /// <summary>
+        /// More verbose statistics.
+        /// </summary>
         Verbose2,
+
+        /// <summary>
+        /// The most verbose statistics level.
+        /// </summary>
         Verbose3,
     }
 }

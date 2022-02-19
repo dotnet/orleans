@@ -15,6 +15,7 @@ namespace Orleans.Storage
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
         Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
 
@@ -22,6 +23,7 @@ namespace Orleans.Storage
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
         Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
 
@@ -29,6 +31,7 @@ namespace Orleans.Storage
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
     }
@@ -40,14 +43,14 @@ namespace Orleans.Storage
     public interface IRestExceptionDecoder
     {
         /// <summary>
-        /// Decode details of the exception
+        /// Decode details of the exception.
         /// </summary>
-        /// <param name="e">Exception to decode</param>
-        /// <param name="httpStatusCode">HTTP status code for the error</param>
-        /// <param name="restStatus">REST status for the error</param>
-        /// <param name="getExtendedErrors">Whether or not to extract REST error code</param>
-        /// <returns></returns>
-        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false);
+        /// <param name="exception">Exception to decode.</param>
+        /// <param name="httpStatusCode">HTTP status code for the error.</param>
+        /// <param name="restStatus">REST status for the error.</param>
+        /// <param name="getExtendedErrors">Whether or not to extract REST error code.</param>
+        /// <returns>A value indicating whether the exception was decoded.</returns>
+        bool DecodeException(Exception exception, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false);
     }
 
     /// <summary>
@@ -57,18 +60,41 @@ namespace Orleans.Storage
     [GenerateSerializer]
     public class BadGrainStorageConfigException : BadProviderConfigException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
+        /// </summary>
         public BadGrainStorageConfigException()
-        { }
-        public BadGrainStorageConfigException(string msg)
-            : base(msg)
-        { }
-        public BadGrainStorageConfigException(string msg, Exception exc)
-            : base(msg, exc)
-        { }
+        {
+        }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        public BadGrainStorageConfigException(string message)
+            : base(message)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <param name="innerException">The inner exception.</param>
+        public BadGrainStorageConfigException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
+        /// </summary>
+        /// <param name="info">The serialization info.</param>
+        /// <param name="context">The context.</param>
         protected BadGrainStorageConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
-        { }
+        {
+        }
     }
 
     /// <summary>
@@ -79,28 +105,50 @@ namespace Orleans.Storage
     public class InconsistentStateException : OrleansException
     {
         /// <summary>
-        /// Whether or not this exception occurred on the current activation.
+        /// Gets or sets a value indicating whether this exception occurred on the current activation.
         /// </summary>
         [Id(0)]
         internal bool IsSourceActivation { get; set; } = true;
 
-        /// <summary>The Etag value currently held in persistent storage.</summary>
+        /// <summary>Gets the Etag value currently held in persistent storage.</summary>
         [Id(1)]
         public string StoredEtag { get; private set; }
 
-        /// <summary>The Etag value currently help in memory, and attempting to be updated.</summary>
+        /// <summary>Gets the Etag value currently help in memory, and attempting to be updated.</summary>
         [Id(2)]
         public string CurrentEtag { get; private set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
         public InconsistentStateException()
-        { }
-        public InconsistentStateException(string msg)
-            : base(msg)
-        { }
-        public InconsistentStateException(string msg, Exception exc)
-            : base(msg, exc)
-        { }
+        {
+        }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        public InconsistentStateException(string message)
+            : base(message)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <param name="innerException">The inner exception.</param>
+        public InconsistentStateException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="info">The serialization info.</param>
+        /// <param name="context">The context.</param>
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -109,35 +157,56 @@ namespace Orleans.Storage
             this.IsSourceActivation = info.GetBoolean(nameof(this.IsSourceActivation));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="errorMsg">The error message.</param>
+        /// <param name="storedEtag">The stored ETag.</param>
+        /// <param name="currentEtag">The current ETag.</param>
+        /// <param name="storageException">The inner exception.</param>
         public InconsistentStateException(
           string errorMsg,
           string storedEtag,
           string currentEtag,
-          Exception storageException
-        ) : base(errorMsg, storageException)
+          Exception storageException) : base(errorMsg, storageException)
         {
             StoredEtag = storedEtag;
             CurrentEtag = currentEtag;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="errorMsg">The error message.</param>
+        /// <param name="storedEtag">The stored ETag.</param>
+        /// <param name="currentEtag">The current ETag.</param>
         public InconsistentStateException(
           string errorMsg,
           string storedEtag,
-          string currentEtag
-        )
+          string currentEtag)
             : this(errorMsg, storedEtag, currentEtag, null)
-        { }
+        {
+        }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
+        /// </summary>
+        /// <param name="storedEtag">The stored ETag.</param>
+        /// <param name="currentEtag">The current ETag.</param>
+        /// <param name="storageException">The storage exception.</param>
         public InconsistentStateException(string storedEtag, string currentEtag, Exception storageException)
             : this(storageException.Message, storedEtag, currentEtag, storageException)
-        { }
+        {
+        }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return String.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
                 Message, StoredEtag, CurrentEtag, InnerException);
         }
 
+        /// <inheritdoc/>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             if (info == null) throw new ArgumentNullException(nameof(info));

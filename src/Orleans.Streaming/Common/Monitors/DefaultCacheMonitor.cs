@@ -12,19 +12,29 @@ namespace Orleans.Providers.Streams.Common
         protected readonly ITelemetryProducer TelemetryProducer;
         protected Dictionary<string, string> LogProperties;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
+        /// </summary>
+        /// <param name="telemetryProducer">The telemetry producer.</param>
         public DefaultCacheMonitor(ITelemetryProducer telemetryProducer)
         {
             this.TelemetryProducer = telemetryProducer;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The dimensions.</param>
+        /// <param name="telemetryProducer">The telemetry producer.</param>
         public DefaultCacheMonitor(CacheMonitorDimensions dimensions, ITelemetryProducer telemetryProducer)
-            :this(telemetryProducer)
+            : this(telemetryProducer)
         {
             this.LogProperties = new Dictionary<string, string>
             {
                 {"QueueId", dimensions.QueueId},
             };
         }
+
         /// <inheritdoc />
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)

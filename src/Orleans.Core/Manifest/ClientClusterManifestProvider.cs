@@ -14,6 +14,9 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// <see cref="IClusterManifestProvider"/> implementation for external clients.
+    /// </summary>
     internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
         private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -47,12 +50,19 @@ namespace Orleans.Runtime
             };
         }
 
+        /// <inheritdoc />
         public ClusterManifest Current => _current;
 
+        /// <inheritdoc />
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
+        /// <inheritdoc />
         public GrainManifest LocalGrainManifest { get; }
 
+        /// <summary>
+        /// Starts this service.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> which completes once the service has started.</returns>
         public Task StartAsync()
         {
             _runTask = Task.Run(RunAsync);
@@ -112,12 +122,14 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc />
         public ValueTask DisposeAsync()
         {
             _cancellation.Cancel();
             return _runTask is Task task ? new ValueTask(task) : default;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             _cancellation.Cancel();

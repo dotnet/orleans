@@ -7,6 +7,9 @@ namespace Orleans
     /// </summary>
     internal interface ISystemTargetBase : IGrainContext
     {
+        /// <summary>
+        /// Gets the address of the server which this system target is activated on.
+        /// </summary>
         SiloAddress Silo { get; }
     }
 }

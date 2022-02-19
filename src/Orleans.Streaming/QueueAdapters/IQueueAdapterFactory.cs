@@ -3,33 +3,33 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Adapter factory.  This should create an adapter from the stream provider configuration
+    /// Adapter factory. This should create an adapter from the stream provider configuration
     /// </summary>
     public interface IQueueAdapterFactory
     {
         /// <summary>
-        /// Create queue adapter.
+        /// Creates a queue adapter.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The queue adapter</returns>
         Task<IQueueAdapter> CreateAdapter();
 
         /// <summary>
-        /// Create queue message cache adapter
+        /// Creates queue message cache adapter.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The queue adapter cache.</returns>
         IQueueAdapterCache GetQueueAdapterCache();
 
         /// <summary>
-        /// Create queue mapper
+        /// Creates a queue mapper.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The queue mapper.</returns>
         IStreamQueueMapper GetStreamQueueMapper();
 
         /// <summary>
         /// Acquire delivery failure handler for a queue
         /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <returns>The stream failure handler.</returns>
         Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
     }
 }

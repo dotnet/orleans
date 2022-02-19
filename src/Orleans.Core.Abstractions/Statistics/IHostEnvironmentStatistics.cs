@@ -1,26 +1,32 @@
 namespace Orleans.Statistics
 {
+    /// <summary>
+    /// Functionality for accessing statistics relating to the hosting environment.
+    /// </summary>
     public interface IHostEnvironmentStatistics
     {
         /// <summary>
-        /// Total physical memory on the host in bytes
-        /// i.e. 16426476000L for 16 gb
+        /// Gets the total physical memory on the host in bytes.
         /// </summary>
-        /// <value>16426476000</value>
+        /// <example>
+        /// <c>16426476000L</c> for 16 GB.
+        /// </example>
         long? TotalPhysicalMemory { get; }
 
         /// <summary>
-        /// Host CPU usage from 0.0-100.0
-        /// i.e. 70.0f for 70% CPU usage
+        /// Gets the host CPU usage from 0.0-100.0.
         /// </summary>
-        /// <value>70.0</value>
+        /// <example>
+        /// <c>70.0f</c> for 70% CPU usage.
+        /// </example>
         float? CpuUsage { get; }
 
         /// <summary>
-        /// Total memory available for allocation on the host in bytes
-        /// i.e. 14426476000L for 14 gb
+        /// Gets the total memory available for allocation on the host in bytes.
         /// </summary>
-        /// <value>14426476000</value>
+        /// <example>
+        /// <c>14426476000L</c> for 14 GB.
+        /// </example>
         long? AvailableMemory { get; }
     }
 }

@@ -22,42 +22,42 @@ namespace Orleans.Providers.Streams.Common
         private int readIndex;
 
         /// <summary>
-        /// Linked list node, so this message block can be kept in a linked list
+        /// Linked list node, so this message block can be kept in a linked list.
         /// </summary>
         public LinkedListNode<CachedMessageBlock> Node { get; private set; }
 
         /// <summary>
-        /// More messages can be added to the blocks
+        /// Gets a value indicating whether more messages can be added to the block.
         /// </summary>
         public bool HasCapacity => writeIndex < blockSize;
 
         /// <summary>
-        /// Block is empty
+        /// Gets a value indicating whether this block is empty.
         /// </summary>
         public bool IsEmpty => readIndex >= writeIndex;
 
         /// <summary>
-        /// Index of most recent message added to the block
+        /// Gets the index of most recent message added to the block.
         /// </summary>
         public int NewestMessageIndex => writeIndex - 1;
 
         /// <summary>
-        /// Index of oldest message in this block
+        /// Gets the index of the oldest message in this block.
         /// </summary>
         public int OldestMessageIndex => readIndex;
 
         /// <summary>
-        /// Oldest message in the block
+        /// Gets the oldest message in the block.
         /// </summary>
         public CachedMessage OldestMessage => cachedMessages[OldestMessageIndex];
 
         /// <summary>
-        /// Newest message in this block
+        /// Gets the newest message in this block.
         /// </summary>
         public CachedMessage NewestMessage => cachedMessages[NewestMessageIndex];
 
         /// <summary>
-        /// Message count in this block
+        /// Gets the number of messages in this block.
         /// </summary>
         public int ItemCount { get
             {
@@ -67,9 +67,9 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Block of cached messages
+        /// Block of cached messages.
         /// </summary>
-        /// <param name="blockSize"></param>
+        /// <param name="blockSize">The block size, expressed as a number of messages.</param>
         public CachedMessageBlock(int blockSize = DefaultCachedMessagesPerBlock)
         {
             this.blockSize = blockSize;
@@ -80,9 +80,9 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Removes a message from the start of the block (oldest data).  Returns true if more items are still available.
+        /// Removes a message from the start of the block (oldest data).
         /// </summary>
-        /// <returns></returns>
+        /// <returns><see langword="true"/> if there are more items remaining; otherwise <see langword="false"/>.</returns>
         public bool Remove()
         {
             if (readIndex < writeIndex)
@@ -96,7 +96,10 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Add a message from the queue to the block.
         /// Converts the queue message to a cached message and stores it at the end of the block.
-        /// </summary>
+        /// </summary>        
+        /// <param name="message">
+        /// The message to add to this block.
+        /// </param>
         public void Add(CachedMessage message)
         {
             if (!HasCapacity)
@@ -111,8 +114,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Access the cached message at the provided index.
         /// </summary>
-        /// <param name="index"></param>
-        /// <returns></returns>
+        /// <param name="index">The index to access.</param>
+        /// <returns>The message at the specified index.</returns>
         public CachedMessage this[int index]
         {
             get
@@ -128,9 +131,9 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the sequence token of the cached message a the provided index
         /// </summary>
-        /// <param name="index"></param>
-        /// <param name="dataAdapter"></param>
-        /// <returns></returns>
+        /// <param name="index">The index of the message to access.</param>
+        /// <param name="dataAdapter">The data adapter.</param>
+        /// <returns>The sequence token.</returns>
         public StreamSequenceToken GetSequenceToken(int index, ICacheDataAdapter dataAdapter)
         {
             if (index >= writeIndex || index < readIndex)
@@ -143,8 +146,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the sequence token of the newest message in this block
         /// </summary>
-        /// <param name="dataAdapter"></param>
-        /// <returns></returns>
+        /// <param name="dataAdapter">The data adapter.</param>
+        /// <returns>The sequence token of the newest message in this block.</returns>
         public StreamSequenceToken GetNewestSequenceToken(ICacheDataAdapter dataAdapter)
         {
             return GetSequenceToken(NewestMessageIndex, dataAdapter);
@@ -153,8 +156,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the sequence token of the oldest message in this block
         /// </summary>
-        /// <param name="dataAdapter"></param>
-        /// <returns></returns>
+        /// <param name="dataAdapter">The data adapter.</param>
+        /// <returns>The sequence token of the oldest message in this block.</returns>
         public StreamSequenceToken GetOldestSequenceToken(ICacheDataAdapter dataAdapter)
         {
             return GetSequenceToken(OldestMessageIndex, dataAdapter);
@@ -163,8 +166,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the index of the first message in this block that has a sequence token at or before the provided token
         /// </summary>
-        /// <param name="token"></param>
-        /// <returns></returns>
+        /// <param name="token">The sequence token.</param>
+        /// <returns>The index of the first message in this block that has a sequence token equal to or before the provided token.</returns>
         public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token)
         {
             for (int i = writeIndex - 1; i >= readIndex; i--)
@@ -180,6 +183,10 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Tries to find the first message in the block that is part of the provided stream.
         /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="dataAdapter">The data adapter.</param>
+        /// <param name="index">The index.</param>
+        /// <returns><see langword="true" /> if the message was found, <see langword="false" /> otherwise.</returns>
         public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
         {
             return TryFindNextMessage(readIndex, streamId, dataAdapter, out index);
@@ -187,7 +194,12 @@ namespace Orleans.Providers.Streams.Common
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.
-        /// </summary>
+        /// </summary>        
+        /// <param name="start">The start index.</param>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="dataAdapter">The data adapter.</param>
+        /// <param name="index">The index.</param>
+        /// <returns><see langword="true" /> if the message was found, <see langword="false" /> otherwise.</returns>
         public bool TryFindNextMessage(int start, StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
         {
             if (start < readIndex)
@@ -208,9 +220,7 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
-        /// <summary>
-        /// Resets this blocks state to that of an empty block.
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnResetState()
         {
             writeIndex = 0;

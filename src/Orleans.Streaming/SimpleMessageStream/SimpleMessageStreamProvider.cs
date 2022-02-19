@@ -11,8 +11,12 @@ using Orleans.Serialization;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
+    /// <summary>
+    /// A stream provider which uses direct grain messaging.
+    /// </summary>
     public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamProvider, IStreamSubscriptionManagerRetriever
     {
+        /// <inheritdoc/>
         public string                       Name { get; private set; }
 
         private ILogger                      logger;
@@ -23,8 +27,17 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private SimpleMessageStreamProviderOptions options;
         private readonly IStreamFilter streamFilter;
 
+        /// <inheritdoc/>
         public bool IsRewindable { get { return false; } }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SimpleMessageStreamProvider"/> class.
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <param name="options">The options.</param>
+        /// <param name="streamFilter">The stream filter.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="services">The services.</param>
         public SimpleMessageStreamProvider(
             string name,
             SimpleMessageStreamProviderOptions options,
@@ -52,11 +65,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 this.options.PubSubType);
         }
 
+        /// <inheritdoc/>
         public IStreamSubscriptionManager GetStreamSubscriptionManager()
         {
             return this.streamSubscriptionManager;
         }
 
+        /// <inheritdoc/>
         public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
             var id = new InternalStreamId(Name, streamId);
@@ -65,6 +80,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
         }
 
+        /// <inheritdoc/>
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>(
@@ -80,6 +96,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 this.loggerFactory.CreateLogger<SimpleMessageStreamProducer<T>>());
         }
 
+        /// <inheritdoc/>
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
         {
             return GetConsumerInterfaceImpl(streamId);
@@ -91,6 +108,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 providerRuntime.PubSub(this.options.PubSubType), this.logger, IsRewindable);
         }
 
+        /// <summary>
+        /// Creates a new <see cref="SimpleMessageStreamProvider"/> instance.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="name">The provider name.</param>
+        /// <returns>The new provider instance.</returns>
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
             return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(
