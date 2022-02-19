@@ -5,7 +5,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Adapter for simple queue caches
+    /// Adapter for simple queue caches.
     /// </summary>
     public class SimpleQueueAdapterCache : IQueueAdapterCache
     {
@@ -19,11 +19,11 @@ namespace Orleans.Providers.Streams.Common
         private readonly ILoggerFactory loggerFactory;
 
         /// <summary>
-        /// Adapter for simple queue caches
+        /// Adapter for simple queue caches.
         /// </summary>
-        /// <param name="options"></param>
-        /// <param name="providerName"></param>
-        /// <param name="loggerFactory"></param>
+        /// <param name="options">The options.</param>
+        /// <param name="providerName">The stream provider name.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public SimpleQueueAdapterCache(SimpleQueueCacheOptions options, string providerName, ILoggerFactory loggerFactory)
         {
             this.cacheSize = options.CacheSize;
@@ -31,10 +31,7 @@ namespace Orleans.Providers.Streams.Common
             this.providerName = providerName;
         }
 
-        /// <summary>
-        /// Create a cache for a given queue id
-        /// </summary>
-        /// <param name="queueId"></param>
+        /// <inheritdoc />
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
             return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));

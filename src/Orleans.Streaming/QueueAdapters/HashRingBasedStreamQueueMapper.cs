@@ -4,10 +4,18 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// A <see cref="IConsistentRingStreamQueueMapper"/> and hence <see cref="IStreamQueueMapper"/> which balances queues by mapping them onto a hash ring consisting of silos.
+    /// </summary>
     public class HashRingBasedStreamQueueMapper : IConsistentRingStreamQueueMapper
     {
         private readonly HashRing<QueueId> hashRing;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HashRingBasedStreamQueueMapper"/> class.
+        /// </summary>
+        /// <param name="options">The options.</param>
+        /// <param name="queueNamePrefix">The queue name prefix.</param>
         public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
         {
             var numQueues = options.TotalQueueCount;
@@ -29,6 +37,7 @@ namespace Orleans.Streams
             this.hashRing = new HashRing<QueueId>(queueIds);
         }
 
+        /// <inheritdoc/>
         public IEnumerable<QueueId> GetQueuesForRange(IRingRange range)
         {
             var ls = new List<QueueId>();
@@ -43,16 +52,19 @@ namespace Orleans.Streams
             return ls;
         }
 
+        /// <inheritdoc/>
         public IEnumerable<QueueId> GetAllQueues()
         {
             return hashRing.GetAllRingMembers();
         }
 
+        /// <inheritdoc/>
         public QueueId GetQueueForStream(StreamId streamId)
         {
             return hashRing.CalculateResponsible((uint)streamId.GetHashCode());
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return hashRing.ToString();

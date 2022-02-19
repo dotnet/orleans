@@ -160,7 +160,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainType">Type of the grain.</param>
         /// <param name="properties">The grain properties.</param>
-        /// <param name="configurator">The configurator.</param>
+        /// <param name="configurator">The configuration provider.</param>
         /// <returns><see langword="true"/> if a configuration provider was found, <see langword="false"/> otherwise.</returns>
         bool TryGetConfigurator(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IConfigureGrainContext configurator);
     }

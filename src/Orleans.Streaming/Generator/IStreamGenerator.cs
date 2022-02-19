@@ -14,13 +14,17 @@ namespace Orleans.Providers.Streams.Generator
         /// <summary>
         /// Tries to get an event, if the generator is configured to generate any at this time
         /// </summary>
+        /// <param name="utcNow">The current UTC time.</param>
+        /// <param name="maxCount">The maximum number of events to read.</param>
+        /// <param name="events">The events.</param>
+        /// <returns><see langword="true" /> if events were read, <see langword="false" /> otherwise.</returns>
         bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events);
 
         /// <summary>
-        /// Configures the generator
+        /// Configures the stream generator.
         /// </summary>
-        /// <param name="serviceProvider"></param>
-        /// <param name="generatorConfig"></param>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="generatorConfig">The generator configuration.</param>
         void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig);
     }
 
@@ -32,7 +36,7 @@ namespace Orleans.Providers.Streams.Generator
     public interface IStreamGeneratorConfig
     {
         /// <summary>
-        /// Stream generator type
+        /// Gets the stream generator type
         /// </summary>
         Type StreamGeneratorType { get; }
     }

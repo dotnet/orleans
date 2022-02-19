@@ -54,8 +54,17 @@ namespace Orleans.Hosting
         }
     }
 
+    /// <summary>
+    /// Configures persistent streams.
+    /// </summary>
     public class SiloPersistentStreamConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloPersistentStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configureDelegate">The configuration delegate.</param>
+        /// <param name="adapterFactory">The adapter factory.</param>
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate)
         {

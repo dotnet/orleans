@@ -35,7 +35,7 @@ namespace Orleans
         /// Used to subscribe to the specified stream namespace.
         /// </summary>
         /// <param name="streamNamespace">The stream namespace to subscribe.</param>
-        /// <param name="streamIdMapper"></param>
+        /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
         public ImplicitStreamSubscriptionAttribute(string streamNamespace, string streamIdMapper = null)
         {
             Predicate = new ExactMatchStreamNamespacePredicate(streamNamespace.Trim());

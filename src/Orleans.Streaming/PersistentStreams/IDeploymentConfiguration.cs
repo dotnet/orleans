@@ -8,9 +8,9 @@ namespace Orleans.Streams
     public interface IDeploymentConfiguration
     {
         /// <summary>
-        /// Get the silo instance names for all configured silos
+        /// Get the silo instance names for all configured silos.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The list of silo names.</returns>
         IList<string> GetAllSiloNames();
     }
 }

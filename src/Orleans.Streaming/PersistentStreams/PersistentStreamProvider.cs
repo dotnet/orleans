@@ -12,17 +12,53 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// Commands which can be handled by the <see cref="PersistentStreamProvider" />.
+    /// </summary>
+    /// <seealso cref="IControllable"/>
     [Serializable]
     public enum PersistentStreamProviderCommand
     {
         None,
+
+        /// <summary>
+        /// Starts the agents.
+        /// </summary>
         StartAgents,
+
+        /// <summary>
+        /// Stops the agents.
+        /// </summary>
         StopAgents,
+
+        /// <summary>
+        /// Retrieves agent state.
+        /// </summary>
         GetAgentsState,
+
+        /// <summary>
+        /// Gets the number of running agents.
+        /// </summary>
         GetNumberRunningAgents,
+
+        /// <summary>
+        /// The command start range for custom adapters.
+        /// </summary>
         AdapterCommandStartRange = 10000,
+
+        /// <summary>
+        /// The command end range for custom adapters.
+        /// </summary>
         AdapterCommandEndRange = AdapterCommandStartRange + 9999,
+
+        /// <summary>
+        /// The command start range for custom adapter factories.
+        /// </summary>
         AdapterFactoryCommandStartRange = AdapterCommandEndRange + 1,
+
+        /// <summary>
+        /// The command end range for custom adapter factories.
+        /// </summary>
         AdapterFactoryCommandEndRange = AdapterFactoryCommandStartRange + 9999,
     }
 

@@ -72,7 +72,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.ShouldPurge = false;
         }
 
-        public override bool ShouldPurgFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
+        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
         {
             return this.ShouldPurge;
         }

@@ -12,13 +12,16 @@ namespace Orleans.Streams
     public interface IStreamQueueBalancer
     {
         /// <summary>
-        /// Initialize this instance
+        /// Initializes this instance.
         /// </summary>
+        /// <param name="queueMapper">The queue mapper.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task Initialize(IStreamQueueMapper queueMapper);
 
         /// <summary>
-        /// Shutdown queue balancer
+        /// Shutdown the queue balancer.
         /// </summary>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task Shutdown();
 
         /// <summary>
@@ -28,17 +31,17 @@ namespace Orleans.Streams
         IEnumerable<QueueId> GetMyQueues();
 
         /// <summary>
-        /// Subscribe to receive queue distribution change notifications
+        /// Subscribes to receive queue distribution change notifications
         /// </summary>
         /// <param name="observer">An observer interface to receive queue distribution change notifications.</param>
-        /// <returns>Bool value indicating that subscription succeeded or not.</returns>
+        /// <returns>A value indicating whether subscription succeeded or not.</returns>
         bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
 
         /// <summary>
-        /// Unsubscribe from receiving queue distribution notifications
+        /// Unsubscribes from receiving queue distribution notifications.
         /// </summary>
         /// <param name="observer">An observer interface to receive queue distribution change notifications.</param>
-        /// <returns>Bool value indicating that unsubscription succeeded or not</returns>
+        /// <returns>A value indicating whether teh unsubscription succeeded or not</returns>
         bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
     }
 
@@ -51,9 +54,9 @@ namespace Orleans.Streams
     public interface IStreamQueueBalanceListener
     {
         /// <summary>
-        /// Receive notifications about adapter queue responsibility changes. 
+        /// Called when adapter queue responsibility changes. 
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task QueueDistributionChangeNotification();
     }
 }

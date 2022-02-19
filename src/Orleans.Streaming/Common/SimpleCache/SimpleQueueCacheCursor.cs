@@ -7,7 +7,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Cursor into a simple queue cache
+    /// Cursor into a simple queue cache.
     /// </summary>
     public class SimpleQueueCacheCursor : IQueueCacheCursor
     {
@@ -44,15 +44,16 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Cursor into a simple queue cache
         /// </summary>
-        /// <param name="cache"></param>
-        /// <param name="streamId"></param>
-        /// <param name="logger"></param>
+        /// <param name="cache">The cache instance.</param>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="logger">The logger.</param>
         public SimpleQueueCacheCursor(SimpleQueueCache cache, StreamId streamId, ILogger logger)
         {
             if (cache == null)
             {
                 throw new ArgumentNullException(nameof(cache));
             }
+
             this.cache = cache;
             this.streamId = streamId;
             this.logger = logger;
@@ -63,16 +64,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-
-        /// <summary>
-        /// Get the current value.
-        /// </summary>
-        /// <param name="exception"></param>
-        /// <returns>
-        /// Returns the current batch container.
-        /// If null then the stream has completed or there was a stream error.  
-        /// If there was a stream error, an error exception will be provided in the output.
-        /// </returns>
+        /// <inheritdoc />
         public virtual IBatchContainer GetCurrent(out Exception exception)
         {
             if (logger.IsEnabled(LogLevel.Debug))
@@ -84,13 +76,7 @@ namespace Orleans.Providers.Streams.Common
             return current;
         }
 
-        /// <summary>
-        /// Move to next message in the stream.
-        /// If it returns false, there are no more messages.  The enumerator is still
-        ///  valid however and can be called again when more data has come in on this
-        ///  stream.
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public virtual bool MoveNext()
         {
             if (current == null && IsSet && IsInStream(Element.Value.Batch))
@@ -112,10 +98,7 @@ namespace Orleans.Providers.Streams.Common
             return true;
         }
 
-        /// <summary>
-        /// Refresh that cache cursor. Called when new data is added into a cache.
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public virtual void Refresh(StreamSequenceToken sequenceToken)
         {
             if (!IsSet)
@@ -124,9 +107,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        /// <summary>
-        /// Record that delivery of the current event has failed
-        /// </summary>
+        /// <inheritdoc />
         public void RecordDeliveryFailure()
         {
             if (IsSet && current != null)
@@ -141,9 +122,7 @@ namespace Orleans.Providers.Streams.Common
                     batchContainer.StreamId.Equals(this.streamId);
         }
 
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
+        /// <inheritdoc />
         public void Dispose()
         {
             Dispose(true);
@@ -152,7 +131,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Clean up cache data when done
         /// </summary>
-        /// <param name="disposing"></param>
+        /// <param name="disposing"><see langword="true"/> if the instance is being disposed; <see langword="false"/> if it is being called from a finalizer.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (disposing)
@@ -162,10 +141,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        /// <summary>
-        /// Convert object to string
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public override string ToString()
         {
             return $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";

@@ -22,10 +22,10 @@ namespace Orleans.Streams
         /// <returns>The stream.</returns>
         IAsyncStream<T> GetStream<T>(StreamId streamId);
         /// <summary>
-        /// Determines whether this is a rewindable provider - supports creating rewindable streams 
+        /// Gets a value indicating whether this is a rewindable provider - supports creating rewindable streams 
         /// (streams that allow subscribing from previous point in time).
         /// </summary>
-        /// <returns>True if this is a rewindable provider, false otherwise.</returns>
+        /// <returns><see langword="true"/> if this is a rewindable provider, <see langword="false"/> otherwise.</returns>
         bool IsRewindable { get; }
     }
 

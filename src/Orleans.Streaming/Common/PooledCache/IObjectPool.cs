@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading;
 
@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
         private IObjectPool<T> pool;
 
         /// <summary>
-        /// The pool to return this resource to upon disposal.
+        /// Gets the pool to return this resource to upon disposal.
         /// A pool must set this property upon resource allocation.
         /// </summary>
         public IObjectPool<T> Pool { set { pool = value; } }
@@ -50,7 +50,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Returns item to pool
+        /// Returns item to pool.
         /// </summary>
         public void Dispose()
         {

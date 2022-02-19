@@ -3,14 +3,14 @@ using System;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Enumerates the messages in a stream
+    /// Enumerates the messages in a stream.
     /// </summary>
     public interface IQueueCacheCursor : IDisposable
     {
         /// <summary>
         /// Get the current value.
         /// </summary>
-        /// <param name="exception"></param>
+        /// <param name="exception">The resulting exception.</param>
         /// <returns>
         /// Returns the current batch container.
         /// If null then the stream has completed or there was a stream error.  
@@ -24,17 +24,17 @@ namespace Orleans.Streams
         ///  valid however and can be called again when more data has come in on this
         ///  stream.
         /// </summary>
-        /// <returns></returns>
+        /// <returns><see langword="true"/> if there are more items, <see langword="false"/> otherwise</returns>
         bool MoveNext();
 
         /// <summary>
-        /// Refresh that cache cursor. Called when new data is added into a cache.
+        /// Refreshes the cache cursor. Called when new data is added into a cache.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="token">The token.</param>
         void Refresh(StreamSequenceToken token);
 
         /// <summary>
-        /// Record that delivery of the current event has failed
+        /// Records that delivery of the current event has failed
         /// </summary>
         void RecordDeliveryFailure();
     }

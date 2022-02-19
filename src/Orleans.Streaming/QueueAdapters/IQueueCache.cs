@@ -6,30 +6,31 @@ namespace Orleans.Streams
     public interface IQueueCache : IQueueFlowController
     {
         /// <summary>
-        /// Add messages to the cache
+        /// Adds messages to the cache.
         /// </summary>
-        /// <param name="messages"></param>
+        /// <param name="messages">The message batches.</param>
         void AddToCache(IList<IBatchContainer> messages);
 
         /// <summary>
-        /// Ask the cache if it has items that can be purged from the cache 
-        /// (so that they can be subsequently released them the underlying queue).
+        /// Requests that the cache purge any items that can be purged.
         /// </summary>
-        /// <param name="purgedItems"></param>
+        /// <param name="purgedItems">The purged items.</param>
+        /// <returns><see langword="true" /> if items were successfully purged from the cache., <see langword="false" /> otherwise.</returns>
         bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems);
 
         /// <summary>
         /// Acquire a stream message cursor.  This can be used to retrieve messages from the
-        ///   cache starting at the location indicated by the provided token.
+        /// cache starting at the location indicated by the provided token.
         /// </summary>
-        /// <param name="streamId"></param>
-        /// <param name="token"></param>
-        /// <returns></returns>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="token">The token.</param>
+        /// <returns>The queue cache cursor.</returns>
         IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token);
 
         /// <summary>
-        /// Returns true if this cache is under pressure.
+        /// Returns <see langword="true" /> if this cache is under pressure, <see langword="false" /> otherwise.
         /// </summary>
+        /// <returns><see langword="true" /> if this cache is under pressure; otherwise, <see langword="false" />.</returns>
         bool IsUnderPressure();
     }
 }

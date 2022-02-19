@@ -47,21 +47,14 @@ namespace Orleans.Providers.Streams.Generator
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
-        /// <summary>
-        /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
-        /// </summary>
-        /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
+
+        /// <inheritdoc />
         public bool IsRewindable => true;
 
-        /// <summary>
-        /// Direction of this queue adapter: Read, Write or ReadWrite.
-        /// </summary>
-        /// <returns>The direction in which this adapter provides data.</returns>
+        /// <inheritdoc />
         public StreamProviderDirection Direction => StreamProviderDirection.ReadOnly;
 
-        /// <summary>
-        /// Name of the adapter. From IQueueAdapter.
-        /// </summary>
+        /// <inheritdoc />
         public string Name { get; }
 
         /// <summary>
@@ -81,8 +74,15 @@ namespace Orleans.Providers.Streams.Generator
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
-
-        public GeneratorAdapterFactory(string providerName, HashRingStreamQueueMapperOptions queueMapperOptions, StreamStatisticOptions statisticOptions, IServiceProvider serviceProvider, Serialization.Serializer serializer, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        
+        public GeneratorAdapterFactory(
+            string providerName,
+            HashRingStreamQueueMapperOptions queueMapperOptions,
+            StreamStatisticOptions statisticOptions,
+            IServiceProvider serviceProvider,
+            Serialization.Serializer serializer,
+            ITelemetryProducer telemetryProducer,
+            ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
@@ -95,7 +95,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Initialize the factory
+        /// Initializes the factory.
         /// </summary>
         public void Init()
         {
@@ -125,63 +125,38 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        /// <summary>
-        /// Create an adapter
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task<IQueueAdapter> CreateAdapter()
         {
             return Task.FromResult<IQueueAdapter>(this);
         }
 
-        /// <summary>
-        /// Get the cache adapter
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public IQueueAdapterCache GetQueueAdapterCache()
         {
             return this;
         }
 
-        /// <summary>
-        /// Get the stream queue mapper
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
         }
 
-        /// <summary>
-        /// Get the delivery failure handler
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
 
-        /// <summary>
-        /// Stores a batch of messages
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="streamId"></param>
-        /// <param name="events"></param>
-        /// <param name="token"></param>
-        /// <param name="requestContext"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Creates a queue receiver for the specified queueId
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
@@ -191,11 +166,7 @@ namespace Orleans.Providers.Streams.Generator
             return receiver;
         }
 
-        /// <summary>
-        /// A function to execute a control command.
-        /// </summary>
-        /// <param name="command">A serial number of the command.</param>
-        /// <param name="arg">An opaque command argument</param>
+        /// <inheritdoc />
         public Task<object> ExecuteCommand(int command, object arg)
         {
             if (arg == null)
@@ -283,10 +254,7 @@ namespace Orleans.Providers.Streams.Generator
             receiver.QueueGenerator = generator;
         }
 
-        /// <summary>
-        /// Create a cache for a given queue id
-        /// </summary>
-        /// <param name="queueId"></param>
+        /// <inheritdoc />
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side.
@@ -301,6 +269,12 @@ namespace Orleans.Providers.Streams.Generator
                 this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
+        /// <summary>
+        /// Creates a new <see cref="GeneratorAdapterFactory"/> instance.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        /// <param name="name">The provider name.</param>
+        /// <returns>The newly created <see cref="GeneratorAdapterFactory"/> instance.</returns>
         public static GeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);

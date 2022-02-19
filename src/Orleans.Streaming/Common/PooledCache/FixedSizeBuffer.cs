@@ -1,4 +1,4 @@
-﻿
+
 using System;
 
 namespace Orleans.Providers.Streams.Common
@@ -11,20 +11,21 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly byte[] buffer;
         private int count;
+
         /// <summary>
-        /// Buffer size in Byte
+        /// Buffer size in bytes.
         /// </summary>
         public readonly int SizeInByte;
 
         /// <summary>
-        /// Unique identifier of this buffer
+        /// Unique identifier of this buffer.
         /// </summary>
         public object Id => buffer;
 
         /// <summary>
         /// Manages access to a fixed size byte buffer.
         /// </summary>
-        /// <param name="blockSizeInByte"></param>
+        /// <param name="blockSizeInByte">The block size, in bytes.</param>
         public FixedSizeBuffer(int blockSizeInByte)
         {
             if (blockSizeInByte < 0)
@@ -40,9 +41,9 @@ namespace Orleans.Providers.Streams.Common
         /// Try to get a segment with a buffer of the specified size from this block.
         /// Fail if there is not enough space available
         /// </summary>
-        /// <param name="size"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <param name="size">The size.</param>
+        /// <param name="value">The segment.</param>
+        /// <returns><see langword="true"/> if the segment was retrieved; otherwise <see langword="false"/>.</returns>
         public bool TryGetSegment(int size, out ArraySegment<byte> value)
         {
             value = default(ArraySegment<byte>);

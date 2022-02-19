@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.Common
     }
 
     /// <summary>
-    /// A queue cache that keeps items in memory
+    /// A queue cache that keeps items in memory.
     /// </summary>
     public class SimpleQueueCache : IQueueCache
     {
@@ -48,23 +48,21 @@ namespace Orleans.Providers.Streams.Common
         private readonly int CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
         /// <summary>
-        /// Number of items in the cache
+        /// Gets the number of items in the cache.
         /// </summary>
         public int Size => cachedMessages.Count;
 
-        /// <summary>
-        /// The limit of the maximum number of items that can be added
-        /// </summary>
+        /// <inheritdoc />
         public int GetMaxAddCount()
         {
             return CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
         }
 
         /// <summary>
-        /// SimpleQueueCache Constructor
+        /// Initializes a new instance of the <see cref="SimpleQueueCache"/> class.
         /// </summary>
-        /// <param name="cacheSize"></param>
-        /// <param name="logger"></param>
+        /// <param name="cacheSize">Size of the cache.</param>
+        /// <param name="logger">The logger.</param>
         public SimpleQueueCache(int cacheSize, ILogger logger)
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
@@ -75,20 +73,14 @@ namespace Orleans.Providers.Streams.Common
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
         }
 
-        /// <summary>
-        /// Returns true if this cache is under pressure.
-        /// </summary>
+        /// <inheritdoc />
         public virtual bool IsUnderPressure()
         {
             return cacheCursorHistogram.Count >= NUM_CACHE_HISTOGRAM_BUCKETS;
         }
 
 
-        /// <summary>
-        /// Ask the cache if it has items that can be purged from the cache 
-        /// (so that they can be subsequently released them the underlying queue).
-        /// </summary>
-        /// <param name="purgedItems"></param>
+        /// <inheritdoc />
         public virtual bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
@@ -139,10 +131,7 @@ namespace Orleans.Providers.Streams.Common
             return itemsToRelease;
         }
 
-        /// <summary>
-        /// Add a list of message to the cache
-        /// </summary>
-        /// <param name="msgs"></param>
+        /// <inheritdoc />
         public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException(nameof(msgs));
@@ -158,13 +147,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        /// <summary>
-        /// Acquire a stream message cursor.  This can be used to retrieve messages from the
-        ///   cache starting at the location indicated by the provided token.
-        /// </summary>
-        /// <param name="streamId"></param>
-        /// <param name="token"></param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public virtual IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
         {
             var cursor = new SimpleQueueCacheCursor(this, streamId, logger);

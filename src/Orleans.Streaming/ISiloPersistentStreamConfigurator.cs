@@ -18,7 +18,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures the pulling agent.
         /// </summary>
-        /// <param name="configurator">The configurator.</param>
+        /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
         public static void ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
         {
@@ -28,7 +28,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures the lifecycle.
         /// </summary>
-        /// <param name="configurator">The configurator.</param>
+        /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
         public static void ConfigureLifecycle(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
@@ -38,7 +38,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures partition balancing.
         /// </summary>
-        /// <param name="configurator">The configurator.</param>
+        /// <param name="configurator">The configuration builder.</param>
         /// <param name="factory">The partition balancer factory.</param>
         public static void ConfigurePartitionBalancing(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
         {
@@ -49,7 +49,7 @@ namespace Orleans.Hosting
         /// Configures partition balancing.
         /// </summary>
         /// <typeparam name="TOptions">The partition balancer options.</typeparam>
-        /// <param name="configurator">The configurator.</param>
+        /// <param name="configurator">The configuration builder.</param>
         /// <param name="factory">The partition balancer factory.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
         public static void ConfigurePartitionBalancing<TOptions>(

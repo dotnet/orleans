@@ -1,61 +1,61 @@
-﻿using System;
+using System;
 
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Responsible for monitoring cache related metrics
+    /// Responsible for monitoring cache related metrics.
     /// </summary>
     public interface ICacheMonitor
     {
         /// <summary>
-        /// Track cache pressure metrics when cache pressure monitor encounter a status change
+        /// Called when the cache pressure monitor encounter a status change.
         /// </summary>
-        /// <param name="pressureMonitorType"></param>
-        /// <param name="underPressure"></param>
-        /// <param name="cachePressureContributionCount"></param>
-        /// <param name="currentPressure"></param>
-        /// <param name="flowControlThreshold"></param>
+        /// <param name="pressureMonitorType">Type of the pressure monitor.</param>
+        /// <param name="underPressure">if set to <see langword="true" />, the cache is under pressure.</param>
+        /// <param name="cachePressureContributionCount">The cache pressure contribution count.</param>
+        /// <param name="currentPressure">The current pressure.</param>
+        /// <param name="flowControlThreshold">The flow control threshold.</param>
         void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure, 
             double? flowControlThreshold);
 
         /// <summary>
-        /// Track message added to the cache, and newest and oldest messages among them 
+        /// Called when messages are added to the cache.
         /// </summary>
-        /// <param name="messageAdded"></param>
-        void TrackMessagesAdded(long messageAdded);
+        /// <param name="messagesAdded">The number of messages added.</param>
+        void TrackMessagesAdded(long messagesAdded);
 
         /// <summary>
-        /// Track message purged from the cache, and the newest and oldest messages among them
+        /// Called when messages are purged from the cache.
         /// </summary>
-        /// <param name="messagePurged"></param>
-        void TrackMessagesPurged(long messagePurged);
+        /// <param name="messagesPurged">The number of messages purged.</param>
+        void TrackMessagesPurged(long messagesPurged);
 
         /// <summary>
-        /// Track new memory allocated by the cache
+        /// Called when new memory is allocated by the cache.
         /// </summary>
-        /// <param name="memoryInByte"></param>
-        void TrackMemoryAllocated(int memoryInByte);
+        /// <param name="memoryInBytes">The memory in bytes.</param>
+        void TrackMemoryAllocated(int memoryInBytes);
 
         /// <summary>
-        /// Track memory returned to block pool
+        /// Called when memory returned to block pool.
         /// </summary>
-        /// <param name="memoryInByte"></param>
-        void TrackMemoryReleased(int memoryInByte);
+        /// <param name="memoryInBytes">The memory in bytes.</param>
+        void TrackMemoryReleased(int memoryInBytes);
 
         /// <summary>
-        /// Periodically report cache status metrics
+        /// Called to report cache status metrics.
         /// </summary>
-        /// <param name="oldestMessageEnqueueTimeUtc">The time in Utc when oldest message enqueued the queue.</param>
-        /// <param name="oldestMessageDequeueTimeUtc">The time in Utc when oldest message was read from the queue and put in cache.</param>
-        /// <param name="newestMessageEnqueueTimeUtc">The time in Utc when newest message enqueued the queue.</param>
-        /// <param name="totalMessageCount"></param>
+        /// <param name="oldestMessageEnqueueTimeUtc">The time in UTC when the oldest message was enqueued to the queue.</param>
+        /// <param name="oldestMessageDequeueTimeUtc">The time in UTC when the oldest message was read from the queue and put in the cache.</param>
+        /// <param name="newestMessageEnqueueTimeUtc">The time in UTC when the newest message was enqueued to the queue.</param>
+        /// <param name="totalMessageCount">The total message count.</param>
         void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, 
             long totalMessageCount);
 
         /// <summary>
-        /// report total cache size
+        /// Called to report the total cache size.
         /// </summary>
-        /// <param name="totalCacheSizeInByte"></param>
-        void ReportCacheSize(long totalCacheSizeInByte);
+        /// <param name="totalCacheSizeInBytes">The total cache size in bytes.</param>
+        void ReportCacheSize(long totalCacheSizeInBytes);
     }
 }

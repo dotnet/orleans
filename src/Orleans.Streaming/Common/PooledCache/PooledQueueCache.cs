@@ -37,7 +37,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)>();
 
         /// <summary>
-        /// Cached message most recently added
+        /// Gets the cached message most recently added.
         /// </summary>
         public CachedMessage? Newest
         {
@@ -50,7 +50,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Oldest message in cache
+        /// Gets the oldest message in cache.
         /// </summary>
         public CachedMessage? Oldest
         {
@@ -63,18 +63,18 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Cached message count
+        /// Gets the cached message count.
         /// </summary>
         public int ItemCount { get; private set; }
 
         /// <summary>
         /// Pooled queue cache is a cache of message that obtains resource from a pool
         /// </summary>
-        /// <param name="cacheDataAdapter"></param>
-        /// <param name="logger"></param>
-        /// <param name="cacheMonitor"></param>
-        /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
-        /// <param name="purgeMetadataInterval"></param>
+        /// <param name="cacheDataAdapter">The cache data adapter.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="cacheMonitor">The cache monitor.</param>
+        /// <param name="cacheMonitorWriteInterval">The cache monitor write interval. Only triggered for active caches.</param>
+        /// <param name="purgeMetadataInterval">The interval after which to purge cache metadata.</param>
         public PooledQueueCache(
             ICacheDataAdapter cacheDataAdapter,
             ILogger logger,
