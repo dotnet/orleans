@@ -22,7 +22,7 @@ namespace Orleans.Streams
                         
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamSubscriptionHandlerFactory"/> class.
-        /// <summary>        
+        /// </summary>        
         /// <param name="streamProvider">
         /// The stream provider.
         /// </param>
