@@ -800,6 +800,22 @@ namespace UnitTests.Grains
         public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
     }
 
+    public interface IUnmanagedArgGrain<T> : IGrainWithGuidKey where T : unmanaged
+    {
+        ValueTask<T> Echo(T value);
+        ValueTask<U> EchoNonNullable<U>(U value) where U : notnull;
+        ValueTask<U> EchoReference<U>(U value) where U : class;
+        ValueTask<U> EchoValue<U>(U value) where U : struct;
+    }
+
+    public class UnmanagedArgGrain<T> : IUnmanagedArgGrain<T> where T : unmanaged
+    {
+        public ValueTask<T> Echo(T value) => new(value);
+        public ValueTask<U> EchoNonNullable<U>(U value)  where U : notnull => new(value);
+        public ValueTask<U> EchoReference<U>(U value) where U : class => new(value);
+        public ValueTask<U> EchoValue<U>(U value) where U : struct => new(value);
+    }
+
     public interface IReducerGameGrain<TState, TAction> : IGrainWithStringKey
     {
         Task<TState> Go(TState prevState, TAction act);

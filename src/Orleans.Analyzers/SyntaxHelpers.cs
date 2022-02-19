@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
@@ -60,7 +61,7 @@ namespace Orleans.Analyzers
         {
             if (member is PropertyDeclarationSyntax property)
             {
-                return property.ChildTokens().FirstOrDefault(token => token.Kind() == SyntaxKind.IdentifierToken).ValueText;
+                return property.ChildTokens().FirstOrDefault(token => token.IsKind(SyntaxKind.IdentifierToken)).ValueText;
             }
             else if (member is FieldDeclarationSyntax field)
             {

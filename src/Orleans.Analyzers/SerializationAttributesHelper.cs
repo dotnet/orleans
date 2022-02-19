@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ namespace Orleans.Analyzers
     {
         public static bool ShouldGenerateSerializer(TypeDeclarationSyntax declaration)
         {
-            if (!declaration.Modifiers.Any(m => m.Kind() == SyntaxKind.StaticKeyword) && declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+            if (!declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)) && declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
             {
                 return true;
             }

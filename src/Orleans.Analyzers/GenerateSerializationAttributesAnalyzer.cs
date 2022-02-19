@@ -29,7 +29,7 @@ namespace Orleans.Analyzers
 
         private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
         {
-            if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.Kind() == SyntaxKind.StaticKeyword))
+            if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
             {
                 if (declaration.TryGetAttribute(Constants.GenerateSerializerAttributeName, out var attribute))
                 {
@@ -65,7 +65,7 @@ namespace Orleans.Analyzers
 
         private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
         {
-            if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.Kind() == SyntaxKind.StaticKeyword))
+            if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
             {
                 if (declaration.TryGetAttribute(Constants.SerializableAttributeName, out var attribute) && !declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
                 {

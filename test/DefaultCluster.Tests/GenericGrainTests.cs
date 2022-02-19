@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace DefaultCluster.Tests.General
@@ -672,6 +673,22 @@ namespace DefaultCluster.Tests.General
             await grain.Add(42);
             result = await grain.GetCount();
             Assert.Equal(1, result);
+
+            var unmanagedGrain = this.GrainFactory.GetGrain<IUnmanagedArgGrain<DateTime>>(Guid.NewGuid());
+            {
+                var echoInput = DateTime.UtcNow;
+                var echoOutput = await unmanagedGrain.Echo(echoInput);
+                Assert.Equal(echoInput, echoOutput);
+                echoOutput = await unmanagedGrain.EchoValue(echoInput);
+                Assert.Equal(echoInput, echoOutput);
+            }
+            {
+                var echoInput = "hello";
+                var echoOutput = await unmanagedGrain.EchoNonNullable(echoInput);
+                Assert.Equal(echoInput, echoOutput);
+                echoOutput = await unmanagedGrain.EchoReference(echoInput);
+                Assert.Equal(echoInput, echoOutput);
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Persistence")]
