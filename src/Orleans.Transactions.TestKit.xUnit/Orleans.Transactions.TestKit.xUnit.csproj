@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Transactions.TestKitBase\Orleans.Transactions.TestKit.Base.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions.TestKit.Base\Orleans.Transactions.TestKit.Base.csproj" />
   </ItemGroup>
 
 </Project>
