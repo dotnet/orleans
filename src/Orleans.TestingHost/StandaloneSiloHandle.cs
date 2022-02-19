@@ -35,7 +35,7 @@ namespace Orleans.TestingHost
 
         /// <inheritdoc />
         public override bool IsActive => isActive;
-
+        
         public StandaloneSiloHandle(string siloName, IConfiguration configuration, string executablePath)
         {
             if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
@@ -280,6 +280,7 @@ namespace Orleans.TestingHost
             await StopSiloAsync(ct);
         }
 
+        /// <inheritdoc />
         public override async Task StopSiloAsync(CancellationToken ct)
         {
             if (!IsActive) return;
@@ -333,6 +334,7 @@ namespace Orleans.TestingHost
             AppDomain.CurrentDomain.ProcessExit -= _processExitHandler;
         }
 
+        /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
             if (!this.IsActive) return;

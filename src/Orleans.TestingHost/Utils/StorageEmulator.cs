@@ -31,11 +31,11 @@ namespace Orleans.TestingHost.Utils
             "AzureStorageEmulator.exe", // >= 2.7
             "WAStorageEmulator.exe", // < 2.7
         };
-        
+
         /// <summary>
         /// Is the storage emulator already started.
         /// </summary>
-        /// <returns></returns>
+        /// <returns><see langword="true" /> if this instance is started; otherwise, <see langword="false" />.</returns>
         public static bool IsStarted()
         {
             return GetStorageEmulatorProcess();
@@ -45,6 +45,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Checks if the storage emulator exists, i.e. is installed.
         /// </summary>
+        /// <value><see langword="true" /> if the storage emulator exists; otherwise, <see langword="false" />.</value>
         public static bool Exists
         {
             get
@@ -85,7 +86,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Tries to start the storage emulator.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was started successfully. <em>FALSE</em> otherwise.</returns>
+        /// <returns><see langword="true"/> if the process was started successfully; <see langword="false"/> otherwise.</returns>
         public static bool TryStart()
         {
             if (!StorageEmulator.Exists)
@@ -97,7 +98,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Starts the storage emulator if not already started.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was stopped successfully or was already started. <em>FALSE</em> otherwise.</returns>
+        /// <returns><see langword="true"/> if the process was started successfully; <see langword="false"/> otherwise.</returns>
         public static bool Start()
         {
             if (IsStarted()) return true;
@@ -121,7 +122,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Stops the storage emulator if started.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was stopped successfully or was already stopped. <em>FALSE</em> otherwise.</returns>
+        /// <returns><see langword="true"/> if the process was stopped successfully or was already stopped; <see langword="false"/> otherwise.</returns>
         public static bool Stop()
         {
             if (!IsStarted()) return false;
@@ -146,7 +147,7 @@ namespace Orleans.TestingHost.Utils
         /// to other operations in this class.
         /// </summary>
         /// <param name="arguments">The arguments.</param>
-        /// <returns>A new <see cref="ProcessStartInfo">ProcessStartInfo</see> that has the given arguments.</returns>
+        /// <returns>A new <see cref="ProcessStartInfo"/> that has the given arguments.</returns>
         private static ProcessStartInfo CreateProcessArguments(string arguments)
         {
 #pragma warning disable CA1416 // Validate platform compatibility
@@ -167,7 +168,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Queries the storage emulator process from the system.
         /// </summary>
-        /// <returns></returns>
+        /// <returns><see langword="true" /> if the storage emulator process was found, <see langword="false" /> otherwise.</returns>
         private static bool GetStorageEmulatorProcess()
         {
             foreach (var name in storageEmulatorProcessNames)

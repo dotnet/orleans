@@ -4,21 +4,28 @@ using Microsoft.Extensions.Logging;
 namespace Orleans.TestingHost.Logging
 {
     /// <summary>
-    /// FileLoggerProvider implements ILoggerProvider, creates <see cref="FileLogger"/>
+    /// <see cref="ILoggerProvider"/> which outputs to a log file.
     /// </summary>
     public class FileLoggerProvider : ILoggerProvider
     {
         private FileLoggingOutput output;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FileLoggerProvider"/> class.
+        /// </summary>
+        /// <param name="filePath">The log file path.</param>
         public FileLoggerProvider(string filePath)
         {
             this.output = new FileLoggingOutput(filePath);
         }
 
+        /// <inheritdoc />
         public ILogger CreateLogger(string categoryName)
         {
             return new FileLogger(this.output, categoryName);
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             this.output.Dispose();
@@ -33,9 +40,9 @@ namespace Orleans.TestingHost.Logging
         /// <summary>
         /// Add <see cref="FileLoggerProvider"/> to <paramref name="builder"/>
         /// </summary>
-        /// <param name="builder">logging builder</param>
-        /// <param name="filePathName">log file path</param>
-        /// <returns></returns>
+        /// <param name="builder">The logging builder.</param>
+        /// <param name="filePathName">The log file path</param>
+        /// <returns>The logging builder.</returns>
         public static ILoggingBuilder AddFile(
             this ILoggingBuilder builder,
             string filePathName)

@@ -10,12 +10,16 @@ using Orleans.Internal;
 
 namespace Orleans.TestingHost
 {
+    /// <summary>
+    /// Default <see cref="ITestClusterPortAllocator"/> implementation, which tries to allocate unused ports.
+    /// </summary>
     public class TestClusterPortAllocator : ITestClusterPortAllocator
     {
         private bool disposed;
         private readonly object lockObj = new object();
         private readonly Dictionary<int, string> allocatedPorts = new Dictionary<int, string>();
 
+        /// <inheritdoc />
         public (int, int) AllocateConsecutivePortPairs(int numPorts = 5)
         {
             // Evaluate current system tcp connections
@@ -28,12 +32,17 @@ namespace Orleans.TestingHost
                 GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 40000, 50000, numPorts));
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing"><see langword="true" /> to release both managed and unmanaged resources; <see langword="false" /> to release only unmanaged resources.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (disposed)
@@ -58,6 +67,9 @@ namespace Orleans.TestingHost
             }
         }
 
+        /// <summary>
+        /// Finalizes an instance of the <see cref="TestClusterPortAllocator"/> class.
+        /// </summary>
         ~TestClusterPortAllocator()
         {
             Dispose(false);

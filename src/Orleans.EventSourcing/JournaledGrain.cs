@@ -14,9 +14,11 @@ namespace Orleans.EventSourcing
     public abstract class JournaledGrain<TGrainState> : JournaledGrain<TGrainState, object>
         where TGrainState : class, new()
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="JournaledGrain{TGrainState}"/> class.
+        /// </summary>
         protected JournaledGrain() { }
     }
-
 
     /// <summary>
     /// A base class for log-consistent grains using standard event-sourcing terminology.
@@ -31,13 +33,15 @@ namespace Orleans.EventSourcing
         where TGrainState : class, new()
         where TEventBase: class
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="JournaledGrain{TGrainState, TEventBase}"/> class.
+        /// </summary>
         protected JournaledGrain() { }
 
         /// <summary>
-        /// Raise an event.
+        /// Raises an event.
         /// </summary>
-        /// <param name="event">Event to raise</param>
-        /// <returns></returns>
+        /// <param name="event">Event to raise.</param>
         protected virtual void RaiseEvent<TEvent>(TEvent @event) 
             where TEvent : TEventBase
         {
@@ -49,8 +53,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// Raise multiple events, as an atomic sequence.
         /// </summary>
-        /// <param name="events">Events to raise</param>
-        /// <returns></returns>
+        /// <param name="events">Events to raise.</param>
         protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
             where TEvent : TEventBase
         {
@@ -59,13 +62,12 @@ namespace Orleans.EventSourcing
             LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
         }
 
-
         /// <summary>
         /// Raise an event conditionally. 
         /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
         /// </summary>
-        /// <param name="event">Event to raise</param>
-        /// <returns>true if successful, false if there was a conflict.</returns>
+        /// <param name="event">Event to raise.</param>
+        /// <returns><see langword="true"/> if successful, <see langword="false"/> if there was a conflict.</returns>
         protected virtual Task<bool> RaiseConditionalEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
@@ -74,13 +76,12 @@ namespace Orleans.EventSourcing
             return LogViewAdaptor.TryAppend(@event);
         }
 
-
         /// <summary>
         /// Raise multiple events, as an atomic sequence, conditionally. 
         /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
         /// </summary>
         /// <param name="events">Events to raise</param>
-        /// <returns>true if successful, false if there was a conflict.</returns>
+        /// <returns><see langword="true"/> if successful, <see langword="false"/> if there was a conflict.</returns>
         protected virtual Task<bool> RaiseConditionalEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
@@ -89,7 +90,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// The current confirmed state. 
+        /// Gets the current confirmed state. 
         /// Includes only confirmed events.
         /// </summary>
         protected TGrainState State
@@ -98,7 +99,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// The version of the current confirmed state. 
+        /// Gets the version of the current confirmed state. 
         /// Equals the total number of confirmed events.
         /// </summary>
         protected int Version
@@ -115,7 +116,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// The current tentative state.
+        /// Gets the current tentative state.
         /// Includes both confirmed and unconfirmed events.
         /// </summary>
         protected TGrainState TentativeState
@@ -132,7 +133,6 @@ namespace Orleans.EventSourcing
             // overridden by journaled grains that want to react to state changes
         }
 
-
         /// <summary>
         /// Waits until all previously raised events have been confirmed. 
         /// <para>await this after raising one or more events, to ensure events are persisted before proceeding, or to guarantee strong consistency (linearizability) even if there are multiple instances of this grain</para>
@@ -141,7 +141,6 @@ namespace Orleans.EventSourcing
         protected Task ConfirmEvents()
         {
             return LogViewAdaptor.ConfirmSubmittedEntries();
-
         }
 
         /// <summary>
@@ -155,7 +154,6 @@ namespace Orleans.EventSourcing
             return LogViewAdaptor.Synchronize();
         }
 
-
         /// <summary>
         /// Returns the current queue of unconfirmed events.
         /// </summary>
@@ -163,7 +161,6 @@ namespace Orleans.EventSourcing
         {
             get { return LogViewAdaptor.UnconfirmedSuffix; }
         }
-
 
         /// <summary>
         /// By default, upon activation, the journaled grain waits until it has loaded the latest
@@ -231,16 +228,14 @@ namespace Orleans.EventSourcing
             return LogViewAdaptor.GetStats();
         }
 
-
-
         /// <summary>
         /// Defines how to apply events to the state. Unless it is overridden in the subclass, it calls
         /// a dynamic "Apply" function on the state, with the event as a parameter.
         /// All exceptions thrown by this method are caught and logged by the log view provider.
         /// <para>Override this to customize how to transition the state for a given event.</para>
         /// </summary>
-        /// <param name="state"></param>
-        /// <param name="event"></param>
+        /// <param name="state">The state.</param>
+        /// <param name="event">The event.</param>
         protected virtual void TransitionState(TGrainState state, TEventBase @event)
         {
             dynamic s = state;
@@ -248,10 +243,8 @@ namespace Orleans.EventSourcing
             s.Apply(e);
         }
 
-
         /// <summary>
-        /// Adaptor for log consistency protocol.
-        /// Is installed by the log-consistency provider.
+        /// Gets the adaptor for the log-consistency protocol, which is installed by the log-consistency provider.
         /// </summary>
         internal ILogViewAdaptor<TGrainState, TEventBase> LogViewAdaptor { get; private set; }
 
@@ -277,10 +270,10 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// called by adaptor to update the view when entries are appended.
+        /// Called by adaptor to update the view when entries are appended.
         /// </summary>
-        /// <param name="view">log view</param>
-        /// <param name="entry">log entry</param>
+        /// <param name="view">The log view.</param>
+        /// <param name="entry">The entry.</param>
         void ILogViewAdaptorHost<TGrainState, TEventBase>.UpdateView(TGrainState view, TEventBase entry)
         {
             TransitionState(view, entry);
@@ -311,7 +304,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// called by adaptor on state change. 
+        /// Called by adaptor on state change. 
         /// </summary>
         void ILogViewAdaptorHost<TGrainState, TEventBase>.OnViewChanged(bool tentative, bool confirmed)
         {
@@ -330,7 +323,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// called by adaptor when a connection issue is resolved. 
+        /// Called by adaptor when a connection issue is resolved. 
         /// </summary>
         void IConnectionIssueListener.OnConnectionIssueResolved(ConnectionIssue connectionIssue)
         {
