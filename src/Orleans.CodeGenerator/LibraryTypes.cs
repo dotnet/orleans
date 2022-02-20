@@ -49,7 +49,7 @@ namespace Orleans.CodeGenerator
                 RegisterActivatorAttribute = Type("Orleans.RegisterActivatorAttribute"),
                 RegisterCopierAttribute = Type("Orleans.RegisterCopierAttribute"),
                 UseActivatorAttribute = Type("Orleans.UseActivatorAttribute"),
-                SuppressReferenceTrackingAttribute = Type("Orleans.SuppressReferenceTrackingAttribute"),
+                EnableReferenceTrackingAttribute = Type("Orleans.EnableReferenceTrackingAttribute"),
                 OmitDefaultMemberValuesAttribute = Type("Orleans.OmitDefaultMemberValuesAttribute"),
                 Int32 = compilation.GetSpecialType(SpecialType.System_Int32),
                 UInt32 = compilation.GetSpecialType(SpecialType.System_UInt32),
@@ -265,7 +265,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol RegisterSerializerAttribute { get; private set; }
         public INamedTypeSymbol RegisterActivatorAttribute { get; private set; }
         public INamedTypeSymbol UseActivatorAttribute { get; private set; }
-        public INamedTypeSymbol SuppressReferenceTrackingAttribute { get; private set; }
+        public INamedTypeSymbol EnableReferenceTrackingAttribute { get; private set; }
         public INamedTypeSymbol OmitDefaultMemberValuesAttribute { get; private set; }
         public INamedTypeSymbol CopyContext { get; private set; }
         public Compilation Compilation { get; private set; }

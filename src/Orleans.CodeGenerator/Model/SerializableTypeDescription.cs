@@ -186,7 +186,7 @@ namespace Orleans.CodeGenerator
 
         public bool UseActivator => Type.HasAttribute(_libraryTypes.UseActivatorAttribute) || !IsEmptyConstructable || HasActivatorConstructor;
 
-        public bool TrackReferences => !IsValueType && !Type.HasAttribute(_libraryTypes.SuppressReferenceTrackingAttribute);
+        public bool TrackReferences => !IsValueType && Type.HasAttribute(_libraryTypes.EnableReferenceTrackingAttribute);
         public bool OmitDefaultMemberValues => Type.HasAttribute(_libraryTypes.OmitDefaultMemberValuesAttribute);
 
         public List<INamedTypeSymbol> SerializationHooks { get; }

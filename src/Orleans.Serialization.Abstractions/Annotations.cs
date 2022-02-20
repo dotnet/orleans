@@ -399,13 +399,13 @@ namespace Orleans
     }
 
     /// <summary>
-    /// When applied to a type, indicates that generated serializers for the type should not track references to the type.
+    /// When applied to a type, indicates that generated serializers for the type should track references to the type.
     /// </summary>
     /// <remarks>
     /// Reference tracking allows a serializable type to participate in a cyclic object graph.
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-    public sealed class SuppressReferenceTrackingAttribute : Attribute
+    public sealed class EnableReferenceTrackingAttribute : Attribute
     {
     }
 

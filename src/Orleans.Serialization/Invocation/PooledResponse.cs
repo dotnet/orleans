@@ -8,7 +8,6 @@ namespace Orleans.Serialization.Invocation
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
     [GenerateSerializer]
-    [SuppressReferenceTracking]
     public class PooledResponse<TResult> : Response<TResult>
     {
         [Id(0)]

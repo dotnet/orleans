@@ -20,7 +20,6 @@ namespace Orleans.Runtime
     [Serializable, Immutable]
     [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
-    [SuppressReferenceTracking]
     public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
     {
         [NonSerialized]
