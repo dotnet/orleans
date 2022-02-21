@@ -1,5 +1,9 @@
 pool: Default
 
+pr:
+  - main
+  - azure-pipeline
+
 parameters:
   - name: build_configuration
     displayName: Build configuration
