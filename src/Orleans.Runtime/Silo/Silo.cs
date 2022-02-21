@@ -404,7 +404,7 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
 
-            if (this.reminderService != null)
+            if (this.reminderServiceV2 != null)
             {
                 await StartAsyncTaskWithPerfAnalysis("Start reminder V2 service", StartReminderV2Service, stopWatch);
 
