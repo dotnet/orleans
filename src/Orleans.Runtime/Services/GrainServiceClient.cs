@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Services
         }
 
         /// <summary>
-        /// Gets a reference to the the currently executing grain.
+        /// Gets a reference to the currently executing grain.
         /// </summary>
         protected GrainReference CallingGrainReference => RuntimeContext.Current?.GrainReference;
 
