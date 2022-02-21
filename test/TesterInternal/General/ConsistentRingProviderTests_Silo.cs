@@ -38,7 +38,8 @@ namespace UnitTests.General
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
-                    .UseInMemoryReminderService();
+                    .UseInMemoryReminderService()
+                    .UseInMemoryReminderV2Service();
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -276,7 +277,7 @@ namespace UnitTests.General
             List<SiloHandle> failures = new List<SiloHandle>();
             int count = 0;
 
-            // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
+            // Figure out the primary directory partition and the silo hosting the ReminderV2TableGrain.
             var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(InMemoryReminderTable.ReminderTableGrainId);
 
             // Ping the grain to make sure it is active.
@@ -296,7 +297,7 @@ namespace UnitTests.General
                 {
                     continue;
                 }
-                // Don't fail primary directory partition and the silo hosting the ReminderTableGrain.
+                // Don't fail primary directory partition and the silo hosting the ReminderV2TableGrain.
                 if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.SiloAddress))
                 {
                     continue;

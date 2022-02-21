@@ -7,7 +7,7 @@ namespace Orleans
     /// <summary>
     /// Callback interface that grains must implement in order to be able to register and receive Reminders.
     /// </summary>
-    public interface IRemindable : IGrain
+    public interface IRemindableV2 : IGrain
     {
         /// <summary>
         /// Receive a new Reminder.
@@ -23,7 +23,7 @@ namespace Orleans
         /// <summary>
         /// Handle for a persistent Reminder.
         /// </summary>
-        public interface IGrainReminder
+        public interface IGrainReminderV2
         {
             /// <summary>
             /// Gets the name of this reminder.
@@ -41,7 +41,7 @@ namespace Orleans
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public struct TickStatus
+        public struct TickStatusV2
         {
             /// <summary>
             /// Gets the time at which the first tick of this reminder is due, or was triggered.
@@ -62,17 +62,17 @@ namespace Orleans
             public DateTime CurrentTickTime { get; private set; }
 
             /// <summary>
-            /// Creates a new <see cref="TickStatus"/> instance.
+            /// Creates a new <see cref="TickStatusV2"/> instance.
             /// </summary>
             /// <param name="firstTickTime">The time at which the first tick of the reminder is due.</param>
             /// <param name="period">The period of the reminder.</param>
             /// <param name="timeStamp">The time when delivery of the current tick was initiated.</param>
             /// <returns></returns>
-            public static TickStatus Create(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
+            public static TickStatusV2 Create(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
             {
                 return
-                    new TickStatus
-                        {
+                    new TickStatusV2
+                    {
                             FirstTickTime = firstTickTime,
                             Period = period,
                             CurrentTickTime = timeStamp
@@ -89,21 +89,21 @@ namespace Orleans
         [Serializable]
         [GenerateSerializer]
 #pragma warning disable RCS1194 // Implement exception constructors.
-        public class ReminderException : OrleansException
+        public class ReminderV2Exception : OrleansException
 #pragma warning restore RCS1194 // Implement exception constructors.
         {
             /// <summary>
             /// Initializes a new instance of the <see cref="ReminderException"/> class.
             /// </summary>
             /// <param name="message">The message.</param>
-            public ReminderException(string message) : base(message) { }
+            public ReminderV2Exception(string message) : base(message) { }
 
             /// <summary>
             /// Initializes a new instance of the <see cref="ReminderException"/> class.
             /// </summary>
             /// <param name="info">The serialization info.</param>
             /// <param name="context">The context.</param>
-            public ReminderException(SerializationInfo info, StreamingContext context)
+            public ReminderV2Exception(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {
             }

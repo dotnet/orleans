@@ -29,6 +29,7 @@ namespace UnitTests.TimerTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.UseInMemoryReminderService();
+                    hostBuilder.UseInMemoryReminderV2Service();
                 }
             }
         }

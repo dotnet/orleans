@@ -17,8 +17,8 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
-using Orleans.Serialization;
 using Orleans.Internal;
+using Orleans.Runtime.ReminderServiceV2;
 
 namespace Orleans.Runtime
 {
@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
         private IReminderService reminderService;
+        private IReminderServiceV2 reminderServiceV2;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private Watchdog platformWatchdog;
@@ -74,6 +75,7 @@ namespace Orleans.Runtime
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
         private IGrainContext reminderServiceContext;
+        private IGrainContext reminderServiceV2Context;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
@@ -240,6 +242,16 @@ namespace Orleans.Runtime
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
+            InjectRemindersV1();
+            InjectRemindersV2();
+
+            // SystemTarget for provider init calls
+            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
+            RegisterSystemTarget(fallbackScheduler);
+        }
+
+        private void InjectRemindersV1()
+        {
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)
             {
@@ -247,13 +259,23 @@ namespace Orleans.Runtime
 
                 // Start the reminder service system target
                 var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
-                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
+                this.reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
+        }
 
-            // SystemTarget for provider init calls
-            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
-            RegisterSystemTarget(fallbackScheduler);
+        private void InjectRemindersV2()
+        {
+            var reminderTable = Services.GetService<IReminderV2Table>();
+            if (reminderTable != null)
+            {
+                logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
+
+                // Start the reminder service system target
+                var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
+                this.reminderServiceV2 = new LocalReminderV2Service(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
+                RegisterSystemTarget((SystemTarget)reminderService);
+            }
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -350,7 +372,20 @@ namespace Orleans.Runtime
 
         private async Task OnActiveStart(CancellationToken ct)
         {
+
+            await StartReminderV1Service();
+            await StartReminderV2Service();
+
+            foreach (var grainService in grainServices)
+            {
+                await StartGrainService(grainService);
+            }
+        }
+
+        private async Task StartReminderV1Service()
+        {
             var stopWatch = Stopwatch.StartNew();
+
             if (this.reminderService != null)
             {
                 await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
@@ -364,9 +399,23 @@ namespace Orleans.Runtime
                     this.logger.Debug("Reminder service started successfully.");
                 }
             }
-            foreach (var grainService in grainServices)
+        }
+        private async Task StartReminderV2Service()
+        {
+            var stopWatch = Stopwatch.StartNew();
+
+            if (this.reminderService != null)
             {
-                await StartGrainService(grainService);
+                await StartAsyncTaskWithPerfAnalysis("Start reminder V2 service", StartReminderV2Service, stopWatch);
+
+                async Task StartReminderV2Service()
+                {
+                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
+                    this.reminderServiceV2Context = (this.reminderServiceV2 as IGrainContext) ?? this.fallbackScheduler;
+                    await this.reminderServiceV2Context.QueueTask(this.reminderServiceV2.Start)
+                        .WithTimeout(this.initTimeout, $"Starting ReminderService V2 failed due to timeout {initTimeout}");
+                    this.logger.Debug("Reminder V2 service started successfully.");
+                }
             }
         }
 
@@ -612,12 +661,9 @@ namespace Orleans.Runtime
                     .WithCancellation(ct, "Sending gateway disconnection requests failed because the task was cancelled");
             }
 
-            if (reminderService != null)
-            {
-                await reminderServiceContext
-                    .QueueTask(reminderService.Stop)
-                    .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
-            }
+            await StopReminderV1Service(ct);
+
+            await StopReminderV2Service(ct);
 
             foreach (var grainService in grainServices)
             {
@@ -632,6 +678,26 @@ namespace Orleans.Runtime
                         grainService.GetType().FullName,
                         grainService.GetPrimaryKeyLong(out string ignored));
                 }
+            }
+        }
+
+        private async Task StopReminderV1Service(CancellationToken ct)
+        {
+            if (reminderService != null)
+            {
+                await reminderServiceContext
+                    .QueueTask(reminderService.Stop)
+                    .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
+            }
+        }
+
+        private async Task StopReminderV2Service(CancellationToken ct)
+        {
+            if (reminderServiceV2!= null)
+            {
+                await reminderServiceV2Context
+                    .QueueTask(reminderServiceV2.Stop)
+                    .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
             }
         }
 

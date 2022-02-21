@@ -137,6 +137,28 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain.
+        /// The grain must implement the <c>Orleans.IRemindable</c> interface, and reminders for this grain will be sent to the <c>ReceiveReminder</c> callback method.
+        /// If the current grain is deactivated when the timer fires, a new activation of this grain will be created to receive this reminder.
+        /// If an existing reminder with the same name already exists, that reminder will be overwritten with this new reminder.
+        /// Reminders will always be received by one activation of this grain, even if multiple activations exist for this grain.
+        /// </summary>
+        /// <param name="reminderName">Name of this reminder</param>
+        /// <param name="dueTime">Due time for this reminder</param>
+        /// <param name="period">Frequency period for this reminder</param>
+        /// <returns>Promise for Reminder handle.</returns>
+        protected Task<IGrainReminderV2> RegisterOrUpdateReminderV2(string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+            if (string.IsNullOrWhiteSpace(reminderName))
+                throw new ArgumentNullException(nameof(reminderName));
+            if (!(this is IRemindable))
+                throw new InvalidOperationException($"Grain {IdentityString} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service");
+
+            EnsureRuntime();
+            return Runtime.ReminderV2Registry.RegisterOrUpdateReminder(reminderName, dueTime, period);
+        }
+
+        /// <summary>
         /// Unregisters a previously registered reminder.
         /// </summary>
         /// <param name="reminder">Reminder to unregister.</param>
@@ -148,6 +170,20 @@ namespace Orleans
 
             EnsureRuntime();
             return Runtime.ReminderRegistry.UnregisterReminder(reminder);
+        }
+
+        /// <summary>
+        /// Unregisters a previously registered reminder V2.
+        /// </summary>
+        /// <param name="reminder">Reminder to unregister.</param>
+        /// <returns>Completion promise for this operation.</returns>
+        protected Task UnregisterReminder(IGrainReminderV2 reminder)
+        {
+            if (reminder == null)
+                throw new ArgumentNullException(nameof(reminder));
+
+            EnsureRuntime();
+            return Runtime.ReminderV2Registry.UnregisterReminder(reminder);
         }
 
         /// <summary>
@@ -165,6 +201,20 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns a previously registered reminder.
+        /// </summary>
+        /// <param name="reminderName">Reminder to return</param>
+        /// <returns>Promise for Reminder handle.</returns>
+        protected Task<IGrainReminderV2> GetReminderV2(string reminderName)
+        {
+            if (string.IsNullOrWhiteSpace(reminderName))
+                throw new ArgumentNullException(nameof(reminderName));
+
+            EnsureRuntime();
+            return Runtime.ReminderV2Registry.GetReminder(reminderName);
+        }
+
+        /// <summary>
         /// Returns a list of all reminders registered by the grain.
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
@@ -172,6 +222,16 @@ namespace Orleans
         {
             EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminders();
+        }
+
+        /// <summary>
+        /// Returns a list of all reminders v2 registered by the grain.
+        /// </summary>
+        /// <returns>Promise for list of Reminders v2 registered for this grain.</returns>
+        protected Task<List<IGrainReminderV2>> GetRemindersV2()
+        {
+            EnsureRuntime();
+            return Runtime.ReminderV2Registry.GetReminders();
         }
 
         /// <summary>

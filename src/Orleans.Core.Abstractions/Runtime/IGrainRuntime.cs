@@ -36,6 +36,11 @@ namespace Orleans.Runtime
         IReminderRegistry ReminderRegistry { get; }
 
         /// <summary>
+        /// Gets the reminder registry.
+        /// </summary>
+        IReminderV2Registry ReminderV2Registry { get; }
+
+        /// <summary>
         /// Gets the service provider.
         /// </summary>
         IServiceProvider ServiceProvider { get; }

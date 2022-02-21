@@ -62,6 +62,15 @@ namespace Orleans.Runtime
             }
         }
 
+        public IReminderV2Registry ReminderV2Registry
+        {
+            get
+            {
+                CheckRuntimeContext(RuntimeContext.Current);
+                return this.ReminderV2Registry;
+            }
+        }
+
         public IServiceProvider ServiceProvider
         {
             get
