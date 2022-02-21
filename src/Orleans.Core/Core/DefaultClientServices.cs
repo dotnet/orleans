@@ -96,6 +96,7 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+            services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 
             // TODO: abstract or move into some options.
             services.AddSingleton<SocketSchedulers>();

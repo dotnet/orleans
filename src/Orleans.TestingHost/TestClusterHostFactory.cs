@@ -17,6 +17,7 @@ using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
 using Orleans.TestingHost.Logging;
 using Orleans.Configuration.Internal;
+using Microsoft.Extensions.Hosting.Internal;
 
 namespace Orleans.TestingHost
 {
@@ -36,6 +37,7 @@ namespace Orleans.TestingHost
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             var hostBuilder = new HostBuilder();
+            hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
@@ -89,6 +91,7 @@ namespace Orleans.TestingHost
             var configuration = configBuilder.Build();
 
             var hostBuilder = new HostBuilder();
+            hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
                 .UseOrleansClient(clientBuilder =>

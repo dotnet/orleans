@@ -10,6 +10,7 @@ namespace UnitTests.GrainInterfaces
 
     namespace One
     {
+        [GenerateSerializer]
         public class Command
         {
         }
@@ -17,6 +18,7 @@ namespace UnitTests.GrainInterfaces
 
     namespace Two
     {
+        [GenerateSerializer]
         public class Command
         {
         }
@@ -64,6 +66,7 @@ namespace UnitTests.GrainInterfaces
     }
 }
 
+[GenerateSerializer]
 public class Outsider { }
 
 namespace UnitTests.GrainInterfaces
