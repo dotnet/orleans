@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Providers
 {
@@ -14,10 +14,13 @@ namespace Orleans.Providers
     public sealed class StorageProviderAttribute : Attribute
     {
         /// <summary>
-        /// The name of the provider to be used for persisting of grain state
+        /// Gets or sets the name of the provider to be used for persisting of grain state.
         /// </summary>
         public string ProviderName { get; set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StorageProviderAttribute"/> class.
+        /// </summary>
         public StorageProviderAttribute()
         {
             ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
@@ -39,10 +42,13 @@ namespace Orleans.Providers
     public sealed class LogConsistencyProviderAttribute : Attribute
     {
         /// <summary>
-        /// The name of the provider to be used for consistency
+        /// Gets or sets name of the provider to be used for consistency.
         /// </summary>
         public string ProviderName { get; set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogConsistencyProviderAttribute"/> class.
+        /// </summary>
         public LogConsistencyProviderAttribute()
         {
             ProviderName = ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;

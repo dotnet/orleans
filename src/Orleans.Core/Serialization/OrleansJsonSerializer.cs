@@ -9,6 +9,9 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Utility class for configuring <see cref="JsonSerializerSettings"/> to support Orleans types.
+    /// </summary>
     public class OrleansJsonSerializer
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
@@ -16,6 +19,10 @@ namespace Orleans.Serialization
         public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly Lazy<JsonSerializerSettings> settings;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
         public OrleansJsonSerializer(IServiceProvider services)
         {
             this.settings = new Lazy<JsonSerializerSettings>(() =>
@@ -27,6 +34,9 @@ namespace Orleans.Serialization
         /// <summary>
         /// Returns the default serializer settings.
         /// </summary>
+        /// <param name="services">
+        /// The service provider.
+        /// </param>
         /// <returns>The default serializer settings.</returns>
         public static JsonSerializerSettings GetDefaultSerializerSettings(IServiceProvider services)
         {
@@ -56,6 +66,14 @@ namespace Orleans.Serialization
             return settings;
         }
 
+        /// <summary>
+        /// Updates the provided serializer settings with the specified options.
+        /// </summary>
+        /// <param name="settings">The settings.</param>
+        /// <param name="useFullAssemblyNames">if set to <c>true</c>, use full assembly-qualified names when formatting type names.</param>
+        /// <param name="indentJson">if set to <c>true</c>, indent the formatted JSON.</param>
+        /// <param name="typeNameHandling">The type name handling options.</param>
+        /// <returns>The provided serializer settings.</returns>
         public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling)
         {
             if (useFullAssemblyNames)
@@ -76,13 +94,12 @@ namespace Orleans.Serialization
             return settings;
         }
 
-        /// <inheritdoc />
-        public bool IsSupportedType(Type itemType)
-        {
-            return true;
-        }
-
-        /// <inheritdoc />
+        /// <summary>
+        /// Deserializes an object of the specified expected type from the provided input.
+        /// </summary>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="input">The input.</param>
+        /// <returns>The deserialized object.</returns>
         public object Deserialize(Type expectedType, string input)
         {
             if (string.IsNullOrWhiteSpace(input))
@@ -94,26 +111,33 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Serializes an object to a binary stream
+        /// Serializes an object to a JSON string.
         /// </summary>
-        /// <param name="item">The object to serialize</param>
-        /// <param name="expectedType">The type the deserializer should expect</param>
+        /// <param name="item">The object to serialize.</param>
+        /// <param name="expectedType">The type the deserializer should expect.</param>
         public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="IPAddress"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class IPAddressConverter : JsonConverter
     {
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return (objectType == typeof(IPAddress));
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             IPAddress ip = (IPAddress)value;
             writer.WriteValue(ip.ToString());
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JToken token = JToken.Load(reader);
@@ -121,13 +145,19 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="GrainId"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class GrainIdConverter : JsonConverter
     {
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return (objectType == typeof(GrainId));
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             GrainId id = (GrainId)value;
@@ -139,6 +169,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
@@ -147,13 +178,19 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="SiloAddress"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class SiloAddressConverter : JsonConverter
     {
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return (objectType == typeof(SiloAddress));
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             SiloAddress addr = (SiloAddress)value;
@@ -163,6 +200,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
@@ -171,13 +209,19 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="UniqueKey"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class UniqueKeyConverter : JsonConverter
     {
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return (objectType == typeof(UniqueKey));
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             UniqueKey key = (UniqueKey)value;
@@ -187,6 +231,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
@@ -195,13 +240,19 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="IPEndPoint"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class IPEndPointConverter : JsonConverter
     {
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return (objectType == typeof(IPEndPoint));
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             IPEndPoint ep = (IPEndPoint)value;
@@ -213,6 +264,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
@@ -222,21 +274,31 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="GrainReference"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
     public class GrainReferenceJsonConverter : JsonConverter
     {
         private static readonly Type AddressableType = typeof(IAddressable);
         private readonly GrainReferenceActivator referenceActivator;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceJsonConverter"/> class.
+        /// </summary>
+        /// <param name="referenceActivator">The grain reference activator.</param>
         public GrainReferenceJsonConverter(GrainReferenceActivator referenceActivator)
         {
             this.referenceActivator = referenceActivator;
         }
 
+        /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
         {
             return AddressableType.IsAssignableFrom(objectType);
         }
 
+        /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             var val = (GrainReference)value;
@@ -253,6 +315,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);

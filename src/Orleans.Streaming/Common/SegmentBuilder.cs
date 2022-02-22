@@ -12,8 +12,6 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
-        /// <param name="bytes"></param>
-        /// <returns></returns>
         public static int CalculateAppendSize(byte[] bytes)
         {
             return (bytes == null || bytes.Length == 0)

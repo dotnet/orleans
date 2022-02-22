@@ -14,8 +14,11 @@ namespace Orleans.Metadata
     public class GrainInterfaceProperties
     {
         /// <summary>
-        /// Creates a <see cref="GrainInterfaceProperties"/> instance.
+        /// Initializes a new instance of the <see cref="GrainInterfaceProperties"/> class.
         /// </summary>
+        /// <param name="values">
+        /// The interface property values.
+        /// </param>
         public GrainInterfaceProperties(ImmutableDictionary<string, string> values)
         {
             this.Properties = values;
@@ -30,6 +33,9 @@ namespace Orleans.Metadata
         /// <summary>
         /// Returns a detailed string representation of this instance.
         /// </summary>
+        /// <returns>
+        /// A detailed, string representation of this instance.
+        /// </returns>
         public string ToDetailedString()
         {
             if (this.Properties is null) return string.Empty;
@@ -82,6 +88,15 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain interface properties to <paramref name="properties"/>.
         /// </summary>
+        /// <param name="interfaceType">
+        /// The interface type.
+        /// </param>
+        /// <param name="grainInterfaceType">
+        /// The interface type id.
+        /// </param>
+        /// <param name="properties">
+        /// The properties collection which this calls to this method should populate.
+        /// </param>
         void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties);
     }
 
@@ -93,6 +108,15 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain interface properties to <paramref name="properties"/>.
         /// </summary>
+        /// <param name="services">
+        /// The service provider.
+        /// </param>
+        /// <param name="interfaceType">
+        /// The interface type.
+        /// </param>
+        /// <param name="properties">
+        /// The properties collection which this calls to this method should populate.
+        /// </param>
         void Populate(IServiceProvider services, Type interfaceType, Dictionary<string, string> properties);
     }
 
@@ -104,8 +128,11 @@ namespace Orleans.Metadata
         private readonly IServiceProvider serviceProvider;
 
         /// <summary>
-        /// Creates a <see cref="AttributeGrainInterfacePropertiesProvider"/> instance.
+        /// Initializes a new instance of the <see cref="AttributeGrainInterfacePropertiesProvider"/> class.
         /// </summary>
+        /// <param name="serviceProvider">
+        /// The service provider.
+        /// </param>
         public AttributeGrainInterfacePropertiesProvider(IServiceProvider serviceProvider)
         {
             this.serviceProvider = serviceProvider;
@@ -133,8 +160,11 @@ namespace Orleans.Metadata
         private readonly string grainType;
 
         /// <summary>
-        /// Creates a <see cref="DefaultGrainTypeAttribute"/> instance.
+        /// Initializes a new instance of the <see cref="DefaultGrainTypeAttribute"/> class.
         /// </summary>
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
         public DefaultGrainTypeAttribute(string grainType)
         {
             this.grainType = grainType;

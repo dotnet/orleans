@@ -21,6 +21,10 @@ namespace Orleans
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache _cache;
 
+        /// <summary>
+        /// Creates a new instance of the <see cref="GrainInterfaceTypeToGrainTypeResolver"/> class.
+        /// </summary>
+        /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
         public GrainInterfaceTypeToGrainTypeResolver(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
@@ -148,6 +152,10 @@ namespace Orleans
             return result;
         }
 
+        /// <summary>
+        /// Returns the cache, rebuilding it if it is out of date.
+        /// </summary>
+        /// <returns>The cache.</returns>
         private Cache GetCache()
         {
             if (_cache is Cache cache && cache.Version == _clusterManifestProvider.Current.Version)
@@ -168,6 +176,11 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Builds a cached resolution mapping.
+        /// </summary>
+        /// <param name="clusterManifest">The current cluster manifest.</param>
+        /// <returns>The cache.</returns>
         private static Cache BuildCache(ClusterManifest clusterManifest)
         {
             var result = new Dictionary<GrainInterfaceType, CacheEntry>();
@@ -235,27 +248,57 @@ namespace Orleans
             return new Cache(clusterManifest.Version, result);
         }
 
+        /// <summary>
+        /// Contains a mapping from grain interface type to the implementations of that interface.
+        /// </summary>
         private class Cache
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Cache"/> class.
+            /// </summary>
+            /// <param name="version">The cluster manifest version which this instance corresponds to.</param>
+            /// <param name="map">The interface map.</param>
             public Cache(MajorMinorVersion version, Dictionary<GrainInterfaceType, CacheEntry> map)
             {
                 this.Version = version;
                 this.Map = map;
             }
 
+            /// <summary>
+            /// Gets the cluster manifest version which this cache corresponds to.
+            /// </summary>
             public MajorMinorVersion Version { get; }
+
+            /// <summary>
+            /// Gets the mapping from grain interface type to implementations.
+            /// </summary>
             public Dictionary<GrainInterfaceType, CacheEntry> Map { get; }
         }
 
+        /// <summary>
+        /// Represents the implementation <see cref="GrainType"/> values for a grain interface type.
+        /// </summary>
         private readonly struct CacheEntry
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="CacheEntry"/> struct.
+            /// </summary>
+            /// <param name="primaryImplementation">The primary implementation type.</param>
+            /// <param name="implementations">The set of other implementations along with their grain type prefixes.</param>
             public CacheEntry(GrainType primaryImplementation, List<(string Prefix, GrainType GrainType)> implementations)
             {
                 this.PrimaryImplementation = primaryImplementation;
                 this.Implementations = implementations;
             }
 
+            /// <summary>
+            /// Gets the primary implementation type.
+            /// </summary>
             public GrainType PrimaryImplementation { get; }
+
+            /// <summary>
+            /// Gets the collection of implementation types with their class name prefixes.
+            /// </summary>
             public List<(string Prefix, GrainType GrainType)> Implementations { get; }
         }
     }

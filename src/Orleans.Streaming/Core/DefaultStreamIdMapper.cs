@@ -6,10 +6,17 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// The default <see cref="IStreamIdMapper"/> implementation.
+    /// </summary>
     public class DefaultStreamIdMapper : IStreamIdMapper
     {
+        /// <summary>
+        /// The name of this stream identity mapper.
+        /// </summary>
         public const string Name = "default";
 
+        /// <inheritdoc />
         public IdSpan GetGrainKeyId(GrainBindings grainBindings, StreamId streamId)
         {
             string keyType = null;

@@ -1,20 +1,28 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// <see cref="ITelemetryConsumer"/> which writes output to <see cref="System.Diagnostics.Trace"/>.
+    /// Implements the <see cref="Orleans.Runtime.ITraceTelemetryConsumer" />
+    /// </summary>
+    /// <seealso cref="Orleans.Runtime.ITraceTelemetryConsumer" />
     public class TraceTelemetryConsumer : ITraceTelemetryConsumer
     {
+        /// <inheritdoc/>
         public void TrackTrace(string message)
         {
             Trace.TraceInformation(message);
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, IDictionary<string, string> properties)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties));            
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severity)
         {
             switch (severity)
@@ -39,16 +47,19 @@ namespace Orleans.Runtime
             Trace.Flush();
         }
 
+        /// <inheritdoc/>
         public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties), severity);
         }
 
+        /// <inheritdoc/>
         public void Flush()
         {
             Trace.Flush();
         }
 
+        /// <inheritdoc/>
         public void Close()
         {
             // We are not closing Trace here, since Orleans does not own the configured TraceListeners.

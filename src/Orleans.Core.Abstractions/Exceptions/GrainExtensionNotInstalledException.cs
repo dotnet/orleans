@@ -10,13 +10,52 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public class GrainExtensionNotInstalledException : OrleansException
     {
-        public GrainExtensionNotInstalledException() : base("GrainExtensionNotInstalledException") { }
-        public GrainExtensionNotInstalledException(string msg) : base(msg) { }
-        public GrainExtensionNotInstalledException(string message, Exception innerException) : base(message, innerException) { }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainExtensionNotInstalledException"/> class.
+        /// </summary>
+        public GrainExtensionNotInstalledException()
+            : base("GrainExtensionNotInstalledException")
+        {
+        }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainExtensionNotInstalledException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        public GrainExtensionNotInstalledException(string message)
+            : base(message)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainExtensionNotInstalledException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        /// <param name="innerException">
+        /// The inner exception.
+        /// </param>
+        public GrainExtensionNotInstalledException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainExtensionNotInstalledException"/> class.
+        /// </summary>
+        /// <param name="info">
+        /// The serialization info.
+        /// </param>
+        /// <param name="context">
+        /// The context.
+        /// </param>
         protected GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
-        { }
+        {
+        }
     }
 }
 

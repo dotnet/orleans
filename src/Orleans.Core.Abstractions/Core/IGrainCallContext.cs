@@ -54,11 +54,6 @@ namespace Orleans
         IMethodArguments Arguments { get; }
 
         /// <summary>
-        /// Invokes the request.
-        /// </summary>
-        Task Invoke();
-
-        /// <summary>
         /// Gets or sets the result.
         /// </summary>
         object Result { get; set; }
@@ -67,6 +62,14 @@ namespace Orleans
         /// Gets or sets the response.
         /// </summary>
         Response Response { get; set; }
+
+        /// <summary>
+        /// Invokes the request.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="Task"/> representing the invocation.
+        /// </returns>
+        Task Invoke();
     }
 
     /// <summary>
@@ -87,11 +90,43 @@ namespace Orleans
     {
     }
 
+    /// <summary>
+    /// Represents the arguments to a method invocation.
+    /// </summary>
     public interface IMethodArguments
     {
-        object this[int index] { get;set; }
-        T GetArgument<T>(int index);
-        void SetArgument<T>(int index, T value);
+        /// <summary>
+        /// Gets the number of arguments.
+        /// </summary>
         int Length { get; }
+
+        /// <summary>
+        /// Gets the argument at the provided index.
+        /// </summary>
+        /// <param name="index">The argument index.</param>
+        /// <returns>The argument at the provided index.</returns>
+        object this[int index] { get; set; }
+
+        /// <summary>
+        /// Gets the argument at the provided index.
+        /// </summary>
+        /// <param name="index">
+        /// The argument index.
+        /// </param>
+        /// <typeparam name="T">
+        /// The type of the argument.
+        /// </typeparam>
+        /// <returns>
+        /// The argument at the provided index.
+        /// </returns>
+        T GetArgument<T>(int index);
+
+        /// <summary>
+        /// Sets the argument at the provided index.
+        /// </summary>
+        /// <typeparam name="T">The type of the argument.</typeparam>
+        /// <param name="index">The argument index.</param>
+        /// <param name="value">The new argument value.</param>
+        void SetArgument<T>(int index, T value);
     }
 }

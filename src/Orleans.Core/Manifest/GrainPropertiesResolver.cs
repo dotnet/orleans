@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -11,8 +12,11 @@ namespace Orleans.Metadata
         private readonly IClusterManifestProvider _clusterManifestProvider;
 
         /// <summary>
-        /// Creates a <see cref="GrainPropertiesResolver"/> instance.
+        /// Initializes a new instance of the <see cref="GrainPropertiesResolver"/> class.
         /// </summary>
+        /// <param name="clusterManifestProvider">
+        /// The cluster manifest provider.
+        /// </param>
         public GrainPropertiesResolver(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
@@ -21,6 +25,12 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the grain properties for the provided type.
         /// </summary>
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
+        /// <returns>
+        /// The grain properties.
+        /// </returns>
         public GrainProperties GetGrainProperties(GrainType grainType)
         {
             if (!TryGetGrainProperties(grainType, out var result))
@@ -35,7 +45,16 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the grain properties for the provided type.
         /// </summary>
-        public bool TryGetGrainProperties(GrainType grainType, out GrainProperties properties)
+        /// <param name="grainType">
+        /// The grain type.
+        /// </param>
+        /// <param name="properties">
+        /// The grain properties.
+        /// </param>
+        /// <returns>
+        /// A value indicating whether grain properties could be found for the provided grain type.
+        /// </returns>
+        public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties properties)
         {
             var clusterManifest = _clusterManifestProvider.Current;
             if (clusterManifest is null)

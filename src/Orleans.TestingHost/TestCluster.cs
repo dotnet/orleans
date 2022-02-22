@@ -385,6 +385,10 @@ namespace Orleans.TestingHost
             await StopSiloAsync(Primary);
         }
 
+        /// <summary>
+        /// Stop cluster client as an asynchronous operation.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         public async Task StopClusterClientAsync()
         {
             var client = this.ClientHost;
@@ -560,6 +564,10 @@ namespace Orleans.TestingHost
             await this.ClientHost.StartAsync();
         }
 
+        /// <summary>
+        /// Gets the configuration sources.
+        /// </summary>
+        /// <value>The configuration sources.</value>
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }
 
         private async Task InitializeAsync()
@@ -646,6 +654,10 @@ namespace Orleans.TestingHost
             }
         }
 
+        /// <summary>
+        /// Gets the log.
+        /// </summary>
+        /// <returns>The log contents.</returns>
         public string GetLog()
         {
             return this.log.ToString();
@@ -667,6 +679,7 @@ namespace Orleans.TestingHost
             Console.WriteLine(GetLog());
         }
 
+        /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
             if (_disposed)
@@ -695,6 +708,7 @@ namespace Orleans.TestingHost
             _disposed = true;
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             if (_disposed)

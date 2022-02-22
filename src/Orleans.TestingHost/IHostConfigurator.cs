@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -10,6 +10,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Configures the host builder.
         /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
         void Configure(IHostBuilder hostBuilder);
     }
 }

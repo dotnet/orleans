@@ -22,6 +22,12 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override bool IsActive => isActive;
 
+        /// <summary>
+        /// Create a silo handle.
+        /// </summary>
+        /// <param name="siloName">Name of the silo.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <returns>The silo handle.</returns>
         public static async Task<SiloHandle> CreateAsync(
             string siloName,
             IConfiguration configuration)
@@ -56,6 +62,7 @@ namespace Orleans.TestingHost
             await StopSiloAsync(ct);
         }
 
+        /// <inheritdoc />
         public override async Task StopSiloAsync(CancellationToken ct)
         {
             if (!IsActive) return;
@@ -94,6 +101,7 @@ namespace Orleans.TestingHost
             }
         }
 
+        /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
             if (!this.IsActive) return;

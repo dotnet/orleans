@@ -3,6 +3,9 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
+    /// <summary>
+    /// Provides functionality for locating grain activations in a cluster and registering the location of grain activations.
+    /// </summary>
     internal class GrainLocator
     {
         private readonly GrainLocatorResolver _grainLocatorResolver;

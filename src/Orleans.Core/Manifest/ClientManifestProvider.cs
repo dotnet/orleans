@@ -7,6 +7,9 @@ using Orleans.Metadata;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Creates a manifest of the locally available grain interface types.
+    /// </summary>
     internal class ClientManifestProvider
     {
         public ClientManifestProvider(
@@ -21,17 +24,20 @@ namespace Orleans.Runtime
             this.ClientManifest = new GrainManifest(grainProperties, interfaces);
         }
 
+        /// <summary>
+        /// Gets the client manifest.
+        /// </summary>
         public GrainManifest ClientManifest { get; }
 
         private static ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> CreateInterfaceManifest(
             IEnumerable<IGrainInterfacePropertiesProvider> propertyProviders,
             IOptions<GrainTypeOptions> grainTypeOptions,
-            GrainInterfaceTypeResolver interfgaceTypeResolver)
+            GrainInterfaceTypeResolver interfaceTypeResolver)
         {
             var builder = ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>();
             foreach (var grainInterface in grainTypeOptions.Value.Interfaces)
             {
-                var interfaceId = interfgaceTypeResolver.GetGrainInterfaceType(grainInterface);
+                var interfaceId = interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
                 var properties = new Dictionary<string, string>();
                 foreach (var provider in propertyProviders)
                 {

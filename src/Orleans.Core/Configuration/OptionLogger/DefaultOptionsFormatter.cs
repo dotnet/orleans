@@ -6,24 +6,44 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Default implementation of <see cref="IOptionFormatter{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The options type.</typeparam>
     internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T> where T : class, new()
     {
         private readonly T _options;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultOptionsFormatter{T}"/> class.
+        /// </summary>
+        /// <param name="options">The options.</param>
         public DefaultOptionsFormatter(IOptions<T> options)
         {
             _options = options.Value;
             Name = OptionFormattingUtilities.Name<T>();
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultOptionsFormatter{T}"/> class.
+        /// </summary>
+        /// <param name="name">The options name.</param>
+        /// <param name="options">The options.</param>
         internal DefaultOptionsFormatter(string name, T options)
         {
             _options = options;
             Name = OptionFormattingUtilities.Name<T>(name);
         }
 
+        /// <summary>
+        /// Gets the options name.
+        /// </summary>
         public string Name { get; }
 
+        /// <summary>
+        /// For
+        /// </summary>
+        /// <returns></returns>
         public IEnumerable<string> Format()
         {
             foreach (var prop in typeof(T).GetProperties())

@@ -13,25 +13,25 @@ namespace Orleans.Streams
     public class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>
-        /// Stream identifier for the stream this batch is part of.
+        /// Gets the stream identifier for the stream this batch is part of.
         /// Derived from the first batch container in the batch.
         /// </summary>
         [Id(0)]
         public StreamId StreamId { get; }
 
         /// <summary>
-        /// Stream Sequence Token for the start of this batch.
+        /// Gets the stream Sequence Token for the start of this batch.
         /// Derived from the first batch container in the batch.
         /// </summary>
         [Id(1)]
         public StreamSequenceToken SequenceToken { get; }
 
         /// <summary>
-        /// Batch containers comprising this batch
+        /// Gets the batch containers comprising this batch
         /// </summary>
         [Id(2)]
         public List<IBatchContainer> BatchContainers { get; }
-
+                
         public BatchContainerBatch(List<IBatchContainer> batchContainers)
         {
             if ((batchContainers == null) || !batchContainers.Any())
@@ -46,11 +46,13 @@ namespace Orleans.Streams
             this.StreamId = containerDelegate.StreamId;
         }
 
+        /// <inheritdoc/>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             return this.BatchContainers.SelectMany(batchContainer => batchContainer.GetEvents<T>());
         }
 
+        /// <inheritdoc/>
         public bool ImportRequestContext()
         {
             return this.BatchContainers[0].ImportRequestContext();

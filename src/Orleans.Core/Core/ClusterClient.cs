@@ -68,12 +68,14 @@ namespace Orleans
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => _runtimeClient.ServiceProvider;
 
+        /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await _runtimeClient.Start(cancellationToken).ConfigureAwait(false);
             await _clusterClientLifecycle.OnStart(cancellationToken).ConfigureAwait(false);
         }
 
+        /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             try
@@ -111,11 +113,11 @@ namespace Orleans
             where TGrainInterface : IGrainWithIntegerCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver => ((IGrainFactory)_runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
-        public Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
+        public void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => _runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
 
         /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
@@ -159,6 +161,7 @@ namespace Orleans
         public object Cast(IAddressable grain, Type outputGrainInterfaceType)
             => _runtimeClient.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
 
+        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
     }

@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading;
 using System.Collections.Concurrent;
@@ -16,6 +16,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly ConcurrentStack<T> pool;
         private readonly Func<T> factoryFunc;
         private long totalObjects;
+
         /// <summary>
         /// monitor to report statistics for current object pool
         /// </summary>

@@ -2,34 +2,62 @@ using System.Globalization;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents the name of a statistic.
+    /// </summary>
     public class StatisticName
     {
-        public string Name { get; }
-
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatisticName"/> class.
+        /// </summary>
+        /// <param name="name">The name.</param>
         public StatisticName(string name)
         {
             Name = name;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatisticName"/> class.
+        /// </summary>
+        /// <param name="nameFormat">The name format.</param>
+        /// <param name="args">The arguments.</param>
         public StatisticName(StatisticNameFormat nameFormat, params object[] args)
         {
             Name = string.Format(CultureInfo.InvariantCulture, nameFormat.Name, args);
         }
 
+        /// <summary>
+        /// Gets the name.
+        /// </summary>
+        /// <value>The name.</value>
+        public string Name { get; }
+
+        /// <inheritdoc/>
         public override string ToString()
         {
             return Name;
         }
     }
 
+    /// <summary>
+    /// Represents a format string for a <see cref="StatisticName"/>.
+    /// </summary>
     public class StatisticNameFormat
     {
-        public string Name { get; }
-
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatisticNameFormat"/> class.
+        /// </summary>
+        /// <param name="name">The name.</param>
         public StatisticNameFormat(string name)
         {
             Name = name;
         }
+
+        /// <summary>
+        /// Gets the name.
+        /// </summary>
+        /// <value>The name.</value>
+        public string Name { get; }
     }
 
     internal class StatisticNames

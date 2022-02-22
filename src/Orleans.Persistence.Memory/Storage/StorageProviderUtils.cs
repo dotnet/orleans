@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
-    public class StorageProviderUtils
+    internal class StorageProviderUtils
     {
         /// <summary>
         /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Orleans
 {
     /// <summary>
-    /// Utility functions for dealing with Tasks.
+    /// Utility functions for dealing with <see cref="Task"/> instances.
     /// </summary>
     public static class PublicOrleansTaskExtensions
     {
@@ -19,7 +19,6 @@ namespace Orleans
         /// This will prevent the escalation of this exception to the .NET finalizer thread.
         /// </summary>
         /// <param name="task">The task to be ignored.</param>
-        [SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
         public static void Ignore(this Task task)
         {
             if (task.IsCompleted)

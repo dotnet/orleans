@@ -5,15 +5,23 @@ using Orleans.Runtime;
 
 namespace Orleans.Metadata
 {
+    /// <summary>
+    /// Populates grain interface properties with the grain interfaces implemented by a grain class.
+    /// </summary>
     internal class ImplementedInterfaceProvider : IGrainPropertiesProvider
     {
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ImplementedInterfaceProvider"/> class.
+        /// </summary>
+        /// <param name="interfaceTypeResolver">The interface type resolver.</param>
         public ImplementedInterfaceProvider(GrainInterfaceTypeResolver interfaceTypeResolver)
         {
             this.interfaceTypeResolver = interfaceTypeResolver;
         }
 
+        /// <inheritdoc/>
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             var counter = 0;
@@ -33,19 +41,24 @@ namespace Orleans.Metadata
             }
         }
 
-        public static bool IsGrainInterface(Type t)
+        /// <summary>
+        /// Gets a value indicating whether the specified type is a grain interface type.
+        /// </summary>
+        /// <param name="type">The type to inspect.</param>
+        /// <returns>A value indicating whether the specified type is a grain interface type.</returns>
+        public static bool IsGrainInterface(Type type)
         {
-            if (t.IsClass)
+            if (type.IsClass)
                 return false;
-            if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
+            if (type == typeof(IGrainObserver) || type == typeof(IAddressable) || type == typeof(IGrainExtension))
                 return false;
-            if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
-                || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
+            if (type == typeof(IGrain) || type == typeof(IGrainWithGuidKey) || type == typeof(IGrainWithIntegerKey)
+                || type == typeof(IGrainWithGuidCompoundKey) || type == typeof(IGrainWithIntegerCompoundKey))
                 return false;
-            if (t == typeof(ISystemTarget))
+            if (type == typeof(ISystemTarget))
                 return false;
 
-            return typeof(IAddressable).IsAssignableFrom(t);
+            return typeof(IAddressable).IsAssignableFrom(type);
         }
     }
 }

@@ -6,8 +6,12 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for unknown types.
+    /// </summary>
     public sealed class VoidCodec : IFieldCodec<object>
     {
+        /// <inheritdoc />
         void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
         {
             if (!ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -16,6 +20,7 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <inheritdoc />
         object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType != WireType.Reference)
@@ -34,6 +39,9 @@ namespace Orleans.Serialization.Codecs
             $"Expected a value of null, but encountered a value of '{value}'.");
     }
 
+    /// <summary>
+    /// Copier for unknown types.
+    /// </summary>
     public sealed class VoidCopier : IDeepCopier<object>
     {
         public object DeepCopy(object input, CopyContext context)

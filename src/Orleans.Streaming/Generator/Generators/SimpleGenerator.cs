@@ -18,6 +18,7 @@ namespace Orleans.Providers.Streams.Generator
         private StreamId streamId;
         private int sequenceId;
 
+        /// <inheritdoc />
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)
         {
             var cfg = generatorConfig as SimpleGeneratorOptions;

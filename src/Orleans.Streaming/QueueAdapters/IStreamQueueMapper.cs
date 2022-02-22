@@ -9,8 +9,17 @@ namespace Orleans.Streams
     /// </summary>
     public interface IStreamQueueMapper
     {
+        /// <summary>
+        /// Gets all queues.
+        /// </summary>
+        /// <returns>All queues.</returns>
         IEnumerable<QueueId> GetAllQueues();
 
+        /// <summary>
+        /// Gets the queue for the specified stream.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <returns>The queue responsible for the specified stream.</returns>
         QueueId GetQueueForStream(StreamId streamId);
     }
 }

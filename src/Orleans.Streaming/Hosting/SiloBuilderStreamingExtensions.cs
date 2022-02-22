@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
+using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
@@ -12,16 +13,22 @@ using Orleans.Streams.Filtering;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for confiiguring streaming on silos.
+    /// </summary>
     public static class SiloBuilderStreamingExtensions
     {
         /// <summary>
         /// Add support for streaming to this application.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
 
         /// <summary>
         /// Add support for streaming to this silo.
         /// </summary>
+        /// <param name="services">The services.</param>
         public static void AddSiloStreaming(this IServiceCollection services)
         {
             if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))
@@ -29,6 +36,7 @@ namespace Orleans.Hosting
                 return;
             }
 
+            services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
@@ -51,9 +59,16 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use persistent streams.
+        /// Configures the silo to use persistent streams.
         /// </summary>
-        public static ISiloBuilder AddPersistentStreams(this ISiloBuilder builder, string name,
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="adapterFactory">The provider adapter factory.</param>
+        /// <param name="configureStream">The stream provider configuration delegate.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddPersistentStreams(
+            this ISiloBuilder builder,
+            string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
             Action<ISiloPersistentStreamConfigurator> configureStream)
         {
@@ -64,8 +79,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use SimpleMessageProvider
+        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
         /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureStream">The stream provider configuration delegate.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddSimpleMessageStreamProvider(
             this ISiloBuilder builder,
             string name,
@@ -78,9 +97,15 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use SimpleMessageProvider
+        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
         /// </summary>
-        public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureOptions">The delegate used to configure the stream provider options.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddSimpleMessageStreamProvider(
+            this ISiloBuilder builder,
+            string name,
             Action<SimpleMessageStreamProviderOptions> configureOptions)
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
@@ -88,24 +113,51 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use SimpleMessageProvider
+        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
         /// </summary>
-        public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureOptions">The delegate used to configure the stream provider options.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddSimpleMessageStreamProvider(
+            this ISiloBuilder builder,
+            string name,
             Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b.Configure(configureOptions));
         }
 
+        /// <summary>
+        /// Adds a stream filter. 
+        /// </summary>
+        /// <typeparam name="T">The stream filter type.</typeparam>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream filter name.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddStreamFilter<T>(this ISiloBuilder builder, string name) where T : class, IStreamFilter
         {
             return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
         }
 
+        /// <summary>
+        /// Adds a stream filter. 
+        /// </summary>
+        /// <typeparam name="T">The stream filter type.</typeparam>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream filter name.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddStreamFilter<T>(this IClientBuilder builder, string name) where T : class, IStreamFilter
         {
             return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
         }
 
+        /// <summary>
+        /// Adds a stream filter. 
+        /// </summary>
+        /// <typeparam name="T">The stream filter type.</typeparam>
+        /// <param name="services">The service collection.</param>
+        /// <param name="name">The stream filter name.</param>
+        /// <returns>The service collection.</returns>
         public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
         {
             return services.AddSingletonNamedService<IStreamFilter, T>(name);

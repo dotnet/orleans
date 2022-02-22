@@ -8,7 +8,7 @@ namespace Orleans
     public interface IClientBuilder
     {
         /// <summary>
-        /// The services shared between the client and the host.
+        /// Gets the services collection.
         /// </summary>
         IServiceCollection Services { get; }
     }

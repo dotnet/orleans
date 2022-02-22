@@ -138,7 +138,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Go over every node excluding me,
             // Find up to NumProbedSilos silos after me, which are not suspected by anyone and add them to the probedSilos,
-            // In addition, every suspected silo you encounter on the way, add him to the probedSilos.
+            // In addition, every suspected silo you encounter on the way, add it to the probedSilos.
             var silosToWatch = new List<SiloAddress>();
             var additionalSilos = new List<SiloAddress>();
 
@@ -160,7 +160,7 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            // take new watched silos, but leave the probe counters for the old ones.
+            // Take new watched silos, but leave the probe counters for the old ones.
             var newProbedSilos = ImmutableDictionary.CreateBuilder<SiloAddress, SiloHealthMonitor>();
             foreach (var silo in silosToWatch.Union(additionalSilos))
             {

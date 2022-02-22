@@ -12,14 +12,16 @@ namespace Orleans.Configuration
         /// Regulates the periodic collection of inactive grains.
         /// </summary>
         public TimeSpan CollectionQuantum { get; set; } = DEFAULT_COLLECTION_QUANTUM;
+
+        /// <summary>
+        /// The default value for <see cref="CollectionQuantum"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromMinutes(1);
 
         /// <summary>
-        /// Default period of inactivity necessary for a grain to be available for collection and deactivation.
+        /// Gets or sets the default period of inactivity necessary for a grain to be available for collection and deactivation.
         /// </summary>
-        public TimeSpan CollectionAge { get; set; } = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
-        [Obsolete("Use CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT instead")]
-        public static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
+        public TimeSpan CollectionAge { get; set; } = TimeSpan.FromHours(2);
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
@@ -30,6 +32,10 @@ namespace Orleans.Configuration
         /// Timeout value before giving up when trying to activate a grain.
         /// </summary>
         public TimeSpan ActivationTimeout { get; set; } = DEFAULT_ACTIVATION_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="ActivationTimeout"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_ACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
 
         /// <summary>
@@ -37,6 +43,10 @@ namespace Orleans.Configuration
         /// (waiting for all timers to stop and calling Grain.OnDeactivate())
         /// </summary>
         public TimeSpan DeactivationTimeout { get; set; } = DEFAULT_DEACTIVATION_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="DeactivationTimeout"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
     }
 }

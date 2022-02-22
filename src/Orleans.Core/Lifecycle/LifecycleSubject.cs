@@ -10,14 +10,17 @@ using Orleans.Runtime;
 namespace Orleans
 {
     /// <summary>
-    /// Observable lifecycle
-    /// Notes:
-    /// - Single use, does not support multiple start/stop cycles.
-    /// - Once started, no other observers can be subscribed.
-    /// - OnStart starts stages in order until first failure or cancelation.
-    /// - OnStop stops states in reverse order starting from highest started stage.
-    /// - OnStop stops all stages regardless of errors even if canceled canceled.
+    /// Provides functionality for observing a lifecycle.
     /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><description>Single use, does not support multiple start/stop cycles.</description></item>
+    /// <item><description>Once started, no other observers can be subscribed.</description></item>
+    /// <item><description>OnStart starts stages in order until first failure or cancellation.</description></item>
+    /// <item><description>OnStop stops states in reverse order starting from highest started stage.</description></item>
+    /// <item><description>OnStop stops all stages regardless of errors even if canceled canceled.</description></item>
+    /// </list>
+    /// </remarks>
     public abstract class LifecycleSubject : ILifecycleSubject
     {
         private readonly List<OrderedObserver> subscribers;
@@ -30,8 +33,19 @@ namespace Orleans
             this.subscribers = new List<OrderedObserver>();
         }
 
+        /// <summary>
+        /// Gets the name of the specified numeric stage.
+        /// </summary>
+        /// <param name="stage">The stage number.</param>
+        /// <returns>The name of the stage.</returns>
         protected virtual string GetStageName(int stage) => stage.ToString();
 
+        /// <summary>
+        /// Gets the collection of all stage numbers and their corresponding names.
+        /// </summary>
+        /// <seealso cref="ServiceLifecycleStage"/>
+        /// <param name="type">The lifecycle stage class.</param>
+        /// <returns>The collection of all stage numbers and their corresponding names.</returns>
         protected static ImmutableDictionary<int, string> GetStageNames(Type type)
         {
             try
@@ -65,6 +79,11 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Logs the observed performance of an <see cref="OnStart"/> call.
+        /// </summary>
+        /// <param name="stage">The stage.</param>
+        /// <param name="elapsed">The period of time which elapsed before <see cref="OnStart"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
             if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
@@ -77,7 +96,8 @@ namespace Orleans
             }
         }
 
-        public virtual async Task OnStart(CancellationToken ct)
+        /// <inheritdoc />
+        public virtual async Task OnStart(CancellationToken cancellationToken = default)
         {
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
@@ -86,7 +106,7 @@ namespace Orleans
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
-                    if (ct.IsCancellationRequested)
+                    if (cancellationToken.IsCancellationRequested)
                     {
                         throw new OrleansLifecycleCanceledException("Lifecycle start canceled by request");
                     }
@@ -94,7 +114,7 @@ namespace Orleans
                     var stage = observerGroup.Key;
                     this.highStage = stage;
                     var stopWatch = ValueStopwatch.StartNew();
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, ct)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, cancellationToken)));
                     stopWatch.Stop();
                     this.PerfMeasureOnStart(stage, stopWatch.Elapsed);
 
@@ -124,8 +144,17 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Signifies that <see cref="OnStart"/> completed.
+        /// </summary>
+        /// <param name="stage">The stage which completed.</param>
         protected virtual void OnStartStageCompleted(int stage) { }
 
+        /// <summary>
+        /// Logs the observed performance of an <see cref="OnStop"/> call.
+        /// </summary>
+        /// <param name="stage">The stage.</param>
+        /// <param name="elapsed">The period of time which elapsed before <see cref="OnStop"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
             if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
@@ -138,7 +167,8 @@ namespace Orleans
             }
         }
 
-        public virtual async Task OnStop(CancellationToken ct)
+        /// <inheritdoc />
+        public virtual async Task OnStop(CancellationToken cancellationToken = default)
         {
             // if not started, do nothing
             if (!this.highStage.HasValue) return;
@@ -149,7 +179,7 @@ namespace Orleans
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key))
             {
-                if (ct.IsCancellationRequested && !loggedCancellation)
+                if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
                     this.logger?.LogWarning("Lifecycle stop operations canceled by request.");
                     loggedCancellation = true;
@@ -160,7 +190,7 @@ namespace Orleans
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, ct)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, cancellationToken)));
                     stopwatch.Stop();
                     this.PerfMeasureOnStop(stage, stopwatch.Elapsed);
                 }
@@ -187,6 +217,10 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Signifies that <see cref="OnStop"/> completed.
+        /// </summary>
+        /// <param name="stage">The stage which completed.</param>
         protected virtual void OnStopStageCompleted(int stage) { }
 
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
@@ -199,17 +233,33 @@ namespace Orleans
             return orderedObserver;
         }
 
+        /// <summary>
+        /// Represents a <see cref="ILifecycleObservable"/>'s participation in a given lifecycle stage.
+        /// </summary>
         private class OrderedObserver : IDisposable
         {
+            /// <summary>
+            /// Gets the observer.
+            /// </summary>
             public ILifecycleObserver Observer { get; private set; }
+
+            /// <summary>
+            /// Gets the stage which the observer is participating in.
+            /// </summary>
             public int Stage { get; }
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="OrderedObserver"/> class.
+            /// </summary>
+            /// <param name="stage">The stage which the observer is participating in.</param>
+            /// <param name="observer">The participating observer.</param>
             public OrderedObserver(int stage, ILifecycleObserver observer)
             {
                 this.Stage = stage;
                 this.Observer = observer;
             }
 
+            /// <inheritdoc />
             public void Dispose() => Observer = null;
         }
     }

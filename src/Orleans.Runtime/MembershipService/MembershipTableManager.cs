@@ -72,6 +72,8 @@ namespace Orleans.Runtime.MembershipService
                 nameof(PeriodicallyRefreshMembershipTable));
         }
 
+        internal Func<DateTime> GetDateTimeUtcNow { get; set; } = () => DateTime.UtcNow;
+
         public MembershipTableSnapshot MembershipTableSnapshot => this.snapshot;
 
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipTableUpdates => this.updates;
@@ -194,7 +196,7 @@ namespace Orleans.Runtime.MembershipService
             var entry = new MembershipEntry
             {
                 SiloAddress = myAddress,
-                IAmAliveTime = DateTime.UtcNow
+                IAmAliveTime = GetDateTimeUtcNow()
             };
 
             await this.membershipTableProvider.UpdateIAmAlive(entry);
@@ -395,7 +397,7 @@ namespace Orleans.Runtime.MembershipService
                 return true;
             }
 
-            var now = DateTime.UtcNow;
+            var now = GetDateTimeUtcNow();
             if (newStatus == SiloStatus.Dead)
                 myEntry.AddSuspector(myAddress, now); // add the killer (myself) to the suspect list, for easier diagnostics later on.
 
@@ -453,7 +455,7 @@ namespace Orleans.Runtime.MembershipService
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
-                IAmAliveTime = DateTime.UtcNow
+                IAmAliveTime = GetDateTimeUtcNow()
             };
         }
 
@@ -486,7 +488,7 @@ namespace Orleans.Runtime.MembershipService
                 if (entry.SiloAddress.Equals(myAddress)) continue;
                 if (entry.Status != SiloStatus.Active) continue;
 
-                var now = DateTime.UtcNow;
+                var now = GetDateTimeUtcNow();
                 var missedSince = entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now);
                 if (missedSince != null)
                 {
@@ -561,7 +563,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 MembershipEntry entry = siloData.Item1;
                 string eTag = siloData.Item2;
-                bool ok = await DeclareDead(entry, eTag, nextVersion);
+                bool ok = await DeclareDead(entry, eTag, nextVersion, GetDateTimeUtcNow());
                 if (!ok) result = false;
                 nextVersion = nextVersion.Next(); // advance the table version (if write succeded, we advanced the version. if failed, someone else did. It is safe anyway).
             }
@@ -581,7 +583,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (!this.clusterMembershipOptions.UseLivenessGossip) return;
 
-            var now = DateTime.UtcNow;
+            var now = GetDateTimeUtcNow();
             var gossipPartners = new List<SiloAddress>();
             foreach (var item in this.MembershipTableSnapshot.Entries)
             {
@@ -657,12 +659,13 @@ namespace Orleans.Runtime.MembershipService
                 (int)ErrorCode.MembershipMarkingAsDead,
                 "Going to mark silo {SiloAddress} dead as a result of a call to TryKill",
                 entry.SiloAddress);
-            return await DeclareDead(entry, eTag, table.Version);
+            return await DeclareDead(entry, eTag, table.Version, GetDateTimeUtcNow());
         }
 
         public async Task<bool> TryToSuspectOrKill(SiloAddress silo)
         {
             var table = await membershipTableProvider.ReadAll();
+            var now = GetDateTimeUtcNow();
 
             if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill: Read Membership table {0}", table.ToString());
 
@@ -700,17 +703,16 @@ namespace Orleans.Runtime.MembershipService
                 entry.SiloAddress, // Second
                 entry.Status, 
                 entry.ToFullString());
-            // check if the table already knows that this silo is dead
+
+            // Check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
             {
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
                 return true;
             }
 
-            var allVotes = entry.SuspectTimes ?? new List<Tuple<SiloAddress, DateTime>>();
-
-            // get all valid (non-expired) votes
-            var freshVotes = entry.GetFreshVotes(DateTime.UtcNow, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
+            // Get all valid (non-expired) votes
+            var freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("-Current number of fresh Voters for {0} is {1}", silo, freshVotes.Count.ToString());
 
@@ -724,66 +726,31 @@ namespace Orleans.Runtime.MembershipService
                 return false;
             }
 
-            // handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, this.localSiloDetails.SiloAddress).Count;
-            // find if I have already voted
-            int myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
+            // Try to add our vote to the list and tally the fresh votes again.
+            var prevList = entry.SuspectTimes?.ToList() ?? new List<Tuple<SiloAddress, DateTime>>();
+            entry.AddOrUpdateSuspector(myAddress, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
+            freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
-            // Try to kill:
-            //  if there is NumVotesForDeathDeclaration votes (including me) to kill - kill.
-            //  otherwise, if there is a majority of nodes (including me) voting to kill – kill.
-            bool declareDead = false;
-            int myAdditionalVote = myVoteIndex == -1 ? 1 : 0;
-
-            if (freshVotes.Count + myAdditionalVote >= this.clusterMembershipOptions.NumVotesForDeathDeclaration)
-                declareDead = true;
-            
-            if (freshVotes.Count + myAdditionalVote >= (activeSilos + 1) / 2)
-                declareDead = true;
-            
-            if (declareDead)
+            // Determine if there are enough votes to evict the silo.
+            // Handle the corner case when the number of active silos is very small (then my only vote is enough)
+            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, myAddress).Count;
+            if (freshVotes.Count >= clusterMembershipOptions.NumVotesForDeathDeclaration || freshVotes.Count >= (activeSilos + 1) / 2)
             {
-                // kick this silo off
-                log.Info(ErrorCode.MembershipMarkingAsDead, 
-                    "-Going to mark silo {0} as DEAD in the table #1. I am the last voter: #freshVotes={1}, myVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
-                            entry.SiloAddress, 
-                            freshVotes.Count, 
+                // Find the local silo's vote index
+                int myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
+
+                // Kick this silo off
+                log.Info(ErrorCode.MembershipMarkingAsDead,
+                    "-Going to mark silo {0} as DEAD in the table #1. This silo is the last voter: #FreshVotes={1}, MyVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
+                            entry.SiloAddress,
+                            freshVotes.Count,
                             myVoteIndex,
-                            this.clusterMembershipOptions.NumVotesForDeathDeclaration, 
-                            activeSilos, 
-                            PrintSuspectList(allVotes));
-                return await DeclareDead(entry, eTag, table.Version);
+                            this.clusterMembershipOptions.NumVotesForDeathDeclaration,
+                            activeSilos,
+                            PrintSuspectList(entry.SuspectTimes));
+                return await DeclareDead(entry, eTag, table.Version, now);
             }
 
-            // we still do not have enough votes - need to vote                             
-            // find voting place:
-            //      update my vote, if I voted previously
-            //      OR if the list is not full - just add a new vote
-            //      OR overwrite the oldest entry.
-            int indexToWrite = allVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
-            if (indexToWrite == -1)
-            {
-                // My vote is not recorded. Find the most outdated vote if the list is full, and overwrite it
-                if (allVotes.Count >= this.clusterMembershipOptions.NumVotesForDeathDeclaration) // if the list is full
-                {
-                    // The list is full.
-                    DateTime minVoteTime = allVotes.Min(voter => voter.Item2); // pick the most outdated vote
-                    indexToWrite = allVotes.FindIndex(voter => voter.Item2.Equals(minVoteTime));
-                }
-            }
-
-            var prevList = allVotes.ToList(); // take a copy
-            var now = DateTime.UtcNow;
-            if (indexToWrite == -1)
-            {
-                // if did not find specific place to write (the list is not full), just add a new element to the list
-                entry.AddSuspector(myAddress, now);
-            }
-            else
-            {
-                var newEntry = new Tuple<SiloAddress, DateTime>(myAddress, now);
-                entry.SuspectTimes[indexToWrite] = newEntry;
-            }
             log.Info(ErrorCode.MembershipVotingForKill,
                 "-Putting my vote to mark silo {0} as DEAD #2. Previous suspect list is {1}, trying to update to {2}, eTag={3}, freshVotes is {4}",
                 entry.SiloAddress, 
@@ -812,14 +779,14 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task<bool> DeclareDead(MembershipEntry entry, string etag, TableVersion tableVersion)
+        private async Task<bool> DeclareDead(MembershipEntry entry, string etag, TableVersion tableVersion, DateTime time)
         {
             if (this.clusterMembershipOptions.LivenessEnabled)
             {
                 entry = entry.Copy();
 
-                // add the killer (myself) to the suspect list, for easier diagnosis later on.
-                entry.AddSuspector(myAddress, DateTime.UtcNow);
+                // Add the killer (myself) to the suspect list, for easier diagnosis later on.
+                entry.AddSuspector(myAddress, time);
 
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to DeclareDead silo {0} in the table. About to write entry {1}.", entry.SiloAddress, entry.ToFullString());
                 entry.Status = SiloStatus.Dead;

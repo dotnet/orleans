@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace Orleans.TestingHost
 {
@@ -8,8 +8,10 @@ namespace Orleans.TestingHost
     public interface IClientBuilderConfigurator
     {
         /// <summary>
-        /// Configures the client builder
+        /// Configures the client builder.
         /// </summary>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="clientBuilder">The client builder.</param>
         void Configure(IConfiguration configuration, IClientBuilder clientBuilder);
     }
 }

@@ -1,12 +1,10 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Wrapper object around Guid.
-    /// Can be used in places where Guid is optional and in those cases it can be set to null and will not use the storage of an empty Guid struct.
+    /// A unique identifier based on a <see cref="Guid"/>.
     /// </summary>
     [Serializable]
     [Immutable]
@@ -15,90 +13,142 @@ namespace Orleans.Runtime
     {
         private static readonly Interner<Guid, GuidId> guidIdInternCache = new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE);
 
+        /// <summary>
+        /// The underlying <see cref="Guid"/>.
+        /// </summary>
         [Id(1)]
         public readonly Guid Guid;
 
-        // TODO: Need to integrate with Orleans serializer to really use Interner.
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GuidId"/> class.
+        /// </summary>
+        /// <param name="guid">
+        /// The underlying <see cref="Guid"/>.
+        /// </param>
         private GuidId(Guid guid)
         {
             this.Guid = guid;
         }
 
+        /// <summary>
+        /// Returns a new, randomly generated <see cref="GuidId"/>.
+        /// </summary>
+        /// <returns>A new, randomly generated <see cref="GuidId"/>.</returns>
         public static GuidId GetNewGuidId()
         {
             return FindOrCreateGuidId(Guid.NewGuid());
         }
 
+        /// <summary>
+        /// Returns a <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.
+        /// </summary>
+        /// <param name="guid">The guid.</param>
+        /// <returns>A <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.</returns>
         public static GuidId GetGuidId(Guid guid)
         {
             return FindOrCreateGuidId(guid);
         }
 
+        /// <summary>
+        /// Returns a <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.
+        /// </summary>
+        /// <param name="guid">The <see cref="Guid"/>.</param>
+        /// <returns>A <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.</returns>
         private static GuidId FindOrCreateGuidId(Guid guid)
         {
             return guidIdInternCache.FindOrCreate(guid, g => new GuidId(g));
         }
 
+        /// <inheritdoc />
         public int CompareTo(GuidId other)
         {
             return this.Guid.CompareTo(other.Guid);
         }
 
+        /// <inheritdoc />
         public bool Equals(GuidId other)
         {
             return other != null && this.Guid.Equals(other.Guid);
         }
 
+        /// <inheritdoc />
         public override bool Equals(object obj)
         {
             return this.Equals(obj as GuidId);
         }
 
+        /// <inheritdoc />
         public override int GetHashCode()
         {
             return this.Guid.GetHashCode();
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return this.Guid.ToString();
         }
 
+        /// <summary>
+        /// Returns a detailed string representation of this instance.
+        /// </summary>
+        /// <returns>A detailed string representation of this instance.</returns>
         internal string ToDetailedString()
         {
             return this.Guid.ToString();
         }
 
+        /// <summary>
+        /// Returns a string representation of this instance which can be parsed by <see cref="FromParsableString"/>
+        /// </summary>
+        /// <returns>A string representation of this instance which can be parsed by <see cref="FromParsableString"/></returns>
         public string ToParsableString()
         {
             return Guid.ToString();
         }
 
+        /// <summary>
+        /// Parses a string formatted using <see cref="ToParsableString"/> and returns the corresponding <see cref="GuidId"/>.
+        /// </summary>
+        /// <param name="guidId">A string representation of an id.</param>
+        /// <returns>A <see cref="GuidId"/> corresponding to the provided string</returns>
         public static GuidId FromParsableString(string guidId)
         {
             Guid id = System.Guid.Parse(guidId);
             return GetGuidId(id);
         }
 
-        public static bool operator ==(GuidId a, GuidId b)
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator ==(GuidId left, GuidId right)
         {
-            if (ReferenceEquals(a, b)) return true;
-            if (ReferenceEquals(a, null)) return false;
-            if (ReferenceEquals(b, null)) return false;
-            return a.Guid.Equals(b.Guid);
+            if (ReferenceEquals(left, right)) return true;
+            if (ReferenceEquals(left, null)) return false;
+            if (ReferenceEquals(right, null)) return false;
+            return left.Guid.Equals(right.Guid);
         }
 
-        public static bool operator !=(GuidId a, GuidId b)
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator !=(GuidId left, GuidId right)
         {
-            return !(a == b);
+            return !(left == right);
         }
 
+        /// <inheritdoc />
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Guid", Guid, typeof(Guid));
         }
 
-        // The special constructor is used to deserialize values. 
         private GuidId(SerializationInfo info, StreamingContext context)
         {
             Guid = (Guid) info.GetValue("Guid", typeof(Guid));

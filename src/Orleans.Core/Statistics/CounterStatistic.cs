@@ -6,8 +6,8 @@ using System.Linq;
 using System.Threading;
 
 namespace Orleans.Runtime
-{
-    public enum CounterStorage
+{        
+    internal enum CounterStorage
     {
         DontStore,
         LogOnly,
@@ -17,26 +17,55 @@ namespace Orleans.Runtime
     /// <summary>
     /// A detailed statistic counter. Usually a low level performance statistic used in troubleshooting scenarios.
     /// </summary>
-    public interface ICounter
+    internal interface ICounter
     {
         /// <summary>
-        /// the name of the statistic counter
+        /// Gets the name of the statistic counter.
         /// </summary>
+        /// <value>The name.</value>
         string Name { get; }
 
         /// <summary>
         /// if this the statistic counter value is delta since last value reported or an absolute value
         /// </summary>
+        /// <value><c>true</c> if this instance is value delta; otherwise, <c>false</c>.</value>
         bool IsValueDelta { get; }
+
+        /// <summary>
+        /// Gets the value as a string.
+        /// </summary>
+        /// <returns>The current value.</returns>
         string GetValueString();
+        /// <summary>
+        /// Gets the delta as a string.
+        /// </summary>
+        /// <returns>The delta value.</returns>
         string GetDeltaString();
+        /// <summary>
+        /// Resets the current value.
+        /// </summary>
         void ResetCurrent();
+
+        /// <summary>
+        /// Gets the display string.
+        /// </summary>
+        /// <returns>A display string.</returns>
         string GetDisplayString();
+
+        /// <summary>
+        /// Gets the storage.
+        /// </summary>
+        /// <value>The storage.</value>
         CounterStorage Storage { get; }
+
+        /// <summary>
+        /// Tracks the metric.
+        /// </summary>
+        /// <param name="telemetryProducer">The telemetry producer.</param>
         void TrackMetric(ITelemetryProducer telemetryProducer);
     }
 
-    public static class Metric
+    internal static class Metric
     {
         public static string CreateCurrentName(string statisticName)
         {

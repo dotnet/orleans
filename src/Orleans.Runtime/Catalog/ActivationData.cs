@@ -278,12 +278,12 @@ namespace Orleans.Runtime
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
         public LimitExceededException CheckOverloaded()
         {
-            string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
+            string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
             int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
             int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
             if (IsStatelessWorker)
             {
-                limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER;
+                limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker);
                 maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
                 maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
             }

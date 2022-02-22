@@ -16,6 +16,9 @@ namespace Orleans.Serialization
         private readonly Func<Type, object> _createConstructorDelegate;
         private readonly ConcurrentDictionary<Type, object> _constructors = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SerializationConstructorFactory"/> class.
+        /// </summary>
         [SecurityCritical]
         public SerializationConstructorFactory()
         {
@@ -23,6 +26,11 @@ namespace Orleans.Serialization
                 GetSerializationConstructorInvoker<object, Action<object, SerializationInfo, StreamingContext>>;
         }
 
+        /// <summary>
+        /// Determines whether the provided type has a serialization constructor.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns><see langword="true" /> if the provided type has a serialization constructor; otherwise, <see langword="false" />.</returns>
         [SecurityCritical]
         public static bool HasSerializationConstructor(Type type) => GetSerializationConstructor(type) != null;
 

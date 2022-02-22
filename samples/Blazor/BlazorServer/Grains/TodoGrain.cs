@@ -1,88 +1,86 @@
-using System;
-using System.Threading.Tasks;
 using BlazorServer.Models;
-using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 
-namespace BlazorServer
+namespace BlazorServer;
+
+public class TodoGrain : Grain, ITodoGrain
 {
-    public class TodoGrain : Grain, ITodoGrain
+    private readonly ILogger<TodoGrain> _logger;
+    private readonly IPersistentState<State> _state;
+
+    private string GrainType => nameof(TodoGrain);
+    private Guid GrainKey => this.GetPrimaryKey();
+
+    public TodoGrain(
+        ILogger<TodoGrain> logger,
+        [PersistentState("State")] IPersistentState<State> state)
     {
-        private readonly ILogger<TodoGrain> _logger;
-        private readonly IPersistentState<State> _state;
+        _logger = logger;
+        _state = state;
+    }
 
-        private string GrainType => nameof(TodoGrain);
-        private Guid GrainKey => this.GetPrimaryKey();
+    public Task<TodoItem?> GetAsync() => Task.FromResult(_state.State.Item);
 
-        public TodoGrain(ILogger<TodoGrain> logger, [PersistentState("State")] IPersistentState<State> state)
+    public async Task SetAsync(TodoItem item)
+    {
+        // Ensure the key is consistent
+        if (item.Key != GrainKey)
         {
-            this._logger = logger;
-            this._state = state;
+            throw new InvalidOperationException();
         }
 
-        public Task<TodoItem> GetAsync() => Task.FromResult(_state.State.Item);
+        // Save the item
+        _state.State.Item = item;
+        await _state.WriteStateAsync();
 
-        public async Task SetAsync(TodoItem item)
-        {
-            // Ensure the key is consistent
-            if (item.Key != GrainKey)
-            {
-                throw new InvalidOperationException();
-            }
+        // Register the item with its owner list
+        await GrainFactory.GetGrain<ITodoManagerGrain>(item.OwnerKey)
+            .RegisterAsync(item.Key);
 
-            // Save the item
-            _state.State.Item = item;
-            await _state.WriteStateAsync();
+        // For sample debugging
+        _logger.LogInformation(
+            "{@GrainType} {@GrainKey} now contains {@Todo}",
+            GrainType, GrainKey, item);
 
-            // Register the item with its owner list
-            await GrainFactory.GetGrain<ITodoManagerGrain>(item.OwnerKey)
-                .RegisterAsync(item.Key);
+        // Notify listeners - best effort only
+        GetStreamProvider("SMS").GetStream<TodoNotification>(item.OwnerKey, nameof(ITodoGrain))
+            .OnNextAsync(new TodoNotification(item.Key, item))
+            .Ignore();
+    }
 
-            // For sample debugging
-            _logger.LogInformation(
-                "{@GrainType} {@GrainKey} now contains {@Todo}",
-                GrainType, GrainKey, item);
+    public async Task ClearAsync()
+    {
+        // Fast path for already cleared state
+        if (_state.State.Item is null) return;
 
-            // Notify listeners - best effort only
-            GetStreamProvider("SMS").GetStream<TodoNotification>(item.OwnerKey, nameof(ITodoGrain))
-                .OnNextAsync(new TodoNotification(item.Key, item))
-                .Ignore();
-        }
+        // Hold on to the keys
+        var itemKey = _state.State.Item.Key;
+        var ownerKey = _state.State.Item.OwnerKey;
 
-        public async Task ClearAsync()
-        {
-            // Fast path for already cleared state
-            if (_state.State.Item == null) return;
+        // Unregister from the registry
+        await GrainFactory.GetGrain<ITodoManagerGrain>(ownerKey)
+            .UnregisterAsync(itemKey);
 
-            // Hold on to the keys
-            var itemKey = _state.State.Item.Key;
-            var ownerKey = _state.State.Item.OwnerKey;
+        // Clear the state
+        await _state.ClearStateAsync();
 
-            // Unregister from the registry
-            await GrainFactory.GetGrain<ITodoManagerGrain>(ownerKey)
-                .UnregisterAsync(itemKey);
+        // For sample debugging
+        _logger.LogInformation(
+            "{@GrainType} {@GrainKey} is now cleared",
+            GrainType, GrainKey);
 
-            // Clear the state
-            await _state.ClearStateAsync();
+        // Notify listeners - best effort only
+        GetStreamProvider("SMS").GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
+            .OnNextAsync(new TodoNotification(itemKey, null))
+            .Ignore();
 
-            // For sample debugging
-            _logger.LogInformation(
-                "{@GrainType} {@GrainKey} is now cleared",
-                GrainType, GrainKey);
+        // No need to stay alive anymore
+        DeactivateOnIdle();
+    }
 
-            // Notify listeners - best effort only
-            GetStreamProvider("SMS").GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
-                .OnNextAsync(new TodoNotification(itemKey, null))
-                .Ignore();
-
-            // No need to stay alive anymore
-            DeactivateOnIdle();
-        }
-
-        public class State
-        {
-            public TodoItem Item { get; set; }
-        }
+    public class State
+    {
+        public TodoItem? Item { get; set; }
     }
 }

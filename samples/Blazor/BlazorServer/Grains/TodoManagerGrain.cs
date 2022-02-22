@@ -1,49 +1,36 @@
+using System.Collections.Immutable;
 using Orleans;
 using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Threading.Tasks;
 
-namespace BlazorServer
+namespace BlazorServer;
+
+public class TodoManagerGrain : Grain, ITodoManagerGrain
 {
-    public class TodoManagerGrain : Grain, ITodoManagerGrain
+    private readonly IPersistentState<State> _state;
+
+    public TodoManagerGrain(
+        [PersistentState("State")] IPersistentState<State> state)
     {
-        private readonly IPersistentState<State> _state;
+        _state = state;
+    }
 
-        public TodoManagerGrain([PersistentState("State")] IPersistentState<State> state)
-        {
-            this._state = state;
-        }
+    public async Task RegisterAsync(Guid itemKey)
+    {
+        _state.State.Items.Add(itemKey);
+        await _state.WriteStateAsync();
+    }
 
-        public override Task OnActivateAsync()
-        {
-            if (_state.State.Items == null)
-            {
-                _state.State.Items = new HashSet<Guid>();
-            }
+    public async Task UnregisterAsync(Guid itemKey)
+    {
+        _state.State.Items.Remove(itemKey);
+        await _state.WriteStateAsync();
+    }
 
-            return base.OnActivateAsync();
-        }
+    public Task<ImmutableArray<Guid>> GetAllAsync() =>
+        Task.FromResult(ImmutableArray.CreateRange(_state.State.Items));
 
-        public async Task RegisterAsync(Guid itemKey)
-        {
-            _state.State.Items.Add(itemKey);
-            await _state.WriteStateAsync();
-        }
-
-        public async Task UnregisterAsync(Guid itemKey)
-        {
-            _state.State.Items.Remove(itemKey);
-            await _state.WriteStateAsync();
-        }
-
-        public Task<ImmutableArray<Guid>> GetAllAsync() =>
-            Task.FromResult(ImmutableArray.CreateRange(_state.State.Items));
-
-        public class State
-        {
-            public HashSet<Guid> Items { get; set; }
-        }
+    public class State
+    {
+        public HashSet<Guid> Items { get; set; } = new();
     }
 }

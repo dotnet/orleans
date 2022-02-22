@@ -54,11 +54,20 @@ namespace Orleans.Concurrency
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class StatelessWorkerAttribute : PlacementAttribute, IGrainPropertiesProviderAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// </summary>
+        /// <param name="maxLocalWorkers">
+        /// The maximum local workers.
+        /// </param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
             : base(new StatelessWorkerPlacement(maxLocalWorkers))
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// </summary>
         public StatelessWorkerAttribute()
             : base(new StatelessWorkerPlacement())
         {
@@ -97,14 +106,21 @@ namespace Orleans.Concurrency
     public sealed class MayInterleaveAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         /// <summary>
-        /// The name of the callback method
+        /// Initializes a new instance of the <see cref="MayInterleaveAttribute"/> class.
         /// </summary>
-        internal string CallbackMethodName { get; private set; }
-
+        /// <param name="callbackMethodName">
+        /// The callback method name.
+        /// </param>
         public MayInterleaveAttribute(string callbackMethodName)
         {
             this.CallbackMethodName = callbackMethodName;
         }
+
+        /// <summary>
+        /// Gets the name of the callback method
+        /// </summary>
+        internal string CallbackMethodName { get; private set; }
+
 
         /// <inheritdoc/>
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)

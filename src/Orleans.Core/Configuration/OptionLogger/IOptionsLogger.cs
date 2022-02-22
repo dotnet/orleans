@@ -9,19 +9,37 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans
 { 
+    /// <summary>
+    /// Logger for options on the client.
+    /// </summary>
     internal class ClientOptionsLogger : OptionsLogger, ILifecycleParticipant<IClusterClientLifecycle>
     {
-        private int ClientOptionLoggerLifeCycleRing = int.MinValue;
+        /// <summary>
+        /// Logs options as soon as possible.
+        /// </summary>
+        private const int ClientOptionLoggerLifeCycleRing = int.MinValue;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClientOptionsLogger"/> class.
+        /// </summary>
+        /// <param name="logger">
+        /// The logger.
+        /// </param>
+        /// <param name="services">
+        /// The services.
+        /// </param>
         public ClientOptionsLogger(ILogger<ClientOptionsLogger> logger, IServiceProvider services)
             : base(logger, services)
         {
         }
 
+        /// <inheritdoc />
         public void Participate(IClusterClientLifecycle lifecycle)
         {
             lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, this.OnStart);
         }
 
+        /// <inheritdoc />
         public Task OnStart(CancellationToken token)
         {
             this.LogOptions();
@@ -34,8 +52,18 @@ namespace Orleans
     /// </summary>
     public abstract class OptionsLogger 
     {
-        private ILogger logger;
-        private IServiceProvider services;
+        private readonly ILogger logger;
+        private readonly IServiceProvider services;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OptionsLogger"/> class.
+        /// </summary>
+        /// <param name="logger">
+        /// The logger.
+        /// </param>
+        /// <param name="services">
+        /// The services.
+        /// </param>
         protected OptionsLogger(ILogger logger, IServiceProvider services)
         {
             this.logger = logger;
@@ -51,9 +79,9 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Log options using a set of formatters
+        /// Log options using a set of formatters.
         /// </summary>
-        /// <param name="formatters"></param>
+        /// <param name="formatters">The collection of options formatters.</param>
         public void LogOptions(IEnumerable<IOptionFormatter> formatters)
         {
             foreach (var optionFormatter in formatters.OrderBy(f => f.Name))
@@ -63,9 +91,9 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Log an options using a formatter
+        /// Log an options using a formatter.
         /// </summary>
-        /// <param name="formatter"></param>
+        /// <param name="formatter">The options formatter.</param>
         public void LogOption(IOptionFormatter formatter)
         {
             try

@@ -3,9 +3,10 @@ using System.Text;
 
 namespace Orleans
 {
-    // Based on the version in http://home.comcast.net/~bretm/hash/7.html, which is based on that
-    // in http://burtleburtle.net/bob/hash/evahash.html.
-    // Note that we only use the version that takes three ulongs, which was written by the Orleans team.
+    /// <summary>
+    /// Implements Bob Jenkins' hashing algorithm.
+    /// </summary>
+    /// <seealso href="https://en.wikipedia.org/wiki/Jenkins_hash_function"/>
     public static class JenkinsHash
     {
         private static void Mix(ref uint a, ref uint b, ref uint c)
@@ -21,13 +22,29 @@ namespace Orleans
             c -= a; c -= b; c ^= (b >> 15);
         }
 
-        // This is the reference implementation of the Jenkins hash.
+        /// <summary>
+        /// Computes a hash digest of the input.
+        /// </summary>
+        /// <param name="data">
+        /// The input data.
+        /// </param>
+        /// <returns>
+        /// A hash digest of the input.
+        /// </returns>
         public static uint ComputeHash(byte[] data)
         {
             return ComputeHash(data.AsSpan());
         }
 
-        // This is the reference implementation of the Jenkins hash.
+        /// <summary>
+        /// Computes a hash digest of the input.
+        /// </summary>
+        /// <param name="data">
+        /// The input data.
+        /// </param>
+        /// <returns>
+        /// A hash digest of the input.
+        /// </returns>
         public static uint ComputeHash(ReadOnlySpan<byte> data)
         {
             int len = data.Length;
@@ -79,17 +96,41 @@ namespace Orleans
             return c;
         }
 
+        /// <summary>
+        /// Computes a hash digest of the input.
+        /// </summary>
+        /// <param name="data">
+        /// The input data.
+        /// </param>
+        /// <returns>
+        /// A hash digest of the input.
+        /// </returns>
         public static uint ComputeHash(string data)
         {
             byte[] bytesToHash = Encoding.UTF8.GetBytes(data);
             return ComputeHash(bytesToHash);
         }
 
-        // This implementation calculates the exact same hash value as the above, but is
-        // optimized for the case where the input is exactly 24 bytes of data provided as
-        // three 8-byte unsigned integers.
+        /// <summary>
+        /// Computes a hash digest of the input.
+        /// </summary>
+        /// <param name="u1">
+        /// The first input.
+        /// </param>
+        /// <param name="u2">
+        /// The second input.
+        /// </param>
+        /// <param name="u3">
+        /// The third input.
+        /// </param>
+        /// <returns>
+        /// A hash digest of the input.
+        /// </returns>
         public static uint ComputeHash(ulong u1, ulong u2, ulong u3)
         {
+            // This implementation calculates the exact same hash value as the above, but is
+            // optimized for the case where the input is exactly 24 bytes of data provided as
+            // three 8-byte unsigned integers.
             uint a = 0x9e3779b9;
             uint b = a;
             uint c = 0;

@@ -1,4 +1,4 @@
-﻿
+
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -10,13 +10,19 @@ namespace Orleans.Providers
     public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
     {
         /// <summary>
-        /// Enqueue an event.
+        /// Enqueues an event.
         /// </summary>
+        /// <param name="data">The data.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task Enqueue(MemoryMessageData data);
 
         /// <summary>
-        /// Dequeue up to maxCount events.
+        /// Dequeues up to <paramref name="maxCount"/> events.
         /// </summary>
+        /// <param name="maxCount">
+        /// The maximum number of events to dequeue.
+        /// </param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task<List<MemoryMessageData>> Dequeue(int maxCount);
     }
 }

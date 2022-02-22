@@ -20,6 +20,10 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class PointerTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PointerTypeSpec"/> class.
+        /// </summary>
+        /// <param name="elementType">The element type.</param>
         public PointerTypeSpec(TypeSpec elementType)
         {
             if (elementType is null)
@@ -47,6 +51,10 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class ReferenceTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReferenceTypeSpec"/> class.
+        /// </summary>
+        /// <param name="elementType">The element type.</param>
         public ReferenceTypeSpec(TypeSpec elementType)
         {
             if (elementType is null)
@@ -74,6 +82,11 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class ArrayTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArrayTypeSpec"/> class.
+        /// </summary>
+        /// <param name="elementType">The array element type.</param>
+        /// <param name="dimensions">The number of dimensions for the array.</param>
         public ArrayTypeSpec(TypeSpec elementType, int dimensions)
         {
             if (elementType is null)
@@ -112,6 +125,11 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class ConstructedGenericTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConstructedGenericTypeSpec"/> class.
+        /// </summary>
+        /// <param name="unconstructedType">The unconstructed type.</param>
+        /// <param name="arguments">The generic type arguments.</param>
         public ConstructedGenericTypeSpec(NamedTypeSpec unconstructedType, TypeSpec[] arguments)
         {
             if (unconstructedType is null)
@@ -163,6 +181,12 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class NamedTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NamedTypeSpec"/> class.
+        /// </summary>
+        /// <param name="containingType">The containing type.</param>
+        /// <param name="name">The type name.</param>
+        /// <param name="arity">The generic arity of the type, which must be greater than or equal to the generic arity of the containing type.</param>
         public NamedTypeSpec(NamedTypeSpec containingType, string name, int arity)
         {
             ContainingType = containingType;
@@ -198,7 +222,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Gets the namespace-qualified type name, including containing types (for nested types).
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The namespace-qualified type name.</returns>
         public string GetNamespaceQualifiedName()
         {
             var builder = new StringBuilder();
@@ -229,6 +253,11 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public class AssemblyQualifiedTypeSpec : TypeSpec
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AssemblyQualifiedTypeSpec"/> class.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <param name="assembly">The assembly.</param>
         public AssemblyQualifiedTypeSpec(TypeSpec type, string assembly)
         {
             if (type is null)

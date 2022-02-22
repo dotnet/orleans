@@ -14,17 +14,73 @@ using Orleans.Serialization.Utilities;
 
 namespace Orleans.Serialization.Buffers
 {
+    /// <summary>
+    /// Functionality for reading binary data.
+    /// </summary>
     public abstract class ReaderInput
     {
+        /// <summary>
+        /// Gets the position.
+        /// </summary>
+        /// <value>The position.</value>
         public abstract long Position { get; }
+
+        /// <summary>
+        /// Gets the length.
+        /// </summary>
+        /// <value>The length.</value>
         public abstract long Length { get; }
+
+        /// <summary>
+        /// Skips the specified number of bytes.
+        /// </summary>
+        /// <param name="count">The number of bytes to skip.</param>
         public abstract void Skip(long count);
+
+        /// <summary>
+        /// Seeks to the specified position.
+        /// </summary>
+        /// <param name="position">The position.</param>
         public abstract void Seek(long position);
+
+        /// <summary>
+        /// Reads a byte from the input.
+        /// </summary>
+        /// <returns>The byte which was read.</returns>
         public abstract byte ReadByte();
+
+        /// <summary>
+        /// Reads a <see cref="uint"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="uint"/> which was read.</returns>
         public abstract uint ReadUInt32();
+
+        /// <summary>
+        /// Reads a <see cref="ulong"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="ulong"/> which was read.</returns>
         public abstract ulong ReadUInt64();
+
+        /// <summary>
+        /// Fills the destination span with data from the input.
+        /// </summary>
+        /// <param name="destination">The destination.</param>
         public abstract void ReadBytes(in Span<byte> destination);
+
+        /// <summary>
+        /// Reads bytes from the input into the destination array.
+        /// </summary>
+        /// <param name="destination">The destination array.</param>
+        /// <param name="offset">The offset into the destination to start writing bytes.</param>
+        /// <param name="length">The number of bytes to copy into destination.</param>
         public abstract void ReadBytes(byte[] destination, int offset, int length);
+
+        /// <summary>
+        /// Tries to read the specified number of bytes from the input.
+        /// </summary>
+        /// <param name="length">The number of bytes to read..</param>
+        /// <param name="bytes">The bytes which were read..</param>
+        /// <returns><see langword="true"/> if the number of bytes were successfully read, <see langword="false"/> otherwise.</returns>
         public abstract bool TryReadBytes(int length, out ReadOnlySpan<byte> bytes);
     }
 
@@ -146,28 +202,68 @@ namespace Orleans.Serialization.Buffers
         private static byte[] GetScratchBuffer() => Scratch ??= new byte[1024];
     }
 
+    /// <summary>
+    /// Helper methods for <see cref="Reader{TInput}"/>.
+    /// </summary>
     public static class Reader
     {
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
+        /// <param name="stream">The stream.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<ReaderInput> Create(Stream stream, SerializerSession session) => new Reader<ReaderInput>(new StreamReaderInput(stream, ArrayPool<byte>.Shared), session, 0);
 
+        /// <summary>
+        /// Creates a reader for the provided input data.
+        /// </summary>
+        /// <param name="sequence">The input data.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<ReadOnlySequence<byte>> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new Reader<ReadOnlySequence<byte>>(sequence, session, 0);
 
+        /// <summary>
+        /// Creates a reader for the provided input data.
+        /// </summary>
+        /// <param name="buffer">The input data.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<SpanReaderInput> Create(ReadOnlySpan<byte> buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer, session, 0);
 
+        /// <summary>
+        /// Creates a reader for the provided input data.
+        /// </summary>
+        /// <param name="buffer">The input data.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<SpanReaderInput> Create(byte[] buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer, session, 0);
 
+        /// <summary>
+        /// Creates a reader for the provided input data.
+        /// </summary>
+        /// <param name="buffer">The input data.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<SpanReaderInput> Create(ReadOnlyMemory<byte> buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer.Span, session, 0);
     }
 
+    /// <summary>
+    /// Marker type for <see cref="Reader{TInput}"/> objects which operate over <see cref="ReadOnlySpan{Byte}"/> buffers.
+    /// </summary>
     public readonly struct SpanReaderInput
     {
     }
 
+    /// <summary>
+    /// Provides functionality for parsing data from binary input.
+    /// </summary>
+    /// <typeparam name="TInput">The underlying buffer reader type.</typeparam>
     public ref struct Reader<TInput>
     {
         private readonly static bool IsSpanInput = typeof(TInput) == typeof(SpanReaderInput);
@@ -181,7 +277,7 @@ namespace Orleans.Serialization.Buffers
         private long _previousBuffersSize;
         private readonly long _sequenceOffset;
         private TInput _input;
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Reader(TInput input, SerializerSession session, long globalOffset)
         {
@@ -235,8 +331,16 @@ namespace Orleans.Serialization.Buffers
             Session = session;
         }
 
+        /// <summary>
+        /// Gets the serializer session.
+        /// </summary>
+        /// <value>The serializer session.</value>
         public SerializerSession Session { get; }
 
+        /// <summary>
+        /// Gets the current reader position.
+        /// </summary>
+        /// <value>The current position.</value>
         public long Position
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -261,6 +365,10 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Gets the input length.
+        /// </summary>
+        /// <value>The input length.</value>
         public long Length
         {
             get
@@ -284,6 +392,10 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Skips the specified number of bytes.
+        /// </summary>
+        /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
             if (IsReadOnlySequenceInput)
@@ -321,7 +433,13 @@ namespace Orleans.Serialization.Buffers
 
         /// <summary>
         /// Creates a new reader beginning at the specified position.
-        /// </summary>
+        /// </summary>        
+        /// <param name="position">
+        /// The position in the input stream to fork from.
+        /// </param>        
+        /// <param name="forked">
+        /// The forked reader instance.
+        /// </param>        
         public void ForkFrom(long position, out Reader<TInput> forked)
         {
             if (IsReadOnlySequenceInput)
@@ -364,7 +482,13 @@ namespace Orleans.Serialization.Buffers
                 throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after {nameof(ForkFrom)}, but resulting position is {actualPosition}");
             }
         }
-
+        
+        /// <summary>
+        /// Resumes the reader from the specified position after forked readers are no longer in use.
+        /// </summary>
+        /// <param name="position">
+        /// The position to resume reading from.
+        /// </param>
         public void ResumeFrom(long position)
         {
             if (IsReadOnlySequenceInput)
@@ -431,6 +555,10 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Reads a byte from the input.
+        /// </summary>
+        /// <returns>The byte which was read.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte()
         {
@@ -462,13 +590,18 @@ namespace Orleans.Serialization.Buffers
         {
             reader.MoveNext();
             return reader._currentSpan[reader._bufferPos++];
-
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Reads an <see cref="int"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="int"/> which was read.</returns>
         public int ReadInt32() => (int)ReadUInt32();
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Reads a <see cref="uint"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="uint"/> which was read.</returns>
         public uint ReadUInt32()
         {
             if (IsReadOnlySequenceInput || IsSpanInput)
@@ -503,10 +636,16 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Reads a <see cref="long"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="long"/> which was read.</returns>
         public long ReadInt64() => (long)ReadUInt64();
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Reads a <see cref="ulong"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="ulong"/> which was read.</returns>
         public ulong ReadUInt64()
         {
             if (IsReadOnlySequenceInput || IsSpanInput)
@@ -549,6 +688,11 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
+        /// <summary>
+        /// Reads an array of bytes from the input.
+        /// </summary>
+        /// <param name="count">The length of the array to read.</param>
+        /// <returns>The array wihch was read.</returns>
         public byte[] ReadBytes(uint count)
         {
             if (count == 0)
@@ -575,6 +719,10 @@ namespace Orleans.Serialization.Buffers
             return bytes;
         }
 
+        /// <summary>
+        /// Fills <paramref name="destination"/> with bytes read from the input.
+        /// </summary>
+        /// <param name="destination">The destination.</param>
         public void ReadBytes(in Span<byte> destination)
         {
             if (IsReadOnlySequenceInput || IsSpanInput)
@@ -617,6 +765,12 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Tries the read the specified number of bytes from the input.
+        /// </summary>
+        /// <param name="length">The length.</param>
+        /// <param name="bytes">The bytes which were read.</param>
+        /// <returns><see langword="true"/> if the specified number of bytes were read from the input, <see langword="false"/> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadBytes(int length, out ReadOnlySpan<byte> bytes)
         {
@@ -646,6 +800,10 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal uint ReadVarUInt32NoInlining() => ReadVarUInt32();
 
+        /// <summary>
+        /// Reads a variable-width <see cref="uint"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="uint"/> which was read.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe uint ReadVarUInt32()
         {
@@ -702,6 +860,10 @@ namespace Orleans.Serialization.Buffers
             return (uint)result;
         }
 
+        /// <summary>
+        /// Reads a variable-width <see cref="ulong"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="ulong"/> which was read.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadVarUInt64()
         {
@@ -815,5 +977,4 @@ namespace Orleans.Serialization.Buffers
         private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(byte[])}, {length}, is greater than total length of input.");
     }
-
 }

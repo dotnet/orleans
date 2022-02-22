@@ -21,6 +21,9 @@ namespace Orleans.Runtime.Messaging
 
         [Id(2)]
         public SiloAddress SiloAddress { get; set; }
+
+        [Id(3)]
+        public string ClusterId { get; set; }
     }
 
     internal class ConnectionPreambleHelper

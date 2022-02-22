@@ -7,6 +7,9 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Functionality for reading and writing object references.
+    /// </summary>
     public static class ReferenceCodec
     {
         /// <summary>
@@ -16,6 +19,15 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MarkValueField(SerializerSession session) => session.ReferencedObjects.MarkValueField();
 
+        /// <summary>
+        /// Write an object reference if <paramref name="value"/> has already been written and has been tracked via <see cref="RecordObject(SerializerSession, object)"/>.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
+        /// <returns><see langword="true" /> if a reference was written, <see langword="false" /> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryWriteReferenceField<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
@@ -33,6 +45,13 @@ namespace Orleans.Serialization.Codecs
             return true;
         }
 
+        /// <summary>
+        /// Writes the null reference.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="expectedType">The expected type.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void WriteNullReference<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
@@ -44,9 +63,25 @@ namespace Orleans.Serialization.Codecs
             writer.WriteVarUInt32(0U);
         }
 
+        /// <summary>
+        /// Reads a referenced value.
+        /// </summary>
+        /// <typeparam name="T">The type of the referenced object.</typeparam>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field, typeof(T));
 
+        /// <summary>
+        /// Reads the reference.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static object ReadReference<TInput>(ref Reader<TInput> reader, Field field, Type expectedType)
         {
@@ -104,12 +139,26 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Records that an object was read or written.
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="value">The value.</param>
         public static void RecordObject(SerializerSession session, object value) => session.ReferencedObjects.RecordReferenceField(value);
+
+        /// <summary>
+        /// Records that an object was read or written.
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="referenceId">The reference identifier.</param>
         public static void RecordObject(SerializerSession session, object value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
 
         /// <summary>
         /// Records and returns a placeholder reference id for objects which cannot be immediately deserialized.
         /// </summary>
+        /// <param name="session">The session.</param>
+        /// <returns>The placeholder reference id.</returns>
         public static uint CreateRecordPlaceholder(SerializerSession session)
         {
             var referencedObject = session.ReferencedObjects;

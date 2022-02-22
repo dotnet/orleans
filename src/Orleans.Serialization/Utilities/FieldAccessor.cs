@@ -13,11 +13,17 @@ namespace Orleans.Serialization.Utilities
     /// <param name="value">The value being set.</param>
     public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
 
+    /// <summary>
+    /// Functionality for accessing fields.
+    /// </summary>
     public static class FieldAccessor
     {
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
+        /// <param name="field">
+        /// The field.
+        /// </param>
         /// <returns>A delegate to get the value of a specified field.</returns>
         public static Delegate GetGetter(FieldInfo field) => GetGetDelegate(
                 field,

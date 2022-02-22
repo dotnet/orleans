@@ -7,23 +7,17 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.CodeGeneration
 {
+    /// <summary>
+    /// Utilities for grain interface types.
+    /// </summary>
     internal static class GrainInterfaceUtils
     {
-        public static bool IsGrainInterface(Type t)
-        {
-            if (t.IsClass)
-                return false;
-            if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
-                return false;
-            if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
-                || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
-                return false;
-            if (t == typeof (ISystemTarget))
-                return false;
-
-            return typeof (IAddressable).IsAssignableFrom(t);
-        }
-
+        /// <summary>
+        /// Gets all grain interface methods for a specified type, which may be a class.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="bAllMethods">Whether to get all methods or only declared methods.</param>
+        /// <returns>All grain interface methods for a specified type.</returns>
         public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = true)
         {
             var methodInfos = new List<MethodInfo>();
@@ -89,6 +83,21 @@ namespace Orleans.CodeGeneration
                 }
 
                 return res;
+            }
+
+            static bool IsGrainInterface(Type t)
+            {
+                if (t.IsClass)
+                    return false;
+                if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
+                    return false;
+                if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
+                    || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
+                    return false;
+                if (t == typeof (ISystemTarget))
+                    return false;
+
+                return typeof (IAddressable).IsAssignableFrom(t);
             }
         }
 

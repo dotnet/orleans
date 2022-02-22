@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -29,6 +30,12 @@ namespace Orleans.Runtime
         private readonly GrainPropertiesResolver _resolver;
         private ImmutableDictionary<GrainType, ActivatorEntry> _activators = ImmutableDictionary<GrainType, ActivatorEntry>.Empty;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainContextActivator"/> class.
+        /// </summary>
+        /// <param name="providers">The grain context activator providers.</param>
+        /// <param name="configureContextActions">The <see cref="IConfigureGrainContext"/> providers.</param>
+        /// <param name="grainPropertiesResolver">The grain properties resolver.</param>
         public GrainContextActivator(
             IEnumerable<IGrainContextActivatorProvider> providers,
             IEnumerable<IConfigureGrainContextProvider> configureContextActions,
@@ -42,6 +49,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new grain context for the provided grain address.
         /// </summary>
+        /// <param name="address">The grain address.</param>
+        /// <returns>The grain context.</returns>
         public IGrainContext CreateInstance(GrainAddress address)
         {
             var grainId = address.GrainId;
@@ -122,7 +131,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a grain context activator for the given grain type.
         /// </summary>
-        bool TryGet(GrainType grainType, out IGrainContextActivator activator);
+        /// <param name="grainType">Type of the grain.</param>
+        /// <param name="activator">The grain context activator.</param>
+        /// <returns><see langword="true"/> if an appropriate activator was found, otherwise <see langword="false"/>.</returns>
+        bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator activator);
     }
    
     /// <summary>
@@ -133,6 +145,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a grain context for the given grain address.
         /// </summary>
+        /// <param name="address">The grain address.</param>
+        /// <returns>The newly created grain context.</returns>
         public IGrainContext CreateContext(GrainAddress address);
     }
 
@@ -142,9 +156,13 @@ namespace Orleans.Runtime
     public interface IConfigureGrainContextProvider
     {
         /// <summary>
-        /// Provides a <see cref="IConfigureGrainContext"/> instance for the provided grain type.
+        /// Provides a <see cref="IConfigureGrainContext" /> instance for the provided grain type.
         /// </summary>
-        bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator);
+        /// <param name="grainType">Type of the grain.</param>
+        /// <param name="properties">The grain properties.</param>
+        /// <param name="configurator">The configuration provider.</param>
+        /// <returns><see langword="true"/> if a configuration provider was found, <see langword="false"/> otherwise.</returns>
+        bool TryGetConfigurator(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IConfigureGrainContext configurator);
     }
 
     /// <summary>
@@ -155,6 +173,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Configures the provided grain context.
         /// </summary>
+        /// <param name="context">The grain context.</param>
         void Configure(IGrainContext context);
     }
 
@@ -177,6 +196,20 @@ namespace Orleans.Runtime
         private readonly ILogger<Grain> _logger;
         private readonly IServiceProvider _serviceProvider;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainTypeSharedContextResolver"/> class.
+        /// </summary>
+        /// <param name="configurators">The grain type component configuration providers.</param>
+        /// <param name="grainPropertiesResolver">The grain properties resolver.</param>
+        /// <param name="grainReferenceActivator">The grain reference activator.</param>
+        /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
+        /// <param name="grainClassMap">The grain class map.</param>
+        /// <param name="placementStrategyResolver">The grain placement strategy resolver.</param>
+        /// <param name="messagingOptions">The messaging options.</param>
+        /// <param name="collectionOptions">The grain activation collection options</param>
+        /// <param name="grainRuntime">The grain runtime.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="serviceProvider">The service provider.</param>
         public GrainTypeSharedContextResolver(
             IEnumerable<IConfigureGrainTypeComponents> configurators,
             GrainPropertiesResolver grainPropertiesResolver,
@@ -207,6 +240,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns shared grain components for the provided grain type.
         /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <returns>The shared context for all grains of the provided type.</returns>
         public GrainTypeSharedContext GetComponents(GrainType grainType) => _components.GetOrAdd(grainType, _createFunc);
 
         private GrainTypeSharedContext Create(GrainType grainType)
@@ -240,6 +275,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Configures shared components which are common for all instances of a given grain type.
         /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="properties">The grain properties.</param>
+        /// <param name="shared">The shared context for all grains of the specified type.</param>
         void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared);
     }
 

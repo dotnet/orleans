@@ -2,7 +2,7 @@
 namespace Orleans
 {
     /// <summary>
-    /// Lifecycle stages of an orlean service.  Cluster Client, or Silo
+    /// Lifecycle stages of an Orleans client or silo.
     /// </summary>
     public static class ServiceLifecycleStage
     {

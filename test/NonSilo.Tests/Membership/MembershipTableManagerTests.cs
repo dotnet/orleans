@@ -519,6 +519,82 @@ namespace NonSilo.Tests.Membership
         }
 
         /// <summary>
+        /// Declare a silo dead in a larger cluster, requiring 2 votes (per configuration), but where our clock is several minutes out of sync with others in the cluster.
+        /// The purpose is to check that logic is consistent across a cluster even if clocks are wildly out of sync.
+        /// This is especially relevant when it comes to vote counting.
+        /// </summary>
+        [Fact]
+        public async Task MembershipTableManager_TrySuspectOrKill_ClocksNotSynchronized()
+        {
+            var otherSilos = new[]
+            {
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead),
+            };
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
+
+            var clusterMembershipOptions = new ClusterMembershipOptions();
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(clusterMembershipOptions),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                siloLifecycle: this.lifecycle);
+
+            // Rig the local clock.
+            var now = DateTime.UtcNow;
+            manager.GetDateTimeUtcNow = () => now;
+
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Active);
+
+            // Add some suspect times. The time difference between them is larger than the recency window (DeathVoteExpirationTimeout),
+            // so only one of the votes will be considered fresh, even though both will be in the future from the perspective
+            // of the local silo.
+            var victim = otherSilos.First().SiloAddress;
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(victim));
+                var entry = row.Item1.Copy();
+                entry.SuspectTimes?.Clear();
+
+                // Twice the recency window into the future (from the local silo's perspective). This will be the benchmark against which
+                // other votes are compared.
+                // If the logic for counting fresh votes is faulty, this plus the vote below should have resulted in an eviction, and
+                // therefore the local silo will crash, declaring that there is a bug.
+                entry.AddSuspector(otherSilos[2].SiloAddress, now.Add(clusterMembershipOptions.DeathVoteExpirationTimeout.Multiply(2)));
+
+                // Half the recency window into the past (from the local silo's perspective) and therefore within the recency window from
+                // the local silo's perspective.
+                // If the logic for counting fresh votes is faulty, this plus the local silo's vote should be enough to evict the victim.
+                entry.AddSuspector(otherSilos[4].SiloAddress, now.Subtract(clusterMembershipOptions.DeathVoteExpirationTimeout.Divide(2)));
+                if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
+            }
+
+            // Check that:
+            //   a) Adding our vote changes nothing, since our clock is too far behind
+            //   b) The silo is not mistakenly declared dead, since the difference between the two votes is larger than DeathVoteExpirationTimeout.
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await manager.TryToSuspectOrKill(victim);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            // The victim should be alive as no second vote fell within the recency window of the latest vote.
+            await manager.Refresh();
+            Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+        }
+
+        /// <summary>
         /// Declare a silo dead in a larger cluster, requiring 2 votes (per configuration).
         /// </summary>
         [Fact]

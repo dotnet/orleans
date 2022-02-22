@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -7,171 +6,11 @@ using Orleans.Runtime;
 
 namespace Orleans.Internal
 {
-    public static class OrleansTaskExtentions
+    /// <summary>
+    /// Extensions for working with <see cref="Task"/> and <see cref="Task{TResult}"/>.
+    /// </summary>
+    internal static class OrleansTaskExtentions
     {
-        internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
-        internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
-
-        /// <summary>
-        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
-        /// </summary>
-        /// <param name="task">The task.</param>
-        public static Task<object> ToUntypedTask(this Task task)
-        {
-            switch (task.Status)
-            {
-                case TaskStatus.RanToCompletion:
-                    return CompletedTask;
-
-                case TaskStatus.Faulted:
-                    return TaskFromFaulted(task);
-
-                case TaskStatus.Canceled:
-                    return CanceledTask;
-
-                default:
-                    return ConvertAsync(task);
-            }
-
-            async Task<object> ConvertAsync(Task asyncTask)
-            {
-                await asyncTask;
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
-        /// <param name="task">The task.</param>
-        public static Task<object> ToUntypedTask<T>(this Task<T> task)
-        {
-            if (typeof(T) == typeof(object))
-                return task as Task<object>;
-
-            switch (task.Status)
-            {
-                case TaskStatus.RanToCompletion:
-                    return Task.FromResult((object)GetResult(task));
-
-                case TaskStatus.Faulted:
-                    return TaskFromFaulted(task);
-
-                case TaskStatus.Canceled:
-                    return CanceledTask;
-
-                default:
-                    return ConvertAsync(task);
-            }
-
-            async Task<object> ConvertAsync(Task<T> asyncTask)
-            {
-                return await asyncTask.ConfigureAwait(false);
-            }
-        }
-
-        /// <summary>
-        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
-        /// <param name="task">The task.</param>
-        internal static Task<T> ToTypedTask<T>(this Task<object> task)
-        {
-            if (typeof(T) == typeof(object))
-                return task as Task<T>;
-
-            switch (task.Status)
-            {
-                case TaskStatus.RanToCompletion:
-                    return Task.FromResult((T)GetResult(task));
-
-                case TaskStatus.Faulted:
-                    return TaskFromFaulted<T>(task);
-
-                case TaskStatus.Canceled:
-                    return TaskFromCanceled<T>();
-
-                default:
-                    return ConvertAsync(task);
-            }
-
-            async Task<T> ConvertAsync(Task<object> asyncTask)
-            {
-                var result = await asyncTask.ConfigureAwait(false);
-
-                if (result is null)
-                {
-                    if (!NullabilityHelper<T>.IsNullableType)
-                    {
-                        ThrowInvalidTaskResultType(typeof(T));
-                    }
-
-                    return default;
-                }
-
-                return (T)result;
-            }
-        }
-
-        private static class NullabilityHelper<T>
-        {
-            /// <summary>
-            /// True if <typeparamref name="T" /> is an instance of a nullable type (a reference type or <see cref="Nullable{T}"/>), otherwise false.
-            /// </summary>
-            public static readonly bool IsNullableType = !typeof(T).IsValueType || typeof(T).IsConstructedGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Nullable<>);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidTaskResultType(Type type)
-        {
-            var message = $"Expected result of type {type} but encountered a null value. This may be caused by a grain call filter swallowing an exception.";
-            throw new InvalidOperationException(message);
-        }
-
-        /// <summary>
-        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{Object}"/>.
-        /// </summary>
-        /// <param name="task">The task.</param>
-        public static Task<object> ToUntypedTask(this Task<object> task)
-        {
-            return task;
-        }
-        
-        private static Task<object> TaskFromFaulted(Task task)
-        {
-            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            completion.SetException(task.Exception.InnerExceptions);
-            return completion.Task;
-        }
-
-        private static Task<T> TaskFromFaulted<T>(Task task)
-        {
-            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-            completion.SetException(task.Exception.InnerExceptions);
-            return completion.Task;
-        }
-
-        private static Task<T> TaskFromCanceled<T>()
-        {
-            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-            completion.SetCanceled();
-            return completion.Task;
-        }
-
-        /// <summary>
-        /// Returns the single exception contained by the provided <see cref="AggregateException"/> or the provided <see cref="AggregateException"/> if it represents multiple exceptions.
-        /// </summary>
-        internal static Exception OriginalException(this AggregateException exception)
-        {
-            if (exception.InnerExceptions.Count == 1)
-            {
-                return exception.InnerException;
-            }
-
-            return exception;
-        }
-
         public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try
@@ -204,7 +43,7 @@ namespace Orleans.Internal
             }
         }
 
-        internal static String ToString(this Task t)
+        internal static string ToString(this Task t)
         {
             return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));
         }
@@ -351,46 +190,6 @@ namespace Orleans.Internal
                 }
 
                 await firstToComplete.ConfigureAwait(false);
-            }
-        }
-
-        /// <summary>
-        /// For making an uncancellable task cancellable, by ignoring its result.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="taskToComplete">The task to wait for unless cancelled</param>
-        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
-        /// <returns></returns>
-        internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
-        {
-            if (taskToComplete.IsCompleted || !cancellationToken.CanBeCanceled)
-            {
-                return taskToComplete;
-            }
-            else if (cancellationToken.IsCancellationRequested)
-            {
-                return Task.FromCanceled<T>(cancellationToken);
-            }
-            else 
-            {
-                return MakeCancellable(taskToComplete, cancellationToken);
-            }
-        }
-
-        private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
-        {
-            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using (cancellationToken.Register(() =>
-                      tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
-            {
-                var firstToComplete = await Task.WhenAny(task, tcs.Task).ConfigureAwait(false);
-
-                if (firstToComplete != task)
-                {
-                    task.Ignore();
-                }
-
-                return await firstToComplete.ConfigureAwait(false);
             }
         }
 

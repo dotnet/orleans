@@ -16,9 +16,11 @@ namespace Orleans.Runtime
         string ClusterId { get; }
 
         /// <summary>
-        /// The DNS host name of this silo.
-        /// This is a true host name, no IP address. Equals Dns.GetHostName().
+        /// Gets the host name of this silo.
         /// </summary>
+        /// <remarks>
+        /// This is equal to <see cref="System.Net.Dns.GetHostName()"/>.
+        /// </remarks>
         string DnsHostName { get; }
 
         /// <summary>

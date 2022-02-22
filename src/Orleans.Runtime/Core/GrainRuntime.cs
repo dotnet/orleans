@@ -92,7 +92,7 @@ namespace Orleans.Runtime
         {
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
-            IGrainStorage grainStorage = GrainStorageExtensions.GetGrainStorage(grainType, ServiceProvider);
+            IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
             string grainTypeName = grainContext.GrainInstance.GetType().FullName;
             return new StateStorageBridge<TGrainState>(grainTypeName, grainContext.GrainReference, grainStorage, this.loggerFactory);
         }

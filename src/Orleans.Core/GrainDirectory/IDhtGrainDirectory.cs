@@ -29,18 +29,18 @@ namespace Orleans.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the activation to remove.</param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
-        /// <param name="cause">The reason for unregistration</param>
-        /// <returns>An acknowledgement that the unregistration has completed.</returns>
+        /// <param name="hopCount">Counts recursion depth across silos.</param>
+        /// <param name="cause">The reason for deregistration.</param>
+        /// <returns>An acknowledgement that the deregistration has completed.</returns>
         Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0);
 
         /// <summary>
         /// Unregister a batch of addresses at once
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="addresses"></param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
-        /// <param name="cause">The reason for unregistration</param>
+        /// <param name="addresses">The addresses to deregister.</param>
+        /// <param name="hopCount">Counts recursion depth across silos.</param>
+        /// <param name="cause">The reason for deregistration.</param>
         /// <returns>An acknowledgement that the unregistration has completed.</returns>
         Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0);
 
@@ -49,9 +49,10 @@ namespace Orleans.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="grainId">The ID of the grain.</param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
-        /// <returns>An acknowledgement that the deletion has completed.
-        /// It is safe to ignore this result.</returns>
+        /// <param name="hopCount">Counts recursion depth across silos.</param>
+        /// <returns>
+        /// An acknowledgement that the deletion has completed.
+        /// </returns>
         Task DeleteGrainAsync(GrainId grainId, int hopCount = 0);
 
         /// <summary>
@@ -60,18 +61,27 @@ namespace Orleans.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="grainId">The ID of the grain to look up.</param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
+        /// <param name="hopCount">Counts recursion depth across silos.</param>
         /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
         Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
     }
 
+    /// <summary>
+    /// Represents the address of a grain as well as a version tag.
+    /// </summary>
     [Serializable]
     [GenerateSerializer]
     internal struct AddressAndTag
     {
+        /// <summary>
+        /// The address.
+        /// </summary>
         [Id(1)]
         public GrainAddress Address;
        
+        /// <summary>
+        /// The version of this entry.
+        /// </summary>
         [Id(2)]
         public int VersionTag;
     }

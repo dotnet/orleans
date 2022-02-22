@@ -6,6 +6,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration.Overrides
 {
+    /// <summary>
+    /// Functionality for overriding options using named options, falling back to the default (unnamed) value.
+    /// </summary>
     public static class OptionsOverrides
     {
         /// <summary>

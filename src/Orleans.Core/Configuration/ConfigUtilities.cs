@@ -5,12 +5,11 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Configuration
 {
     /// <summary>
-    /// Utilities class for handling configuration.
+    /// Utilities class for working with configuration.
     /// </summary>
     public static class ConfigUtilities
     {

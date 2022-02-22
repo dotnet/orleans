@@ -4,13 +4,20 @@ using Orleans.LeaseProviders;
 
 namespace Orleans.Runtime.Development
 {
+    /// <summary>
+    /// <see cref="ISiloBuilder"/> extensions to configure an in-memory lease provider.
+    /// </summary>
     public static class DevelopmentSiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo with test/development features.
-        /// NOT FOR PRODUCTION USE - dev/test only
+        /// Configures silo with test/development features.
         /// </summary>
-        public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
+        /// <remarks>
+        /// Not for production use. This is for development and test scenarios only.
+        /// </remarks>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The builder.</returns>
+         public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(UseInMemoryLeaseProvider);
         }

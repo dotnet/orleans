@@ -2,11 +2,15 @@ using Orleans.Serialization.Buffers;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Orleans.Serialization.TypeSystem
 {
+    /// <summary>
+    /// Functionality for serializing and deserializing types.
+    /// </summary>
     public sealed class TypeCodec
     {
         private const byte Version1 = 1;
@@ -15,12 +19,22 @@ namespace Orleans.Serialization.TypeSystem
         private readonly TypeConverter _typeConverter;
         private readonly Func<Type, TypeKey> _getTypeKey;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TypeCodec"/> class.
+        /// </summary>
+        /// <param name="typeConverter">The type converter.</param>
         public TypeCodec(TypeConverter typeConverter)
         {
             _typeConverter = typeConverter;
             _getTypeKey = type => new TypeKey(Encoding.UTF8.GetBytes(_typeConverter.Format(type)));
         }
 
+        /// <summary>
+        /// Writes a type with a length-prefix.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="type">The type.</param>
         public void WriteLengthPrefixed<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type) where TBufferWriter : IBufferWriter<byte>
         {
             var key = _typeCache.GetOrAdd(type, _getTypeKey);
@@ -28,6 +42,12 @@ namespace Orleans.Serialization.TypeSystem
             writer.Write(key.TypeName);
         }
 
+        /// <summary>
+        /// Writes a type.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="type">The type.</param>
         public void WriteEncodedType<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type) where TBufferWriter : IBufferWriter<byte>
         {
             var key = _typeCache.GetOrAdd(type, _getTypeKey);
@@ -37,7 +57,14 @@ namespace Orleans.Serialization.TypeSystem
             writer.Write(key.TypeName);
         }
 
-        public unsafe bool TryRead<TInput>(ref Reader<TInput> reader, out Type type)
+        /// <summary>
+        /// Reads a type.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="type">The type.</param>
+        /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
+        public unsafe bool TryRead<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type)
         {
             var version = reader.ReadByte();
             if (version != Version1)
@@ -95,6 +122,12 @@ namespace Orleans.Serialization.TypeSystem
             return false;
         }
 
+        /// <summary>
+        /// Reads a length-prefixed type.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>Type.</returns>
         public unsafe Type ReadLengthPrefixed<TInput>(ref Reader<TInput> reader)
         {
             var count = (int)reader.ReadVarUInt32();
@@ -115,7 +148,15 @@ namespace Orleans.Serialization.TypeSystem
             return type;
         }
 
-        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader, out Type type, out string typeString)
+        /// <summary>
+        /// Tries to read a type for diagnostics purposes.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="type">The type.</param>
+        /// <param name="typeString">The type name as a string.</param>
+        /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
+        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type, out string typeString)
         {
             var version = reader.ReadByte();
             var hashCode = reader.ReadInt32();

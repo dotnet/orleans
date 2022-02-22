@@ -23,7 +23,7 @@ namespace ServiceBus.Tests.StreamingTests
             DateTime timeRead = NowUtc - MinTimeInCache;
             TimeSpan timeInCache = NowUtc - timeRead;
             TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
-            Assert.False(TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
+            Assert.False(TimePurge.ShouldPurgeFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace ServiceBus.Tests.StreamingTests
             DateTime timeRead = NowUtc - MinTimeInCache - TimeSpan.FromTicks(1);
             TimeSpan timeInCache = NowUtc - timeRead;
             TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
-            Assert.True(TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
+            Assert.True(TimePurge.ShouldPurgeFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.StreamingTests
             DateTime timeRead = NowUtc - MinTimeInCache - TimeSpan.FromTicks(1);
             TimeSpan timeInCache = NowUtc - timeRead;
             TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
-            Assert.False(TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
+            Assert.False(TimePurge.ShouldPurgeFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace ServiceBus.Tests.StreamingTests
             DateTime timeRead = NowUtc - MinTimeInCache;
             TimeSpan timeInCache = NowUtc - timeRead;
             TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
-            Assert.False(TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
+            Assert.False(TimePurge.ShouldPurgeFromTime(timeInCache, relativeAge));
         }
     }
 }

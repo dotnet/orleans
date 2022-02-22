@@ -18,7 +18,7 @@ namespace DefaultCluster.Tests.General
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var task = grain.Notify(await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.Notify(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
             Assert.True(task.Status == TaskStatus.RanToCompletion, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
@@ -36,7 +36,7 @@ namespace DefaultCluster.Tests.General
             var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var observerReference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
             var completedSynchronously = await grain.NotifyOtherGrain(otherGrain, observerReference);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
@@ -50,7 +50,7 @@ namespace DefaultCluster.Tests.General
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var task = grain.NotifyValueTask(await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.NotifyValueTask(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
             Assert.True(task.IsCompleted, "ValueTask should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
@@ -68,7 +68,7 @@ namespace DefaultCluster.Tests.General
             var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var observerReference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
             var completedSynchronously = await grain.NotifyOtherGrainValueTask(otherGrain, observerReference);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));

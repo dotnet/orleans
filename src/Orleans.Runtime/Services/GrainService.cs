@@ -16,13 +16,17 @@ namespace Orleans.Runtime
         private GrainServiceStatus status;
 
         private ILogger Logger;
-        /// <summary>Token for signaling cancellation upon stopping of grain service</summary>
+
+        /// <summary>Gets the token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
-        /// <summary>Monotonically increasing serial number of the version of the ring range owned by the grain service instance</summary>
+
+        /// <summary>Gets the monotonically increasing serial number of the version of the ring range owned by the grain service instance</summary>
         protected int RangeSerialNumber { get; private set; }
-        /// <summary>Range of the partitioning ring currently owned by the grain service instance</summary>
+
+        /// <summary>Gets the range of the partitioning ring currently owned by the grain service instance</summary>
         protected IRingRange RingRange { get; private set; }
-        /// <summary>Status of the grain service instance</summary>
+
+        /// <summary>Gets the status of the grain service instance</summary>
         protected GrainServiceStatus Status
         {
             get { return status; }
@@ -32,8 +36,6 @@ namespace Orleans.Runtime
                 status = value;
             }
         }
-
-        public GrainReference GetGrainReference() => this.GrainReference;
 
         /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
@@ -54,7 +56,11 @@ namespace Orleans.Runtime
             StoppedCancellationTokenSource = new CancellationTokenSource();
         }
 
-        /// <summary>Invoked upon initialization of the service</summary>
+        /// <summary>
+        /// Invoked upon initialization of the service
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task Init(IServiceProvider serviceProvider)
         {
             return Task.CompletedTask;
@@ -73,6 +79,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Invoked when service is being started</summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task Start()
         {
             RingRange = ring.GetMyRange();
@@ -86,6 +93,7 @@ namespace Orleans.Runtime
         /// Deferred part of initialization that executes after the service is already started (to speed up startup).
         /// Sets Status to Started.
         /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         protected virtual Task StartInBackground()
         {
             Status = GrainServiceStatus.Started;
@@ -93,6 +101,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Invoked when service is being stopped</summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task Stop()
         {
             StoppedCancellationTokenSource.Cancel();
@@ -103,13 +112,19 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-
+        /// <inheritdoc/>
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
         }
 
-        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>
+        /// <summary>
+        /// Invoked when the ring range owned by the service instance changes because of a change in the cluster state
+        /// </summary>
+        /// <param name="oldRange">The old range.</param>
+        /// <param name="newRange">The new range.</param>
+        /// <param name="increased">A value indicating whether the range has increased.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             Logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);

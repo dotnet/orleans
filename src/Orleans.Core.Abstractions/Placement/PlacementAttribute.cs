@@ -59,20 +59,30 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class PreferLocalPlacementAttribute : PlacementAttribute
     {
-        public PreferLocalPlacementAttribute() :
-            base(PreferLocalPlacement.Singleton)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PreferLocalPlacementAttribute"/> class.
+        /// </summary>
+        public PreferLocalPlacementAttribute()
+            : base(PreferLocalPlacement.Singleton)
         {
         }
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>ActivationCountBasedPlacement</c> policy.
+    /// Marks a grain class as using the <see cref="ActivationCountBasedPlacement"/> policy, which attempts to balance
+    /// grain placment across servers based upon the relative number of recently active grains on each one.
     /// </summary>
+    /// <remarks>
+    /// See the documentation for <seealso cref="ActivationCountBasedPlacement"/> for more information.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class ActivationCountBasedPlacementAttribute : PlacementAttribute
     {
-        public ActivationCountBasedPlacementAttribute() :
-            base(ActivationCountBasedPlacement.Singleton)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ActivationCountBasedPlacementAttribute"/> class.
+        /// </summary>
+        public ActivationCountBasedPlacementAttribute()
+            : base(ActivationCountBasedPlacement.Singleton)
         {
         }
     }

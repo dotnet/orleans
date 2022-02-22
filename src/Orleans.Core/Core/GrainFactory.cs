@@ -64,7 +64,7 @@ namespace Orleans
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
-            DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            ValidateGrainKeyExtension(keyExtension);
 
             var grainKey = GrainIdKeyExtensions.CreateGuidKey(primaryKey, keyExtension);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
@@ -74,7 +74,7 @@ namespace Orleans
         public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
-            DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            ValidateGrainKeyExtension(keyExtension);
 
             var grainKey = GrainIdKeyExtensions.CreateIntegerKey(primaryKey, keyExtension);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
@@ -82,18 +82,17 @@ namespace Orleans
 
 
         /// <inheritdoc />
-        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
-            return Task.FromResult(this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj));
+            return this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj);
         }
 
         /// <inheritdoc />
-        public Task DeleteObjectReference<TGrainObserverInterface>(
+        public void DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
             this.runtimeClient.DeleteObjectReference(obj);
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc />
@@ -103,26 +102,14 @@ namespace Orleans
             return (TGrainObserverInterface)this.CreateObjectReference(typeof(TGrainObserverInterface), obj);
         }
 
-        /// <summary>
-        /// Casts the provided <paramref name="grain"/> to the specified interface
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The target grain interface type.</typeparam>
-        /// <param name="grain">The grain reference being cast.</param>
-        /// <returns>
-        /// A reference to <paramref name="grain"/> which implements <typeparamref name="TGrainInterface"/>.
-        /// </returns>
+        /// <inheritdoc />
         public TGrainInterface Cast<TGrainInterface>(IAddressable grain)
         {
             var interfaceType = typeof(TGrainInterface);
             return (TGrainInterface)this.Cast(grain, interfaceType);
         }
 
-        /// <summary>
-        /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
-        /// </summary>
-        /// <param name="grain">The grain.</param>
-        /// <param name="interfaceType">The resulting interface type.</param>
-        /// <returns>A reference to <paramref name="grain"/> which implements <paramref name="interfaceType"/>.</returns>
+        /// <inheritdoc />
         public object Cast(IAddressable grain, Type interfaceType) => this.GrainReferenceRuntime.Cast(grain, interfaceType);
 
         public TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
@@ -132,12 +119,7 @@ namespace Orleans
             return this.GetSystemTarget<TGrainInterface>(grainId.GrainId);
         }
 
-        /// <summary>
-        /// Gets a reference to the specified system target.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The system target interface.</typeparam>
-        /// <param name="grainId">The id of the target.</param>
-        /// <returns>A reference to the specified system target.</returns>
+        /// <inheritdoc />
         public TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId)
             where TGrainInterface : ISystemTarget
         {
@@ -201,6 +183,23 @@ namespace Orleans
             return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
         }
 
+        /// <inheritdoc />
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
+        {
+            return this.referenceActivator.CreateReference(grainId, interfaceType);
+        }
+
+        /// <summary>
+        /// Gets a grain reference which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.
+        /// </summary>
+        /// <remarks>
+        /// This method infers the most appropriate <see cref="GrainId.Type"/> value based on the <paramref name="interfaceType"/> argument and optional <paramref name="grainClassNamePrefix"/> argument.
+        /// The <see cref="GrainInterfaceTypeToGrainTypeResolver"/> type is responsible for determining the most appropriate grain type.
+        /// </remarks>
+        /// <param name="interfaceType">The interface type which the returned grain reference will implement.</param>
+        /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
+        /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
+        /// <returns>A grain reference which implements the provided interface.</returns>
         private IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
@@ -220,17 +219,24 @@ namespace Orleans
             return grain;
         }
 
-        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
-        {
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
-        }
-
+        /// <summary>
+        /// Creates a grain reference.
+        /// </summary>
+        /// <param name="interfaceType">The interface type which the reference must implement..</param>
+        /// <param name="grainId">The grain id which the reference will target.</param>
+        /// <returns>A grain reference.</returns>
         private object CreateGrainReference(Type interfaceType, GrainId grainId)
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
             return this.referenceActivator.CreateReference(grainId, grainInterfaceType);
         }
 
+        /// <summary>
+        /// Creates an object reference which points to the provided object.
+        /// </summary>
+        /// <param name="interfaceType">The interface type which the reference must implement..</param>
+        /// <param name="obj">The addressable object implementation.</param>
+        /// <returns>An object reference.</returns>
         private object CreateObjectReference(Type interfaceType, IAddressable obj)
         {
             if (!interfaceType.IsInterface)
@@ -247,7 +253,13 @@ namespace Orleans
             return this.Cast(this.runtimeClient.CreateObjectReference(obj), interfaceType);
         }
 
-        private static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
+        /// <summary>
+        /// Validates the provided grain key extension.
+        /// </summary>
+        /// <param name="keyExt">The grain key extension.</param>
+        /// <exception cref="ArgumentNullException">The key is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">The key is empty or contains only whitespace.</exception>
+        private static void ValidateGrainKeyExtension(string keyExt)
         {
             if (!string.IsNullOrWhiteSpace(keyExt)) return;
 

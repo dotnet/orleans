@@ -9,117 +9,135 @@ namespace Orleans.Configuration
     public class ClusterMembershipOptions
     {
         /// <summary>
-        /// The number of missed "I am alive" updates  in the table from a silo that causes warning to be logged. Does not impact the liveness protocol.
+        /// Gets or sets the number of missed "I am alive" updates in the table from a silo that causes warning to be logged.
         /// </summary>
-        public int NumMissedTableIAmAliveLimit { get; set; } = DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
-        public const int DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT = 2;
+        /// <remarks>
+        /// This value does not affect the liveness protocol during runtime, but it is used to determine which silos are included
+        /// in the initial connectivity check which is performed at startup.
+        /// </remarks>
+        /// <seealso cref="ValidateInitialConnectivity"/>
+        /// <seealso cref="IAmAliveTablePublishTimeout"/>
+        /// <value>The default value is two missed updates before a silo is ignored during the initial connectivity test.</value>
+        public int NumMissedTableIAmAliveLimit { get; set; } = 2;
 
         /// <summary>
-        /// Global switch to disable silo liveness protocol (should be used only for testing).
-        /// The LivenessEnabled attribute, if provided and set to "false", suppresses liveness enforcement.
-        /// If a silo is suspected to be dead, but this attribute is set to "false", the suspicions will not propagated to the system and enforced,
+        /// Gets or sets a value indicating whether to disable silo liveness protocol (should be used only for testing).
+        /// If a silo is suspected to be down, but this attribute is set to <see langword="false"/>, the suspicions will not propagated to the system and enforced.
         /// This parameter is intended for use only for testing and troubleshooting.
         /// In production, liveness should always be enabled.
-        /// Default is true (enabled)
         /// </summary>
-        public bool LivenessEnabled { get; set; } = DEFAULT_LIVENESS_ENABLED;
-        public const bool DEFAULT_LIVENESS_ENABLED = true;
+        /// <value>Liveness is enabled by default.</value>
+        public bool LivenessEnabled { get; set; } = true;
 
         /// <summary>
-        /// The number of seconds to periodically probe other silos for their liveness or for the silo to send "I am alive" heartbeat  messages about itself.
+        /// Gets or sets both the period between sending a liveness probe to any given host as well as the timeout for each probe.
         /// </summary>
-        public TimeSpan ProbeTimeout { get; set; } = DEFAULT_LIVENESS_PROBE_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(5);
+        /// <value>Probes timeout and a new probe is sent every 5 seconds by default.</value>
+        public TimeSpan ProbeTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
         /// <summary>
-        /// The number of seconds to periodically fetch updates from the membership table.
+        /// Gets or sets the period between fetching updates from the membership table.
         /// </summary>
-        public TimeSpan TableRefreshTimeout { get; set; } = DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT = TimeSpan.FromSeconds(60);
+        /// <value>The membership table is refreshed every 60 seconds by default.</value>
+        public TimeSpan TableRefreshTimeout { get; set; } = TimeSpan.FromSeconds(60);
 
         /// <summary>
-        /// Expiration time in seconds for death vote in the membership table.
+        /// Gets or sets the expiration time in seconds for votes in the membership table.
         /// </summary>
-        public TimeSpan DeathVoteExpirationTimeout { get; set; } = DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
+        /// <value>Votes expire after 2 minutes by default.</value>
+        public TimeSpan DeathVoteExpirationTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
+        /// Gets or sets the period between updating this silo's heartbeat in the membership table.
         /// </summary>
-        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);
+        /// <remarks>
+        /// These heartbeats are largely for diagnostic purposes, however they are also used to ignore entries
+        /// in the membership table in the event of a total cluster reset. This value multiplied by <see cref="NumMissedTableIAmAliveLimit"/>
+        /// is used to skip hosts in the membership table when performing an initial connectivity check upon startup.
+        /// </remarks>
+        /// <value>Publish an update every 5 minutes by default.</value>
+        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
         /// <summary>
-        /// The number of seconds to attempt to join a cluster of silos before giving up.
+        /// Gets or sets the maximum amount of time to attempt to join a cluster before giving up.
         /// </summary>
-        public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
-        public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
+        /// <value>Attempt to join for 5 minutes before giving up by default.</value>
+        public TimeSpan MaxJoinAttemptTime { get; set; } = TimeSpan.FromMinutes(5);
                 
         /// <summary>
-        /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
+        /// Gets or sets a value indicating whether new silo that joins the cluster has to validate the initial connectivity with all other active silos.
         /// </summary>
-        public bool ValidateInitialConnectivity { get; set; } = DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
-        public const bool DEFAULT_VALIDATE_INITIAL_CONNECTIVITY = true;
+        /// <remarks>Do not disable this for production services.</remarks>
+        /// <value>Connectivity is validated during startup by default.</value>
+        public bool ValidateInitialConnectivity { get; set; } = true;
 
         /// <summary>
-        /// Whether to use the gossip optimization to speed up spreading liveness information.
+        /// Gets or sets a value indicating whether gossip membership updates between hosts.
         /// </summary>
-        public bool UseLivenessGossip { get; set; } = DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
-        public const bool DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP = true;
+        /// <value>Membership updates are disseminated using gossip by default.</value>
+        public bool UseLivenessGossip { get; set; } = true;
 
         /// <summary>
-        /// The number of silos each silo probes for liveness.
+        /// Gets or sets the number of silos each silo probes for liveness.
         /// </summary>
-        public int NumProbedSilos { get; set; } = DEFAULT_LIVENESS_NUM_PROBED_SILOS;
-        public const int DEFAULT_LIVENESS_NUM_PROBED_SILOS = 3;
+        /// <remarks>
+        /// This determines how many hosts each host will monitor by default.
+        /// A low value, such as the default value of three, is generally sufficient and allows for prompt removal of another silo in the event that it stops functioning.
+        /// When a silo becomes suspicious of another silo, additional silos may begin to probe that silo to speed up the detection of non-functioning silos.
+        /// </remarks>
+        /// <value>Each silo will actively monitor up to three other silos by default.</value>
+        public int NumProbedSilos { get; set; } = 3;
 
         /// <summary>
-        /// The number of missed "I am alive" heartbeat messages from a silo or number of un-replied probes that lead to suspecting this silo as dead.
+        /// Gets or sets the number of missed probe requests from a silo that lead to suspecting this silo as down.
         /// </summary>
-        public int NumMissedProbesLimit { get; set; } = DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT;
-        public const int DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT = 3;
+        /// <value>A silo will be suspected as being down if three probes are missed, by default.</value>
+        public int NumMissedProbesLimit { get; set; } = 3;
 
         /// <summary>
-        /// The number of non-expired votes that are needed to declare some silo as dead (should be at most NumMissedProbesLimit)
+        /// Gets or sets the number of non-expired votes that are needed to declare some silo as down (should be at most <see cref="NumMissedProbesLimit"/>)
         /// </summary>
-        public int NumVotesForDeathDeclaration { get; set; } = DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION;
-        public const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
+        /// <value>Two votes are sufficient for a silo to be declared as down, by default.</value>
+        public int NumVotesForDeathDeclaration { get; set; } = 2;
 
         /// <summary>
-        /// The period of time after which membership entries for defunct silos are eligible for removal.
+        /// Gets or sets the period of time after which membership entries for defunct silos are eligible for removal.
         /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
         /// </summary>
-        public TimeSpan DefunctSiloExpiration { get; set; } = DEFAULT_DEFUNCT_SILO_EXPIRATION;
-        public static readonly TimeSpan DEFAULT_DEFUNCT_SILO_EXPIRATION = TimeSpan.FromDays(7);
+        /// <value>Defunct silos are removed from membership after one week by default.</value>
+        public TimeSpan DefunctSiloExpiration { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// The duration between membership table cleanup operations. When this period elapses, all defunct silo
+        /// Gets or sets the duration between membership table cleanup operations. When this period elapses, all defunct silo
         /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
         /// </summary>
-        public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD;
-        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = TimeSpan.FromHours(1);
+        /// <value>Membership is cleared of expired, defunct silos every hour, by default.</value>
+        public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// TEST ONLY - Do not modify in production environments
+        /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
         /// </summary>
-        public bool IsRunningAsUnitTest { get; set; } = false;
-
         internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
+
+        /// <summary>
+        /// Gets the amount of time to wait for the cluster membership system to terminate during shutdown.
+        /// </summary>
         internal static TimeSpan ClusteringShutdownGracePeriod => TimeSpan.FromSeconds(5);
 
         /// <summary>
-        /// The period between self-tests to log local health degradation status.
+        /// Gets or sets the period between self-tests to log local health degradation status.
         /// </summary>
+        /// <value>The local host will perform a self-test every ten seconds by default.</value>
         public TimeSpan LocalHealthDegradationMonitoringPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
-        /// Whether to extend the effective <see cref="ProbeTimeout"/> value based upon current local health degradation.
+        /// Gets or sets a value indicating whether to extend the effective <see cref="ProbeTimeout"/> value based upon current local health degradation.
         /// </summary>
-        public bool ExtendProbeTimeoutDuringDegradation { get; set; } = false;
+        public bool ExtendProbeTimeoutDuringDegradation { get; set; } = true;
 
         /// <summary>
-        /// Whether to enable probing silos indirectly, via other silos.
+        /// Gets or sets a value indicating whether to enable probing silos indirectly, via other silos.
         /// </summary>
-        public bool EnableIndirectProbes { get; set; } = false;
+        public bool EnableIndirectProbes { get; set; } = true;
     }
 }

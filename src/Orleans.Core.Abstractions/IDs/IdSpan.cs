@@ -1,145 +1,11 @@
 using System;
-using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Runtime
 {
-    [RegisterSerializer]
-    public sealed class IdSpanCodec : IFieldCodec<IdSpan>
-    {
-        private static readonly ConcurrentDictionary<int, IdSpan> _cache = new ConcurrentDictionary<int, IdSpan>();
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(
-          ref Writer<TBufferWriter> writer,
-          uint fieldIdDelta,
-          Type expectedType,
-          IdSpan value)
-          where TBufferWriter : IBufferWriter<byte>
-        {
-            ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
-            var hashCode = value.GetHashCode();
-            var bytes = IdSpan.UnsafeGetArray(value);
-            var bytesLength = value.IsDefault ? 0 : bytes.Length;
-            writer.WriteVarUInt32((uint)(sizeof(int) + bytesLength));
-            writer.WriteInt32(hashCode);
-            writer.Write(bytes);
-        }
-
-        public static void WriteRaw<TBufferWriter>(
-          ref Writer<TBufferWriter> writer,
-          IdSpan value)
-          where TBufferWriter : IBufferWriter<byte>
-        {
-            var hashCode = value.GetHashCode();
-            var bytes = IdSpan.UnsafeGetArray(value);
-            writer.WriteInt32(hashCode);
-            var bytesLength = value.IsDefault ? 0 : bytes.Length;
-            writer.WriteVarUInt32((uint)bytesLength);
-            writer.Write(bytes);
-        }
-
-        public static unsafe IdSpan ReadRaw<TInput>(ref Reader<TInput> reader)
-        {
-            byte[] payloadArray = default;
-            var hashCode = reader.ReadInt32();
-            var length = reader.ReadVarUInt32();
-            if (!reader.TryReadBytes((int)length, out var payloadSpan))
-            {
-                payloadSpan = payloadArray = reader.ReadBytes(length);
-            }
-
-            // Search through 
-            var candidateHashCode = hashCode;
-            while (_cache.TryGetValue(candidateHashCode, out var existing))
-            {
-                if (existing.GetHashCode() != hashCode)
-                {
-                    break;
-                }
-
-                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-                if (existingSpan.SequenceEqual(payloadSpan))
-                {
-                    return existing;
-                }
-
-                // Try the next slot. 
-                ++candidateHashCode;
-            }
-
-            if (payloadArray is null)
-            {
-                payloadArray = new byte[length];
-                payloadSpan.CopyTo(payloadArray);
-            }
-
-            var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-            while (!_cache.TryAdd(candidateHashCode++, value))
-            {
-                // Insert the value at the first available position.
-            }
-
-            return value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe IdSpan ReadValue<TInput>(ref Reader<TInput> reader, Field field)
-        {
-            ReferenceCodec.MarkValueField(reader.Session);
-
-            byte[] payloadArray = default;
-            var length = reader.ReadVarUInt32() - sizeof(int);
-            var hashCode = reader.ReadInt32();
-            if (!reader.TryReadBytes((int)length, out var payloadSpan))
-            {
-                payloadSpan = payloadArray = reader.ReadBytes(length);
-            }
-
-            // Search through 
-            var candidateHashCode = hashCode;
-            while (_cache.TryGetValue(candidateHashCode, out var existing))
-            {
-                if (existing.GetHashCode() != hashCode)
-                {
-                    break;
-                }
-
-                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-                if (existingSpan.SequenceEqual(payloadSpan))
-                {
-                    return existing;
-                }
-
-                // Try the next slot. 
-                ++candidateHashCode;
-            }
-
-            if (payloadArray is null)
-            {
-                payloadArray = new byte[length];
-                payloadSpan.CopyTo(payloadArray);
-            }
-
-            var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-            while (!_cache.TryAdd(candidateHashCode++, value))
-            {
-                // Insert the value at the first available position.
-            }
-
-            return value;
-        }
-    }
-
     /// <summary>
     /// Primitive type for identities, representing a sequence of bytes.
     /// </summary>
@@ -149,23 +15,39 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable
     {
+        /// <summary>
+        /// The stable hash of the underlying value.
+        /// </summary>
         [Id(0)]
         private readonly int _hashCode;
+
+        /// <summary>
+        /// The underlying value.
+        /// </summary>
         [Id(1)]
         private readonly byte[] _value;
 
         /// <summary>
-        /// Creates a new <see cref="IdSpan"/> instance from the provided value.
+        /// Initializes a new instance of the <see cref="IdSpan"/> struct.
         /// </summary>
-        internal IdSpan(byte[] value)
+        /// <param name="value">
+        /// The value.
+        /// </param>
+        public IdSpan(byte[] value)
         {
             _value = value;
             _hashCode = GetHashCode(value);
         }
 
         /// <summary>
-        /// Creates a new <see cref="IdSpan"/> instance from the provided value.
+        /// Initializes a new instance of the <see cref="IdSpan"/> struct.
         /// </summary>
+        /// <param name="value">
+        /// The value.
+        /// </param>
+        /// <param name="hashCode">
+        /// The hash code of the value.
+        /// </param>
         private IdSpan(byte[] value, int hashCode)
         {
             _value = value;
@@ -173,29 +55,44 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Creates a new <see cref="IdSpan"/> instance from the provided value.
+        /// Initializes a new instance of the <see cref="IdSpan"/> struct.
         /// </summary>
+        /// <param name="info">
+        /// The serialization info.
+        /// </param>
+        /// <param name="context">
+        /// The context.
+        /// </param>
         private IdSpan(SerializationInfo info, StreamingContext context)
         {
             _value = (byte[])info.GetValue("v", typeof(byte[]));
             _hashCode = info.GetInt32("h");
         }
 
+        /// <summary>
+        /// Gets the underlying value.
+        /// </summary>
         public ReadOnlyMemory<byte> Value => _value;
 
         /// <summary>
-        /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
+        /// Gets a value indicating whether this instance is the default value.
         /// </summary>
         public bool IsDefault => _value is null || _value.Length == 0;
 
         /// <summary>
         /// Creates a new <see cref="IdSpan"/> instance from the provided value.
         /// </summary>
+        /// <returns>
+        /// A new <see cref="IdSpan"/> corresponding to the provided id.
+        /// </returns>
         public static IdSpan Create(string id) => id is string idString ? new IdSpan(Encoding.UTF8.GetBytes(idString)) : default;
 
         /// <summary>
         /// Returns a span representation of this instance.
         /// </summary>
+        /// <returns>
+        /// A span representation fo this instance.
+        /// </returns>
         public ReadOnlySpan<byte> AsSpan() => _value;
 
         /// <inheritdoc/>
@@ -225,8 +122,11 @@ namespace Orleans.Runtime
         public override int GetHashCode() => _hashCode;
 
         /// <summary>
-        /// Return uniform, stable hash code for IdSpan
+        /// Returns a uniform, stable hash code for an <see cref="IdSpan"/>.
         /// </summary>
+        /// <returns>
+        /// The hash code of this instance.
+        /// </returns>
         public uint GetUniformHashCode() => unchecked((uint)_hashCode);
 
         /// <inheritdoc/>
@@ -242,9 +142,22 @@ namespace Orleans.Runtime
         /// <remarks>
         /// This method is intended for use by serializers and other low-level libraries.
         /// </remarks>
+        /// <param name="value">
+        /// The underlying value.
+        /// </param>
+        /// <param name="hashCode">
+        /// The hash of the underlying value.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IdSpan"/> instance.
+        /// </returns>
         public static IdSpan UnsafeCreate(byte[] value, int hashCode) => new IdSpan(value, hashCode);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the underlying array from this instance.
+        /// </summary>
+        /// <param name="id">The id span.</param>
+        /// <returns>The underlying array from this instance.</returns>
         public static byte[] UnsafeGetArray(IdSpan id) => id._value;
 
         /// <inheritdoc/>
@@ -256,18 +169,36 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a string representation of this instance, decoding the value as UTF8.
         /// </summary>
+        /// <returns>
+        /// A string representation fo this instance.
+        /// </returns>
         public string ToStringUtf8()
         {
             if (_value is object) return Encoding.UTF8.GetString(_value);
             return null;
         }
 
-        /// <inheritdoc/>
-        public static bool operator ==(IdSpan a, IdSpan b) => a.Equals(b);
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator ==(IdSpan left, IdSpan right) => left.Equals(right);
 
-        /// <inheritdoc/>
-        public static bool operator !=(IdSpan a, IdSpan b) => !a.Equals(b);
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
+        public static bool operator !=(IdSpan left, IdSpan right) => !left.Equals(right);
 
+        /// <summary>
+        /// Gets a hashed representation of the provided value.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>A hashed representation of the provided value.</returns>
         private static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
 
         /// <summary>
@@ -276,7 +207,7 @@ namespace Orleans.Runtime
         public sealed class Comparer : IEqualityComparer<IdSpan>, IComparer<IdSpan>
         {
             /// <summary>
-            /// A singleton <see cref="Comparer"/> instance.
+            /// Gets the singleton <see cref="Comparer"/> instance.
             /// </summary>
             public static Comparer Instance { get; } = new Comparer();
 

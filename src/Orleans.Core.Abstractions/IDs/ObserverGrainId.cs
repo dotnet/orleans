@@ -8,10 +8,13 @@ namespace Orleans.Runtime
     /// </summary>
     internal readonly struct ObserverGrainId : IEquatable<ObserverGrainId>, IComparable<ObserverGrainId>
     {
+        /// <summary>
+        /// The separator between the client id portion of the observer id and the client-scoped observer id portion.
+        /// </summary>
         internal const char SegmentSeparator = '+';
 
         /// <summary>
-        /// Creates a new <see cref="ObserverGrainId"/> instance.
+        /// Initializes a new instance of the <see cref="ObserverGrainId"/> struct.
         /// </summary>
         private ObserverGrainId(GrainId grainId)
         {
@@ -26,6 +29,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the <see cref="ClientGrainId"/> associated with this instance.
         /// </summary>
+        /// <returns>
+        /// The <see cref="ClientGrainId"/> associated with this instance.
+        /// </returns>
         public ClientGrainId GetClientId()
         {
             if (!ClientGrainId.TryParse(this.GrainId, out var result))
@@ -38,23 +44,53 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Creates a new <see cref="ObserverGrainId"/> instance.
+        /// Returns a new, random <see cref="ObserverGrainId"/> instance for the provided client id.
         /// </summary>
+        /// <param name="clientId">
+        /// The client id.
+        /// </param>
+        /// <returns>
+        /// A new, random <see cref="ObserverGrainId"/> instance for the provided client id.
+        /// </returns>
         public static ObserverGrainId Create(ClientGrainId clientId) => Create(clientId, GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
 
         /// <summary>
-        /// Creates a new <see cref="ObserverGrainId"/> instance.
+        /// Returns a new <see cref="ObserverGrainId"/> instance for the provided client id.
         /// </summary>
+        /// <param name="clientId">
+        /// The client id.
+        /// </param>
+        /// <param name="scopedId">
+        /// The client-scoped observer id.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="ObserverGrainId"/> instance for the provided client id.
+        /// </returns>
         public static ObserverGrainId Create(ClientGrainId clientId, IdSpan scopedId) => new ObserverGrainId(ConstructGrainId(clientId, scopedId));
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided instance represents an observer, <see langword="false"/> if otherwise.
         /// </summary>
+        /// <param name="grainId">
+        /// The grain id.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if the provided grain id is an observer id, otherwise <see langword="false"/>.
+        /// </returns>
         public static bool IsObserverGrainId(GrainId grainId) => grainId.IsClient() && grainId.Key.AsSpan().IndexOf((byte)SegmentSeparator) >= 0;
 
         /// <summary>
         /// Converts the provided <see cref="GrainId"/> to a <see cref="ObserverGrainId"/>. A return value indicates whether the operation succeeded.
         /// </summary>
+        /// <param name="grainId">
+        /// The grain id.
+        /// </param>
+        /// <param name="observerId">
+        /// The corresponding observer id.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if the provided grain id is an observer id, otherwise <see langword="false"/>.
+        /// </returns>
         public static bool TryParse(GrainId grainId, out ObserverGrainId observerId)
         {
             if (!IsObserverGrainId(grainId))
@@ -95,22 +131,52 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public int CompareTo(ObserverGrainId other) => this.GrainId.CompareTo(other.GrainId);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands for equality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
         public static bool operator ==(ObserverGrainId left, ObserverGrainId right) => left.Equals(right);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands for inequality.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(ObserverGrainId left, ObserverGrainId right) => !(left == right);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator <(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) < 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator <=(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) <= 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) > 0;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="left">The left operand.</param>
+        /// <param name="right">The right operand.</param>
+        /// <returns><see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >=(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) >= 0;
 
         /// <summary>
@@ -119,7 +185,7 @@ namespace Orleans.Runtime
         public sealed class Comparer : IEqualityComparer<ObserverGrainId>, IComparer<ObserverGrainId>
         {
             /// <summary>
-            /// A singleton <see cref="Comparer"/> instance.
+            /// Gets the singleton <see cref="Comparer"/> instance.
             /// </summary>
             public static Comparer Instance { get; } = new Comparer();
 

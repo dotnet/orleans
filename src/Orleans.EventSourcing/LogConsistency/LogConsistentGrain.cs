@@ -59,7 +59,7 @@ namespace Orleans.EventSourcing
             Factory<IGrainContext, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<IGrainContext, ILogConsistencyProtocolServices>>();
             var grainContext = grainContextAccessor.GrainContext;
             ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContext);
-            IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? GrainStorageExtensions.GetGrainStorage(grainContext?.GrainInstance.GetType(), this.ServiceProvider) : null;
+            IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? GrainStorageHelpers.GetGrainStorage(grainContext?.GrainInstance.GetType(), this.ServiceProvider) : null;
             InstallLogViewAdaptor(grainContext, protocolServicesFactory, consistencyProvider, grainStorage);
             return Task.CompletedTask;
         }

@@ -3,6 +3,9 @@ using Orleans.Runtime.TestHooks;
 
 namespace Orleans.TestingHost
 {
+    /// <summary>
+    /// Extension methods for <see cref="IClusterClient"/>.
+    /// </summary>
     internal static class ClientExtensions
     {
         /// <summary>

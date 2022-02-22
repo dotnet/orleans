@@ -3,11 +3,21 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams.Core
 {
+    /// <summary>
+    /// Represents a subscription to a stream.
+    /// </summary>
     [Serializable]
     [Immutable]
     [GenerateSerializer]
     public class StreamSubscription
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamSubscription"/> class.
+        /// </summary>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="streamProviderName">Name of the stream provider.</param>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="grainId">The grain identifier.</param>
         public StreamSubscription(Guid subscriptionId, string streamProviderName, StreamId streamId, GrainId grainId)
         {
             this.SubscriptionId = subscriptionId;
@@ -16,12 +26,31 @@ namespace Orleans.Streams.Core
             this.GrainId = grainId;
         }
 
+        /// <summary>
+        /// Gets or sets the subscription identifier.
+        /// </summary>
+        /// <value>The subscription identifier.</value>
         [Id(1)]
         public Guid SubscriptionId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the name of the stream provider.
+        /// </summary>
+        /// <value>The name of the stream provider.</value>
         [Id(2)]
         public string StreamProviderName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the stream identifier.
+        /// </summary>
+        /// <value>The stream identifier.</value>
         [Id(3)]
         public StreamId StreamId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the grain identifier.
+        /// </summary>
+        /// <value>The grain identifier.</value>
         [Id(4)]
         public GrainId GrainId { get; set; }
     }

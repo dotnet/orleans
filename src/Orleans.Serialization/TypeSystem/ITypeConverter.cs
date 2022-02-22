@@ -18,8 +18,17 @@ namespace Orleans.Serialization.TypeSystem
         bool TryParse(string formatted, out Type type);
     }
 
+    /// <summary>
+    /// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+    /// </summary>
     public interface ITypeFilter
     {
+        /// <summary>
+        /// Determines whether the specified type name corresponds to a type which is allowed to be loaded, serialized, deserialized, etcetera.
+        /// </summary>
+        /// <param name="typeName">Name of the type.</param>
+        /// <param name="assemblyName">Name of the assembly.</param>
+        /// <returns><see langword="true" /> if the specified type is allowed; otherwise, <see langword="false" />.</returns>
         bool? IsTypeNameAllowed(string typeName, string assemblyName);
     }
 }

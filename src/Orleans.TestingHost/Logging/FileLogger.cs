@@ -21,6 +21,9 @@ namespace Orleans.TestingHost.Logging
         private DateTime lastFlush = DateTime.UtcNow;
         private StreamWriter logOutput;
 
+        /// <summary>
+        /// Initializes static members of the <see cref="FileLoggingOutput"/> class.
+        /// </summary>
         static FileLoggingOutput()
         {
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
@@ -35,9 +38,9 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="FileLoggingOutput"/> class.
         /// </summary>
-        /// <param name="fileName"></param>
+        /// <param name="fileName">Name of the log file.</param>
         public FileLoggingOutput(string fileName)
         {
             this.logFileName = fileName;
@@ -46,15 +49,15 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <summary>
-        /// Log message for <see cref="FileLogger"/> instance whose category is <paramref name="category"/>
+        /// Logs a message.
         /// </summary>
-        /// <typeparam name="TState"></typeparam>
-        /// <param name="logLevel"></param>
-        /// <param name="eventId"></param>
-        /// <param name="state"></param>
-        /// <param name="exception"></param>
-        /// <param name="formatter"></param>
-        /// <param name="category"></param>
+        /// <typeparam name="TState">The type of <paramref name="state"/>.</typeparam>
+        /// <param name="logLevel">The log level.</param>
+        /// <param name="eventId">The event identifier.</param>
+        /// <param name="state">The state.</param>
+        /// <param name="exception">The exception.</param>
+        /// <param name="formatter">The formatter.</param>
+        /// <param name="category">The category.</param>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,
             Func<TState, Exception, string> formatter, string category)
         {
@@ -97,6 +100,7 @@ namespace Orleans.TestingHost.Logging
             return msg;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             Dispose(true);
@@ -136,8 +140,10 @@ namespace Orleans.TestingHost.Logging
         private string category;
 
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="FileLogger"/> class.
         /// </summary>
+        /// <param name="output">The output logger.</param>
+        /// <param name="category">The category.</param>
         public FileLogger(FileLoggingOutput output, string category)
         {
             this.category = category;

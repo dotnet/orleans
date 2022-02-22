@@ -10,18 +10,38 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public class GrainReferenceNotBoundException : OrleansException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceNotBoundException"/> class.
+        /// </summary>
+        /// <param name="grainReference">The unbound grain reference.</param>
         internal GrainReferenceNotBoundException(GrainReference grainReference) : base(CreateMessage(grainReference)) { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceNotBoundException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        internal GrainReferenceNotBoundException(string message) : base(message) { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceNotBoundException"/> class.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <param name="innerException">The inner exception.</param>
+        internal GrainReferenceNotBoundException(string message, Exception innerException) : base(message, innerException) { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceNotBoundException"/> class.
+        /// </summary>
+        /// <param name="info">The serialization info.</param>
+        /// <param name="context">The context.</param>
+        protected GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
 
         private static string CreateMessage(GrainReference grainReference)
         {
             return $"Attempted to use an invalid GrainReference, which has not been constructed by the runtime: {grainReference}.";
         }
-
-        internal GrainReferenceNotBoundException(string msg) : base(msg) { }
-        internal GrainReferenceNotBoundException(string message, Exception innerException) : base(message, innerException) { }
-
-        protected GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
     }
 }

@@ -46,11 +46,18 @@ namespace Orleans.Configuration
     {
         private ClusterOptions options;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClusterOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">
+        /// The options.
+        /// </param>
         public ClusterOptionsValidator(IOptions<ClusterOptions> options)
         {
             this.options = options.Value;
         }
 
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             if (string.IsNullOrWhiteSpace(this.options.ClusterId))

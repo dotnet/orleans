@@ -11,6 +11,10 @@ namespace Orleans.Runtime
     [Immutable]
     public readonly struct GenericGrainInterfaceType
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GenericGrainInterfaceType"/> struct.
+        /// </summary>
+        /// <param name="value">The underlying grain interface type.</param>
         private GenericGrainInterfaceType(GrainInterfaceType value)
         {
             Value = value;

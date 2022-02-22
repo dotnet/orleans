@@ -1,5 +1,6 @@
 using System;
 using Orleans.Internal;
+using Orleans.Internal.EventSourcing;
 
 namespace Orleans.EventSourcing.Common
 {

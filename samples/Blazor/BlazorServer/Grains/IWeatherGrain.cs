@@ -1,12 +1,10 @@
 using BlazorServer.Models;
 using Orleans;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 
-namespace BlazorServer
+namespace BlazorServer;
+
+public interface IWeatherGrain : IGrainWithGuidKey
 {
-    public interface IWeatherGrain : IGrainWithGuidKey
-    {
-        Task<ImmutableArray<WeatherInfo>> GetForecastAsync();
-    }
+    Task<ImmutableArray<WeatherInfo>> GetForecastAsync();
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.Runtime
@@ -60,7 +60,14 @@ namespace Orleans.Runtime
         [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
         void TrackTrace(string message, IDictionary<string, string> properties);
 
+        /// <summary>
+        /// Flushes this instance.
+        /// </summary>
         void Flush();
+
+        /// <summary>
+        /// Closes this instance.
+        /// </summary>
         void Close();
     }
 }

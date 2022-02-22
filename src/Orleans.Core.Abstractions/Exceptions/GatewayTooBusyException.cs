@@ -15,12 +15,48 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public class GatewayTooBusyException : OrleansException
     {
-        public GatewayTooBusyException() : base("Gateway too busy") { }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayTooBusyException"/> class.
+        /// </summary>
+        public GatewayTooBusyException()
+            : base("Gateway too busy")
+        {
+        }
 
-        public GatewayTooBusyException(string message) : base(message) { }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayTooBusyException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        public GatewayTooBusyException(string message)
+            : base(message)
+        {
+        }
 
-        public GatewayTooBusyException(string message, Exception innerException) : base(message, innerException) { }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayTooBusyException"/> class.
+        /// </summary>
+        /// <param name="message">
+        /// The message.
+        /// </param>
+        /// <param name="innerException">
+        /// The inner exception.
+        /// </param>
+        public GatewayTooBusyException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayTooBusyException"/> class.
+        /// </summary>
+        /// <param name="info">
+        /// The serialization info.
+        /// </param>
+        /// <param name="context">
+        /// The context.
+        /// </param>
         protected GatewayTooBusyException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

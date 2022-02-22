@@ -6,13 +6,18 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// A serializer which skips all fields which it encounters.
+    /// </summary>
     public class SkipFieldCodec : IFieldCodec<object>
     {
+        /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             throw new NotImplementedException();
         }
 
+        /// <inheritdoc />
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             reader.SkipField(field);
@@ -20,8 +25,17 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+    /// <summary>
+    /// Extension methods for <see cref="Reader{TInput}"/> to skip fields.
+    /// </summary>
     public static class SkipFieldExtension
     {
+        /// <summary>
+        /// Skips the current field.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
         public static void SkipField<TInput>(this ref Reader<TInput> reader, Field field)
         {
             switch (field.WireType)

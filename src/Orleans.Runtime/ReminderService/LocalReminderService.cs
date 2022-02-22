@@ -590,7 +590,7 @@ namespace Orleans.Runtime.ReminderService
             public async Task OnTimerTick()
             {
                 var before = DateTime.UtcNow;
-                var status = TickStatus.NewStruct(firstTickTime, period, before);
+                var status = TickStatus.Create(firstTickTime, period, before);
 
                 var logger = this.reminderService.logger;
                 if (logger.IsEnabled(LogLevel.Trace))

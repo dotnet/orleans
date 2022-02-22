@@ -44,15 +44,21 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
+        /// <inheritdoc/>
         public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
 
+        /// <inheritdoc/>
         GrainId IGrainContext.GrainId => this.id.GrainId;
 
+        /// <inheritdoc/>
         object IGrainContext.GrainInstance => this;
 
+        /// <inheritdoc/>
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 
+        /// <inheritdoc/>
         GrainAddress IGrainContext.Address => this.ActivationAddress;
+
         private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
         
         /// <summary>Only needed to make Reflection happy.</summary>
@@ -81,20 +87,24 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger(this.GetType());
         }
 
-        public bool IsLowPriority { get; }
+        internal bool IsLowPriority { get; }
 
         internal WorkItemGroup WorkItemGroup { get; set; }
 
+        /// <inheritdoc />
         public IServiceProvider ActivationServices => this.RuntimeClient.ServiceProvider;
 
+        /// <inheritdoc />
         IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException("IGrainContext.ObservableLifecycle is not implemented by SystemTarget");
 
+        /// <inheritdoc />
         public IWorkItemScheduler Scheduler => WorkItemGroup;
 
-        public bool IsExemptFromCollection => true;
-
-        public PlacementStrategy PlacementStrategy => null;
-
+        /// <summary>
+        /// Gets the component with the specified type.
+        /// </summary>
+        /// <typeparam name="TComponent">The component type.</typeparam>
+        /// <returns>The component with the specified type.</returns>
         public TComponent GetComponent<TComponent>()
         {
             TComponent result;
@@ -114,6 +124,7 @@ namespace Orleans.Runtime
             return result;
         }
 
+        /// <inheritdoc />
         public void SetComponent<TComponent>(TComponent instance)
         {
             if (this is TComponent)
@@ -144,15 +155,24 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Register a timer to send regular callbacks to this grain.
+        /// Registers a timer to send regular callbacks to this grain.
         /// This timer will keep the current grain from being deactivated.
         /// </summary>
-        /// <param name="asyncCallback"></param>
-        /// <param name="state"></param>
-        /// <param name="dueTime"></param>
-        /// <param name="period"></param>
-        /// <param name="name"></param>
-        /// <returns></returns>
+        /// <param name="asyncCallback">The timer callback, which will fire whenever the timer becomes due.</param>
+        /// <param name="state">The state object passed to the callback.</param>
+        /// <param name="dueTime">
+        /// The amount of time to delay before the <paramref name="asyncCallback"/> is invoked.
+        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to prevent the timer from starting.
+        /// Specify <see cref="TimeSpan.Zero"/> to invoke the callback promptly.
+        /// </param>
+        /// <param name="period">
+        /// The time interval between invocations of <paramref name="asyncCallback"/>.
+        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signalling.
+        /// </param>
+        /// <param name="name">The timer name.</param>
+        /// <returns>
+        /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
+        /// </returns>
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
             => RegisterGrainTimer(asyncCallback, state, dueTime, period, name);
 
@@ -169,7 +189,7 @@ namespace Orleans.Runtime
             return timer;
         }
 
-        /// <summary>Override of object.ToString()</summary>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return $"[{(IsLowPriority ? "LowPriority" : string.Empty)}SystemTarget: {Silo}/{this.id.ToString()}{this.ActivationId}]";
@@ -181,8 +201,10 @@ namespace Orleans.Runtime
             return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
         }
 
+        /// <inheritdoc/>
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
 
+        /// <inheritdoc/>
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : TExtensionInterface
             where TExtensionInterface : IGrainExtension
@@ -209,6 +231,7 @@ namespace Orleans.Runtime
             return (implementation, reference);
         }
 
+        /// <inheritdoc/>
         TComponent ITargetHolder.GetComponent<TComponent>()
         {
             var result = this.GetComponent<TComponent>();
@@ -227,6 +250,7 @@ namespace Orleans.Runtime
             return result;
         }
 
+        /// <inheritdoc/>
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : IGrainExtension
         {
@@ -245,6 +269,7 @@ namespace Orleans.Runtime
             return typedResult;
         }
 
+        /// <inheritdoc/>
         public void ReceiveMessage(object message)
         {
             var msg = (Message)message;
@@ -272,9 +297,16 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc/>
         public TTarget GetTarget<TTarget>() => (TTarget)(object)this;
+
+        /// <inheritdoc/>
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+
+        /// <inheritdoc/>
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+
+        /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
     }
 }

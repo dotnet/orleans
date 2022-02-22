@@ -27,7 +27,7 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo
     {
-        /// <summary> Standard name for Primary silo. </summary>
+        /// <summary>Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
@@ -63,9 +63,12 @@ namespace Orleans.Runtime
 
         internal IServiceProvider Services { get; }
 
-        /// <summary> SiloAddress for this silo. </summary>
+        /// <summary>Gets the address of this silo.</summary>
         public SiloAddress SiloAddress => this.siloDetails.SiloAddress;
 
+        /// <summary>
+        /// Gets a <see cref="Task"/> which completes once the silo has terminated.
+        /// </summary>
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
@@ -187,6 +190,11 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
 
+        /// <summary>
+        /// Starts the silo.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token which can be used to cancel the operation.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             // SystemTarget for provider init calls
@@ -259,10 +267,6 @@ namespace Orleans.Runtime
             }
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
-
-            //TODO: setup thead pool directly to lifecycle
-            StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
-                this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
             return Task.CompletedTask;
         }
 
@@ -389,46 +393,6 @@ namespace Orleans.Runtime
             logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
-        private void ConfigureThreadPoolAndServicePointSettings()
-        {
-            PerformanceTuningOptions performanceTuningOptions = Services.GetRequiredService<IOptions<PerformanceTuningOptions>>().Value;
-            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0 || performanceTuningOptions.MinIOThreadPoolSize > 0)
-            {
-                int workerThreads;
-                int completionPortThreads;
-                ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
-                if (performanceTuningOptions.MinDotNetThreadPoolSize > workerThreads ||
-                    performanceTuningOptions.MinIOThreadPoolSize > completionPortThreads)
-                {
-                    // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
-                    int newWorkerThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinIOThreadPoolSize, completionPortThreads);
-                    bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
-                    if (ok)
-                    {
-                        logger.Info(ErrorCode.SiloConfiguredThreadPool,
-                                    "Configured ThreadPool.SetMinThreads() to values: {0},{1}. Previous values are: {2},{3}.",
-                                    newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
-                    }
-                    else
-                    {
-                        logger.Warn(ErrorCode.SiloFailedToConfigureThreadPool,
-                                    "Failed to configure ThreadPool.SetMinThreads(). Tried to set values to: {0},{1}. Previous values are: {2},{3}.",
-                                    newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
-                    }
-                }
-            }
-
-            // Set .NET ServicePointManager settings to optimize throughput performance when using Azure storage
-            // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-            logger.Info(ErrorCode.SiloConfiguredServicePointManager,
-                "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
-                performanceTuningOptions.Expect100Continue, performanceTuningOptions.DefaultConnectionLimit, performanceTuningOptions.UseNagleAlgorithm);
-            ServicePointManager.Expect100Continue = performanceTuningOptions.Expect100Continue;
-            ServicePointManager.DefaultConnectionLimit = performanceTuningOptions.DefaultConnectionLimit;
-            ServicePointManager.UseNagleAlgorithm = performanceTuningOptions.UseNagleAlgorithm;
-        }
-
         /// <summary>
         /// Gracefully stop the run time system only, but not the application.
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
@@ -456,6 +420,10 @@ namespace Orleans.Runtime
         /// Gracefully stop the run time system only, but not the application.
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
+        /// <param name="cancellationToken">
+        /// A cancellation token which can be used to promptly terminate the silo.
+        /// </param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo shutting down");
@@ -630,7 +598,7 @@ namespace Orleans.Runtime
 
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
 
-        /// <summary> Object.ToString override -- summary info for this silo. </summary>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return localGrainDirectory.ToString();
