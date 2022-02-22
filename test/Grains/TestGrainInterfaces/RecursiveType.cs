@@ -19,6 +19,7 @@ namespace UnitTests.GrainInterfaces
     {
     }
 
+    [GenerateSerializer]
     public abstract class SelfTyped<T> where T : SelfTyped<T>
     {
     }

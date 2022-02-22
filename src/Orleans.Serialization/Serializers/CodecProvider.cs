@@ -358,11 +358,6 @@ namespace Orleans.Serialization.Serializers
                     }
                 }
 
-                if (untypedResult is null && (fieldType.IsInterface || fieldType.IsAbstract))
-                {
-                    untypedResult = (IBaseCodec)GetServiceOrCreateInstance(typeof(AbstractTypeSerializer<>).MakeGenericType(fieldType));
-                }
-
                 wasCreated = untypedResult != null;
             }
 
@@ -817,30 +812,6 @@ namespace Orleans.Serialization.Serializers
             {
                 copierType = typeof(ShallowCopyableTypeCopier<>).MakeGenericType(fieldType);
             }
-            /*
-            else if (_baseCopiers.TryGetValue(searchType, out var baseCopierType))
-            {
-                if (baseCopierType.IsGenericTypeDefinition)
-                {
-                    baseCopierType = baseCopierType.MakeGenericType(fieldType.GetGenericArguments());
-                }
-
-                // If there is a base type copier for this type, create a copier which will then accept that base type copier.
-                copierType = typeof(ConcreteTypeCopier<,>).MakeGenericType(fieldType, baseCopierType);
-                constructorArguments = new[] { GetServiceOrCreateInstance(baseCopierType) };
-            }
-            else if (_valueCopiers.TryGetValue(searchType, out var valueCopierType))
-            {
-                if (valueCopierType.IsGenericTypeDefinition)
-                {
-                    valueCopierType = valueCopierType.MakeGenericType(fieldType.GetGenericArguments());
-                }
-
-                // If there is a value serializer for this type, create a copier which will then accept that value serializer.
-                copierType = typeof(ValueCopier<,>).MakeGenericType(fieldType, valueCopierType);
-                constructorArguments = new[] { GetServiceOrCreateInstance(valueCopierType) };
-            }
-            */
             else if (fieldType.IsArray)
             {
                 // Depending on the rank of the array (1 or higher), select the base array copier or the multi-dimensional copier.

@@ -369,6 +369,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
+            services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 
             services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
