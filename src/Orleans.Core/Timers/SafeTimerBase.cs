@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         {
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
-           
+
             timerFrequency = period;
             dueTime = due;
             timerStarted = true;
@@ -114,7 +114,7 @@ namespace Orleans.Runtime
 
         private string GetFullName()
         {
-            // the type information is really useless and just too long. 
+            // the type information is really useless and just too long.
             if (syncCallbackFunc != null)
                 return syncTimerName;
             if (asyncTaskCallback != null)
@@ -129,7 +129,7 @@ namespace Orleans.Runtime
                         dueTime, timerFrequency, logger, () => String.Format("{0}.{1}", GetFullName(), callerName()), ErrorCode.Timer_SafeTimerIsNotTicking, true);
         }
 
-        public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
+        public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks,
                         TimeSpan dueTime, TimeSpan timerFrequency, ILogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
             TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;
@@ -170,7 +170,7 @@ namespace Orleans.Runtime
         /// <param name="period">The time interval between invocations of the callback method specified when the Timer was constructed. Specify negative one (-1) milliseconds to disable periodic signaling.</param>
         /// <returns><c>true</c> if the timer was successfully updated; otherwise, <c>false</c>.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private bool Change(TimeSpan newDueTime, TimeSpan period)
+        internal bool Change(TimeSpan newDueTime, TimeSpan period)
         {
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, string.Format("Cannot use TimeSpan.Zero for timer {0} period", GetFullName()));
 
@@ -236,9 +236,9 @@ namespace Orleans.Runtime
             // It may happen than the asyncCallbackFunc will resolve some promises on which the higher level application code is depends upon
             // and this promise's await or CW will fire before the below code (after await or Finally) even runs.
             // In the unit test case this may lead to the situation where unit test has finished, but p1 or p2 or p3 have not been observed yet.
-            // To properly fix this we may use a mutex/monitor to delay execution of asyncCallbackFunc until all CWs and Finally in the code below were scheduled 
-            // (not until CW lambda was run, but just until CW function itself executed). 
-            // This however will relay on scheduler executing these in separate threads to prevent deadlock, so needs to be done carefully. 
+            // To properly fix this we may use a mutex/monitor to delay execution of asyncCallbackFunc until all CWs and Finally in the code below were scheduled
+            // (not until CW lambda was run, but just until CW function itself executed).
+            // This however will relay on scheduler executing these in separate threads to prevent deadlock, so needs to be done carefully.
             // In particular, need to make sure we execute asyncCallbackFunc in another thread (so use StartNew instead of ExecuteWithSafeTryCatch).
 
             try
