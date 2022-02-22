@@ -1,5 +1,8 @@
 pool: Default
 
+trigger:
+  - none
+
 pr:
   - main
   - azure-pipeline
