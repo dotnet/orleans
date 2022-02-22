@@ -75,7 +75,7 @@ namespace UnitTests.General
             Assert.Contains("ThrowsInvalidOperationException", exception.StackTrace);
         }
 
-        [Fact(Skip = "Does not work on .NET Core"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTraceWhenRethrowingLocally()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
