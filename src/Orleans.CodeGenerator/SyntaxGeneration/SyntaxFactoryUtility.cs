@@ -78,14 +78,22 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             foreach (var (name, tp) in typeParameter)
             {
                 var constraints = new List<TypeParameterConstraintSyntax>();
-                if (tp.HasReferenceTypeConstraint)
-                {
-                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
-                }
 
-                if (tp.HasValueTypeConstraint)
+                if (tp.HasUnmanagedTypeConstraint)
+                {
+                    constraints.Add(TypeConstraint(IdentifierName("unmanaged")));
+                }
+                else if (tp.HasValueTypeConstraint)
                 {
                     constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                }
+                else if (tp.HasNotNullConstraint)
+                {
+                    constraints.Add(TypeConstraint(IdentifierName("notnull")));
+                }
+                else if (tp.HasReferenceTypeConstraint)
+                {
+                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
                 }
 
                 foreach (var c in tp.ConstraintTypes)
