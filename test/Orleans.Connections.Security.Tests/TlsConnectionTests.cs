@@ -96,7 +96,6 @@ namespace Orleans.Connections.Security.Tests
                 var builder = new TestClusterBuilder()
                     .AddSiloBuilderConfigurator<TlsServerConfigurator>()
                     .AddClientBuilderConfigurator<TlsClientConfigurator>();
-                builder.Options.UseInMemoryTransport = false;
 
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);

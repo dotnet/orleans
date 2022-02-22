@@ -19,6 +19,7 @@ namespace Orleans.TestingHost
     {
         private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
         private readonly List<Action> configureBuilderActions = new List<Action>();
+        private Func<string, IConfiguration, Task<SiloHandle>> _createSiloAsync;
 
         /// <summary>
         /// Initializes a new instance of <see cref="TestClusterBuilder"/> using the default options.
@@ -68,7 +69,17 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Gets or sets the delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync { private get; set; }
+        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync
+        {
+            private get => _createSiloAsync;
+            set
+            {
+                _createSiloAsync = value;
+
+                // The custom builder does not have access to the in-memory transport.
+                Options.UseInMemoryTransport = false;
+            }
+        }
         
         /// <summary>
         /// Adds a configuration delegate to the builder
@@ -147,7 +158,7 @@ namespace Orleans.TestingHost
             
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources, portAllocator);
-            if (this.CreateSiloAsync != null) testCluster.CreateSiloAsync = this.CreateSiloAsync;
+            if (CreateSiloAsync != null) testCluster.CreateSiloAsync = CreateSiloAsync;
             return testCluster;
         }
 

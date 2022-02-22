@@ -28,7 +28,6 @@ namespace Tester.HeterogeneousSilosTests
         {
             cluster?.StopAllSilos();
             var builder = new TestClusterBuilder(1);
-            builder.Options.UseInMemoryTransport = false;
             builder.Properties["DefaultPlacementStrategy"] = RuntimeTypeNameFormatter.Format(defaultPlacementStrategy);
             builder.Properties["BlockedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => RuntimeTypeNameFormatter.Format(t)));
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();

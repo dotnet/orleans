@@ -95,7 +95,7 @@ namespace Orleans.TestingHost
         /// <remarks>
         /// Defaults to <see langword="true"/>
         /// </remarks>
-        public bool UseInMemoryTransport { get; set; } = true;
+        internal bool UseInMemoryTransport { get; set; } = true;
 
         /// <summary>
         /// Converts these options into a dictionary.
