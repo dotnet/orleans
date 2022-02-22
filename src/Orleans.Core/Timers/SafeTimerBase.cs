@@ -49,7 +49,6 @@ namespace Orleans.Runtime
         {
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
-
             timerFrequency = period;
             dueTime = due;
             timerStarted = true;
