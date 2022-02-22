@@ -42,7 +42,7 @@ namespace UnitTests.CatalogTests
             var grainGuid = Guid.NewGuid();
             const string reminderName = "minimal_reminder";
 
-            var reminderGrain = this.fixture.GrainFactory.GetGrain<IReminderTestGrain2>(grainGuid);
+            var reminderGrain = this.fixture.GrainFactory.GetGrain<IReminderV2TestGrain2>(grainGuid);
             _ = await reminderGrain.StartReminder(reminderName, TimeSpan.FromMilliseconds(100), true);
 
             var r = await reminderGrain.GetReminderObject(reminderName);
