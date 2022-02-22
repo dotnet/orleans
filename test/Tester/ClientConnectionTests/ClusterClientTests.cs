@@ -40,7 +40,7 @@ namespace Tester.ClientConnectionTests
                 return Task.FromResult(true);
             }
 
-            using var host = new HostBuilder().UseOrleansClient(clientBuilder =>
+            using var host = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder
                         .Configure<ClusterOptions>(options =>

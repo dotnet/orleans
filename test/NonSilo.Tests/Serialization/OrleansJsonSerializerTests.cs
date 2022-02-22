@@ -41,7 +41,7 @@ namespace UnitTests.Serialization
         public void OrleansJsonSerializer_ExternalSerializer_Silo()
         {
             var silo = new HostBuilder()
-                .UseOrleans(siloBuilder =>
+                .UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                     .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")

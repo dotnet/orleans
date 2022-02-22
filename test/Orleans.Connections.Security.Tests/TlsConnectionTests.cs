@@ -63,7 +63,7 @@ namespace Orleans.Connections.Security.Tests
                 var certificateModeString = config[ClientCertificateModeKey];
                 var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
 
-                hostBuilder.UseOrleans(siloBuilder =>
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseTls(localCertificate, options =>
                     {

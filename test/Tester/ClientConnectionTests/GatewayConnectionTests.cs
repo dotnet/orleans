@@ -63,7 +63,7 @@ namespace Tester
         {
             public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.UseOrleans(siloBuilder =>
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseLocalhostClustering();
                 });
@@ -182,7 +182,7 @@ namespace Tester
             // Close current client connection
             await this.HostedCluster.StopClusterClientAsync();
             var hostBuilder = new HostBuilder().UseOrleansClient(
-                clientBuilder =>
+                (ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClientMessagingOptions>(
                         options => { options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(10); });

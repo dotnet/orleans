@@ -70,7 +70,7 @@ namespace NonSilo.Tests
         public void SiloBuilderTest()
         {
             var host = new HostBuilder()
-                .UseOrleans(siloBuilder =>
+                .UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                         .UseLocalhostClustering()
@@ -95,7 +95,7 @@ namespace NonSilo.Tests
         {
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
             {
-                await new HostBuilder().UseOrleans(siloBuilder =>
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                         .Configure<ClusterOptions>(options => { options.ClusterId = "GrainCollectionClusterId"; options.ServiceId = "GrainCollectionServiceId"; })
@@ -116,7 +116,7 @@ namespace NonSilo.Tests
         {
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
             {
-                await new HostBuilder().UseOrleans(siloBuilder =>
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                         .UseLocalhostClustering()
@@ -147,7 +147,7 @@ namespace NonSilo.Tests
         {
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
             {
-                await new HostBuilder().UseOrleans(siloBuilder =>
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                       .UseLocalhostClustering()
@@ -170,7 +170,7 @@ namespace NonSilo.Tests
         public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
         {
             using var host = new HostBuilder()
-                .UseOrleans(siloBuilder =>
+                .UseOrleans((ctx, siloBuilder) =>
                 {
                     // Add only an assembly with generated serializers but no grain interfaces or grain classes
                     siloBuilder.UseLocalhostClustering()
@@ -190,11 +190,11 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() =>
             {
                 _ = new HostBuilder()
-                    .UseOrleansClient(clientBuilder =>
+                    .UseOrleansClient((ctx, clientBuilder) =>
                     {
                         clientBuilder.UseLocalhostClustering();
                     })
-                    .UseOrleans(siloBuilder =>
+                    .UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder.UseLocalhostClustering();
                     });

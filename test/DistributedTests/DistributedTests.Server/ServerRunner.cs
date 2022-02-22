@@ -43,7 +43,7 @@ namespace DistributedTests.Server
             {
                 var host = Host
                     .CreateDefaultBuilder()
-                    .UseOrleans(siloBuilder => ConfigureOrleans(siloBuilder, commonParameters, configuratorParameters))
+                    .UseOrleans((ctx, siloBuilder) => ConfigureOrleans(siloBuilder, commonParameters, configuratorParameters))
                     .Build();
 
                 var hostTask = host.RunAsync();

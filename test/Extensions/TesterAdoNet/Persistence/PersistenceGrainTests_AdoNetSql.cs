@@ -42,7 +42,7 @@ namespace Tester.AdoNet.Persistence
                 public void Configure(IHostBuilder hostBuilder)
                 {
                     var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
-                    hostBuilder.UseOrleans(siloBuilder =>
+                    hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>

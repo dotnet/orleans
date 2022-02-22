@@ -32,7 +32,7 @@ namespace Benchmarks.Ping
             for (var i = 0; i < numSilos; ++i)
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
-                var hostBuilder = new HostBuilder().UseOrleans(siloBuilder =>
+                var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseLocalhostClustering(
                         siloPort: 11111 + i,
@@ -55,7 +55,7 @@ namespace Benchmarks.Ping
 
             if (startClient)
             {
-                var hostBuilder = new HostBuilder().UseOrleansClient(clientBuilder =>
+                var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
 

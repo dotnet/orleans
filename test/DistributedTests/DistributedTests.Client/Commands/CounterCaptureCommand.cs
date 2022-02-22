@@ -45,7 +45,7 @@ namespace DistributedTests.Client.Commands
             _logger.LogInformation("Connecting to cluster...");
             var secrets = SecretConfiguration.Load(parameters.SecretSource);
             var hostBuilder = new HostBuilder()
-                .UseOrleansClient(builder => {
+                .UseOrleansClient((ctx, builder) => {
                     builder
                         .Configure<ClusterOptions>(options => { options.ClusterId = parameters.ClusterId; options.ServiceId = parameters.ServiceId; })
                         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(secrets.ClusteringConnectionString));

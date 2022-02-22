@@ -47,7 +47,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var config = hostBuilder.GetConfiguration();
                 var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
                 var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
-                hostBuilder.UseOrleans(siloBuilder =>
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
                         .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));

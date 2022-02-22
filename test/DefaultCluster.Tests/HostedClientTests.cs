@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests.General
             {
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
                 Host = new HostBuilder()
-                    .UseOrleans(siloBuilder =>
+                    .UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
                             .UseLocalhostClustering(siloPort, gatewayPort)
