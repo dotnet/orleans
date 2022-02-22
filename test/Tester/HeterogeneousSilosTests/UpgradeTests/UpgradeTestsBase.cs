@@ -201,6 +201,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             {
                 // Setup configuration
                 this.builder = new TestClusterBuilder(1);
+                builder.Options.UseInMemoryTransport = false;
                 builder.CreateSiloAsync = StandaloneSiloHandle.Create;
                 TestDefaultConfiguration.ConfigureTestCluster(this.builder);
                 builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();
