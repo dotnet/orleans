@@ -133,11 +133,11 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets a value indicating whether to extend the effective <see cref="ProbeTimeout"/> value based upon current local health degradation.
         /// </summary>
-        public bool ExtendProbeTimeoutDuringDegradation { get; set; } = false;
+        public bool ExtendProbeTimeoutDuringDegradation { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether to enable probing silos indirectly, via other silos.
         /// </summary>
-        public bool EnableIndirectProbes { get; set; } = false;
+        public bool EnableIndirectProbes { get; set; } = true;
     }
 }
