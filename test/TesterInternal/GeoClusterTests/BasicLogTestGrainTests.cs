@@ -45,7 +45,6 @@ namespace Tests.GeoClusterTests
                         {
                             options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                         }))
-                        .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore"); 
                 }
             }
