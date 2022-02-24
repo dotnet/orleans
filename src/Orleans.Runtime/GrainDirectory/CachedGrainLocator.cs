@@ -159,7 +159,12 @@ namespace Orleans.Runtime.GrainDirectory
                 if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
                     await listenToClusterChangeTask.WithCancellation(ct);
             };
-            lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+
+            // If there isn't any custom grain directory register, do not start this cache
+            if (this.grainDirectoryResolver.Directories.Count > 0)
+            {
+                lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+            }
         }
 
         private IGrainDirectory GetGrainDirectory(GrainId grainId) => this.grainDirectoryResolver.Resolve(grainId);

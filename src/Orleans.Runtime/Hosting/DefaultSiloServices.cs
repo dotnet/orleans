@@ -119,16 +119,16 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
             services.AddSingleton<IGrainDirectoryResolver, GrainDirectoryResolver>();
-            if (GrainDirectoryResolver.HasAnyRegisteredGrainDirectory(services))
+            services.AddSingleton<GrainLocatorSelector>();
+            services.AddSingleton<CachedGrainLocator>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
+            services.AddSingleton<IGrainLocator>(sp =>
             {
-                services.AddSingleton<IGrainLocator, GrainLocatorSelector>();
-                services.AddSingleton<CachedGrainLocator>();
-                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
-            }
-            else
-            {
-                services.AddFromExisting<IGrainLocator, DhtGrainLocator>();
-            }
+                // If there isn't any custom grain directory registered, use the default DhtGrainLocator
+                return sp.GetService(typeof(IKeyedService<string, IGrainDirectory>)) != default
+                            ? sp.GetService<GrainLocatorSelector>()
+                            : sp.GetService<DhtGrainLocator>();
+            });
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
