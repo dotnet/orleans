@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.Redis;
 using Orleans.Hosting;
 using Orleans.Internal;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using StackExchange.Redis;
 using TestExtensions;
@@ -72,6 +76,105 @@ namespace Tester.Directories
         }
     }
 
+    [TestCategory("Functionals"), TestCategory("Directory")]
+    public class MockMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
+    {
+        private class MockGrainDirectory : IGrainDirectory
+        {
+            private readonly Dictionary<string, GrainAddress> _mapping = new();
+
+            private readonly SemaphoreSlim _lock = new(1);
+
+            private int _lookupCounter = 0;
+            private int _registerCounter = 0;
+            private int _unregisterCounter = 0;
+
+            public int LookupCounter => _lookupCounter;
+            public int RegisterCounter => _registerCounter;
+            public int UnregisterCounter => _unregisterCounter;
+
+            public async Task<GrainAddress> Lookup(string grainId)
+            {
+                try
+                {
+                    await _lock.WaitAsync();
+                    _lookupCounter++;
+                    return _mapping.TryGetValue(grainId, out var address) ? address : null;
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            }
+
+            public async Task<GrainAddress> Register(GrainAddress address)
+            {
+                try
+                {
+                    await _lock.WaitAsync();
+                    _registerCounter++;
+                    if (_mapping.TryGetValue(address.GrainId, out var existingAddress))
+                    {
+                        return existingAddress;
+                    }
+                    _mapping.Add(address.GrainId, address);
+                    return address;
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            }
+
+            public async Task Unregister(GrainAddress address)
+            {
+                try
+                {
+                    await _lock.WaitAsync();
+                    _unregisterCounter++;
+                    if (_mapping.TryGetValue(address.GrainId, out var existingAddress) && existingAddress.Equals(address))
+                    {
+                        _mapping.Remove(address.GrainId);
+                    }
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            }
+
+            public Task UnregisterSilos(List<string> siloAddresses) => Task.CompletedTask;
+        }
+
+        private static MockGrainDirectory GrainDirectory = new();
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder siloBuilder)
+            {
+                siloBuilder.ConfigureServices(svc => svc.AddSingletonNamedService<IGrainDirectory>(CustomDirectoryGrain.DIRECTORY, (sp, name) => GrainDirectory));
+            }
+        }
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            base.ConfigureTestCluster(builder);
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        [Fact]
+        public async Task CheckIfDirectoryIsUsed()
+        {
+            var grainOnPrimary = await GetGrainOnPrimary().WithTimeout(TimeSpan.FromSeconds(5), "Could not get a grain on the primary silo");
+            var grainOnSecondary = await GetGrainOnSecondary().WithTimeout(TimeSpan.FromSeconds(5), "Could not get a grain on the secondary silo");
+
+            await grainOnPrimary.ProxyPing(grainOnSecondary);
+
+            Assert.True(GrainDirectory.RegisterCounter > 0);
+            Assert.True(GrainDirectory.LookupCounter > 0);
+        }
+    }
+
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -104,7 +207,7 @@ namespace Tester.Directories
             Assert.Equal(1, await grainOnSecondary.Ping());
         }
 
-        private async Task<ICustomDirectoryGrain> GetGrainOnPrimary()
+        protected async Task<ICustomDirectoryGrain> GetGrainOnPrimary()
         {
             while (true)
             {
@@ -115,7 +218,7 @@ namespace Tester.Directories
             }
         }
 
-        private async Task<ICustomDirectoryGrain> GetGrainOnSecondary()
+        protected async Task<ICustomDirectoryGrain> GetGrainOnSecondary()
         {
             while (true)
             {

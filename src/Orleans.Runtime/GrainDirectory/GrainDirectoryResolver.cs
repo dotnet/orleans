@@ -38,8 +38,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public static bool HasAnyRegisteredGrainDirectory(IServiceCollection services) => services.Any(svc => svc.ServiceType == typeof(IKeyedService<string, IGrainDirectory>));
-
         public IGrainDirectory Resolve(GrainId grainId) => this.directoryPerType.GetOrAdd(grainId.TypeCode, GetGrainDirectoryPerType);
 
         private IGrainDirectory GetGrainDirectoryPerType(int grainType)
