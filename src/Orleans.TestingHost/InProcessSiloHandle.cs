@@ -27,14 +27,16 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="siloName">Name of the silo.</param>
         /// <param name="configuration">The configuration.</param>
+        /// <param name="postConfigureHostBuilder">An optional delegate which is invoked just prior to building the host builder.</param>
         /// <returns>The silo handle.</returns>
         public static async Task<SiloHandle> CreateAsync(
             string siloName,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            Action<IHostBuilder> postConfigureHostBuilder = null)
         {
             var host = await Task.Run(async () =>
             {
-                var result = TestClusterHostFactory.CreateSiloHost(siloName, configuration);
+                var result = TestClusterHostFactory.CreateSiloHost(siloName, configuration, postConfigureHostBuilder);
                 await result.StartAsync();
                 return result;
             });
