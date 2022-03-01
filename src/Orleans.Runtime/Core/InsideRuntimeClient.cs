@@ -271,7 +271,7 @@ namespace Orleans.Runtime
                             {
                                 invokable.SetTarget(target);
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
-                                if (GrainCallFilters is { Count: > 0 } || target is IIncomingGrainCallFilter)
+                                if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
                                     var invoker = new GrainMethodInvoker(target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
                                     await invoker.Invoke();
