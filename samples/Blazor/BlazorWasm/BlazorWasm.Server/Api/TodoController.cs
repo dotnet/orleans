@@ -2,8 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Orleans;
 using BlazorWasm.Grains;
 using BlazorWasm.Models;
-using System.Buffers;
-using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 
 namespace Sample.Silo.Api;
@@ -25,53 +23,32 @@ public class TodoController : ControllerBase
         _factory.GetGrain<ITodoGrain>(itemKey).ClearAsync();
 
     [HttpGet("list/{ownerKey}", Name = "list")]
-    public async Task<ImmutableArray<TodoItem>> ListAsync([Required] Guid ownerKey)
+    public async Task<IEnumerable<TodoItem>> ListAsync([Required] Guid ownerKey)
     {
-        // get all item keys for this owner
-        var keys = await _factory.GetGrain<ITodoManagerGrain>(ownerKey).GetAllAsync();
+        // Get all item keys for this owner.
+        var keys =
+            await _factory.GetGrain<ITodoManagerGrain>(ownerKey)
+                          .GetAllAsync();
 
-        // fast path for empty owner
-        if (keys.Length is 0) return ImmutableArray<TodoItem>.Empty;
+        // Fast path for empty owner.
+        if (keys.Length is 0) return Array.Empty<TodoItem>();
 
-        // fan out and get all individual items in parallel
-        var tasks = ArrayPool<Task<TodoItem?>>.Shared.Rent(keys.Length);
-        try
+        // Fan out and get all individual items in parallel.
+        // Issue all requests at the same time.
+        var tasks =
+            keys.Select(key => _factory.GetGrain<ITodoGrain>(key).GetAsync())
+                .ToList();
+
+        // Compose the result as requests complete
+        var result = new List<TodoItem>();
+        for (var i = 0; i < keys.Length; ++i)
         {
-            // issue all requests at the same time
-            for (var i = 0; i < keys.Length; ++i)
-            {
-                tasks[i] = _factory.GetGrain<ITodoGrain>(keys[i]).GetAsync();
-            }
-
-            // compose the result as requests complete
-            var result = ImmutableArray.CreateBuilder<TodoItem>(tasks.Length);
-            for (var i = 0; i < keys.Length; ++i)
-            {
-                var item = await tasks[i];
-                if (item is null) continue;
-                result.Add(item);
-            }
-            return result.ToImmutable();
+            var item = await tasks[i];
+            if (item is null) continue;
+            result.Add(item);
         }
-        finally
-        {
-            ArrayPool<Task<TodoItem?>>.Shared.Return(tasks);
-        }
-    }
 
-    public class TodoItemModel
-    {
-        [Required]
-        public Guid Key { get; set; }
-
-        [Required]
-        public string Title { get; set; } = null!;
-
-        [Required]
-        public bool IsDone { get; set; }
-
-        [Required]
-        public Guid OwnerKey { get; set; }
+        return result;
     }
 
     [HttpPost]
@@ -86,4 +63,10 @@ public class TodoController : ControllerBase
         await _factory.GetGrain<ITodoGrain>(item.Key).SetAsync(item);
         return Ok();
     }
+
+    public record class TodoItemModel(
+        [Required] Guid Key,
+        [Required] string Title,
+        [Required] bool IsDone,
+        [Required] Guid OwnerKey);
 }

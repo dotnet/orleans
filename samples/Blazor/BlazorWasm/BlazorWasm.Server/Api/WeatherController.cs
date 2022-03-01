@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Orleans;
 using BlazorWasm.Grains;
 using BlazorWasm.Models;
-using System.Collections.Immutable;
 
 namespace Sample.Silo.Api;
 
@@ -16,6 +15,6 @@ public class WeatherController : ControllerBase
     public WeatherController(IGrainFactory factory) => _factory = factory;
 
     [HttpGet]
-    public Task<ImmutableArray<WeatherInfo>> GetAsync() =>
-        _factory.GetGrain<IWeatherGrain>(Guid.Empty).GetForecastAsync();
+    public async Task<IEnumerable<WeatherInfo>> GetAsync() =>
+        await _factory.GetGrain<IWeatherGrain>(Guid.Empty).GetForecastAsync();
 }
