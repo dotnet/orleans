@@ -21,7 +21,7 @@ The following diagram is a representation of the above description:
 
 The following an example of how this might look with multiple hosts and many browsers. Note that the `PushNotifierGrain` and `HubListGrain` are singletons and therefore there is one instance of each of those grains shared by the cluster. Singleton grains are a pattern in Orleans whereby only a single grain of a given type is accessed, for example by always calling the instance with a key `0` or `Guid.Empty` or some other fixed value, depending on if the grain is a `IGrainWithIntegerKey` or `IGrainWithGuidKey`. For example, each `DeviceGrain` gets an instance of the `IPushNotifierGrain` with id `0`:
 
-``` C#
+```csharp
 var notifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
 ```
 
@@ -31,13 +31,13 @@ var notifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
 
 Open three terminal windows. In the first terminal window, run the following at the command prompt:
 
-``` bash
+```bash
 dotnet run --project GPSTracker.Service
 ```
 
 In the second terminal, launch another instance of the host, specifying that it's the second host by passing an `InstanceId` value as follows:
 
-``` bash
+```bash
 dotnet run --project GPSTracker.Service -- --InstanceId 1
 ```
 
@@ -45,7 +45,7 @@ Now open a web browser to `http://localhost:5001/index.html`. At this point, the
 
 In the third terminal window, run the following at the command prompt to begin simulating devices:
 
-``` bash
+```bash
 dotnet run --project GPSTracker.FakeDeviceGateway
 ```
 

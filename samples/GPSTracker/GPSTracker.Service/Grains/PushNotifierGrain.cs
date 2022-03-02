@@ -31,7 +31,11 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
         // Set up a timer to regularly refresh the hubs, to respond to azure infrastructure changes
         await RefreshHubs();
-        RegisterTimer(async _ => await RefreshHubs(), null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        RegisterTimer(
+            asyncCallback: async _ => await RefreshHubs(),
+            state: null,
+            dueTime: TimeSpan.FromSeconds(60),
+            period: TimeSpan.FromSeconds(60));
 
         await base.OnActivateAsync();
     }
@@ -83,7 +87,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
                 _messageQueue.Clear();
 
                 var tasks = new List<Task>(_hubs.Count);
-                var batch = new VelocityBatch { Messages = messagesToSend };
+                var batch = new VelocityBatch(messagesToSend);
                 foreach (var hub in _hubs)
                 {
                     tasks.Add(BroadcastUpdates(hub.Host, hub.Hub, batch, _logger));

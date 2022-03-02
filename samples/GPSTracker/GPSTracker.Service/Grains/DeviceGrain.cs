@@ -8,7 +8,7 @@ namespace GPSTracker.GrainImplementation;
 [Reentrant]
 public class DeviceGrain : Grain, IDeviceGrain
 {
-    private DeviceMessage _lastMessage;
+    private DeviceMessage _lastMessage = null!;
 
     public async Task ProcessMessage(DeviceMessage message)
     {
