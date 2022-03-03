@@ -1,32 +1,17 @@
-using System;
 using Orleans.Concurrency;
 
-namespace GPSTracker.Common
-{
-    [Immutable]
-    [Serializable]
-    public class VelocityMessage : DeviceMessage
-    {
-        public VelocityMessage()
-        { }
+namespace GPSTracker.Common;
 
-        public VelocityMessage(DeviceMessage deviceMessage, double velocity)
-        {
-            Latitude = deviceMessage.Latitude;
-            Longitude = deviceMessage.Longitude;
-            MessageId = deviceMessage.MessageId;
-            DeviceId = deviceMessage.DeviceId;
-            Timestamp = deviceMessage.Timestamp;
-            Velocity = velocity;
-        }
+[Immutable, Serializable]
+public record class VelocityMessage(
+    DeviceMessage DeviceMessage,
+    double Velocity) :
+    DeviceMessage(
+        DeviceMessage.Latitude,
+        DeviceMessage.Longitude,
+        DeviceMessage.MessageId,
+        DeviceMessage.DeviceId,
+        DeviceMessage.Timestamp);
 
-        public double Velocity { get; set; }
-    }
-
-    [Immutable]
-    [Serializable]
-    public class VelocityBatch
-    {
-        public VelocityMessage[] Messages { get; set; }
-    }
-}
+[Immutable, Serializable]
+public record class VelocityBatch(VelocityMessage[] Messages);

@@ -8,13 +8,16 @@
     <div class="input-group mb-3">
         <div class="input-group-prepend">
             <div class="input-group-text">
-                <input type="checkbox" checked="@todo.IsDone" @onchange="@(async e => await HandleTodoDoneAsync(todo, (bool)e.Value))" />
+                <input type="checkbox" checked="@todo.IsDone"
+                    @onchange="@(async e => await HandleTodoDoneAsync(todo, (bool)e.Value!))" />
             </div>
-            <button class="btn btn-outline-secondary" type="button" @onclick="@(async e => await HandleDeleteTodoAsync(todo))">
+            <button class="btn btn-outline-secondary" type="button"
+                @onclick="@(async e => await HandleDeleteTodoAsync(todo))">
                 <span class="oi oi-trash" aria-hidden="true"></span>
             </button>
         </div>
-        <input class="form-control" value="@todo.Title" @onchange="@(async e => await HandleTodoTitleChangeAsync(todo, (string)e.Value))" />
+        <input class="form-control" value="@todo.Title"
+            @onchange="@(async e => await HandleTodoTitleChangeAsync(todo, (string)e.Value!))" />
     </div>
 }
 
@@ -24,12 +27,12 @@
 @code {
 
     private Guid ownerKey = Guid.Empty;
-    private List<TodoItem> todos = new List<TodoItem>();
-    private string newTodo;
+    private HashSet<TodoItem> todos = new();
+    private string? newTodo;
 
     protected override async Task OnInitializedAsync()
     {
-        todos = (await ApiService.GetTodosAsync(ownerKey)).ToList();
+        todos = (await ApiService.GetTodosAsync(ownerKey))?.ToHashSet() ?? new();
 
         await base.OnInitializedAsync();
     }
@@ -60,14 +63,14 @@
 
     private async Task HandleTodoDoneAsync(TodoItem item, bool isDone)
     {
-        item.IsDone = isDone;
+        item = item with { IsDone = isDone };
 
         await ApiService.SetTodoAsync(item);
     }
 
     private async Task HandleTodoTitleChangeAsync(TodoItem item, string title)
     {
-        item.Title = title;
+        item = item with { Title = title };
 
         await ApiService.SetTodoAsync(item);
     }

@@ -1,15 +1,12 @@
 using Orleans;
-using System;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 
-namespace BlazorWasm.Grains
+namespace BlazorWasm.Grains;
+
+public interface ITodoManagerGrain : IGrainWithGuidKey
 {
-    public interface ITodoManagerGrain : IGrainWithGuidKey
-    {
-        Task RegisterAsync(Guid itemKey);
-        Task UnregisterAsync(Guid itemKey);
+    Task RegisterAsync(Guid itemKey);
+    Task UnregisterAsync(Guid itemKey);
 
-        Task<ImmutableArray<Guid>> GetAllAsync();
-    }
+    Task<ImmutableArray<Guid>> GetAllAsync();
 }

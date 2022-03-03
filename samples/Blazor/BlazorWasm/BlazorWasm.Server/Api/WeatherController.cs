@@ -1,27 +1,20 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Orleans;
 using BlazorWasm.Grains;
 using BlazorWasm.Models;
-using System;
-using System.Collections.Immutable;
-using System.Threading.Tasks;
 
-namespace Sample.Silo.Api
+namespace Sample.Silo.Api;
+
+[ApiController]
+[ApiVersion("1")]
+[Route("api/[controller]")]
+public class WeatherController : ControllerBase
 {
-    [ApiController]
-    [ApiVersion("1")]
-    [Route("api/[controller]")]
-    public class WeatherController : ControllerBase
-    {
-        private readonly IGrainFactory factory;
+    private readonly IGrainFactory _factory;
 
-        public WeatherController(IGrainFactory factory)
-        {
-            this.factory = factory;
-        }
+    public WeatherController(IGrainFactory factory) => _factory = factory;
 
-        [HttpGet]
-        public Task<ImmutableArray<WeatherInfo>> GetAsync() =>
-            factory.GetGrain<IWeatherGrain>(Guid.Empty).GetForecastAsync();
-    }
+    [HttpGet]
+    public async Task<IEnumerable<WeatherInfo>> GetAsync() =>
+        await _factory.GetGrain<IWeatherGrain>(Guid.Empty).GetForecastAsync();
 }
