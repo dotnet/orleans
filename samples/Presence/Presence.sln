@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31320.298
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains.Interfaces", "src\Grains.Interfaces\Grains.Interfaces.csproj", "{8C8D22B3-73CC-4C8D-B5DD-38401DB06D70}"
 EndProject
@@ -15,8 +15,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadGenerator", "src\LoadGe
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C89D2AC3-5081-477A-AD11-8FE2E4AEF1E1}"
 	ProjectSection(SolutionItems) = preProject
-		BuildAndRun.ps1 = BuildAndRun.ps1
-		BuildAndRun.sh = BuildAndRun.sh
 		README.md = README.md
 	EndProjectSection
 EndProject

@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -18,8 +16,8 @@ await Host.CreateDefaultBuilder()
         // this hosted service connects and disconnects from the cluster along with the host
         // it also exposes the cluster client to other services that request it
         services.AddSingleton<ClusterClientHostedService>();
-        services.AddSingleton<IHostedService>(_ => _.GetService<ClusterClientHostedService>());
-        services.AddSingleton(_ => _.GetService<ClusterClientHostedService>().Client);
+        services.AddSingleton<IHostedService>(_ => _.GetRequiredService<ClusterClientHostedService>());
+        services.AddSingleton(_ => _.GetRequiredService<ClusterClientHostedService>().Client);
 
         // this hosted service runs the sample logic
         services.AddSingleton<IHostedService, PlayerWatcherHostedService>();
