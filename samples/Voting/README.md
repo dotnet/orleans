@@ -4,7 +4,7 @@
 
 This is an [Orleans](https://github.com/dotnet/orleans) sample application which demonstrates deployment to Kubernetes.
 The application is a simplistic Web app for voting on a custom set of options.
-The application uses [.NET Generic Host](https://docs.microsoft.com/en-us/dotnet/core/extensions/generic-host) to co-host [ASP.NET Core](https://docs.microsoft.com/aspnet/core) and Orleans as well as the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard) together in the same process.
+The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/extensions/generic-host) to co-host [ASP.NET Core](https://docs.microsoft.com/aspnet/core) and Orleans as well as the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard) together in the same process.
 
 ![A screenshot of the Orleans dashboard](./dashboard.png)
 

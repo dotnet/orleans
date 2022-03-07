@@ -1,33 +1,31 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using VotingWeb.Models;
 
-namespace VotingWeb.Controllers
+namespace VotingWeb.Controllers;
+
+[Route("")]
+[Route("Home")]
+[Route("Home/Index")]
+public class HomeController : Controller
 {
-    [Route("")]
-    [Route("Home")]
-    [Route("Home/Index")]
-    public class HomeController : Controller
+    private readonly ILogger _logger;
+
+    public HomeController(ILogger<HomeController> logger)
     {
-        private readonly ILogger _logger;
+        _logger = logger;
+    }
 
-        public HomeController(ILogger<HomeController> logger)
-        {
-            _logger = logger;
-        }
+    public ActionResult Index()
+    {
+        _logger.LogInformation("Returning Index page");
+        return View();
+    }
 
-        public ActionResult Index()
-        {
-            _logger.LogInformation("Returning Index page");
-            return View();
-        }
-
-        [Route("Home/Error")]
-        public ActionResult Error()
-        {
-            _logger.LogInformation("Returning Error page");
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
+    [Route("Home/Error")]
+    public ActionResult Error()
+    {
+        _logger.LogInformation("Returning Error page");
+        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 }
