@@ -12,10 +12,14 @@ public class Secrets
     {
     }
 
-    public Secrets(string dataConnectionString!!, string eventHubConnectionString!!)
+    public Secrets(string dataConnectionString, string eventHubConnectionString)
     {
-        DataConnectionString = dataConnectionString;
-        EventHubConnectionString = eventHubConnectionString;
+        DataConnectionString = dataConnectionString
+            ?? throw new ArgumentException(
+                "Must provide a dataConnectionString", nameof(dataConnectionString));
+        EventHubConnectionString = eventHubConnectionString
+            ?? throw new ArgumentException(
+                "Must provide am eventHubConnectionString", nameof(eventHubConnectionString));
     }
 
     public static Secrets? LoadFromFile(string filename = "Secrets.json")
