@@ -1,13 +1,10 @@
-using System;
-using System.Threading.Tasks;
 using Orleans;
 
-namespace GrainInterfaces
-{
-    public interface IProducerGrain : IGrainWithStringKey
-    {
-        Task StartProducing(string ns, Guid key);
+namespace GrainInterfaces;
 
-        Task StopProducing();
-    }
+public interface IProducerGrain : IGrainWithStringKey
+{
+    Task StartProducing(string ns, Guid key);
+
+    Task StopProducing();
 }
