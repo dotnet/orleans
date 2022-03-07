@@ -1,8 +1,6 @@
 using HelloWorld.Interfaces;
 using Orleans;
 using Orleans.Hosting;
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography.X509Certificates;
 
@@ -10,20 +8,20 @@ using System.Security.Cryptography.X509Certificates;
 var client = new ClientBuilder()
     .UseLocalhostClustering(serviceId: "HelloWorldApp", clusterId: "dev")
     .UseTls(
-    StoreName.My,
-    "fakedomain.faketld",
-    allowInvalid: true,
-    StoreLocation.CurrentUser,
-    options =>
-    {
-        options.OnAuthenticateAsClient = (connection, sslOptions) =>
+        StoreName.My,
+        "fakedomain.faketld",
+        allowInvalid: true,
+        StoreLocation.CurrentUser,
+        options =>
         {
-            sslOptions.TargetHost = "fakedomain.faketld";
-        };
+            options.OnAuthenticateAsClient = (connection, sslOptions) =>
+            {
+                sslOptions.TargetHost = "fakedomain.faketld";
+            };
 
-        // NOTE: Do not do this in a production environment, since it is insecure.
-        options.AllowAnyRemoteCertificate();
-    })
+            // NOTE: Do not do this in a production environment, since it is insecure.
+            options.AllowAnyRemoteCertificate();
+        })
     .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHelloGrain).Assembly))
     .ConfigureLogging(logging => logging.AddConsole())
     .Build();
@@ -37,7 +35,6 @@ Console.WriteLine("Client successfully connect to silo host");
 var friend = client.GetGrain<IHelloGrain>(0);
 var response = await friend.SayHello("Good morning, my friend!");
 Console.WriteLine("\n\n{0}\n\n", response);
-
 Console.ReadKey();
 
 await client.Close();
