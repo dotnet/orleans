@@ -1,64 +1,66 @@
-using System;
-using System.Threading.Tasks;
-using Bond;
 using Common;
 using GrainInterfaces;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
 
-namespace Grains
+namespace Grains;
+
+public class ProducerGrain : Grain, IProducerGrain
 {
-    public class ProducerGrain : Grain, IProducerGrain
+    private readonly ILogger<IProducerGrain> _logger;
+
+    private IAsyncStream<int>? _stream;
+    private IDisposable? _timer;
+
+    private int _counter = 0;
+
+    public ProducerGrain(ILogger<IProducerGrain> logger)
     {
-        private readonly ILogger<IProducerGrain> logger;
+        _logger = logger;
+    }
 
-        private IAsyncStream<int> stream;
-        private IDisposable timer;
+    public Task StartProducing(string ns, Guid key)
+    {
+        if (_timer is not null)
+            throw new Exception("This grain is already producing events");
 
-        private int counter = 0;
+        // Get the stream
+        _stream = GetStreamProvider(Constants.StreamProvider)
+            .GetStream<int>(key, ns);
 
-        public ProducerGrain(ILogger<IProducerGrain> logger)
+        // Register a timer that produce an event every second
+        var period = TimeSpan.FromSeconds(1);
+        _timer = RegisterTimer(TimerTick, null, period, period);
+
+        _logger.LogInformation("I will produce a new event every {Period}", period);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task TimerTick(object _)
+    {
+        var value = _counter++;
+        _logger.LogInformation("Sending event {EventNumber}", value);
+        if (_stream is not null)
         {
-            this.logger = logger;
+            await _stream.OnNextAsync(value);
+        }
+    }
+
+    public Task StopProducing()
+    {
+        if (_timer is not null)
+        {
+            _timer.Dispose();
+            _timer = null;
         }
 
-        public Task StartProducing(string ns, Guid key)
+        if (_stream is not null)
         {
-            if (this.timer != null)
-                throw new Exception("This grain is already producing events");
-
-            // Get the stream
-            this.stream = base
-                .GetStreamProvider(Constants.StreamProvider)
-                .GetStream<int>(key, ns);
-
-            // Register a timer that produce an event every second
-            var period = TimeSpan.FromSeconds(1);
-            this.timer = base.RegisterTimer(TimerTick, null, period, period);
-
-            this.logger.LogInformation("I will produce a new event every {Period}", period);
-
-            return Task.CompletedTask;
+            _stream = null;
         }
 
-        private async Task TimerTick(object _)
-        {
-            var value = counter++;
-            this.logger.LogInformation("Sending event {EventNumber}", value);
-            await this.stream.OnNextAsync(value);
-        }
-
-        public Task StopProducing()
-        {
-            if (this.stream != null)
-            {
-                this.timer.Dispose();
-                this.timer = null;
-                this.stream = null;
-            }
-
-            return Task.CompletedTask;
-        }
+        return Task.CompletedTask;
     }
 }

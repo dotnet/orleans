@@ -1,10 +1,8 @@
-using System.Threading.Tasks;
 using Orleans;
 
-namespace Stocks.Interfaces
+namespace Stocks.Interfaces;
+
+public interface IStockGrain : IGrainWithStringKey
 {
-    public interface IStockGrain : IGrainWithStringKey
-    {
-        Task<string> GetPrice();
-    }
+    Task<string> GetPrice();
 }

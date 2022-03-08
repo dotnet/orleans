@@ -1,10 +1,5 @@
-using System;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
-using Microsoft.AspNetCore.Builder;
 using VotingData;
 
 await Host.CreateDefaultBuilder(args)
@@ -37,21 +32,3 @@ await Host.CreateDefaultBuilder(args)
         webBuilder.UseStartup<Startup>();
     })
     .RunConsoleAsync();
-
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddControllersWithViews();
-    }
-
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-    {
-        app.UseStaticFiles();
-        app.UseRouting();
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapDefaultControllerRoute();
-        });
-    }
-}
