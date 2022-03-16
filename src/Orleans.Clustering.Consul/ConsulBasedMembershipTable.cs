@@ -20,14 +20,14 @@ namespace Orleans.Runtime.Membership
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
         private ILogger _logger;
         private readonly IConsulClient _consulClient;
-        private readonly ConsulClusteringSiloOptions clusteringSiloTableOptions;
+        private readonly ConsulClusteringOptions clusteringSiloTableOptions;
         private readonly string clusterId;
         private readonly string kvRootFolder;
         private readonly string versionKey;
 
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulClusteringSiloOptions> membershipTableOptions, 
+            IOptions<ConsulClusteringOptions> membershipTableOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.clusterId = clusterOptions.Value.ClusterId;

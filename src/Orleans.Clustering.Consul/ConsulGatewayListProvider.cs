@@ -16,13 +16,13 @@ namespace Orleans.Runtime.Membership
         private IConsulClient consulClient;
         private string clusterId;
         private ILogger logger;
-        private readonly ConsulClusteringClientOptions options;
+        private readonly ConsulClusteringOptions options;
         private readonly TimeSpan maxStaleness;
         private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
             ILogger<ConsulGatewayListProvider> logger, 
-            IOptions<ConsulClusteringClientOptions> options, 
+            IOptions<ConsulClusteringOptions> options, 
             IOptions<GatewayOptions> gatewayOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {

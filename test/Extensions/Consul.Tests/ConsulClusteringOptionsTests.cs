@@ -7,43 +7,23 @@ using Xunit;
 namespace Consul.Tests
 {
     [TestCategory("Consul")]
-    public class ConsulClusteringAbstractOptionsTests
+    public class ConsulClusteringOptionsTests
     {
         [Fact, TestCategory("Consul")]
         public void DefaultCreationBehaviorIsRetained()
         {            
-            ConsulClusteringAbstractOptions options = new ConsulClusteringClientOptions();
+            var options = new ConsulClusteringOptions();
 
             // ensure we set a default value.
             var actual = options.CreateClient;
 
             Assert.NotNull(actual);
-        }
-
-        [Fact, TestCategory("Consul")]
-        public void DefaultCreateAClientBasedOnTheAdressAndToken()
-        {
-            var address = new Uri("http://localhost:8501");
-            var token = "SomeToken";
-            ConsulClusteringAbstractOptions options = new ConsulClusteringClientOptions();
-
-            options.Address = address;
-            options.AclClientToken = token;
-            
-            // ensure we get a consul client
-            var client = options.CreateClient();
-            
-            Assert.IsType<ConsulClient>(client);
-            var typedClient = (ConsulClient)client;
-
-            Assert.Equal(typedClient.Config.Token, token);
-            Assert.Equal(typedClient.Config.Token, token);
-        }
+        }       
 
         [Fact, TestCategory("Consul")]
         public void ThrowsArgumentNullExceptionIfCallbackIsNull()
         {            
-            var  options = new ConsulClusteringClientOptions();
+            var  options = new ConsulClusteringOptions();
             Func<IConsulClient> callback = null;
 
             // ensure we check the callback.
@@ -56,7 +36,7 @@ namespace Consul.Tests
         public void WeCanInjectAConsulClient()
         {
             var fakeConsul = new FakeConsul();
-            var options = new ConsulClusteringClientOptions();
+            var options = new ConsulClusteringOptions();
             Func<IConsulClient> callback = () => fakeConsul;
 
             //we can inject the consul
@@ -72,7 +52,7 @@ namespace Consul.Tests
             var address = new Uri("http://localhost:8501");
             var token = "SomeToken";
 
-            var options = new ConsulClusteringClientOptions();            
+            var options = new ConsulClusteringOptions();            
 
             //we can configure the default consult client
             options.ConfigureConsulClient(address, token);
@@ -81,6 +61,21 @@ namespace Consul.Tests
 
             Assert.Equal(address, client.Config.Address);
             Assert.Equal(token, client.Config.Token);
+        }
+
+        [Fact, TestCategory("Consul")]
+        public void WeCanUseConfigureToSetupTheDefaultClientWithoutAAclToken()
+        {
+            var address = new Uri("http://localhost:8501");           
+            var options = new ConsulClusteringOptions();
+
+            //we can configure the default consult client
+            options.ConfigureConsulClient(address);
+
+            var client = (ConsulClient)options.CreateClient();
+
+            Assert.Equal(address, client.Config.Address);
+            Assert.Null(client.Config.Token);
         }
 
         /// <summary>
