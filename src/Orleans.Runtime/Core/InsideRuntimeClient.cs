@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Threading;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -37,7 +38,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData systemSharedCallbackData;
         private SafeTimer callbackTimer;
 
-        private ILocalGrainDirectory directory;
+        private IGrainLocator directory;
         private Catalog catalog;
         private Dispatcher dispatcher;
         private List<IIncomingGrainCallFilter> grainCallFilters;
@@ -117,8 +118,8 @@ namespace Orleans.Runtime
         
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
-        private ILocalGrainDirectory Directory
-            => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>());
+        private IGrainLocator Directory
+            => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<IGrainLocator>());
 
         private List<IIncomingGrainCallFilter> GrainCallFilters
             => this.grainCallFilters ?? (this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
@@ -239,7 +240,7 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        this.Directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
+                        this.Directory.InvalidateCache(address);
                     }
                 }
 
@@ -611,7 +612,7 @@ namespace Orleans.Runtime
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
-                            this.Directory.InvalidateCacheEntry(message.SendingAddress);
+                            this.Directory.InvalidateCache(message.SendingAddress);
                         }
                         break;
 

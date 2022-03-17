@@ -56,6 +56,8 @@ namespace Orleans.Runtime.GrainDirectory
             return tcs.Task;
         }
 
+        public void InvalidateCache(ActivationAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
+
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
             => new DhtGrainLocator(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
 

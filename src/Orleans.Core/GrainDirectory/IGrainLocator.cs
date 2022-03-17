@@ -20,5 +20,13 @@ namespace Orleans.GrainDirectory
         Task<List<ActivationAddress>> Lookup(GrainId grainId);
 
         bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses);
+
+        /// <summary>
+        /// Removes the specified address from the lookup cache.
+        /// </summary>
+        /// <param name="address">
+        /// The grain address to invalidate.
+        /// </param>
+        void InvalidateCache(ActivationAddress address);
     }
 }
