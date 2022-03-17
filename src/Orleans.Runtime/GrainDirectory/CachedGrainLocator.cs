@@ -146,6 +146,8 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        public void InvalidateCache(ActivationAddress address) => this.cache.Remove(address);
+
         public void Participate(ISiloLifecycle lifecycle)
         {
             Task OnStart(CancellationToken ct)
