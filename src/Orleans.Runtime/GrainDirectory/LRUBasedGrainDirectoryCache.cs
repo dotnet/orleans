@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -19,9 +19,21 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Add(key, (value, version));
         }
 
-        public bool Remove(GrainId key)
+        public bool Remove(GrainId key) => cache.RemoveKey(key, out var tmp);
+
+        public bool Remove(ActivationAddress activationAddress)
         {
-            return cache.RemoveKey(key, out var tmp);
+            return cache.TryRemove(activationAddress.Grain, ActivationAddressEqual, activationAddress.Activation);
+
+            static bool ActivationAddressEqual(ActivationId activationId, (IReadOnlyList<Tuple<SiloAddress, ActivationId>> Entry, int Version) value)
+            {
+                // value.Entry.Count should always be == 1, but to be safe ask to remove the entry if the count is zero
+                if (value.Entry.Count == 0 || activationId.Equals(value.Entry[0].Item2))
+                {
+                    return true;
+                }
+                return false;
+            }
         }
 
         public void Clear()

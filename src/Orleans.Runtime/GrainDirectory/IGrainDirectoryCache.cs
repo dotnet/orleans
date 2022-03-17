@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -22,7 +22,14 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key to remove</param>
         /// <returns>True if the entry was in the cache and the removal was successful</returns>
         bool Remove(GrainId key);
-        
+
+        /// <summary>
+        /// Removes an entry from the cache given its key
+        /// </summary>
+        /// <param name="key">key to remove</param>
+        /// <returns>True if the entry was in the cache and the removal was successful</returns>
+        bool Remove(ActivationAddress key);
+
         /// <summary>
         /// Clear the cache, deleting all entries.
         /// </summary>
