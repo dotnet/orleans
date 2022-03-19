@@ -816,6 +816,7 @@ namespace Orleans.Runtime
 
                 if (State is ActivationState.Deactivating)
                 {
+                    // Determine whether to declare this activation as stuck
                     var deactivatingTime = DateTime.UtcNow - DeactivationStartTime.Value;
                     if (deactivatingTime > _shared.MaxRequestProcessingTime && !IsStuckDeactivating)
                     {
@@ -825,6 +826,13 @@ namespace Orleans.Runtime
                             var msg = $"Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck";
                             DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive, DeactivationReason.Description + ". " + msg);
                         }
+                    }
+
+                    if (!IsStuckDeactivating && !IsStuckProcessingMessage)
+                    {
+                        // Do not forward messages while the grain is still deactivating and has not been declared stuck, since they
+                        // will be forwarded to the same grain instance.
+                        return;
                     }
                 }
 
