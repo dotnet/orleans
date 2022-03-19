@@ -5,11 +5,10 @@ using Orleans.Configuration;
 using Xunit;
 
 namespace Consul.Tests
-{
-    [TestCategory("Consul")]
+{    
     public class ConsulClusteringOptionsTests
     {
-        [Fact, TestCategory("Consul")]
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void DefaultCreationBehaviorIsRetained()
         {            
             var options = new ConsulClusteringOptions();
@@ -20,7 +19,7 @@ namespace Consul.Tests
             Assert.NotNull(actual);
         }       
 
-        [Fact, TestCategory("Consul")]
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void ThrowsArgumentNullExceptionIfCallbackIsNull()
         {            
             var  options = new ConsulClusteringOptions();
@@ -32,7 +31,7 @@ namespace Consul.Tests
             Assert.Throws<ArgumentNullException>(shouldThrow);
         }
 
-        [Fact, TestCategory("Consul")]
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void WeCanInjectAConsulClient()
         {
             var fakeConsul = new FakeConsul();
@@ -46,7 +45,7 @@ namespace Consul.Tests
             Assert.Equal(fakeConsul, actual);
         }
 
-        [Fact, TestCategory("Consul")]
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void WeCanUseConfigureToSetupTheDefaultClient()
         {
             var address = new Uri("http://localhost:8501");
@@ -63,7 +62,7 @@ namespace Consul.Tests
             Assert.Equal(token, client.Config.Token);
         }
 
-        [Fact, TestCategory("Consul")]
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void WeCanUseConfigureToSetupTheDefaultClientWithoutAAclToken()
         {
             var address = new Uri("http://localhost:8501");           
