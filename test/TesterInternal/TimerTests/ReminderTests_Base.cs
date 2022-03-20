@@ -24,7 +24,7 @@ namespace UnitTests.TimerTests
     public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
         protected TestCluster HostedCluster { get; private set; }
-        internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
+        internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
 
         internal const string DR = "DEFAULT_REMINDER";
@@ -126,11 +126,11 @@ namespace UnitTests.TimerTests
             // do some time tests as well
             log.Info("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
             for (int i = 0; i < count; i++)
             {
                 long curr = await grain.GetCounter(DR + "_" + i);
-                Assert.Equal(2,  curr); // string.Format("Incorrect ticks for {0}_{1}", DR, i));
+                Assert.Equal(2,  curr);
             }
         }
 
@@ -153,7 +153,7 @@ namespace UnitTests.TimerTests
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
             };
 
-            Thread.Sleep(period.Multiply(5));
+            await Task.Delay(period.Multiply(5));
             // start another silo ... although it will take it a while before it stabilizes
             log.Info("Starting another silo");
             await this.HostedCluster.StartAdditionalSilosAsync(1, true);
@@ -234,13 +234,13 @@ namespace UnitTests.TimerTests
 
             await grain.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             long last = await grain.GetCounter(DR);
             AssertIsInRange(last, failCheckAfter - 1, failCheckAfter + 1, grain, DR, sleepFor);
 
             await grain.StopReminder(DR);
             sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             long curr = await grain.GetCounter(DR);
 
             AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
@@ -262,19 +262,19 @@ namespace UnitTests.TimerTests
             // Start Default Reminder
             await g.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             long last = await g.GetCounter(DR);
             AssertIsInRange(last, 1, 2, g, DR, sleepFor);
 
             // Start R1
             await g.StartReminder(R1);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             last = await g.GetCounter(R1);
             AssertIsInRange(last, 1, 2, g, R1, sleepFor);
 
             // Start R2
             await g.StartReminder(R2);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             last = await g.GetCounter(R1);
             AssertIsInRange(last, 3, 4, g, R1, sleepFor);
             last = await g.GetCounter(R2);
@@ -284,7 +284,7 @@ namespace UnitTests.TimerTests
 
             // Stop R1
             await g.StopReminder(R1);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             last = await g.GetCounter(R1);
             AssertIsInRange(last, 3, 4, g, R1, sleepFor);
             last = await g.GetCounter(R2);
@@ -295,7 +295,7 @@ namespace UnitTests.TimerTests
             // Stop R2
             await g.StopReminder(R2);
             sleepFor = period.Multiply(3) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             last = await g.GetCounter(R1);
             AssertIsInRange(last, 3, 4, g, R1, sleepFor);
             last = await g.GetCounter(R2);
@@ -306,7 +306,7 @@ namespace UnitTests.TimerTests
             // Stop Default reminder
             await g.StopReminder(DR);
             sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             last = await g.GetCounter(R1);
             AssertIsInRange(last, 3, 4, g, R1, sleepFor);
             last = await g.GetCounter(R2);
@@ -324,12 +324,12 @@ namespace UnitTests.TimerTests
             this.log.Info("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
 
             await grain.StartReminder(DR);
-            Thread.Sleep(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
+            await Task.Delay(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
             long last = await grain.GetCounter(DR);
             Assert.Equal(failCheckAfter,   last);  // "{0} CopyGrain {1} Reminder {2}" // Time(), grain.GetPrimaryKey(), DR);
 
             await grain.StopReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
             long curr = await grain.GetCounter(DR);
             Assert.Equal(last,  curr); // "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
 
@@ -367,11 +367,14 @@ namespace UnitTests.TimerTests
                 }
                 catch (AggregateException aggEx)
                 {
-                    aggEx.Handle(exc => HandleError(exc, i));
+                    foreach (var exception in aggEx.InnerExceptions)
+                    {
+                        await HandleError(exception, i);
+                    }
                 }
                 catch (ReminderException exc)
                 {
-                    HandleError(exc, i);
+                    await HandleError(exc, i);
                 }
             }
 
@@ -391,11 +394,14 @@ namespace UnitTests.TimerTests
                 }
                 catch (AggregateException aggEx)
                 {
-                    aggEx.Handle(exc => HandleError(exc, i));
+                    foreach (var exception in aggEx.InnerExceptions)
+                    {
+                        await HandleError(exception, i);
+                    }
                 }
                 catch (ReminderException exc)
                 {
-                    HandleError(exc, i);
+                    await HandleError(exc, i);
                 }
             }
 
@@ -403,7 +409,7 @@ namespace UnitTests.TimerTests
             await function(reminderName).WithTimeout(TestConstants.InitTimeout);
         }
 
-        private bool HandleError(Exception ex, long i)
+        private async Task<bool> HandleError(Exception ex, long i)
         {
             if (ex is AggregateException)
             {
@@ -413,7 +419,7 @@ namespace UnitTests.TimerTests
             if (ex is ReminderException)
             {
                 this.log.Info("Retriable operation failed on attempt {0}: {1}", i, ex.ToString());
-                Thread.Sleep(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+                await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
                 return true;
             }
 
