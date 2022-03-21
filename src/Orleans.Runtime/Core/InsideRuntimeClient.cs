@@ -315,7 +315,7 @@ namespace Orleans.Runtime
 
                         var msg = $"Deactivating {target} due to inconsistent state.";
                         this.invokeExceptionLogger.Info(msg);
-                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, invocationException, invocationException.Message));
+                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
                     }
                 }
 
