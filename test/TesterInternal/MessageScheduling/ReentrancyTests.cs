@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -99,20 +100,18 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
+        public async Task NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
-                grain.Exceptional().Wait(2000);
+                await grain.Exceptional().WithTimeout(TimeSpan.FromSeconds(2));
             }
             catch (Exception ex)
             {
-                Assert.IsType<OrleansException>(ex.GetBaseException());
-                Assert.NotNull(ex.GetBaseException().InnerException);
-                Assert.IsType<ApplicationException>(ex.GetBaseException().InnerException);
-                Assert.True(ex.GetBaseException().InnerException?.Message == "boom",
+                Assert.IsType<ApplicationException>(ex);
+                Assert.True(ex.Message == "boom",
                     "Should fail with Orleans runtime exception having all of necessary details");
             }
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");

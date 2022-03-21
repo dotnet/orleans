@@ -736,48 +736,57 @@ namespace Orleans.Runtime
                         }
 
                         message = _waitingRequests[i].Message;
-                        if (!MayInvokeRequest(message))
+                        try
                         {
-                            // The activation is not able to process this message right now, so try the next message.
-                            ++i;
-
-                            if (_blockingRequest != null)
+                            if (!MayInvokeRequest(message))
                             {
-                                var currentRequestActiveTime = _busyDuration.Elapsed;
-                                if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
+                                // The activation is not able to process this message right now, so try the next message.
+                                ++i;
+
+                                if (_blockingRequest != null)
                                 {
-                                    DeactivateStuckActivation();
+                                    var currentRequestActiveTime = _busyDuration.Elapsed;
+                                    if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
+                                    {
+                                        DeactivateStuckActivation();
+                                    }
+                                    else if (currentRequestActiveTime > _shared.MaxWarningRequestProcessingTime)
+                                    {
+                                        // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
+                                        _shared.Logger.LogWarning(
+                                            (int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
+                                            "Current request has been active for {CurrentRequestActiveTime} for grain {Grain}. Currently executing {BlockingRequest}. Trying to enqueue {Message}.",
+                                            currentRequestActiveTime,
+                                            ToDetailedString(),
+                                            _blockingRequest,
+                                            message);
+                                    }
                                 }
-                                else if (currentRequestActiveTime > _shared.MaxWarningRequestProcessingTime)
-                                {
-                                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
-                                    _shared.Logger.LogWarning(
-                                        (int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
-                                        "Current request has been active for {CurrentRequestActiveTime} for grain {Grain}. Currently executing {BlockingRequest}. Trying to enqueue {Message}.",
-                                        currentRequestActiveTime,
-                                        ToDetailedString(),
-                                        _blockingRequest,
-                                        message);
-                                }
+
+                                continue;
                             }
 
-                            continue;
+                            // If the current message is incompatible, deactivate this activation and eventually forward the message to a new incarnation.
+                            if (message.InterfaceVersion > 0)
+                            {
+                                var compatibilityDirector = _shared.InternalRuntime.CompatibilityDirectorManager.GetDirector(message.InterfaceType);
+                                var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
+                                if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
+                                {
+                                    var reason = new DeactivationReason(
+                                        DeactivationReasonCode.IncompatibleRequest,
+                                        $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
+
+                                    Deactivate(reason, token: default);
+                                    return;
+                                }
+                            }
                         }
-
-                        // If the current message is incompatible, deactivate this activation and eventually forward the message to a new incarnation.
-                        if (message.InterfaceVersion > 0)
+                        catch (Exception exception)
                         {
-                            var compatibilityDirector = _shared.InternalRuntime.CompatibilityDirectorManager.GetDirector(message.InterfaceType);
-                            var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
-                            if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
-                            {
-                                var reason = new DeactivationReason(
-                                    DeactivationReasonCode.IncompatibleRequest,
-                                    $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
-
-                                Deactivate(reason, token: default);
-                                return;
-                            }
+                            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
+                            _waitingRequests.RemoveAt(i);
+                            continue;
                         }
 
                         // Process this message, removing it from the queue.
@@ -785,25 +794,25 @@ namespace Orleans.Runtime
 
                         Debug.Assert(State == ActivationState.Valid);
                         RecordRunning(message, message.IsAlwaysInterleave);
-
-                        void RecordRunning(Message message, bool isInterleavable)
-                        {
-                            var stopwatch = CoarseStopwatch.StartNew();
-                            _runningRequests.Add(message, stopwatch);
-
-                            if (_blockingRequest != null || isInterleavable) return;
-
-                            // This logic only works for non-reentrant activations
-                            // Consider: Handle long request detection for reentrant activations.
-                            _blockingRequest = message;
-                            _busyDuration = stopwatch;
-                        }
                     }
 
                     // Start invoking the message outside of the lock
                     InvokeIncomingRequest(message);
                 }
                 while (true);
+            }
+
+            void RecordRunning(Message message, bool isInterleavable)
+            {
+                var stopwatch = CoarseStopwatch.StartNew();
+                _runningRequests.Add(message, stopwatch);
+
+                if (_blockingRequest != null || isInterleavable) return;
+
+                // This logic only works for non-reentrant activations
+                // Consider: Handle long request detection for reentrant activations.
+                _blockingRequest = message;
+                _busyDuration = stopwatch;
             }
 
             void ProcessRequestsToInvalidActivation()
@@ -874,7 +883,15 @@ namespace Orleans.Runtime
 
                 if (GetComponent<GrainCanInterleave>() is GrainCanInterleave canInterleave)
                 {
-                    return canInterleave.MayInterleave(incoming);
+                    try
+                    {
+                        return canInterleave.MayInterleave(incoming);
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger?.LogError(exception, "Error invoking MayInterleave predicate on grain {Grain} for message {Message}", this, incoming);
+                        throw;
+                    }
                 }
 
                 return false;
