@@ -28,7 +28,7 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// PersistenceGrainTests - Run with only local unit test silo -- no external dependency on Azure storage
     /// </summary>
-    public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
+    public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable, IAsyncLifetime
     {
         public class Fixture : BaseTestClusterFixture
         {
@@ -62,13 +62,21 @@ namespace UnitTests.StorageTests
         {
             this.output = output;
             HostedCluster = fixture.HostedCluster;
-            SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
             ResetMockStorageProvidersHistory();
+        }
+
+        public async Task InitializeAsync()
+        {
+            await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
+        }
+
+        public async Task DisposeAsync()
+        {
+            await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
         }
 
         public void Dispose()
         {
-            SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -185,7 +193,7 @@ namespace UnitTests.StorageTests
             int initialValue = 567;
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", initialValue);
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
             await Assert.ThrowsAsync<StorageProviderInjectedError>(() =>
                 grain.GetValue());
@@ -615,16 +623,16 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
             val = await grain.DoRead();
 
             Assert.Equal(expectedVal, val); // Returned value
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
             
-            CheckStorageProviderErrors(grain.DoRead);
+            await CheckStorageProviderErrors(grain.DoRead);
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
 
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
@@ -642,21 +650,21 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 52;
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
             Assert.Equal(expectedVal, val); // Returned value
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
-            CheckStorageProviderErrors(grain.DoRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
+            await CheckStorageProviderErrors(grain.DoRead);
 
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
 
             int newVal = 53;
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
 
             val = await grain.GetValue();
@@ -684,14 +692,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
-            CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
+            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
@@ -719,19 +727,19 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
-            SetErrorInjection(providerName, new ErrorInjectionBehavior
+            await SetErrorInjection(providerName, new ErrorInjectionBehavior
             {
                 ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
                 ExceptionType = typeof(InconsistentStateException)
             });
-            CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
+            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
             Assert.NotEqual(originalActivationId, await grain.GetActivationId());
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
@@ -757,12 +765,12 @@ namespace UnitTests.StorageTests
             var proxyActivationId = await proxy.GetActivationId();
 
             // Cause an inconsistent state exception.
-            this.SetErrorInjection(ErrorInjectorProviderName, new ErrorInjectionBehavior
+            await SetErrorInjection(ErrorInjectorProviderName, new ErrorInjectionBehavior
             {
                 ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
                 ExceptionType = typeof(InconsistentStateException)
             });
-            this.CheckStorageProviderErrors(() => proxy.DoWrite(63, target), typeof(InconsistentStateException));
+            await CheckStorageProviderErrors(() => proxy.DoWrite(63, target), typeof(InconsistentStateException));
 
             // The target should have been deactivated by the exception.
             Assert.NotEqual(targetActivationId, await target.GetActivationId());
@@ -786,14 +794,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal4 = 83;
-            SetErrorInjection(providerName, ErrorInjectionPoint.AfterWrite);
-            CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal4));
+            await SetErrorInjection(providerName, ErrorInjectionPoint.AfterWrite);
+            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal4));
 
             // Stored value has changed
             expectedVal = attemptedVal4;
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
         }
@@ -818,10 +826,10 @@ namespace UnitTests.StorageTests
             var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
-            CheckStorageProviderErrors(grain.DoRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
+            await CheckStorageProviderErrors(grain.DoRead);
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
         }
@@ -849,10 +857,10 @@ namespace UnitTests.StorageTests
 
             expectedVal = 94;
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
-            SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
-            CheckStorageProviderErrors(grain.DoRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
+            await CheckStorageProviderErrors(grain.DoRead);
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
         }
@@ -868,7 +876,7 @@ namespace UnitTests.StorageTests
             _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
@@ -878,10 +886,10 @@ namespace UnitTests.StorageTests
             int newVal = expectedVal + 1;
 
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
             val = await grain.DoRead(true);
             Assert.Equal(expectedVal, val); // Returned value
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             expectedVal = newVal;
 
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
@@ -900,7 +908,7 @@ namespace UnitTests.StorageTests
             _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
@@ -908,12 +916,12 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
 
             int newVal = expectedVal + 1;
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
             await grain.DoWrite(newVal, true);
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
 
             expectedVal = newVal;
             await grain.DoWrite(newVal, false);
@@ -933,15 +941,15 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
             val = await grain.DoRead(false);
 
             Assert.Equal(expectedVal, val); // Returned value after read
 
             int newVal = expectedVal + 1;
-            SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
-            CheckStorageProviderErrors(() => grain.DoWrite(newVal, false));
+            await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
+            await CheckStorageProviderErrors(() => grain.DoWrite(newVal, false));
 
             val = await grain.GetValue();
             // Stored value unchanged
@@ -952,7 +960,7 @@ namespace UnitTests.StorageTests
 #else
             Assert.Equal(newVal, val); // After failed write: Last value attempted to be written is still in memory
 #endif
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            await SetErrorInjection(providerName, ErrorInjectionPoint.None);
 
             expectedVal = newVal;
             await grain.DoWrite(newVal, false);
@@ -1205,23 +1213,23 @@ namespace UnitTests.StorageTests
                 providerName, (int)MockStorageProvider.Commands.SetValue, args).Wait();
         }
 
-        private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
+        private async Task SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
+            await SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
         }
 
-        private void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
+        private async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
         {
-            ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
+            await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
         }
 
-        private void CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)
+        private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)
         {
             StackTrace at = new StackTrace();
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(15);
             try
             {
-                taskFunc().WithTimeout(timeout).GetAwaiter().GetResult();
+                await taskFunc().WithTimeout(timeout);
 
                 if (ErrorInjectionStorageProvider.DoInjectErrors)
                 {

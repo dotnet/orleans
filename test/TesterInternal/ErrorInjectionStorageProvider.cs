@@ -84,15 +84,14 @@ namespace UnitTests.StorageTests
             SetErrorInjection(ErrorInjectionBehavior.None);
         }
 
-        public static void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
+        public static async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
         {
             IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
-            mgmtGrain.SendControlCommandToProvider(
+            await mgmtGrain.SendControlCommandToProvider(
                 typeof(ErrorInjectionStorageProvider).FullName,
                 providerName, 
                 (int)Commands.SetErrorInjection,
-                errorInjectionBehavior)
-                .Wait();
+                errorInjectionBehavior);
         }
 
         public ErrorInjectionBehavior ErrorInjection { get; private set; }

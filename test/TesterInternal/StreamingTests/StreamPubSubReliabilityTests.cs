@@ -15,7 +15,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>
+    public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>, IAsyncLifetime
     {
         public class Fixture : BaseTestClusterFixture
         {
@@ -66,8 +66,14 @@ namespace UnitTests.StreamingTests
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             this.HostedCluster = fixture.HostedCluster;
             _fixture = fixture;
-            SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
+
+        public async Task InitializeAsync()
+        {
+            await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
+        }
+
+        public Task DisposeAsync() => Task.CompletedTask;
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_Baseline()
@@ -84,7 +90,7 @@ namespace UnitTests.StreamingTests
             //                   root cause problem "Failed SetupActivationState" in message text, 
             //                   but no more details or stack trace.
 
-            SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
+            await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
 
             // TODO: expect StorageProviderInjectedError directly instead of OrleansException
             await Assert.ThrowsAsync<StorageProviderInjectedError>(() =>
@@ -94,7 +100,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_WriteError()
         {
-            SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
+            await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
 
             var exception = await Assert.ThrowsAsync<StorageProviderInjectedError>(() =>
                 Test_PubSub_Stream(StreamProviderName, StreamId));
@@ -129,9 +135,9 @@ namespace UnitTests.StreamingTests
 
         }
 
-        private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
+        private async Task SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            ErrorInjectionStorageProvider.SetErrorInjection(
+            await ErrorInjectionStorageProvider.SetErrorInjection(
                 providerName,
                 new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint },
                 this.HostedCluster.GrainFactory);
