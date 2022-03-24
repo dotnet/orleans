@@ -54,6 +54,7 @@ namespace Orleans.Serialization.Invocation
         public abstract string MethodName { get; }
         public abstract Type[] MethodTypeArguments { get; }
         public abstract string InterfaceName { get; }
+        public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }
@@ -108,6 +109,7 @@ namespace Orleans.Serialization.Invocation
         public abstract string MethodName { get; }
         public abstract Type[] MethodTypeArguments { get; }
         public abstract string InterfaceName { get; }
+        public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }
@@ -163,6 +165,7 @@ namespace Orleans.Serialization.Invocation
         public abstract string MethodName { get; }
         public abstract Type[] MethodTypeArguments { get; }
         public abstract string InterfaceName { get; }
+        public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }
@@ -219,6 +222,7 @@ namespace Orleans.Serialization.Invocation
         public abstract string MethodName { get; }
         public abstract Type[] MethodTypeArguments { get; }
         public abstract string InterfaceName { get; }
+        public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }
@@ -254,6 +258,7 @@ namespace Orleans.Serialization.Invocation
         public abstract string MethodName { get; }
         public abstract Type[] MethodTypeArguments { get; }
         public abstract string InterfaceName { get; }
+        public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
         public abstract Type[] InterfaceTypeArguments { get; }
         public abstract Type[] ParameterTypes { get; }

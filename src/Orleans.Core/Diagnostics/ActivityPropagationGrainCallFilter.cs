@@ -13,21 +13,29 @@ namespace Orleans.Runtime
         protected const string TraceParentHeaderName = "traceparent";
         protected const string TraceStateHeaderName = "tracestate";
 
-        internal const string ActivitySourceName = "orleans.runtime.graincall";
-        internal const string ActivityNameIn = "Orleans.Runtime.GrainCall.In";
-        internal const string ActivityNameOut = "Orleans.Runtime.GrainCall.Out";
+        internal const string RpcSystem = "orleans";
+        internal const string ActivitySourceName = "Microsoft.Orleans";
 
-        protected static readonly ActivitySource activitySource = new ActivitySource(ActivitySourceName);
+        protected static readonly ActivitySource Source = new(ActivitySourceName);
 
         protected static async Task Process(IGrainCallContext context, Activity activity)
         {
             if (activity is not null)
             {
                 // rpc attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
-                activity.SetTag("rpc.service", context.InterfaceMethod?.DeclaringType?.FullName);
-                activity.SetTag("rpc.method", context.InterfaceMethod?.Name);
-                activity.SetTag("net.peer.name", context.Grain?.ToString());
-                activity.SetTag("rpc.system", "orleans");
+                activity.SetTag("rpc.system", RpcSystem);
+                activity.SetTag("rpc.service", context.InterfaceName);
+                activity.SetTag("rpc.method", context.MethodName);
+
+                if (activity.IsAllDataRequested)
+                {
+                    // Custom attributes
+                    activity.SetTag("rpc.orleans.target_id", context.TargetId.ToString());
+                    if (context.SourceId is GrainId sourceId)
+                    {
+                        activity.SetTag("rpc.orleans.source_id", sourceId.ToString());
+                    }
+                }
             }
 
             try
@@ -49,6 +57,7 @@ namespace Orleans.Runtime
                     activity.SetTag("exception.escaped", true);
                     activity.SetTag("status", "Error");
                 }
+                
                 throw;
             }
             finally
@@ -63,7 +72,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivityPropagationOutgoingGrainCallFilter : ActivityPropagationGrainCallFilter, IOutgoingGrainCallFilter
     {
-        private readonly DistributedContextPropagator propagator;
+        private readonly DistributedContextPropagator _propagator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivityPropagationOutgoingGrainCallFilter"/> class.
@@ -71,17 +80,17 @@ namespace Orleans.Runtime
         /// <param name="propagator">The context propagator.</param>
         public ActivityPropagationOutgoingGrainCallFilter(DistributedContextPropagator propagator)
         {
-            this.propagator = propagator;
+            _propagator = propagator;
         }
 
         /// <inheritdoc />
         public Task Invoke(IOutgoingGrainCallContext context)
         {
-            var activity = activitySource.StartActivity(ActivityNameOut, ActivityKind.Client);
+            var activity = Source.StartActivity(context.Request.ActivityName, ActivityKind.Client);
 
-            if (activity != null)
+            if (activity is not null)
             {
-                propagator.Inject(activity, null, static (carrier, key, value) =>
+                _propagator.Inject(activity, null, static (carrier, key, value) =>
                 {
                     RequestContext.Set(key, value);
                 });
@@ -89,7 +98,6 @@ namespace Orleans.Runtime
 
             return Process(context, activity);
         }
-
     }
 
     /// <summary>
@@ -97,7 +105,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivityPropagationIncomingGrainCallFilter : ActivityPropagationGrainCallFilter, IIncomingGrainCallFilter
     {
-        private readonly DistributedContextPropagator propagator;
+        private readonly DistributedContextPropagator _propagator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivityPropagationIncomingGrainCallFilter"/> class.
@@ -105,15 +113,14 @@ namespace Orleans.Runtime
         /// <param name="propagator">The context propagator.</param>
         public ActivityPropagationIncomingGrainCallFilter(DistributedContextPropagator propagator)
         {
-            this.propagator = propagator;
+            _propagator = propagator;
         }
 
         /// <inheritdoc />
         public Task Invoke(IIncomingGrainCallContext context)
         {
             Activity activity = default;
-
-            propagator.ExtractTraceIdAndState(null,
+            _propagator.ExtractTraceIdAndState(null,
                 static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
                 {
                     fieldValues = default;
@@ -121,20 +128,24 @@ namespace Orleans.Runtime
                 },
                 out var traceParent,
                 out var traceState);
+
             if (!string.IsNullOrEmpty(traceParent))
             {
-                activity = activitySource.CreateActivity(ActivityNameIn, ActivityKind.Server, traceParent);
+                activity = Source.CreateActivity(context.Request.ActivityName, ActivityKind.Server, traceParent);
+
                 if (activity is not null)
                 {
                     if (!string.IsNullOrEmpty(traceState))
                     {
                         activity.TraceStateString = traceState;
                     }
-                    var baggage = propagator.ExtractBaggage(null, static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
+
+                    var baggage = _propagator.ExtractBaggage(null, static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
                     {
                         fieldValues = default;
                         fieldValue = RequestContext.Get(fieldName) as string;
                     });
+
                     if (baggage is not null)
                     {
                         foreach (var baggageItem in baggage)
@@ -146,13 +157,10 @@ namespace Orleans.Runtime
             }
             else
             {
-                activity = activitySource.CreateActivity(ActivityNameIn, ActivityKind.Server);
+                activity = Source.CreateActivity(context.Request.ActivityName, ActivityKind.Server);
             }
 
-            if (activity is not null)
-            {
-                activity.Start();
-            }
+            activity?.Start();
             return Process(context, activity);
         }
     }

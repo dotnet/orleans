@@ -50,7 +50,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return result;
         }
 
-        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, bool includeGlobalSpecifier = true)
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, bool includeGlobalSpecifier = true, bool includeNamespace = true)
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
             {
@@ -58,7 +58,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
 
             var result = new StringBuilder();
-            ToTypeSyntaxInner(typeSymbol, substitutions, result, includeGlobalSpecifier);
+            ToTypeSyntaxInner(typeSymbol, substitutions, result, includeGlobalSpecifier, includeNamespace);
             return result.ToString();
         }
 
@@ -92,7 +92,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return result;
         }
 
-        private static void ToTypeSyntaxInner(ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier = true)
+        private static void ToTypeSyntaxInner(ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier = true, bool includeNamespace = true)
         {
             switch (typeSymbol)
             {
@@ -100,7 +100,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     res.Append("dynamic");
                     break;
                 case IArrayTypeSymbol a:
-                    ToTypeSyntaxInner(a.ElementType, substitutions, res, includeGlobalSpecifier);
+                    ToTypeSyntaxInner(a.ElementType, substitutions, res, includeGlobalSpecifier, includeNamespace);
                     res.Append('[');
                     if (a.Rank > 1)
                     {
@@ -120,21 +120,21 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     }
                     break;
                 case INamedTypeSymbol n:
-                    OnNamedTypeSymbol(n, substitutions, res, includeGlobalSpecifier);
+                    OnNamedTypeSymbol(n, substitutions, res, includeGlobalSpecifier, includeNamespace);
                     break;
                 default:
                     throw new NotSupportedException($"Symbols of type {typeSymbol?.GetType().ToString() ?? "null"} are not supported");
             }
 
-            static void OnNamedTypeSymbol(INamedTypeSymbol symbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier)
+            static void OnNamedTypeSymbol(INamedTypeSymbol symbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier, bool includeNamespace)
             {
                 switch (symbol.ContainingSymbol)
                 {
-                    case INamespaceSymbol ns:
+                    case INamespaceSymbol ns when includeNamespace:
                         AddFullNamespace(ns, res, includeGlobalSpecifier);
                         break;
                     case INamedTypeSymbol containingType:
-                        OnNamedTypeSymbol(containingType, substitutions, res, includeGlobalSpecifier);
+                        OnNamedTypeSymbol(containingType, substitutions, res, includeGlobalSpecifier, includeNamespace);
                         res.Append('.');
                         break;
                 }
@@ -151,7 +151,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                             res.Append(',');
                         }
 
-                        ToTypeSyntaxInner(typeParameter, substitutions, res, includeGlobalSpecifier);
+                        ToTypeSyntaxInner(typeParameter, substitutions, res, includeGlobalSpecifier, includeNamespace);
                         first = false;
                     }
                     res.Append('>');

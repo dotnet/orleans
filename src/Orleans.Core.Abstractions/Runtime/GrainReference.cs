@@ -474,6 +474,9 @@ namespace Orleans.Runtime
         public abstract string InterfaceName { get; }
 
         /// <inheritdoc/>
+        public abstract string ActivityName { get; }
+
+        /// <inheritdoc/>
         public abstract Type InterfaceType { get; }
 
         /// <inheritdoc/>
