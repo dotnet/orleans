@@ -267,10 +267,6 @@ namespace Orleans.Runtime
             }
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
-
-            //TODO: setup thead pool directly to lifecycle
-            StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
-                this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
             return Task.CompletedTask;
         }
 
@@ -395,46 +391,6 @@ namespace Orleans.Runtime
 
             await grainService.QueueTask(grainService.Start).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
             logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
-        }
-
-        private void ConfigureThreadPoolAndServicePointSettings()
-        {
-            PerformanceTuningOptions performanceTuningOptions = Services.GetRequiredService<IOptions<PerformanceTuningOptions>>().Value;
-            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0 || performanceTuningOptions.MinIOThreadPoolSize > 0)
-            {
-                int workerThreads;
-                int completionPortThreads;
-                ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
-                if (performanceTuningOptions.MinDotNetThreadPoolSize > workerThreads ||
-                    performanceTuningOptions.MinIOThreadPoolSize > completionPortThreads)
-                {
-                    // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
-                    int newWorkerThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinIOThreadPoolSize, completionPortThreads);
-                    bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
-                    if (ok)
-                    {
-                        logger.Info(ErrorCode.SiloConfiguredThreadPool,
-                                    "Configured ThreadPool.SetMinThreads() to values: {0},{1}. Previous values are: {2},{3}.",
-                                    newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
-                    }
-                    else
-                    {
-                        logger.Warn(ErrorCode.SiloFailedToConfigureThreadPool,
-                                    "Failed to configure ThreadPool.SetMinThreads(). Tried to set values to: {0},{1}. Previous values are: {2},{3}.",
-                                    newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
-                    }
-                }
-            }
-
-            // Set .NET ServicePointManager settings to optimize throughput performance when using Azure storage
-            // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-            logger.Info(ErrorCode.SiloConfiguredServicePointManager,
-                "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
-                performanceTuningOptions.Expect100Continue, performanceTuningOptions.DefaultConnectionLimit, performanceTuningOptions.UseNagleAlgorithm);
-            ServicePointManager.Expect100Continue = performanceTuningOptions.Expect100Continue;
-            ServicePointManager.DefaultConnectionLimit = performanceTuningOptions.DefaultConnectionLimit;
-            ServicePointManager.UseNagleAlgorithm = performanceTuningOptions.UseNagleAlgorithm;
         }
 
         /// <summary>

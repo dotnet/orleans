@@ -11,6 +11,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
@@ -19,6 +20,11 @@ namespace Tester.ClientConnectionTests
     [TestCategory("Functional")]
     public class ClusterClientTests : TestClusterPerTest
     {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.Options.UseInMemoryTransport = false;
+        }
+
         /// <summary>
         /// Ensures that ClusterClient.Connect can be retried.
         /// </summary>
@@ -40,7 +46,7 @@ namespace Tester.ClientConnectionTests
                 return Task.FromResult(true);
             }
 
-            using var host = new HostBuilder().UseOrleansClient(clientBuilder =>
+            using var host = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder
                         .Configure<ClusterOptions>(options =>

@@ -292,7 +292,6 @@ namespace Orleans.Hosting
             //Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<SiloOptions>();
             services.ConfigureFormatter<SchedulingOptions>();
-            services.ConfigureFormatter<PerformanceTuningOptions>();
             services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<SiloMessagingOptions>();
             services.ConfigureFormatter<ClusterMembershipOptions>();
@@ -370,6 +369,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
+            services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 
             services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,

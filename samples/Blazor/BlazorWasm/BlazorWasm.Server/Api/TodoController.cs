@@ -1,95 +1,72 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Orleans;
 using BlazorWasm.Grains;
 using BlazorWasm.Models;
-using System;
-using System.Buffers;
-using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
-using System.Threading.Tasks;
 
-namespace Sample.Silo.Api
+namespace Sample.Silo.Api;
+
+[ApiController]
+[Route("api/todo")]
+public class TodoController : ControllerBase
 {
-    [ApiController]
-    [Route("api/todo")]
-    public class TodoController : ControllerBase
+    private readonly IGrainFactory _factory;
+
+    public TodoController(IGrainFactory factory) => _factory = factory;
+
+    [HttpGet("{itemKey}")]
+    public Task<TodoItem?> GetAsync([Required] Guid itemKey) =>
+        _factory.GetGrain<ITodoGrain>(itemKey).GetAsync();
+
+    [HttpDelete("{itemKey}")]
+    public Task DeleteAsync([Required] Guid itemKey) =>
+        _factory.GetGrain<ITodoGrain>(itemKey).ClearAsync();
+
+    [HttpGet("list/{ownerKey}", Name = "list")]
+    public async Task<IEnumerable<TodoItem>> ListAsync([Required] Guid ownerKey)
     {
-        private readonly IGrainFactory factory;
+        // Get all item keys for this owner.
+        var keys =
+            await _factory.GetGrain<ITodoManagerGrain>(ownerKey)
+                          .GetAllAsync();
 
-        public TodoController(IGrainFactory factory)
+        // Fast path for empty owner.
+        if (keys.Length is 0) return Array.Empty<TodoItem>();
+
+        // Fan out and get all individual items in parallel.
+        // Issue all requests at the same time.
+        var tasks =
+            keys.Select(key => _factory.GetGrain<ITodoGrain>(key).GetAsync())
+                .ToList();
+
+        // Compose the result as requests complete
+        var result = new List<TodoItem>();
+        for (var i = 0; i < keys.Length; ++i)
         {
-            this.factory = factory;
+            var item = await tasks[i];
+            if (item is null) continue;
+            result.Add(item);
         }
 
-        [HttpGet("{itemKey}")]
-        public Task<TodoItem> GetAsync([Required] Guid itemKey) =>
-            factory.GetGrain<ITodoGrain>(itemKey).GetAsync();
-
-        [HttpDelete("{itemKey}")]
-        public async Task DeleteAsync([Required] Guid itemKey)
-        {
-            await factory.GetGrain<ITodoGrain>(itemKey).ClearAsync();
-        }
-
-        [HttpGet("list/{ownerKey}", Name = "list")]
-        public async Task<ImmutableArray<TodoItem>> ListAsync([Required] Guid ownerKey)
-        {
-            // get all item keys for this owner
-            var keys = await factory.GetGrain<ITodoManagerGrain>(ownerKey).GetAllAsync();
-
-            // fast path for empty owner
-            if (keys.Length == 0) return ImmutableArray<TodoItem>.Empty;
-
-            // fan out and get all individual items in parallel
-            var tasks = ArrayPool<Task<TodoItem>>.Shared.Rent(keys.Length);
-            try
-            {
-                // issue all requests at the same time
-                for (var i = 0; i < keys.Length; ++i)
-                {
-                    tasks[i] = factory.GetGrain<ITodoGrain>(keys[i]).GetAsync();
-                }
-
-                // compose the result as requests complete
-                var result = ImmutableArray.CreateBuilder<TodoItem>(tasks.Length);
-                for (var i = 0; i < keys.Length; ++i)
-                {
-                    result.Add(await tasks[i]);
-                }
-                return result.ToImmutable();
-            }
-            finally
-            {
-                ArrayPool<Task<TodoItem>>.Shared.Return(tasks);
-            }
-        }
-
-        public class TodoItemModel
-        {
-            [Required]
-            public Guid Key { get; set; }
-
-            [Required]
-            public string Title { get; set; }
-
-            [Required]
-            public bool IsDone { get; set; }
-
-            [Required]
-            public Guid OwnerKey { get; set; }
-        }
-
-        [HttpPost]
-        public async Task<ActionResult> PostAsync([FromBody] TodoItemModel model)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var item = new TodoItem(model.Key, model.Title, model.IsDone, model.OwnerKey);
-            await factory.GetGrain<ITodoGrain>(item.Key).SetAsync(item);
-            return Ok();
-        }
+        return result;
     }
+
+    [HttpPost]
+    public async Task<ActionResult> PostAsync([FromBody] TodoItemModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var item = new TodoItem(model.Key, model.Title, model.IsDone, model.OwnerKey);
+        await _factory.GetGrain<ITodoGrain>(item.Key).SetAsync(item);
+        return Ok();
+    }
+
+    public record class TodoItemModel(
+        [Required] Guid Key,
+        [Required] string Title,
+        [Required] bool IsDone,
+        [Required] Guid OwnerKey);
 }

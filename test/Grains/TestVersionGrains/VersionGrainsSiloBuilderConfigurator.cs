@@ -17,7 +17,7 @@ namespace TestVersionGrains
         {
             var cfg = hostBuilder.GetConfiguration();
             var siloCount = int.Parse(cfg["SiloCount"]);
-            hostBuilder.UseOrleans(siloBuilder =>
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
                 siloBuilder.Configure<GrainVersioningOptions>(options =>

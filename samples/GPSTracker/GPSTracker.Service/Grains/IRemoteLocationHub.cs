@@ -1,11 +1,9 @@
-using System.Threading.Tasks;
 using GPSTracker.Common;
 using Orleans;
 
-namespace GPSTracker
+namespace GPSTracker;
+
+public interface IRemoteLocationHub : IGrainObserver
 {
-    public interface IRemoteLocationHub : IGrainObserver
-    {
-        Task BroadcastUpdates(VelocityBatch messages);
-    }
+    Task BroadcastUpdates(VelocityBatch messages);
 }

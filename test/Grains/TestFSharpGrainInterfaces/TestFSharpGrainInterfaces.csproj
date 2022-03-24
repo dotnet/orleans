@@ -10,7 +10,6 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharp\TestFSharp.fsproj" />
     <ProjectReference Include="$(SourceRoot)test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Streaming.Abstractions\Orleans.Streaming.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
 

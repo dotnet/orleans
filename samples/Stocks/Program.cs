@@ -5,12 +5,8 @@ using Orleans.Hosting;
 using Stocks;
 
 await Host.CreateDefaultBuilder(args)
-    .UseOrleans(builder =>
-    {
-        builder.UseLocalhostClustering();
-    })
-    .ConfigureServices(services =>
-    {
-        services.AddHostedService<StocksHostedService>();
-    })
+    .UseOrleans(
+        builder => builder.UseLocalhostClustering())
+    .ConfigureServices(
+        services => services.AddHostedService<StocksHostedService>())
     .RunConsoleAsync();

@@ -25,13 +25,13 @@ namespace Tester
         {
             using var portAllocator = new TestClusterPortAllocator();
             var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
-            var host = new HostBuilder().UseOrleans(siloBuilder =>
+            var host = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder.AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(siloPort, gatewayPort);
             }).Build();
 
-            var clientHost = new HostBuilder().UseOrleansClient(clientBuilder =>
+            var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
                 clientBuilder.UseLocalhostClustering(gatewayPort);
             }).Build();
@@ -62,21 +62,21 @@ namespace Tester
         {
             using var portAllocator = new TestClusterPortAllocator();
             var (baseSiloPort, baseGatewayPort) = portAllocator.AllocateConsecutivePortPairs(2);
-            var silo1 = new HostBuilder().UseOrleans(siloBuilder =>
+            var silo1 = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort, baseGatewayPort);
             }).Build();
 
-            var silo2 = new HostBuilder().UseOrleans(siloBuilder =>
+            var silo2 = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort));
             }).Build();
 
-            var clientHost = new HostBuilder().UseOrleansClient(clientBuilder =>
+            var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
                 clientBuilder.UseLocalhostClustering(new[] {baseGatewayPort, baseGatewayPort + 1});
             }).Build();

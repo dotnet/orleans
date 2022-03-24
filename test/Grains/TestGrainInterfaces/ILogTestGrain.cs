@@ -75,9 +75,13 @@ namespace UnitTests.GrainInterfaces
     /// The fields don't really have any meaning. 
     /// The point of the struct is just that a grain method can return both A and B at the same time.
     /// </summary>
+    [GenerateSerializer]
     public struct AB
     {
+        [Id(0)]
         public int A;
+
+        [Id(1)]
         public int B;
     }
 }

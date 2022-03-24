@@ -17,6 +17,8 @@ using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
 using Orleans.TestingHost.Logging;
 using Orleans.Configuration.Internal;
+using Microsoft.Extensions.Hosting.Internal;
+using Orleans.TestingHost.InMemoryTransport;
 
 namespace Orleans.TestingHost
 {
@@ -30,16 +32,18 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
         /// <param name="configuration">The configuration.</param>
+        /// <param name="postConfigureHostBuilder">An optional delegate which can be used to configure the host builder just prior to a host being built.</param>
         /// <returns>A new silo.</returns>
-        public static IHost CreateSiloHost(string hostName, IConfiguration configuration)
+        public static IHost CreateSiloHost(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
         {
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             var hostBuilder = new HostBuilder();
+            hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
-            hostBuilder.UseOrleans(siloBuilder =>
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
                     .Configure<ClusterOptions>(configuration)
@@ -66,32 +70,26 @@ namespace Orleans.TestingHost
                 }
             });
 
+            postConfigureHostBuilder?.Invoke(hostBuilder);
             var host = hostBuilder.Build();
-            var silo = host.Services.GetRequiredService<IHost>();
-            InitializeTestHooksSystemTarget(silo);
-            return silo;
+            InitializeTestHooksSystemTarget(host);
+            return host;
         }
 
         /// <summary>
         /// Creates the cluster client.
         /// </summary>
         /// <param name="hostName">Name of the host.</param>
-        /// <param name="configurationSources">The configuration sources.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="postConfigureHostBuilder">An optional delegate which can be used to configure the host builder just prior to a host being built.</param>
         /// <returns>The cluster client host.</returns>
-        public static IHost CreateClusterClient(string hostName, IEnumerable<IConfigurationSource> configurationSources)
+        public static IHost CreateClusterClient(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
         {
-            var configBuilder = new ConfigurationBuilder();
-            foreach (var source in configurationSources)
-            {
-                configBuilder.Add(source);
-            }
-
-            var configuration = configBuilder.Build();
-
             var hostBuilder = new HostBuilder();
+            hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
-                .UseOrleansClient(clientBuilder =>
+                .UseOrleansClient((ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClusterOptions>(configuration);
                     ConfigureAppServices(configuration, clientBuilder);
@@ -102,6 +100,7 @@ namespace Orleans.TestingHost
                     TryConfigureFileLogging(configuration, services, hostName);
                 });
 
+            postConfigureHostBuilder?.Invoke(hostBuilder);
             var host = hostBuilder.Build();
 
             return host;
@@ -172,7 +171,7 @@ namespace Orleans.TestingHost
                     var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
 
                     (configurator as IHostConfigurator)?.Configure(hostBuilder);
-                    hostBuilder.UseOrleans(siloBuilder => (configurator as ISiloConfigurator)?.Configure(siloBuilder));
+                    hostBuilder.UseOrleans((ctx, siloBuilder) => (configurator as ISiloConfigurator)?.Configure(siloBuilder));
                 }
             }
         }
@@ -206,40 +205,6 @@ namespace Orleans.TestingHost
                 services
                     .AddSingleton<SystemTargetBasedMembershipTable>()
                     .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
-            }
-        }
-
-        private static void TryConfigureClientMembership(IConfiguration configuration, IClientBuilder clientBuilder)
-        {
-            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
-
-            if (useTestClusterMembership)
-            {
-                Action<StaticGatewayListProviderOptions> configureOptions = options =>
-                {
-                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
-                    bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
-
-                    if (gatewayPerSilo)
-                    {
-                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                            .ToList();
-                    }
-                    else
-                    {
-                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
-                    }
-                };
-
-                clientBuilder.Configure(configureOptions);
-
-                clientBuilder.ConfigureServices(services =>
-                {
-                    services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
-                });
             }
         }
 

@@ -9,6 +9,15 @@ namespace Orleans.Serialization.Configuration
     public sealed class TypeManifestOptions
     {
         /// <summary>
+        /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
+        /// </summary>
+        /// <remarks>
+        /// This property does not cause <see cref="SerializerConfigurationAnalyzer"/> to be invoked.
+        /// That is the responsibility of the consuming framework.
+        /// </remarks>
+        public bool? EnableConfigurationAnalysis { get; set; }
+
+        /// <summary>
         /// Gets the set of known activators, which are responsible for creating instances of a given type.
         /// </summary>
         public HashSet<Type> Activators { get; } = new HashSet<Type>();

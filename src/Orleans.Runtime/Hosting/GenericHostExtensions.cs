@@ -24,7 +24,7 @@ namespace Microsoft.Extensions.Hosting
         /// </remarks>
         public static IHostBuilder UseOrleans(
             this IHostBuilder hostBuilder,
-            Action<ISiloBuilder> configureDelegate)
+            Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
             if (hostBuilder is null) throw new ArgumentNullException(nameof(hostBuilder));
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
@@ -36,7 +36,7 @@ namespace Microsoft.Extensions.Hosting
 
             hostBuilder.Properties["HasOrleansSiloBuilder"] = "true";
 
-            return hostBuilder.ConfigureServices((context, services) => services.AddOrleans(configureDelegate));
+            return hostBuilder.ConfigureServices((context, services) => configureDelegate(context, AddOrleans(services)));
         }
 
         /// <summary>
@@ -54,6 +54,14 @@ namespace Microsoft.Extensions.Hosting
             Action<ISiloBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            var builder = AddOrleans(services);
+
+            configureDelegate(builder);
+            return services;
+        }
+
+        private static ISiloBuilder AddOrleans(IServiceCollection services)
+        {
             ISiloBuilder builder = default;
             foreach (var descriptor in services)
             {
@@ -75,8 +83,7 @@ namespace Microsoft.Extensions.Hosting
                 services.Add(new(typeof(OrleansBuilderMarker), new OrleansBuilderMarker(builder)));
             }
 
-            configureDelegate(builder);
-            return services;
+            return builder;
         }
 
         private static OrleansConfigurationException GetOrleansClientAddedException() => new("Do not call both UseOrleansClient/AddOrleansClient with UseOrleans/AddOrleans. If you want a client and server in the same process, only UseOrleans/AddOrleans is necessary and the UseOrleansClient/AddOrleansClient call can be removed.");

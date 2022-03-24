@@ -271,7 +271,7 @@ namespace Orleans.Runtime
                             {
                                 invokable.SetTarget(target);
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
-                                if (GrainCallFilters is { Count: > 0 } || target is IIncomingGrainCallFilter)
+                                if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
                                     var invoker = new GrainMethodInvoker(target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
                                     await invoker.Invoke();
@@ -315,7 +315,7 @@ namespace Orleans.Runtime
 
                         var msg = $"Deactivating {target} due to inconsistent state.";
                         this.invokeExceptionLogger.Info(msg);
-                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, invocationException, invocationException.Message));
+                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
                     }
                 }
 

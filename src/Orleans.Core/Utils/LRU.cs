@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    // This class implements an LRU cache of values. It keeps a bounded set of values and will
+    // This class implements an LRU (Least Recently Used) cache of values. It keeps a bounded set of values and will
     // flush "old" values 
     internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         public int MaximumSize { get; }
 
         /// <summary>
-        /// Creates a new LRU cache.
+        /// Creates a new LRU (Least Recently Used) cache.
         /// </summary>
         /// <param name="maxSize">Maximum number of entries to allow.</param>
         /// <param name="maxAge">Maximum age of an entry.</param>
@@ -162,7 +162,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Remove all expired value from the LRU instance.
+        /// Remove all expired values from the LRU (Least Recently Used) instance.
         /// </summary>
         public void RemoveExpired()
         {

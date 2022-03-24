@@ -9,6 +9,7 @@ using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
+using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -444,6 +445,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
+        [DebuggerHidden]
         public abstract ValueTask<Response> Invoke();
 
         /// <inheritdoc/>
@@ -525,6 +527,7 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public abstract class Request : RequestBase 
     {
+        [DebuggerHidden]
         public override ValueTask<Response> Invoke()
         {
             try
@@ -544,6 +547,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
         {
             try
@@ -558,6 +562,7 @@ namespace Orleans.Runtime
         }
 
         // Generated
+        [DebuggerHidden]
         protected abstract ValueTask InvokeInner();
     }
 
@@ -571,6 +576,7 @@ namespace Orleans.Runtime
     public abstract class Request<TResult> : RequestBase
     {
         /// <inheritdoc/>
+        [DebuggerHidden]
         public override ValueTask<Response> Invoke()
         {
             try
@@ -589,6 +595,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
         {
             try
@@ -606,6 +613,7 @@ namespace Orleans.Runtime
         /// Invokes the request against the target.
         /// </summary>
         /// <returns>The invocation result.</returns>
+        [DebuggerHidden]
         protected abstract ValueTask<TResult> InvokeInner();
     }
 
@@ -619,6 +627,7 @@ namespace Orleans.Runtime
     public abstract class TaskRequest<TResult> : RequestBase
     {
         /// <inheritdoc/>
+        [DebuggerHidden]
         public override ValueTask<Response> Invoke()
         {
             try
@@ -638,6 +647,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
         {
             try
@@ -655,6 +665,7 @@ namespace Orleans.Runtime
         /// Invokes the request against the target.
         /// </summary>
         /// <returns>The invocation result.</returns>
+        [DebuggerHidden]
         protected abstract Task<TResult> InvokeInner();
     }
 
@@ -665,6 +676,7 @@ namespace Orleans.Runtime
     public abstract class TaskRequest : RequestBase
     {
         /// <inheritdoc/>
+        [DebuggerHidden]
         public override ValueTask<Response> Invoke()
         {
             try
@@ -685,6 +697,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
         {
             try
@@ -702,6 +715,7 @@ namespace Orleans.Runtime
         /// Invokes the request against the target.
         /// </summary>
         /// <returns>The invocation result.</returns>
+        [DebuggerHidden]
         protected abstract Task InvokeInner();
     }
 
@@ -712,6 +726,7 @@ namespace Orleans.Runtime
     public abstract class VoidRequest : RequestBase
     {
         /// <inheritdoc/>
+        [DebuggerHidden]
         public override ValueTask<Response> Invoke()
         {
             try
@@ -728,6 +743,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Invokes the request against the target.
         /// </summary>
+        [DebuggerHidden]
         protected abstract void InvokeInner();
     }
 }

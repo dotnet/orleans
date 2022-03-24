@@ -21,6 +21,7 @@ namespace Tester.ClientConnectionTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            builder.Options.UseInMemoryTransport = false;
             builder.Options.InitialSilosCount = 1;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();

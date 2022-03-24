@@ -54,6 +54,7 @@ namespace Tester
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.UseTestClusterMembership = false;
+            builder.Options.UseInMemoryTransport = false;
             builder.Options.InitialSilosCount = 1;
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
@@ -63,7 +64,7 @@ namespace Tester
         {
             public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.UseOrleans(siloBuilder =>
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseLocalhostClustering();
                 });
@@ -182,7 +183,7 @@ namespace Tester
             // Close current client connection
             await this.HostedCluster.StopClusterClientAsync();
             var hostBuilder = new HostBuilder().UseOrleansClient(
-                clientBuilder =>
+                (ctx, clientBuilder) =>
                 {
                     clientBuilder.Configure<ClientMessagingOptions>(
                         options => { options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(10); });

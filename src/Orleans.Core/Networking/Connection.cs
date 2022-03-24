@@ -209,7 +209,16 @@ namespace Orleans.Runtime.Messaging
             // Only wait for the transport to close if the connection actually started being processed.
             if (_processIncomingTask is not null && _processOutgoingTask is not null)
             {
-                // Wait for the transport to signal that it's closed before disposing it.
+                // Abort the connection and wait for the transport to signal that it's closed before disposing it.
+                try
+                {
+                    this.Context.Abort();
+                }
+                catch (Exception exception)
+                {
+                    this.Log.LogWarning(exception, "Exception aborting connection {Connection}", this);
+                }
+
                 await _transportConnectionClosed.Task;
             }
 

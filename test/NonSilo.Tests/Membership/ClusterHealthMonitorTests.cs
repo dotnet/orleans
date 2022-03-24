@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,10 +33,8 @@ namespace NonSilo.Tests.Membership
         private readonly ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)> timerCalls;
         private readonly DelegateAsyncTimerFactory timerFactory;
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
-        private readonly IClusterMembershipService membershipService;
-        private readonly IRemoteSiloProber prober;
         private readonly InMemoryMembershipTable membershipTable;
-        private readonly MembershipTableManager manager;
+        private readonly IRemoteSiloProber prober;
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
@@ -71,21 +70,8 @@ namespace NonSilo.Tests.Membership
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
 
-            this.membershipService = Substitute.For<IClusterMembershipService>();
-            this.membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => this.manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
-
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
-            this.manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
-                membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
         }
 
         /// <summary>
@@ -94,20 +80,84 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_BasicScenario()
         {
-            var probeCalls = new ConcurrentQueue<(SiloAddress, int)>();
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2);
+        }
+
+        /// <summary>
+        /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_NoIndirectProbes()
+        {
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 2);
+        }
+
+        /// <summary>
+        /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_ThreeVotesNeededToKill()
+        {
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 3);
+        }
+
+        /// <summary>
+        /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_OneVoteNeededToKill()
+        {
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
+        }
+
+        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default)
+        {
+            var clusterMembershipOptions = new ClusterMembershipOptions
+            {
+                EnableIndirectProbes = enableIndirectProbes,
+            };
+
+            if (numVotesForDeathDeclaration.HasValue)
+            {
+                clusterMembershipOptions.NumVotesForDeathDeclaration = numVotesForDeathDeclaration.Value;
+            }
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(clusterMembershipOptions),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+
+            var membershipService = Substitute.For<IClusterMembershipService>();
+            membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
+            var probeCalls = new ConcurrentQueue<(SiloAddress Target, int ProbeNumber, bool IsIndirect)>();
             this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
             {
-                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1)));
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
             });
+            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            {
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
+                return Task.FromResult(new IndirectProbeResponse
+                {
+                    IntermediaryHealthScore = 0,
+                    ProbeResponseTime = TimeSpan.FromMilliseconds(1),
+                    Succeeded = true 
+                });
+            });
 
-            var clusterMembershipOptions = new ClusterMembershipOptions();
             var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
             optionsMonitor.CurrentValue.ReturnsForAnyArgs(clusterMembershipOptions);
 
             var monitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
-                this.manager,
+                manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
@@ -122,7 +172,7 @@ namespace NonSilo.Tests.Membership
                 this.prober,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                this.membershipService,
+                membershipService,
                 this.localSiloDetails);
 
             await this.lifecycle.OnStart();
@@ -144,13 +194,14 @@ namespace NonSilo.Tests.Membership
             var lastVersion = testAccessor.ObservedVersion;
 
             // Add the new silos
+            var table = await this.membershipTable.ReadAll();
             foreach (var entry in otherSilos)
             {
-                var table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll();
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            await this.manager.Refresh();
+            await manager.Refresh();
 
             await Until(() => testAccessor.ObservedVersion > lastVersion);
             lastVersion = testAccessor.ObservedVersion;
@@ -158,7 +209,7 @@ namespace NonSilo.Tests.Membership
             // No silos should be monitored by this silo until it becomes active.
             Assert.Empty(testAccessor.MonitoredSilos);
 
-            await this.manager.UpdateStatus(SiloStatus.Active);
+            await manager.UpdateStatus(SiloStatus.Active);
 
             await Until(() => testAccessor.ObservedVersion > lastVersion);
             lastVersion = testAccessor.ObservedVersion;
@@ -193,8 +244,19 @@ namespace NonSilo.Tests.Membership
             // Make the probes fail.
             this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
             {
-                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1)));
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), true));
                 return Task.FromException(new Exception("no"));
+            });
+            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            {
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
+                return Task.FromResult(new IndirectProbeResponse
+                {
+                    FailureMessage = "We failed the probe on purpose, as a joke",
+                    IntermediaryHealthScore = 0,
+                    ProbeResponseTime = TimeSpan.FromSeconds(1),
+                    Succeeded = false
+                });
             });
 
             // The above call to specify the probe behaviour also enqueued a value, so clear it here.
@@ -219,7 +281,7 @@ namespace NonSilo.Tests.Membership
                 while (probeCalls.TryDequeue(out var call)) ;
 
                 // Check that probes match the expected missed probes
-                var table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll();
                 foreach (var siloMonitor in monitoredSilos)
                 {
                     Assert.Equal(expectedMissedProbes, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
@@ -233,22 +295,49 @@ namespace NonSilo.Tests.Membership
                     else
                     {
                         // After a certain number of failures, a vote should be added to the table.
-                        Assert.Single(votes);
+                        Assert.Contains(votes, vote => vote.Item1.Equals(localSiloDetails.SiloAddress));
+                        if (clusterMembershipOptions.NumVotesForDeathDeclaration <= 2 && enableIndirectProbes || numVotesForDeathDeclaration == 1)
+                        {
+                            Assert.Equal(SiloStatus.Dead, entry.Status);
+                        }
                     }
                 }
             }
 
+            if (enableIndirectProbes && numVotesForDeathDeclaration <= 2 || numVotesForDeathDeclaration == 1)
+            {
+                table = await this.membershipTable.ReadAll();
+                Assert.Equal(clusterMembershipOptions.NumProbedSilos, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
+
+                // There is no more to test here, since all of the monitored silos have been killed.
+                return;
+            }
+
+            await manager.Refresh();
+
             // Make the probes succeed again.
             this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
             {
-                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1)));
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
+            });
+            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            {
+                probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
+                return Task.FromResult(new IndirectProbeResponse
+                {
+                    IntermediaryHealthScore = 0,
+                    ProbeResponseTime = TimeSpan.FromMilliseconds(1),
+                    Succeeded = true 
+                });
             });
 
             // The above call to specify the probe behaviour also enqueued a value, so clear it here.
             while (probeCalls.TryDequeue(out _)) ;
 
             // Wait for probes to be fired
+            this.output.WriteLine($"Firing probes for silos: {string.Join(", ", testAccessor.MonitoredSilos.Keys)}");
+            var probesReceived = new HashSet<SiloAddress>();
             await UntilEqual(testAccessor.MonitoredSilos.Count, () =>
             {
                 if (this.timerCalls.TryDequeue(out var timer))
@@ -256,11 +345,17 @@ namespace NonSilo.Tests.Membership
                     timer.Completion.TrySetResult(true);
                 }
 
-                return probeCalls.Count;
+                while (probeCalls.TryDequeue(out var call))
+                {
+                    probesReceived.Add(call.Target);
+                }
+
+                return probesReceived.Count;
             });
-            while (probeCalls.TryDequeue(out var call)) ;
+
             foreach (var siloMonitor in testAccessor.MonitoredSilos.Values)
             {
+                this.output.WriteLine($"Checking missed probes on {siloMonitor.SiloAddress}: {((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes}");
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
 

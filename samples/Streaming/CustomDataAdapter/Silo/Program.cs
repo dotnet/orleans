@@ -1,58 +1,56 @@
-using System;
-using System.Threading.Tasks;
 using Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 
-namespace Silo
+using Silo;
+
+try
 {
-    class Program
-    {
-        public static async Task<int> Main(string[] args)
-        {
-            try
+    var host = new HostBuilder()
+        .UseOrleans(ConfigureSilo)
+        .ConfigureLogging(logging => logging.AddConsole())
+        .Build();
+
+    await host.RunAsync();
+
+    return 0;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine(ex);
+    return 1;
+}
+
+static void ConfigureSilo(ISiloBuilder siloBuilder)
+{
+    var secrets = Secrets.LoadFromFile()!;
+    siloBuilder
+        .UseLocalhostClustering(serviceId: Constants.ServiceId, clusterId: Constants.ServiceId)
+        .AddAzureTableGrainStorage(
+            "PubSubStore",
+            options => options.ConfigureTableServiceClient(secrets.DataConnectionString))
+        .AddEventHubStreams(
+            Constants.StreamProvider,
+            (ISiloEventHubStreamConfigurator configurator) =>
             {
-                var host = new HostBuilder()
-                    .UseOrleans(ConfigureSilo)
-                    .ConfigureLogging(logging => logging.AddConsole())
-                    .Build();
-
-                await host.RunAsync();
-
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(ex);
-                return 1;
-            }
-        }
-
-        private static void ConfigureSilo(ISiloBuilder siloBuilder)
-        {
-            var secrets = Secrets.LoadFromFile();
-            siloBuilder
-                .UseLocalhostClustering(serviceId: Constants.ServiceId, clusterId: Constants.ServiceId)
-                .AddAzureTableGrainStorage("PubSubStore", options => options.ConnectionString = secrets.DataConnectionString)
-                .AddEventHubStreams(Constants.StreamProvider, b =>
+                configurator.ConfigureEventHub(builder => builder.Configure(options =>
                 {
-                    b.ConfigureEventHub(ob => ob.Configure(options =>
-                    {
-                        options.ConnectionString = secrets.EventHubConnectionString;
-                        options.ConsumerGroup = Constants.EHConsumerGroup;
-                        options.Path = Constants.EHPath;
+                    options.ConfigureEventHubConnection(
+                        secrets.EventHubConnectionString,
+                        Constants.EHPath,
+                        Constants.EHConsumerGroup);
 
-                    }));
-                    // We plug here our custom DataAdapter for Event Hub
-                    b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<CustomDataAdapter>(sp));
-                    b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                }));
+                // We plug here our custom DataAdapter for Event Hub
+                configurator.UseDataAdapter(
+                    (sp, n) => ActivatorUtilities.CreateInstance<CustomDataAdapter>(sp));
+                configurator.UseAzureTableCheckpointer(
+                    builder => builder.Configure(options =>
                     {
-                        options.ConnectionString = secrets.DataConnectionString;
+                        options.ConfigureTableServiceClient(secrets.DataConnectionString);
                         options.PersistInterval = TimeSpan.FromSeconds(10);
                     }));
-                });
-        }
-    }
+            });
 }

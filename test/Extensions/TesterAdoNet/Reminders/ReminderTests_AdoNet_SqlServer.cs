@@ -45,7 +45,7 @@ namespace Tester.AdoNet.Reminders
         {
             public void Configure(IHostBuilder hostBuilder)
             {
-                hostBuilder.UseOrleans(siloBuilder =>
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseAdoNetReminderService(options =>
                     {

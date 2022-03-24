@@ -43,7 +43,9 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, configureOptions));
         }
 
-        internal static IServiceCollection AddAzureTableGrainStorage(this IServiceCollection services, string name,
+        internal static IServiceCollection AddAzureTableGrainStorage(
+            this IServiceCollection services,
+            string name,
             Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));

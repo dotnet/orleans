@@ -1,8 +1,7 @@
 using Orleans;
 
-namespace GrainInterfaces
+namespace GrainInterfaces;
+
+public interface IConsumerGrain : IGrainWithGuidKey
 {
-    public interface IConsumerGrain : IGrainWithGuidKey
-    {
-    }
 }

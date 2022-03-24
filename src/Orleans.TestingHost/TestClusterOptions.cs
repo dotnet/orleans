@@ -90,6 +90,14 @@ namespace Orleans.TestingHost
         public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
 
         /// <summary>
+        /// Gets or sets a value indicating whether to use an in-memory transport for connecting silos and clients, instead of TCP.
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="true"/>
+        /// </remarks>
+        public bool UseInMemoryTransport { get; set; } = true;
+
+        /// <summary>
         /// Converts these options into a dictionary.
         /// </summary>
         /// <returns>The options dictionary.</returns>
@@ -108,6 +116,7 @@ namespace Orleans.TestingHost
                 [nameof(ConfigureFileLogging)] = this.ConfigureFileLogging.ToString(),
                 [nameof(AssumeHomogenousSilosForTesting)] = this.AssumeHomogenousSilosForTesting.ToString(),
                 [nameof(GatewayPerSilo)] = this.GatewayPerSilo.ToString(),
+                [nameof(UseInMemoryTransport)] = this.UseInMemoryTransport.ToString(),
             };
             
             if (this.SiloBuilderConfiguratorTypes != null)

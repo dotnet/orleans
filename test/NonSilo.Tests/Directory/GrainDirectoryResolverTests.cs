@@ -31,7 +31,7 @@ namespace NonSilo.Tests.Directory
             this.azureDirectory = Substitute.For<IGrainDirectory>();
 
             var hostBuilder = new HostBuilder();
-            hostBuilder.UseOrleans(siloBuilder =>
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
                     .ConfigureServices(svc => svc.AddSingletonNamedService(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory))

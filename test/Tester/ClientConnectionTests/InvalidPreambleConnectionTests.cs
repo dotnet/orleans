@@ -15,6 +15,7 @@ namespace Tester.ClientConnectionTests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            builder.Options.UseInMemoryTransport = false;
         }
 
         [Fact, TestCategory("Functional")]
