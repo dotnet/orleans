@@ -57,8 +57,6 @@ namespace Benchmarks.Ping
             {
                 var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
                 {
-                    clientBuilder.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
-
                     if (numSilos == 1)
                     {
                         clientBuilder.UseLocalhostClustering();
