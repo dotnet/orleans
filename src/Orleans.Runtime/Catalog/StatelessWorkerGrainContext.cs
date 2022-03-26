@@ -5,8 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -85,6 +83,12 @@ namespace Orleans.Runtime
         {
             _workItems.Enqueue(new(WorkItemType.Message, message));
             _workSignal.Signal();
+        }
+
+        bool ICachedMessageReceiver.HandleMessage(object message)
+        {
+            ReceiveMessage(message);
+            return true;
         }
 
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null)

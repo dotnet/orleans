@@ -66,11 +66,27 @@ namespace Orleans.Runtime.Messaging
 
         public void SetHostedClient(HostedClient client) => this.hostedClient = client;
 
-        public bool TryDeliverToProxy(Message msg)
+        public bool TryDeliverToProxy(Message msg, GrainReference targetReference)
         {
-            if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
+            if (!msg.TargetGrain.IsClient())
+            {
+                return false;
+            }
+
+            if (this.Gateway is { } gateway && gateway.TryDeliverToProxy(msg))
+            {
+                return true;
+            }
+
+            if (this.hostedClient is { } client && client.TryDispatchToClient(msg))
+            {
+                if (targetReference is not null)
+                {
+                    targetReference.CachedReceiver = client;
+                }
+            }
+
+            return false;
         }
 
         public void Start()
@@ -134,7 +150,7 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, GrainReference targetReference)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
@@ -162,7 +178,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                if (TryDeliverToProxy(msg, targetReference))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -184,7 +200,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     MessagingStatisticsGroup.LocalMessagesSent.Increment();
-                    this.ReceiveMessage(msg);
+                    this.ReceiveMessage(msg, targetReference);
                 }
                 else
                 {
@@ -212,19 +228,19 @@ namespace Orleans.Runtime.Messaging
                         var connectionTask = this.connectionManager.GetConnection(targetSilo);
                         if (connectionTask.IsCompletedSuccessfully)
                         {
-                            var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            var connection = connectionTask.Result;
+                            connection.Send(msg);
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, targetReference);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, GrainReference targetReference)
                             {
                                 try
                                 {
-                                    var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    var connection = await connectionTask;
+                                    connection.Send(msg);
                                 }
                                 catch (Exception exception)
                                 {
@@ -237,7 +253,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
+        public void DispatchLocalMessage(Message message) => ReceiveMessage(message, targetReference: null);
 
         public void RejectMessage(
             Message message,
@@ -252,7 +268,7 @@ namespace Orleans.Runtime.Messaging
 
                 var str = string.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
-                SendMessage(rejection);
+                SendMessage(rejection, targetReference: null);
             }
             else
             {
@@ -387,19 +403,19 @@ namespace Orleans.Runtime.Messaging
             if (message.TargetGrain.IsSystemTarget())
             {
                 PrepareSystemTargetMessage(message);
-                SendMessage(message);
+                SendMessage(message, targetReference: null);
             }
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                SendMessage(message);
+                SendMessage(message, targetReference: null);
             }
             else
             {
                 message.TargetActivation = default;
                 message.TargetSilo = null;
                 message.ClearTargetAddress();
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, targetReference: null);
             }
         }
 
@@ -417,26 +433,26 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         /// 
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, GrainReference targetReference)
         {
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    return SendMessageAsync(this, messageAddressingTask, message, targetReference);
                 }
 
-                SendMessage(message);
+                SendMessage(message, targetReference);
             }
             catch (Exception ex)
             {
-                OnAddressingFailure(message, ex);
+                OnAddressingFailure(this, message, ex);
             }
 
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            static async Task SendMessageAsync(MessageCenter messageCenter, Task addressMessageTask, Message message, GrainReference targetReference)
             {
                 try
                 {
@@ -444,17 +460,17 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(m, ex);
+                    OnAddressingFailure(messageCenter, message, ex);
                     return;
                 }
 
-                SendMessage(m);
+                messageCenter.SendMessage(message, targetReference);
             }
 
-            void OnAddressingFailure(Message m, Exception ex)
+            static void OnAddressingFailure(MessageCenter messageCenter, Message message, Exception exception)
             {
-                this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
-                RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+                messageCenter.messagingTrace.OnDispatcherSelectTargetFailed(message, exception);
+                messageCenter.RejectMessage(message, Message.RejectionTypes.Unrecoverable, exception);
             }
         }
 
@@ -469,7 +485,7 @@ namespace Orleans.Runtime.Messaging
                 PrepareSystemTargetMessage(message);
             }
 
-            SendMessage(message);
+            SendMessage(message, targetReference: null);
         }
 
         internal void PrepareSystemTargetMessage(Message message)
@@ -488,7 +504,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void ReceiveMessage(Message msg)
+        public void ReceiveMessage(Message msg, GrainReference targetReference)
         {
             this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
@@ -512,14 +528,19 @@ namespace Orleans.Runtime.Messaging
                             Message.RejectionTypes.Unrecoverable,
                             $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
 
-                        SendMessage(response);
+                        SendMessage(response, targetReference);
                     }
                     return;
                 }
 
+                if (targetReference is not null)
+                {
+                    targetReference.CachedReceiver = target;
+                }
+
                 target.ReceiveMessage(msg);
             }
-            else if (TryDeliverToProxy(msg))
+            else if (TryDeliverToProxy(msg, targetReference))
             {
                 return;
             }
@@ -548,6 +569,11 @@ namespace Orleans.Runtime.Messaging
                             var nonExistentActivation = msg.TargetAddress;
                             ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
                             return;
+                        }
+
+                        if (targetReference is not null)
+                        {
+                            targetReference.CachedReceiver = targetActivation;
                         }
 
                         targetActivation.ReceiveMessage(msg);
@@ -584,7 +610,7 @@ namespace Orleans.Runtime.Messaging
                 if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
                 var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
                 // rejection msgs are always originated in the local silo, they are never remote.
-                this.ReceiveMessage(error);
+                this.ReceiveMessage(error, targetReference: null);
             }
         }
 

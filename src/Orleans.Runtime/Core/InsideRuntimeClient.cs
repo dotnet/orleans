@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using System.Diagnostics;
@@ -38,7 +37,6 @@ namespace Orleans.Runtime
         private SafeTimer callbackTimer;
 
         private GrainLocator grainLocator;
-        private Catalog catalog;
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private DeepCopier _deepCopier;
@@ -104,8 +102,6 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
         
-        private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
-
         private GrainLocator GrainLocator
             => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
 
@@ -183,7 +179,20 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (target.CachedReceiver is { } receiver)
+            {
+                // Send a message to this cached value.
+                // This must succeed, but a false return value indicates that the cache should be invalidated.
+                if (!receiver.HandleMessage(message))
+                {
+                    target.CachedReceiver = null;
+                }
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message, target);
+            }
         }
 
         public void SendResponse(Message request, Response response)
@@ -425,7 +434,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    this.MessageCenter.AddressAndSendMessage(message);
+                    this.MessageCenter.AddressAndSendMessage(message, targetReference: null);
                     return;
                 }
 

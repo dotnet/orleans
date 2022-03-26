@@ -508,7 +508,7 @@ namespace Orleans.Runtime
                         }
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetReference: null);
                     }
                 }
 
@@ -530,7 +530,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetReference: null);
                     }
                 }
 
@@ -549,7 +549,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetReference: null);
                     }
 
                     queueLength++;
@@ -1028,6 +1028,12 @@ namespace Orleans.Runtime
             {
                 ReceiveRequest(message);
             }
+        }
+
+        bool ICachedMessageReceiver.HandleMessage(object message)
+        {
+            ReceiveMessage(message);
+            return State is not ActivationState.Invalid or ActivationState.FailedToActivate;
         }
 
         private void ReceiveResponse(Message message)

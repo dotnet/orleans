@@ -93,14 +93,7 @@ namespace Orleans.Runtime.Messaging
             // information, so a null target silo is OK.
             if (msg.TargetSilo == null || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
-                // See if it's a message for a client we're proxying.
-                if (messageCenter.TryDeliverToProxy(msg))
-                {
-                    return;
-                }
-
-                // Nope, it's for us
-                messageCenter.DispatchLocalMessage(msg);
+                messageCenter.ReceiveMessage(msg, targetReference: null);
                 return;
             }
 
@@ -108,7 +101,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
-                messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg, targetReference: null);
                 return;
             }
 
@@ -304,7 +297,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount = msg.RetryCount + 1;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, targetReference: null);
             }
             else
             {

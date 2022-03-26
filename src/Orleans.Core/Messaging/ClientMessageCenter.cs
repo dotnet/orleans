@@ -193,11 +193,22 @@ namespace Orleans.Messaging
             static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, GrainReference targetReference)
         {
             if (!Running)
             {
                 this.logger.Error(ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
+                return;
+            }
+
+            if (targetReference?.CachedReceiver is { } receiver)
+            {
+                if (!receiver.HandleMessage(msg))
+                {
+                    // Invalidate the cache.
+                    targetReference.CachedReceiver = null; 
+                }
+
                 return;
             }
 
@@ -220,9 +231,9 @@ namespace Orleans.Messaging
             }
             else
             {
-                _ = SendAsync(connectionTask, msg);
+                _ = SendAsync(connectionTask, msg, targetReference);
 
-                async Task SendAsync(ValueTask<Connection> task, Message message)
+                async Task SendAsync(ValueTask<Connection> task, Message message, GrainReference targetReference)
                 {
                     try
                     {
@@ -249,8 +260,8 @@ namespace Orleans.Messaging
                             ++message.RetryCount;
 
                             _ = Task.Factory.StartNew(
-                                state => this.SendMessage((Message)state),
-                                message,
+                                _ => this.SendMessage(message, targetReference),
+                                null,
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
                                 TaskScheduler.Default);

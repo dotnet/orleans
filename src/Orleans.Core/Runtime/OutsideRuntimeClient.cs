@@ -247,7 +247,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, targetReference: null);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -293,7 +293,7 @@ namespace Orleans
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, target);
         }
 
         public void ReceiveResponse(Message response)

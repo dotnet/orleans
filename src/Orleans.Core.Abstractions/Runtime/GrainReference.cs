@@ -282,6 +282,11 @@ namespace Orleans.Runtime
         /// </summary>
         public GrainInterfaceType InterfaceType => _shared.InterfaceType;
 
+        /// <summary>
+        /// Gets or sets a cached recipient which can be used to handle messages sent to the target represented by this instance.
+        /// </summary>
+        internal ICachedMessageReceiver CachedReceiver { get; set; }
+
         /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
         /// <param name="shared">
         /// The grain reference functionality which is shared by all grain references of a given type.
