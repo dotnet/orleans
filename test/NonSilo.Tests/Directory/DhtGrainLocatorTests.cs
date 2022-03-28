@@ -108,7 +108,7 @@ namespace UnitTests.Directory
             await Task.WhenAll(tasks);
 
             Assert.All(this.localGrainDirectory.UnregistrationReceived, item => Assert.Equal(map[item.activationAddress], item.cause));
-            Assert.Equal(addresses, this.localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress));
+            Assert.Equal(addresses.ToHashSet(), this.localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress).ToHashSet());
 
             this.localGrainDirectory.Reset();
         }

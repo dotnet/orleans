@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
@@ -14,91 +13,142 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class DhtGrainLocator : IGrainLocator
     {
-        private readonly ILocalGrainDirectory localGrainDirectory;
-        private readonly IGrainContext grainContext;
-        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, GrainAddress address, UnregistrationCause cause)> unregistrationQueue = new();
-        private int isWorking = 0;
+        private readonly ILocalGrainDirectory _localGrainDirectory;
+        private readonly IGrainContext _grainContext;
+        private readonly object _initLock = new();
+        private BatchedDeregistrationWorker _forceWorker;
+        private BatchedDeregistrationWorker _neaWorker;
 
         public DhtGrainLocator(
             ILocalGrainDirectory localGrainDirectory,
             IGrainContext grainContext)
         {
-            this.localGrainDirectory = localGrainDirectory;
-            this.grainContext = grainContext;
+            _localGrainDirectory = localGrainDirectory;
+            _grainContext = grainContext;
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await this.localGrainDirectory.LookupAsync(grainId)).Address;
+        public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await _localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public async Task<GrainAddress> Register(GrainAddress address) => (await this.localGrainDirectory.RegisterAsync(address)).Address;
+        public async Task<GrainAddress> Register(GrainAddress address) => (await _localGrainDirectory.RegisterAsync(address)).Address;
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
-            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            this.unregistrationQueue.Enqueue((tcs, address, cause));
-            // Make sure to not run the loop on the Grain Activation context
-            this.grainContext.RunOrQueueTask(() => this.UnregisterExecute()).Ignore();
-            return tcs.Task;
+            EnsureInitialized();
+
+            // If this ever gets more complicated, we can use a list or internally manage things within a single worker.
+            var worker = cause switch
+            {
+                UnregistrationCause.Force => _forceWorker,
+                UnregistrationCause.NonexistentActivation => _neaWorker,
+                _ => throw new ArgumentOutOfRangeException($"Unregistration cause {cause} is unknown and is not supported. This is a bug."),
+            };
+
+            return worker.Unregister(address);
+            
+            void EnsureInitialized()
+            {
+                // Unfortunately, for now we need to perform this initialization lazily, since a SystemTarget does not become valid
+                // until it's registered with the Catalog (see Catalog.RegisterSystemTarget), which can happen after this instance
+                // is constructed.
+                if (_forceWorker is not null && _neaWorker is not null)
+                {
+                    return;
+                }
+
+                lock (_initLock)
+                {
+                    if (_forceWorker is not null && _neaWorker is not null)
+                    {
+                        return;
+                    }
+
+                    _forceWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.Force);
+                    _neaWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.NonexistentActivation);
+                }
+            }
         }
 
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
             => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory);
 
-        private async Task UnregisterExecute()
+        public void CachePlacementDecision(GrainAddress address) => _localGrainDirectory.CachePlacementDecision(address);
+        public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
+        public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
+        public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryCachedLookup(grainId, out address);
+
+        private class BatchedDeregistrationWorker
         {
-            while (!this.unregistrationQueue.IsEmpty)
+            private const int OperationBatchSizeLimit = 2_000;
+            private readonly ILocalGrainDirectory _localGrainDirectory;
+            private readonly IGrainContext _grainContext;
+            private readonly UnregistrationCause _cause;
+            private readonly Channel<(TaskCompletionSource<bool> tcs, GrainAddress address)> _queue;
+#pragma warning disable IDE0052 // Remove unread private members
+            private readonly Task _runTask;
+#pragma warning restore IDE0052 // Remove unread private members
+
+            public BatchedDeregistrationWorker(
+                ILocalGrainDirectory localGrainDirectory,
+                IGrainContext grainContext,
+                UnregistrationCause cause)
             {
-                if (Interlocked.CompareExchange(ref this.isWorking, 1, 0) == 1)
+                _localGrainDirectory = localGrainDirectory;
+                _grainContext = grainContext;
+                _cause = cause;
+                _queue = Channel.CreateUnbounded<(TaskCompletionSource<bool> tcs, GrainAddress address)>(new UnboundedChannelOptions
                 {
-                    // Someone is already working
-                    return;
-                }
+                    SingleReader = true,
+                    SingleWriter = false,
+                    AllowSynchronousContinuations = false
+                });
+                _runTask = _grainContext.RunOrQueueTask(() => ProcessDeregistrationQueue());
+            }
 
-                var operations = new List<(TaskCompletionSource<object> tcs, GrainAddress address, UnregistrationCause cause)>();
-                UnregistrationCause? cause = default;
+            public Task Unregister(GrainAddress address)
+            {
+                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _queue.Writer.TryWrite((tcs, address));
+                return tcs.Task;
+            }
 
-                try
+            private async Task ProcessDeregistrationQueue()
+            {
+                var operations = new List<TaskCompletionSource<bool>>();
+                var addresses = new List<GrainAddress>();
+                var reader = _queue.Reader;
+
+                while (await reader.WaitToReadAsync())
                 {
-                    while (this.unregistrationQueue.TryPeek(out var op))
+                    // Process a batch of work.
+                    try
                     {
-                        if (cause == default)
+                        operations.Clear();
+                        addresses.Clear();
+
+                        while (operations.Count < OperationBatchSizeLimit && reader.TryRead(out var op))
                         {
-                            cause = op.cause;
+                            operations.Add(op.tcs);
+                            addresses.Add(op.address);
                         }
-                        else if (cause != op.cause)
+
+                        if (operations.Count > 0)
                         {
-                            break;
+                            await _localGrainDirectory.UnregisterManyAsync(addresses, _cause);
+                            foreach (var op in operations)
+                            {
+                                op.TrySetResult(true);
+                            }
                         }
-                        this.unregistrationQueue.TryDequeue(out op);
-                        operations.Add(op);
                     }
-
-                    if (operations.Any())
+                    catch (Exception ex)
                     {
-                        await this.localGrainDirectory.UnregisterManyAsync(operations.Select(op => op.address).ToList(), cause.Value);
                         foreach (var op in operations)
                         {
-                            op.tcs.SetResult(null);
+                            op.TrySetException(ex);
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    foreach (var op in operations)
-                    {
-                        op.tcs.SetException(ex);
-                    }
-                }
-                finally
-                {
-                    // Now we are not working anymore
-                    Interlocked.Exchange(ref this.isWorking, 0);
                 }
             }
         }
-
-        public void CachePlacementDecision(GrainAddress address) => this.localGrainDirectory.CachePlacementDecision(address);
-        public void InvalidateCache(GrainId grainId) => this.localGrainDirectory.InvalidateCacheEntry(grainId);
-        public void InvalidateCache(GrainAddress address) => this.localGrainDirectory.InvalidateCacheEntry(address);
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => localGrainDirectory.TryCachedLookup(grainId, out address);
     }
 }
