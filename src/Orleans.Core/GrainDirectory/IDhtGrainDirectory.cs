@@ -95,11 +95,11 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Remove the directory entry forcefully, without any conditions
         /// </summary>
-        Force,
+        Force = 0,
 
         /// <summary>
         /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
         /// </summary>
-        NonexistentActivation
+        NonexistentActivation = 1,
     }
 }
