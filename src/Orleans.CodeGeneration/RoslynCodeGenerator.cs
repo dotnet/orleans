@@ -372,7 +372,6 @@ namespace Orleans.CodeGenerator
         private static bool TypeHasKnownBase(Type type)
         {
             if (type == null) return false;
-            // if (type.GetCustomAttribute<KnownBaseTypeAttribute>() != null) return true;
             if (type.GetCustomAttributes()?.Any(attr => attr.GetType().FullName == typeof(KnownBaseTypeAttribute).FullName) == true ) return true;
             if (TypeHasKnownBase(type.BaseType)) return true;
             var interfaces = type.GetInterfaces();
