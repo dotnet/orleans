@@ -258,14 +258,16 @@ namespace Orleans.Transactions.DynamoDB
 
         private async Task<TableDescription> TableWaitOnStatusAsync(string tableName, TableStatus whileStatus, TableStatus desiredStatus, int delay = 2000)
         {
-            TableDescription ret;
+            TableDescription ret = null;
 
             do
             {
+                if (ret != null)
+                {
+                    await Task.Delay(delay);
+                }
+                
                 ret = await GetTableDescription(tableName);
-
-                await Task.Delay(delay);
-
             } while (ret.TableStatus == whileStatus);
 
             if (ret.TableStatus != desiredStatus)
@@ -279,17 +281,18 @@ namespace Orleans.Transactions.DynamoDB
         private async Task<TableDescription> TableIndexWaitOnStatusAsync(string tableName, string indexName, IndexStatus whileStatus, IndexStatus desiredStatus = null, int delay = 2000)
         {
             TableDescription ret;
-            GlobalSecondaryIndexDescription index;
+            GlobalSecondaryIndexDescription index = null;
 
             do
             {
+                if (index != null)
+                {
+                    await Task.Delay(delay);
+                }
+
                 ret = await GetTableDescription(tableName);
-
-                await Task.Delay(delay);
-
                 index = ret.GlobalSecondaryIndexes.FirstOrDefault(index => index.IndexName == indexName);
-
-            } while (ret.GlobalSecondaryIndexes.FirstOrDefault(index => index.IndexName == indexName).IndexStatus == whileStatus);
+            } while (index.IndexStatus == whileStatus);
 
             if (desiredStatus != null && index.IndexStatus != desiredStatus)
             {
