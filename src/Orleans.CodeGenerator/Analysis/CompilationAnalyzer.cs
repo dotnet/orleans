@@ -285,6 +285,13 @@ namespace Orleans.CodeGenerator.Analysis
 
             void ExpandKnownAssemblies(IAssemblySymbol asm)
             {
+                // This can occur if a developer adds [assembly: KnownAssembly(type(x))] where x is the main assembly being inspected
+                // by the code generator. i.e., the attribute is self-referential.
+                if (asm is null)
+                {
+                    return;
+                }
+
                 if (!this.KnownAssemblies.Add(asm))
                 {
                     return;
