@@ -21,9 +21,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
-        public static ISiloBuilder UseConsulClustering(
+        public static ISiloBuilder UseConsulSiloClustering(
             this ISiloBuilder builder,
-            Action<ConsulClusteringSiloOptions> configureOptions)
+            Action<ConsulClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -49,14 +49,14 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
-        public static ISiloBuilder UseConsulClustering(
+        public static ISiloBuilder UseConsulSiloClustering(
             this ISiloBuilder builder,
-            Action<OptionsBuilder<ConsulClusteringSiloOptions>> configureOptions)
+            Action<OptionsBuilder<ConsulClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<ConsulClusteringSiloOptions>());
+                    configureOptions?.Invoke(services.AddOptions<ConsulClusteringOptions>());
                     services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
                 });
         }
@@ -73,9 +73,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="IClientBuilder"/>.
         /// </returns>
-        public static IClientBuilder UseConsulClustering(
+        public static IClientBuilder UseConsulClientClustering(
             this IClientBuilder builder,
-            Action<ConsulClusteringClientOptions> configureOptions)
+            Action<ConsulClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(services =>
                 {
@@ -100,14 +100,14 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="IClientBuilder"/>.
         /// </returns>
-        public static IClientBuilder UseConsulClustering(
+        public static IClientBuilder UseConsulClientClustering(
             this IClientBuilder builder,
-            Action<OptionsBuilder<ConsulClusteringClientOptions>> configureOptions)
+            Action<OptionsBuilder<ConsulClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<ConsulClusteringClientOptions>());
+                    configureOptions?.Invoke(services.AddOptions<ConsulClusteringOptions>());
                     services.AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
                 });
         }

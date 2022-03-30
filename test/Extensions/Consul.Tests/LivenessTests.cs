@@ -28,7 +28,11 @@ namespace Consul.Tests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseConsulClustering(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
+                hostBuilder.UseConsulSiloClustering(options =>
+                {
+                    var address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
+                    options.ConfigureConsulClient(address);
+                });
             }
         }
 
@@ -37,10 +41,10 @@ namespace Consul.Tests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .UseConsulClustering(gatewayOptions =>
+                    .UseConsulClientClustering(gatewayOptions =>
                     {
-                        gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
-                        ;
+                        var address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
+                        gatewayOptions.ConfigureConsulClient(address);
                     });
             }
         }

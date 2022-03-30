@@ -19,27 +19,22 @@ namespace Orleans.Runtime.Membership
     {
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
         private ILogger _logger;
-        private readonly ConsulClient _consulClient;
-        private readonly ConsulClusteringSiloOptions clusteringSiloTableOptions;
+        private readonly IConsulClient _consulClient;
+        private readonly ConsulClusteringOptions clusteringSiloTableOptions;
         private readonly string clusterId;
         private readonly string kvRootFolder;
         private readonly string versionKey;
 
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulClusteringSiloOptions> membershipTableOptions, 
+            IOptions<ConsulClusteringOptions> membershipTableOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.clusterId = clusterOptions.Value.ClusterId;
             this.kvRootFolder = membershipTableOptions.Value.KvRootFolder;
             this._logger = logger;
             this.clusteringSiloTableOptions = membershipTableOptions.Value;
-            _consulClient =
-                new ConsulClient(config =>
-                {
-                    config.Address = this.clusteringSiloTableOptions.Address;
-                    config.Token = this.clusteringSiloTableOptions.AclClientToken;
-                });
+            this._consulClient = this.clusteringSiloTableOptions.CreateClient();
             versionKey = ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder);
         }
 
@@ -70,7 +65,7 @@ namespace Orleans.Runtime.Membership
             return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey);
         }
 
-        public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger, string versionKey)
+        public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger, string versionKey)
         {
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)

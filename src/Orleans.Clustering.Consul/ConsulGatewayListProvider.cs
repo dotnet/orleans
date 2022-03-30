@@ -13,16 +13,16 @@ namespace Orleans.Runtime.Membership
 {
     public class ConsulGatewayListProvider : IGatewayListProvider
     {
-        private ConsulClient consulClient;
+        private IConsulClient consulClient;
         private string clusterId;
         private ILogger logger;
-        private readonly ConsulClusteringClientOptions options;
+        private readonly ConsulClusteringOptions options;
         private readonly TimeSpan maxStaleness;
         private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
             ILogger<ConsulGatewayListProvider> logger, 
-            IOptions<ConsulClusteringClientOptions> options, 
+            IOptions<ConsulClusteringOptions> options, 
             IOptions<GatewayOptions> gatewayOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
@@ -44,13 +44,7 @@ namespace Orleans.Runtime.Membership
         }
         public Task InitializeGatewayListProvider()
         {
-            consulClient =
-                new ConsulClient(config =>
-                {
-                    config.Address = options.Address;
-                    config.Token = options.AclClientToken;
-                });
-
+            consulClient = options.CreateClient();
             return Task.CompletedTask;
         }
 
