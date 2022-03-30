@@ -489,19 +489,25 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private Task OnRuntimeInitializeStop(CancellationToken ct)
+        private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
             if (platformWatchdog != null)
             {
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
             }
 
-            SafeExecute(messageCenter.Stop);
+            try
+            {
+                await messageCenter.StopAsync();
+            }
+            catch (Exception exception)
+            {
+                this.logger.LogError(exception, "Error stopping message center");
+            }
+
             SafeExecute(siloStatistics.Stop);
 
-            SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-
-            return Task.CompletedTask;
+            SystemStatus = SystemStatus.Terminated;
         }
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
@@ -553,7 +559,7 @@ namespace Orleans.Runtime
             }
 
             // Stop the gateway
-            SafeExecute(messageCenter.StopAcceptingClientMessages);
+            await messageCenter.StopAcceptingClientMessages();
         }
 
         private async Task OnActiveStop(CancellationToken ct)
