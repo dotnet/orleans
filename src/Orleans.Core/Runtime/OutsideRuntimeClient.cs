@@ -12,7 +12,6 @@ using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
