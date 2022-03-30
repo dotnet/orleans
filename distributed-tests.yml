@@ -14,7 +14,6 @@ jobs:
     arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
     onConfigure: 
       - if (job.endpoints.Count > 0) { 
-          job.endpoints.Reverse();
           job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances); 
         }
   client:
@@ -66,6 +65,36 @@ scenarios:
         instances: 1
         commandOptions: "requests errors"
   reliability:
+    server:
+      job: server
+      variables:
+        instances: 10
+        configurator: SimpleSilo
+    chaosagent:
+      job: client
+      waitForExit: false
+      variables:
+        command: chaosagent
+        instances: 1
+        wait: 30
+        serversPerRound: 1
+        rounds: 4
+        roundDelay: 30
+        graceful: false
+        restart: true
+        commandOptions: "--wait {{wait}} --serversPerRound {{serversPerRound}} --rounds {{rounds}} --roundDelay {{roundDelay}} --graceful {{graceful}} --restart {{restart}}"
+    client:
+      job: client
+      waitForExit: true
+      variables:
+        command: ping
+        instances: 1
+        numWorkers: 250
+        blocksPerWorker: 0
+        requestsPerBlock: 500
+        duration: 180
+        commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
+  rolling:
     server:
       job: server
       variables:
