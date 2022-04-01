@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents a grain from the perspective of the runtime.
     /// </summary>
-    public interface IGrainContext : ITargetHolder, IEquatable<IGrainContext>
+    public interface IGrainContext : ITargetHolder, IEquatable<IGrainContext>, ICachedMessageReceiver
     {
         /// <summary>
         /// Gets a reference to this grain.

@@ -53,6 +53,7 @@ namespace UnitTests.SchedulerTests
         public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+        bool ICachedMessageReceiver.HandleMessage(object message) => throw new NotImplementedException();
     }
     
     [TestCategory("BVT"), TestCategory("Scheduler")]

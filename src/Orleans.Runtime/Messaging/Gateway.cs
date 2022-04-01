@@ -12,7 +12,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class Gateway : IConnectedClientCollection
+    internal sealed class Gateway : IConnectedClientCollection
     {
         private readonly GatewayClientCleanupAgent clientCleanupAgent;
 
@@ -216,7 +216,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// See if this message is intended for a grain we're proxying, and queue it for delivery if so.
         /// </summary>
-        /// <param name="msg"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
         internal bool TryDeliverToProxy(Message msg)
         {
@@ -393,7 +392,7 @@ namespace Orleans.Runtime.Messaging
                             msg,
                             Message.RejectionTypes.Unrecoverable,
                             "Unknown client " + msg.TargetGrain);
-                        messageCenter.SendMessage(error);
+                        messageCenter.SendMessage(error, targetReference: null);
                     }
                     else
                     {

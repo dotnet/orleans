@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection);
+                this.messageCenter.TryDeliverToProxy(rejection, targetReference: null);
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();
                 return;
@@ -97,7 +97,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, targetReference: null);
             }
         }
 
@@ -175,7 +175,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, targetReference: null);
             }
             else
             {
