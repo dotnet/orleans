@@ -9,4 +9,27 @@
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" Version="$(SourceLinkVersion)" PrivateAssets="All"/>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="$(SourceLinkVersion)" PrivateAssets="all" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Set DisableSourceLinkUrlTranslation to true when building a tool for internal use where sources only come from internal URIs -->
+    <DisableSourceLinkUrlTranslation Condition="'$(DisableSourceLinkUrlTranslation)' == ''">false</DisableSourceLinkUrlTranslation>
+    <_TranslateUrlPattern>https://.*\.visualstudio\.com/.*/_git/[^/]*</_TranslateUrlPattern>
+    <_TranslateUrlReplacement>$(PublicRepositoryUrl)</_TranslateUrlReplacement>
+  </PropertyGroup>
+
+  <Target Name="_TranslateAzureDevOpsUrlToGitHubUrl"
+          Condition="'$(DisableSourceLinkUrlTranslation)' == 'false'"
+          DependsOnTargets="$(SourceControlManagerUrlTranslationTargets)"
+          BeforeTargets="SourceControlManagerPublishTranslatedUrls">
+
+    <PropertyGroup>
+      <ScmRepositoryUrl>$([System.Text.RegularExpressions.Regex]::Replace($(ScmRepositoryUrl), $(_TranslateUrlPattern), $(_TranslateUrlReplacement)))</ScmRepositoryUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <SourceRoot Update="@(SourceRoot)">
+        <ScmRepositoryUrl>$([System.Text.RegularExpressions.Regex]::Replace(%(SourceRoot.ScmRepositoryUrl), $(_TranslateUrlPattern), $(_TranslateUrlReplacement)))</ScmRepositoryUrl>
+      </SourceRoot>
+    </ItemGroup>
+  </Target>
 </Project>
