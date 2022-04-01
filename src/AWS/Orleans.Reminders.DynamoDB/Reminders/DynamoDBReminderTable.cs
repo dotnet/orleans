@@ -25,7 +25,8 @@ namespace Orleans.Reminders.DynamoDB
         private const string REMINDER_ID_PROPERTY_NAME = "ReminderId";
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
-        private const string SERVICE_ID_INDEX = "ServiceIdIndex";
+        private const string SERVICE_ID_GRAIN_HASH_INDEX = "ServiceIdIndex";
+        private const string SERVICE_ID_GRAIN_REFERENCE_INDEX = "ServiceIdGrainReferenceIndex";
         private SafeRandom _random = new SafeRandom();
 
         private readonly ILogger logger;
@@ -60,14 +61,25 @@ namespace Orleans.Reminders.DynamoDB
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
-            var secondaryIndex = new GlobalSecondaryIndex
+            var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
-                IndexName = SERVICE_ID_INDEX,
+                IndexName = SERVICE_ID_GRAIN_HASH_INDEX,
                 Projection = new Projection { ProjectionType = ProjectionType.ALL },
                 KeySchema = new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
                     new KeySchemaElement { AttributeName = GRAIN_HASH_PROPERTY_NAME, KeyType = KeyType.RANGE }
+                }
+            };
+
+            var serviceIdGrainReferenceGlobalSecondaryIndex = new GlobalSecondaryIndex
+            {
+                IndexName = SERVICE_ID_GRAIN_REFERENCE_INDEX,
+                Projection = new Projection { ProjectionType = ProjectionType.ALL },
+                KeySchema = new List<KeySchemaElement>
+                {
+                    new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
+                    new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.RANGE }
                 }
             };
 
@@ -81,9 +93,10 @@ namespace Orleans.Reminders.DynamoDB
                 {
                     new AttributeDefinition { AttributeName = REMINDER_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_HASH_PROPERTY_NAME, AttributeType = ScalarAttributeType.N },
-                    new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
+                    new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
+                    new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
-                new List<GlobalSecondaryIndex> { secondaryIndex });
+                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
         }
 
         /// <summary>
@@ -131,7 +144,7 @@ namespace Orleans.Reminders.DynamoDB
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
-                var records = await this.storage.ScanAsync(this.options.TableName, expressionValues, expression, this.Resolve).ConfigureAwait(false);
+                var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
@@ -167,7 +180,7 @@ namespace Orleans.Reminders.DynamoDB
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
                 }
                 else
                 {
@@ -177,7 +190,7 @@ namespace Orleans.Reminders.DynamoDB
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
 
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
@@ -185,7 +198,7 @@ namespace Orleans.Reminders.DynamoDB
                         { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME}";
-                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_INDEX, consistentRead: false).ConfigureAwait(false));
+                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false));
 
                 }
 
