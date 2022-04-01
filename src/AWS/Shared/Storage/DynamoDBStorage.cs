@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -37,9 +38,12 @@ namespace Orleans.Transactions.DynamoDB
         private string service;
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
-        private int readCapacityUnits = DefaultReadCapacityUnits;
-        private int writeCapacityUnits = DefaultWriteCapacityUnits;
+        private readonly ProvisionedThroughput provisionedThroughput;
         private readonly bool useProvisionedThroughput;
+        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
+            {
+                TableStatus.CREATING, TableStatus.UPDATING, TableStatus.ACTIVE
+            });
         private AmazonDynamoDBClient ddbClient;
         private ILogger Logger;
 
@@ -72,9 +76,10 @@ namespace Orleans.Transactions.DynamoDB
             this.token = token;
             this.profileName = profileName;
             this.service = service;
-            this.readCapacityUnits = readCapacityUnits;
-            this.writeCapacityUnits = writeCapacityUnits;
             this.useProvisionedThroughput = useProvisionedThroughput;
+            this.provisionedThroughput = this.useProvisionedThroughput
+                ? new ProvisionedThroughput(readCapacityUnits, writeCapacityUnits)
+                : null;
             Logger = logger;
             CreateClient();
         }
@@ -92,8 +97,10 @@ namespace Orleans.Transactions.DynamoDB
         {
             try
             {
-                if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes, secondaryIndexes, ttlAttributeName);
+                TableDescription tableDescription = await GetTableDescription(tableName);
+                await (tableDescription == null
+                    ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName)
+                    : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName));
             }
             catch (Exception exc)
             {
@@ -121,7 +128,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service) });
             }
             else if (!string.IsNullOrEmpty(this.profileName))
             {
@@ -145,7 +152,7 @@ namespace Orleans.Transactions.DynamoDB
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service) });
             }
         }
 
@@ -164,7 +171,7 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async Task CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             var request = new CreateTableRequest
             {
@@ -172,21 +179,16 @@ namespace Orleans.Transactions.DynamoDB
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
                 BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = this.useProvisionedThroughput ? new ProvisionedThroughput
-                {
-                    ReadCapacityUnits = readCapacityUnits,
-                    WriteCapacityUnits = writeCapacityUnits
-                } : null
+                ProvisionedThroughput = provisionedThroughput
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
                 if (this.useProvisionedThroughput)
                 {
-                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
                     secondaryIndexes.ForEach(i =>
                     {
-                        i.ProvisionedThroughput = indexThroughput;
+                        i.ProvisionedThroughput = provisionedThroughput;
                     });
                 }
 
@@ -195,32 +197,189 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                var response = await ddbClient.CreateTableAsync(request);
-                TableDescription description = null;
-                do
-                {
-                    description = await GetTableDescription(tableName);
-
-                    await Task.Delay(2000);
-
-                } while (description.TableStatus == TableStatus.CREATING);
-
-                if (!string.IsNullOrEmpty(ttlAttributeName))
-                {
-                    await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
-                    {
-                        TableName = tableName,
-                        TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
-                    });
-                }
-                if (description.TableStatus != TableStatus.ACTIVE)
-                    throw new InvalidOperationException($"Failure creating table {tableName}");
+                await ddbClient.CreateTableAsync(request);
+                TableDescription description = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
+                await TableUpdateTtlAsync(tableName, ttlAttributeName);
             }
             catch (Exception exc)
             {
                 Logger.Error(ErrorCode.StorageProviderBase, $"Could not create table {tableName}", exc);
                 throw;
             }
+        }
+
+        private async Task UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        {
+            if (!updateTableValidTableStatuses.Contains(tableDescription.TableStatus))
+            {
+                throw new InvalidOperationException($"Table {tableDescription.TableName} has a status of {tableDescription.TableStatus} and can't be updated automatically.");
+            }
+
+            if (tableDescription.TableStatus == TableStatus.CREATING
+                || tableDescription.TableStatus == TableStatus.UPDATING)
+            {
+                await TableWaitOnStatusAsync(tableDescription.TableName, tableDescription.TableStatus, TableStatus.ACTIVE);
+            }
+
+            var request = new UpdateTableRequest
+            {
+                TableName = tableDescription.TableName,
+                AttributeDefinitions = attributes,
+                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = provisionedThroughput
+            };
+
+            try
+            {
+                if (request.ProvisionedThroughput?.ReadCapacityUnits != tableDescription.ProvisionedThroughput?.ReadCapacityUnits
+                    || request.ProvisionedThroughput?.WriteCapacityUnits != tableDescription.ProvisionedThroughput?.WriteCapacityUnits)
+                {
+                    await ddbClient.UpdateTableAsync(request);
+                    tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE);
+                }
+
+                await TableUpdateTtlAsync(tableDescription.TableName, ttlAttributeName);
+
+                // Wait for all table indexes to become ACTIVE.
+                // We can only have one GSI in CREATING state at one time.
+                // We also wait for all indexes to finish UPDATING as the table is not ready to receive queries from Orleans until all indexes are created.
+                foreach (var globalSecondaryIndex in tableDescription.GlobalSecondaryIndexes)
+                {
+                    if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
+                        || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
+                    {
+                        await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                    }
+                }
+
+                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray();
+                var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
+
+                foreach (var secondaryIndex in secondaryIndexesToCreate)
+                {
+                    await TableCreateSecondaryIndex(tableDescription.TableName, attributes, secondaryIndex);
+                }
+            }
+            catch (Exception exc)
+            {
+                Logger.Error(ErrorCode.StorageProviderBase, $"Could not update table {tableDescription.TableName}", exc);
+                throw;
+            }
+        }
+
+        private async Task TableCreateSecondaryIndex(string tableName, List<AttributeDefinition> attributes, GlobalSecondaryIndex secondaryIndex)
+        {
+            await ddbClient.UpdateTableAsync(new UpdateTableRequest
+            {
+                TableName = tableName,
+                GlobalSecondaryIndexUpdates = new List<GlobalSecondaryIndexUpdate>
+                {
+                    new GlobalSecondaryIndexUpdate
+                    {
+                        Create = new CreateGlobalSecondaryIndexAction()
+                        {
+                            IndexName = secondaryIndex.IndexName,
+                            Projection = secondaryIndex.Projection,
+                            ProvisionedThroughput = provisionedThroughput,
+                            KeySchema = secondaryIndex.KeySchema
+                        }
+                    }
+                },
+                AttributeDefinitions = attributes
+            });
+
+            // Adding a GSI to a table is an eventually consistent operation and we might miss the table UPDATING status if we query the table status imediatelly after the table update call.
+            // Creating a GSI takes significantly longer than 1 second and therefore this delay does not add time to the total duration of this method.
+            await Task.Delay(1000);
+
+            // When adding a GSI, the table briefly changes its status to UPDATING. The GSI creation process usually takes longer.
+            // For this reason, we will wait for both the table and the index to become ACTIVE before marking the operation as complete.
+            await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE);
+            await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE);
+        }
+
+        private async ValueTask TableUpdateTtlAsync(string tableName, string ttlAttributeName)
+        {
+            var describeTimeToLive = (await ddbClient.DescribeTimeToLiveAsync(tableName)).TimeToLiveDescription;
+
+            // We can only handle updates to the table TTL from DISABLED to ENABLED.
+            // This is because updating the TTL attribute requires (1) disabling the table TTL and (2) re-enabling it with the new TTL attribute.
+            // As per the below details page for this API: "It can take up to one hour for the change to fully process. Any additional UpdateTimeToLive calls for the same table during this one hour duration result in a ValidationException."
+            // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateTimeToLive.html
+            if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED)
+            {
+                Logger.Error(ErrorCode.StorageProviderBase, $"TTL is not DISABLED. Cannot update table TTL for table {tableName}. Please update manually.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(ttlAttributeName))
+            {
+                return;
+            }
+
+            try
+            {
+                await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                {
+                    TableName = tableName,
+                    TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
+                });
+
+                await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE);
+            }
+            catch (AmazonDynamoDBException ddbEx)
+            {
+                // We need to swallow this exception as there is no API exposed to determine if the below issue will occur before calling UpdateTimeToLive(Async)
+                // "Time to live has been modified multiple times within a fixed interval".
+                // We can arrive at this situation if the TTL feature was recently disabled on the target table.
+                Logger.Error(ErrorCode.StorageProviderBase, $"Exception occured while updating table {tableName} TTL attribute to {ttlAttributeName}. Please update manually.", ddbEx);
+            }
+        }
+
+        private async Task<TableDescription> TableWaitOnStatusAsync(string tableName, TableStatus whileStatus, TableStatus desiredStatus, int delay = 2000)
+        {
+            TableDescription ret = null;
+
+            do
+            {
+                if (ret != null)
+                {
+                    await Task.Delay(delay);
+                }
+
+                ret = await GetTableDescription(tableName);
+            } while (ret.TableStatus == whileStatus);
+
+            if (ret.TableStatus != desiredStatus)
+            {
+                throw new InvalidOperationException($"Table {tableName} has failed to reach the desired status of {desiredStatus}");
+            }
+
+            return ret;
+        }
+
+        private async Task<TableDescription> TableIndexWaitOnStatusAsync(string tableName, string indexName, IndexStatus whileStatus, IndexStatus desiredStatus = null, int delay = 2000)
+        {
+            TableDescription ret;
+            GlobalSecondaryIndexDescription index = null;
+
+            do
+            {
+                if (index != null)
+                {
+                    await Task.Delay(delay);
+                }
+
+                ret = await GetTableDescription(tableName);
+                index = ret.GlobalSecondaryIndexes.FirstOrDefault(index => index.IndexName == indexName);
+            } while (index.IndexStatus == whileStatus);
+
+            if (desiredStatus != null && index.IndexStatus != desiredStatus)
+            {
+                throw new InvalidOperationException($"Index {indexName} in table {tableName} has failed to reach the desired status of {desiredStatus}");
+            }
+
+            return ret;
         }
 
         /// <summary>
@@ -624,7 +783,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 var errorMsg = $"Failed to read table {tableName}: {exc.Message}";
                 Logger.Warn(ErrorCode.StorageProviderBase, errorMsg, exc);
-                throw new OrleansException(errorMsg, exc);
+                throw new Orleans.Runtime.OrleansException(errorMsg, exc);
             }
         }
 
@@ -717,19 +876,19 @@ namespace Orleans.Transactions.DynamoDB
                 var transactItems = new List<TransactWriteItem>();
                 if (puts != null)
                 {
-                    transactItems.AddRange(puts.Select(p => new TransactWriteItem{Put = p}));
+                    transactItems.AddRange(puts.Select(p => new TransactWriteItem { Put = p }));
                 }
                 if (updates != null)
                 {
-                    transactItems.AddRange(updates.Select(u => new TransactWriteItem{Update = u}));
+                    transactItems.AddRange(updates.Select(u => new TransactWriteItem { Update = u }));
                 }
                 if (deletes != null)
                 {
-                    transactItems.AddRange(deletes.Select(d => new TransactWriteItem{Delete = d}));
+                    transactItems.AddRange(deletes.Select(d => new TransactWriteItem { Delete = d }));
                 }
                 if (conditionChecks != null)
                 {
-                    transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem{ConditionCheck = c}));
+                    transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem { ConditionCheck = c }));
                 }
 
                 var request = new TransactWriteItemsRequest
@@ -746,4 +905,5 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
     }
+
 }
