@@ -93,14 +93,7 @@ namespace Orleans.Runtime.Messaging
             // information, so a null target silo is OK.
             if (msg.TargetSilo == null || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
-                // See if it's a message for a client we're proxying.
-                if (messageCenter.TryDeliverToProxy(msg))
-                {
-                    return;
-                }
-
-                // Nope, it's for us
-                messageCenter.DispatchLocalMessage(msg);
+                messageCenter.ReceiveMessage(msg);
                 return;
             }
 
