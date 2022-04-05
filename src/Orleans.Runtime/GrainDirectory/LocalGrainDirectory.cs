@@ -491,15 +491,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             SiloAddress owner = CalculateGrainDirectoryPartition(grainId);
 
-            if (owner == null)
+            if (owner is null || owner.Equals(MyAddress))
             {
-                // We don't know about any other silos, and we're stopping, so throw
-                throw new OrleansGrainDirectoryException("Grain directory is stopping");
-            }
-
-            if (owner.Equals(MyAddress))
-            {
-                // if I am the owner, perform the operation locally
+                // Either we don't know about any other silos and we're stopping, or we are the owner.
+                // Null indicates that the operation should be performed locally.
+                // In the case that this host is terminating, any grain registered to this host must terminate.
                 return null;
             }
 
