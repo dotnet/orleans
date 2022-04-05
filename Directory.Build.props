@@ -10,13 +10,14 @@
     <Product>Microsoft Orleans</Product>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnet/orleans</PackageProjectUrl>
     <PackageIcon>logo_128.png</PackageIcon>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
-    <RepositoryUrl>https://github.com/dotnet/orleans</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
+    <PublicRepositoryUrl>https://github.com/dotnet/orleans</PublicRepositoryUrl>
     <PrivateRepositoryUrl>$(RepositoryUrl)</PrivateRepositoryUrl>
+    <RepositoryUrl>$(RepositoryUrl)</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <LangVersion>latest</LangVersion>
     <Features>strict</Features>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
