@@ -10,7 +10,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageCenter : IMessageCenter, IDisposable
+    internal class MessageCenter : IMessageCenter, IAsyncDisposable
     {
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly MessageFactory messageFactory;
@@ -56,7 +56,6 @@ namespace Orleans.Runtime.Messaging
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
-                Gateway.Start();
             }
         }
 
@@ -73,14 +72,10 @@ namespace Orleans.Runtime.Messaging
             return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
         }
 
-        public void Start()
-        {
-        }
-
-        public void Stop()
+        public async Task StopAsync()
         {
             BlockApplicationMessages();
-            StopAcceptingClientMessages();
+            await StopAcceptingClientMessages();
             stopped = true;
         }
 
@@ -102,7 +97,7 @@ namespace Orleans.Runtime.Messaging
             IsBlockingApplicationMessages = true;
         }
 
-        public void StopAcceptingClientMessages()
+        public async Task StopAcceptingClientMessages()
         {
             if (log.IsEnabled(LogLevel.Debug))
             {
@@ -111,7 +106,10 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                Gateway?.Stop();
+                if (Gateway is { } gateway)
+                {
+                    await gateway.StopAsync();
+                }
             }
             catch (Exception exc)
             {
@@ -588,9 +586,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            Stop();
+            await StopAsync();
         }
     }
 }
