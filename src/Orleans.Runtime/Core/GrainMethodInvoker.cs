@@ -13,6 +13,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class GrainMethodInvoker : IIncomingGrainCallContext, IMethodArguments
     {
+        private readonly Message message;
         private readonly IInvokable request;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
@@ -23,18 +24,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
         /// </summary>
+        /// <param name="message">The message.</param>
         /// <param name="grainContext">The grain.</param>
         /// <param name="request">The request.</param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
         /// <param name="responseCopier">The response copier.</param>
         public GrainMethodInvoker(
+            Message message,
             IGrainContext grainContext,
             IInvokable request,
             List<IIncomingGrainCallFilter> filters,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             DeepCopier<Response> responseCopier)
         {
+            this.message = message;
             this.request = request;
             this.grainContext = grainContext;
             this.filters = filters;
@@ -42,22 +46,16 @@ namespace Orleans.Runtime
             this.responseCopier = responseCopier;
         }
 
-        /// <inheritdoc />
+        public IInvokable Request => request;
+
         public object Grain => grainContext.GrainInstance;
 
-        /// <inheritdoc />
-        public MethodInfo Method => request.Method;
-
-        /// <inheritdoc />
         public MethodInfo InterfaceMethod => request.Method;
 
-        /// <inheritdoc />
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
-        /// <inheritdoc />
         public IMethodArguments Arguments => this;
         
-        /// <inheritdoc />
         public object Result
         {
             get => Response switch
@@ -68,7 +66,6 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        /// <inheritdoc />
         public Response Response { get; set; }
 
         object IMethodArguments.this[int index]
@@ -83,7 +80,18 @@ namespace Orleans.Runtime
 
         int IMethodArguments.Length => request.ArgumentCount;
 
-        /// <inheritdoc />
+        public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
+
+        public IGrainContext TargetContext => grainContext;
+
+        public GrainId TargetId => grainContext.GrainId;
+
+        public GrainInterfaceType InterfaceType => message.InterfaceType;
+
+        public string InterfaceName => request.InterfaceName;
+
+        public string MethodName => request.MethodName;
+
         public async Task Invoke()
         {
             try

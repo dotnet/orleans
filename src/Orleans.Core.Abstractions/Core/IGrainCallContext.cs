@@ -33,15 +33,39 @@ namespace Orleans
     public interface IGrainCallContext
     {
         /// <summary>
+        /// Gets the request.
+        /// </summary>
+        IInvokable Request { get; }
+
+        /// <summary>
         /// Gets the grain being invoked.
         /// </summary>
         object Grain { get; }
 
         /// <summary>
-        /// Gets the <see cref="MethodInfo"/> of the method being invoked.
+        /// Gets the identity of the source, if available.
         /// </summary>
-        [Obsolete("Use InterfaceMethod or IIncomingGrainCallContext.ImplementationMethod instead.")]
-        MethodInfo Method { get; }
+        GrainId? SourceId { get; }
+
+        /// <summary>
+        /// Gets the identity of the target.
+        /// </summary>
+        GrainId TargetId { get; }
+
+        /// <summary>
+        /// Gets the type of the interface being invoked.
+        /// </summary>
+        GrainInterfaceType InterfaceType { get; }
+
+        /// <summary>
+        /// Gets the name of the interface being invoked.
+        /// </summary>
+        string InterfaceName { get; }
+
+        /// <summary>
+        /// Gets the name of the method being invoked.
+        /// </summary>
+        string MethodName { get; }
 
         /// <summary>
         /// Gets the <see cref="MethodInfo"/> for the interface method being invoked.
@@ -78,6 +102,11 @@ namespace Orleans
     public interface IIncomingGrainCallContext : IGrainCallContext
     {
         /// <summary>
+        /// Gets the grain context of the target.
+        /// </summary>
+        public IGrainContext TargetContext { get; }
+
+        /// <summary>
         /// Gets the <see cref="MethodInfo"/> for the implementation method being invoked.
         /// </summary>
         MethodInfo ImplementationMethod { get; }
@@ -88,6 +117,10 @@ namespace Orleans
     /// </summary>
     public interface IOutgoingGrainCallContext : IGrainCallContext
     {
+        /// <summary>
+        /// Gets the grain context of the sender.
+        /// </summary>
+        public IGrainContext SourceContext { get; }
     }
 
     /// <summary>
