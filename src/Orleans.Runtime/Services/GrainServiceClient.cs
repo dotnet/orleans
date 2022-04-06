@@ -32,29 +32,22 @@ namespace Orleans.Runtime.Services
         }
 
         /// <summary>
-        /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <see cref="CallingGrainReference"/>
-        /// </summary>
-        protected TGrainService GrainService
-        {
-            get
-            {
-                var destination = MapGrainReferenceToSiloRing(CallingGrainReference);
-                var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainType, destination);
-                var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
-
-                return grainService;
-            }
-        }
-
-        /// <summary>
         /// Gets a reference to the the currently executing grain.
         /// </summary>
-        protected GrainReference CallingGrainReference => RuntimeContext.Current?.GrainReference;
+        protected GrainReference CurrentGrainReference => RuntimeContext.Current?.GrainReference;
 
-        private SiloAddress MapGrainReferenceToSiloRing(GrainReference grainRef)
+        /// <summary>
+        /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <paramref name="callingGrainId"/>.
+        /// </summary>
+        protected TGrainService GetGrainService(GrainId callingGrainId)
         {
-            var hashCode = grainRef.GetUniformHashCode();
-            return ringProvider.GetPrimaryTargetSilo(hashCode);
+            var hashCode = callingGrainId.GetUniformHashCode();
+            var destination = ringProvider.GetPrimaryTargetSilo(hashCode);
+
+            var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainType, destination);
+            var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
+
+            return grainService;
         }
     }
 }
