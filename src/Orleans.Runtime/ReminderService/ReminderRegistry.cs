@@ -21,15 +21,17 @@ namespace Orleans.Runtime.ReminderService
            + "\n  * Others, see: https://www.nuget.org/packages?q=Microsoft.Orleans.Reminders.";
 
         private const uint MaxSupportedTimeout = 0xfffffffe;
+        private readonly IGrainFactory grainFactory;
         private readonly IServiceProvider serviceProvider;
         private bool reminderServiceRegistered;
 
-        public ReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
+        public ReminderRegistry(IGrainFactory grainFactory, IServiceProvider serviceProvider) : base(serviceProvider)
         {
+            this.grainFactory = grainFactory;
             this.serviceProvider = serviceProvider;
         }
 
-        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             this.EnsureReminderServiceRegistered();
 
@@ -69,16 +71,17 @@ namespace Orleans.Runtime.ReminderService
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
             }
 
-            return GrainService.RegisterOrUpdateReminder(CallingGrainReference, reminderName, dueTime, period);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainReference, reminderName, dueTime, period);
         }
 
-        public Task UnregisterReminder(IGrainReminder reminder)
+        public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
         {
             this.EnsureReminderServiceRegistered();
-            return GrainService.UnregisterReminder(reminder);
+            return GetGrainService(callingGrainId).UnregisterReminder(reminder);
         }
 
-        public Task<IGrainReminder> GetReminder(string reminderName)
+        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
         {
             this.EnsureReminderServiceRegistered();
             if (string.IsNullOrEmpty(reminderName))
@@ -86,13 +89,15 @@ namespace Orleans.Runtime.ReminderService
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
             }
 
-            return GrainService.GetReminder(CallingGrainReference, reminderName);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).GetReminder(callingGrainReference, reminderName);
         }
 
-        public Task<List<IGrainReminder>> GetReminders()
+        public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
             this.EnsureReminderServiceRegistered();
-            return GrainService.GetReminders(CallingGrainReference);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).GetReminders(callingGrainReference);
         }
 
         private void EnsureReminderServiceRegistered()

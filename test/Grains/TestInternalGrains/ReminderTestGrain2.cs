@@ -75,7 +75,7 @@ namespace UnitTests.Grains
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
             else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
+                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
 
             this.allReminders[reminderName] = r;
             this.sequence[reminderName] = 0;
@@ -269,6 +269,7 @@ namespace UnitTests.Grains
                 r = await RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
                 r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
+                    this.GrainId,
                     reminderName,
                     usePeriod - TimeSpan.FromSeconds(2),
                     usePeriod);
@@ -419,28 +420,32 @@ namespace UnitTests.Grains
 
     internal class UnvalidatedReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
     {
+        private readonly IGrainFactory grainFactory;
+
         public UnvalidatedReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
         {
+            this.grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
         }
 
-        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
-            return this.GrainService.RegisterOrUpdateReminder(this.CallingGrainReference, reminderName, dueTime, period);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainReference, reminderName, dueTime, period);
         }
 
-        public Task UnregisterReminder(IGrainReminder reminder)
+        public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
+            => GetGrainService(callingGrainId).UnregisterReminder(reminder);
+
+        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
         {
-            return this.GrainService.UnregisterReminder(reminder);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).GetReminder(callingGrainReference, reminderName);
         }
 
-        public Task<IGrainReminder> GetReminder(string reminderName)
+        public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
-            return this.GrainService.GetReminder(this.CallingGrainReference, reminderName);
-        }
-
-        public Task<List<IGrainReminder>> GetReminders()
-        {
-            return this.GrainService.GetReminders(this.CallingGrainReference);
+            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            return GetGrainService(callingGrainId).GetReminders(callingGrainReference);
         }
     }
 }

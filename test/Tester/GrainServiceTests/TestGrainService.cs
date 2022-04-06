@@ -19,32 +19,32 @@ namespace Tester
 
         public Task<string> GetHelloWorldUsingCustomService()
         {
-            return GrainService.GetHelloWorldUsingCustomService(CallingGrainReference);
+            return GetGrainService(CurrentGrainReference.GrainId).GetHelloWorldUsingCustomService(CurrentGrainReference);
         }
 
         public Task<bool> HasStarted()
         {
-            return GrainService.HasStarted();
+            return GetGrainService(CurrentGrainReference.GrainId).HasStarted();
         }
 
         public Task<bool> HasStartedInBackground()
         {
-            return GrainService.HasStartedInBackground();
+            return GetGrainService(CurrentGrainReference.GrainId).HasStartedInBackground();
         }
 
         public Task<bool> HasInit()
         {
-            return GrainService.HasInit();
+            return GetGrainService(CurrentGrainReference.GrainId).HasInit();
         }
 
         public Task<string> GetServiceConfigProperty()
         {
-            return GrainService.GetServiceConfigProperty();
+            return GetGrainService(CurrentGrainReference.GrainId).GetServiceConfigProperty();
         }
 
         public Task<string> EchoViaExtension(string what)
         {
-            return GrainService.AsReference<IEchoExtension>().Echo(what);
+            return GetGrainService(CurrentGrainReference.GrainId).AsReference<IEchoExtension>().Echo(what);
         }
     }
 

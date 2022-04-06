@@ -133,7 +133,7 @@ namespace Orleans
                 throw new InvalidOperationException($"Grain {IdentityString} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service");
 
             EnsureRuntime();
-            return Runtime.ReminderRegistry.RegisterOrUpdateReminder(reminderName, dueTime, period);
+            return Runtime.ReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, period);
         }
 
         /// <summary>
@@ -147,7 +147,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(reminder));
 
             EnsureRuntime();
-            return Runtime.ReminderRegistry.UnregisterReminder(reminder);
+            return Runtime.ReminderRegistry.UnregisterReminder(GrainId, reminder);
         }
 
         /// <summary>
@@ -161,7 +161,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(reminderName));
 
             EnsureRuntime();
-            return Runtime.ReminderRegistry.GetReminder(reminderName);
+            return Runtime.ReminderRegistry.GetReminder(GrainId, reminderName);
         }
 
         /// <summary>
@@ -171,7 +171,7 @@ namespace Orleans
         protected Task<List<IGrainReminder>> GetReminders()
         {
             EnsureRuntime();
-            return Runtime.ReminderRegistry.GetReminders();
+            return Runtime.ReminderRegistry.GetReminders(GrainId);
         }
 
         /// <summary>
