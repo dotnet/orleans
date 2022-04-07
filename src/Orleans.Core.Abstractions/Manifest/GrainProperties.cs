@@ -120,14 +120,29 @@ namespace Orleans.Metadata
         public const string StreamBindingTypeValue = "stream";
 
         /// <summary>
+        /// The binding type for Broadcast Channels.
+        /// </summary>
+        public const string BroadcastChannelBindingTypeValue = "broadcast-channel";
+
+        /// <summary>
         /// The key to specify a stream binding pattern. 
         /// </summary>
         public const string StreamBindingPatternKey = "pattern";
 
         /// <summary>
+        /// The key to specify a channel binding pattern. 
+        /// </summary>
+        public const string BroadcastChannelBindingPatternKey = "channel-pattern";
+
+        /// <summary>
         /// The key to specify a stream id mapper 
         /// </summary>
         public const string StreamIdMapperKey = "streamid-mapper";
+
+        /// <summary>
+        /// The key to specify a channel id mapper 
+        /// </summary>
+        public const string ChannelIdMapperKey = "channelid-mapper";
 
         /// <summary>
         /// Whether to include the namespace name in the grain id.

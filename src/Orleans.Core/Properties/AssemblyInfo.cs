@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Orleans.BroadcastChannel")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration.Build")]
 [assembly: InternalsVisibleTo("Orleans.Runtime")]

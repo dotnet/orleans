@@ -14,6 +14,7 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Serialization;
+using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace UnitTests.General
 {
