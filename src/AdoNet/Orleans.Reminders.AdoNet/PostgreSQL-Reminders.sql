@@ -1,4 +1,4 @@
--- Orleans Reminders table - https://dotnet.github.io/orleans/Documentation/Core-Features/Timers-and-Reminders.html
+-- Orleans Reminders table - https://docs.microsoft.com/dotnet/orleans/grains/timers-and-reminders
 CREATE TABLE OrleansRemindersTable
 (
     ServiceId varchar(150) NOT NULL,

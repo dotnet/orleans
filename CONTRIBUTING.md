@@ -22,15 +22,15 @@ A style guide for writing documentation for this site.
 
 ## Code contributions
 
-This project uses the same contribution process as the other **[DotNet projects](http://dotnet.github.io/)** on GitHub.
+This project uses the same contribution process as the other **[.NET projects](https://github.com/dotnet)** on GitHub.
 
-* **[DotNet Project Contribution Guidelines](https://github.com/dotnet/runtime/blob/main/CONTRIBUTING.md)**
+* **[.NET Project Contribution Guidelines](https://github.com/dotnet/runtime/blob/main/CONTRIBUTING.md)**
 
-Guidelines and workflow for contributing to DotNet projects on GitHub.
+Guidelines and workflow for contributing to .NET projects on GitHub.
 
-* **[DotNet CLA](https://cla.dotnetfoundation.org/)**
+* **[.NET CLA](https://cla.dotnetfoundation.org/)**
 
-Contribution License Agreement for DotNet projects on GitHub.
+Contribution License Agreement for .NET projects on GitHub.
 
 * **[.NET Framework Design Guidelines](https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/framework-design-guidelines-digest.md)**
 
@@ -38,7 +38,7 @@ Some basic API design rules, coding standards, and style guide for .NET Framewor
 
 ## Coding Standards and Conventions
 
-We try not to be too OCD about coding style wars, but in case of disputes we do fall back to the core principles in the two ".NET Coding Standards" books used by the other DotNet OSS projects on GitHub:
+We try not to be too OCD about coding style wars, but in case of disputes we do fall back to the core principles in the two ".NET Coding Standards" books used by the other .NET OSS projects on GitHub:
 
 * [C# Coding Style Guide](https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/coding-style.md)
 

@@ -5,7 +5,7 @@
 </p>
 
 This sample demonstrates how to integrate [ASP.NET Core Blazor](https://docs.microsoft.com/aspnet/core/blazor/)
-with [Microsoft Orleans](https://dotnet.github.io/orleans/).
+with [Microsoft Orleans](https://docs.microsoft.com/dotnet/orleans).
 This demonstrates the in-browser [Blazor Server hosting model](https://docs.microsoft.com/aspnet/core/blazor/hosting-models#blazor-server).
 
 The application leverages Orleans Streams to provide real-time synchronization between browser sessions.
