@@ -21,8 +21,8 @@ if ($null -eq $env:BuildConfiguration)
 # misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
 $Platform = $null
 
-# Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
- $DOTNET_MULTILEVEL_LOOKUP = 0 
+# Disable multilevel lookup https://github.com/dotnet/core-setup/blob/main/Documentation/design-docs/multilevel-sharedfx-lookup.md
+ $DOTNET_MULTILEVEL_LOOKUP = 0
 
  # Set DateTime suffix for debug builds
  if ($BuildConfiguration -eq "Debug")

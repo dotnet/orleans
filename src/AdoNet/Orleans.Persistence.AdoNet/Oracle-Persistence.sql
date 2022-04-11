@@ -110,7 +110,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
     -- If the version number explicitly returned is still the same, Orleans interprets it so the update did not succeed
     -- and throws an InconsistentStateException.
     --
-    -- See further information at https://dotnet.github.io/orleans/Documentation/Core-Features/Grain-Persistence.html.
+    -- See further information at https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence.
 
 
     -- If the @GrainStateVersion is not zero, this branch assumes it exists in this database.

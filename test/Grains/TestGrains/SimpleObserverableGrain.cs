@@ -37,14 +37,14 @@ namespace UnitTests.Grains
 
             //If this were run with Task.Run there were no need for the added Unwrap call.
             //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
-            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //See more at https://docs.microsoft.com/dotnet/orleans/grains/external-tasks-and-grains.
             //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
             //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
             await Task.Factory.StartNew(async () =>
             {
                 await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Unwrap();            
+            }).Unwrap();
         }
 
         public async Task SetB(int b)
@@ -53,19 +53,19 @@ namespace UnitTests.Grains
 
             //If this were run with Task.Run there were no need for the added Unwrap call.
             //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
-            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //See more at https://docs.microsoft.com/dotnet/orleans/grains/external-tasks-and-grains.
             //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
             //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
             await Task.Factory.StartNew(async () =>
             {
                 await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Unwrap();            
+            }).Unwrap();
         }
 
         public async Task IncrementA()
         {
-            await SetA(A + 1);            
+            await SetA(A + 1);
         }
 
         public Task<int> GetAxB()

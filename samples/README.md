@@ -132,12 +132,12 @@ The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/
     <img src="./ChatRoom/screenshot.png" />
 </p>
 
-A terminal-based chat application built using [Orleans Streams](http://dotnet.github.io/orleans/docs/streaming/index.html).
+A terminal-based chat application built using [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming).
 
 ### Demonstrates
 
 * How to build a chat application using Orleans
-* How to use [Orleans Streams](http://dotnet.github.io/orleans/docs/streaming/index.html)
+* How to use [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming)
 
 ## [Bank Account](./BankAccount/#readme)
 
@@ -236,7 +236,7 @@ An application using Orleans Streams with [Azure Event Hubs](https://azure.micro
 
 ### Demonstrates
 
-* How to use [Orleans Streams](http://dotnet.github.io/orleans/docs/streaming/index.html)
+* How to use [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming)
 * How to use the `[ImplicitStreamSubscription(namespace)]` attribute to implicitly subscribe a grain to the stream with the corresponding id
 * How to configure Orleans Streams for use with [Azure Event Hubs](https://azure.microsoft.com/services/event-hubs/)
 
@@ -246,7 +246,7 @@ An application using Orleans Streams with a non-Orleans publisher pushing to a s
 
 ### Demonstrates
 
-* How to use [Orleans Streams](http://dotnet.github.io/orleans/docs/streaming/index.html)
+* How to use [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming)
 * How to use the `[ImplicitStreamSubscription(namespace)]` attribute to implicitly subscribe a grain to the stream with the corresponding id
 * How to configure Orleans Streams for use with [Azure Event Hubs](https://azure.microsoft.com/services/event-hubs/)
 * How to consume stream messages published by non-Orleans publishers by providing a custom `EventHubDataAdapter` implementation (a custom data adapter)

@@ -2,7 +2,7 @@
 
 ![A screenshot of the chat client](screenshot.png)
 
-This sample uses [Orleans Streaming](http://dotnet.github.io/orleans/docs/streaming/index.html) to build a basic chat application. In this application, each client can:
+This sample uses [Orleans Streaming](https://docs.microsoft.com/dotnet/orleans/streaming) to build a basic chat application. In this application, each client can:
 
 * Set their name
 * Join and leave a channel

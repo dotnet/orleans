@@ -22,9 +22,8 @@ Implementation notes:
    Orleans handles exception as a failure and will retry.
 
 7) The implementation follows the Extended Orleans membership protocol. For more information, see at:
-        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Runtime-Tables.html
-        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html
-        https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs
+        https://docs.microsoft.com/dotnet/orleans/implementation/cluster-management
+        https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs
 */
 
 
