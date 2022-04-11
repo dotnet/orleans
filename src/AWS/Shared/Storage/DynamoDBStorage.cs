@@ -38,6 +38,8 @@ namespace Orleans.Transactions.DynamoDB
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
         private readonly ProvisionedThroughput provisionedThroughput;
+        private readonly bool createIfNotExists;
+        private readonly bool updateIfExists;
         private readonly bool useProvisionedThroughput;
         private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
             {
@@ -56,6 +58,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
         /// <param name="useProvisionedThroughput"></param>
+        /// <param name="createIfNotExists"></param>
+        /// <param name="updateIfExists"></param>
         public DynamoDBStorage(
             ILogger logger,
             string service,
@@ -63,7 +67,9 @@ namespace Orleans.Transactions.DynamoDB
             string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits,
-            bool useProvisionedThroughput = true)
+            bool useProvisionedThroughput = true,
+            bool createIfNotExists = true,
+            bool updateIfExists = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
@@ -73,6 +79,8 @@ namespace Orleans.Transactions.DynamoDB
             this.provisionedThroughput = this.useProvisionedThroughput
                 ? new ProvisionedThroughput(readCapacityUnits, writeCapacityUnits)
                 : null;
+            this.createIfNotExists = createIfNotExists;
+            this.updateIfExists = updateIfExists;
             Logger = logger;
             CreateClient();
         }
@@ -88,6 +96,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
+            if (!this.createIfNotExists && !this.updateIfExists)
+            {
+                Logger.Info(ErrorCode.StorageProviderBase, $"The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{tableName}' will not be created or updated.");
+                return;
+            }
+
             try
             {
                 TableDescription tableDescription = await GetTableDescription(tableName);
@@ -139,8 +153,14 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
+            if (!createIfNotExists)
+            {
+                Logger.Warn(ErrorCode.StorageProviderBase, $"The config value 'createIfNotExists' is false. The table '{tableName}' does not exist and it will not get created.");
+                return;
+            }
+
             var request = new CreateTableRequest
             {
                 TableName = tableName,
@@ -176,8 +196,14 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async Task UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
+            if (!this.updateIfExists)
+            {
+                Logger.Warn(ErrorCode.StorageProviderBase, $"The config value 'updateIfExists' is false. The table structure for table '{tableDescription.TableName}' will not be updated.");
+                return;
+            }
+
             if (!updateTableValidTableStatuses.Contains(tableDescription.TableStatus))
             {
                 throw new InvalidOperationException($"Table {tableDescription.TableName} has a status of {tableDescription.TableStatus} and can't be updated automatically.");
