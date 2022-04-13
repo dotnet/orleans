@@ -45,6 +45,7 @@ namespace Orleans.CodeGenerator
                     GenerateGetArgumentCount(libraryTypes, method),
                     GenerateGetMethodName(libraryTypes, method),
                     GenerateGetInterfaceName(libraryTypes, method),
+                    GenerateGetActivityName(libraryTypes, method),
                     GenerateGetInterfaceType(libraryTypes, method),
                     GenerateGetInterfaceTypeArguments(libraryTypes, method),
                     GenerateGetMethodTypeArguments(libraryTypes, method),
@@ -409,6 +410,28 @@ namespace Orleans.CodeGenerator
                             Literal(methodDescription.Method.Parameters.Length))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+        private static MemberDeclarationSyntax GenerateGetActivityName(
+            LibraryTypes libraryTypes,
+            MethodDescription methodDescription)
+        {
+            // This property is intended to contain a value suitable for use as an OpenTelemetry Span Name for RPC calls.
+            // Therefore, the interface name and method name components must not include periods or slashes.
+            // In order to avoid that, we omit the namespace from the interface name.
+            // See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
+
+            var interfaceName = methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false, includeNamespace: false);
+            var methodName = methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var activityName = $"{interfaceName}/{methodName}";
+            return PropertyDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "ActivityName")
+                .WithExpressionBody(
+                    ArrowExpressionClause(
+                        LiteralExpression(
+                            SyntaxKind.NumericLiteralExpression,
+                            Literal(activityName))))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+        }
 
         private static MemberDeclarationSyntax GenerateGetMethodName(
             LibraryTypes libraryTypes,

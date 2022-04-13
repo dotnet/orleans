@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization.Invocation;

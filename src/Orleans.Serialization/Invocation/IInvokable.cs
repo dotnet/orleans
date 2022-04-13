@@ -61,6 +61,11 @@ namespace Orleans.Serialization.Invocation
         string InterfaceName { get; }
 
         /// <summary>
+        /// Gets the activity name, which refers to both the interface name and method name.
+        /// </summary>
+        string ActivityName { get; }
+
+        /// <summary>
         /// Gets the method info object, which may be <see langword="null"/>.
         /// </summary>
         MethodInfo Method { get; }

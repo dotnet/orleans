@@ -14,24 +14,26 @@ using Xunit;
 
 namespace UnitTests.General
 {
-    public class DiagnosticTests : OrleansTestingBase, IClassFixture<DiagnosticTests.Fixture>
+    public class ActivityPropagationTests : OrleansTestingBase, IClassFixture<ActivityPropagationTests.Fixture>
     {
-        private static readonly ActivityListener activityListener;
+        private static readonly ActivityListener Listener;
 
-        static DiagnosticTests()
+        static ActivityPropagationTests()
         {
-            activityListener = new()
+            Listener = new()
             {
                 ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ActivitySourceName,
                 Sample = Sample,
                 SampleUsingParentId = SampleUsingParentId,
             };
+
             static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options)
             {
                 //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
                 var _ = options.TraceId; 
                 return ActivitySamplingResult.PropagationData;
             };
+
             static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options)
             {
                 //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
@@ -39,6 +41,7 @@ namespace UnitTests.General
                 return ActivitySamplingResult.PropagationData;
             };
         }
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -70,16 +73,17 @@ namespace UnitTests.General
         private readonly ActivityIdFormat defaultIdFormat;
         private readonly Fixture fixture;
 
-        public DiagnosticTests(Fixture fixture)
+        public ActivityPropagationTests(Fixture fixture)
         {
             defaultIdFormat = Activity.DefaultIdFormat;
             this.fixture = fixture;
-            ActivitySource.AddActivityListener(activityListener);
+            ActivitySource.AddActivityListener(Listener);
         }
 
         [Theory]
         [InlineData(ActivityIdFormat.W3C)]
         [InlineData(ActivityIdFormat.Hierarchical)]
+        [TestCategory("BVT")]
         public async Task WithoutParentActivity(ActivityIdFormat idFormat)
         {
             Activity.DefaultIdFormat = idFormat;
@@ -100,6 +104,7 @@ namespace UnitTests.General
         }
 
         [Fact]
+        [TestCategory("BVT")]
         public async Task WithParentActivity_W3C()
         {
             Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -134,6 +139,7 @@ namespace UnitTests.General
         }
 
         [Fact]
+        [TestCategory("BVT")]
         public async Task WithParentActivity_Hierarchical()
         {
             Activity.DefaultIdFormat = ActivityIdFormat.Hierarchical;
@@ -164,6 +170,5 @@ namespace UnitTests.General
                 Assert.Equal(activity.Baggage, result.Baggage);
             }
         }
-
     }
 }
