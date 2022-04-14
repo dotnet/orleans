@@ -57,7 +57,8 @@ namespace Orleans.Reminders.DynamoDB
         public Task Init()
         {
             this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits, this.options.UseProvisionedThroughput,
+                 this.options.CreateIfNotExists, this.options.UpdateIfExists);
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 

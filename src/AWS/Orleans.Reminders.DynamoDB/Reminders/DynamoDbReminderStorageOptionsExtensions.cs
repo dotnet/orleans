@@ -13,6 +13,9 @@ namespace Orleans.Configuration
         private const string ServicePropertyName = "Service";
         private const string ReadCapacityUnitsPropertyName = "ReadCapacityUnits";
         private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
+        private const string UseProvisionedThroughputPropertyName = "UseProvisionedThroughput";
+        private const string CreateIfNotExistsPropertyName = "CreateIfNotExists";
+        private const string UpdateIfExistsPropertyName = "UpdateIfExists";
 
         /// <summary>
         /// Configures this instance using the provided connection string.
@@ -59,6 +62,30 @@ namespace Orleans.Configuration
                 var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.WriteCapacityUnits = int.Parse(value[1]);
+            }
+
+            var useProvisionedThroughputConfig = parameters.Where(p => p.Contains(UseProvisionedThroughputPropertyName)).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(useProvisionedThroughputConfig))
+            {
+                var value = useProvisionedThroughputConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.UseProvisionedThroughput = bool.Parse(value[1]);
+            }
+
+            var createIfNotExistsPropertyNameConfig = parameters.Where(p => p.Contains(CreateIfNotExistsPropertyName)).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(createIfNotExistsPropertyNameConfig))
+            {
+                var value = createIfNotExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.CreateIfNotExists = bool.Parse(value[1]);
+            }
+
+            var updateIfExistsPropertyNameConfig = parameters.Where(p => p.Contains(UpdateIfExistsPropertyName)).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(updateIfExistsPropertyNameConfig))
+            {
+                var value = updateIfExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.UpdateIfExists = bool.Parse(value[1]);
             }
         }
     }
