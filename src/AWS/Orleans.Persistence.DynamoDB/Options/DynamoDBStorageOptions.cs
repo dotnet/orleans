@@ -18,6 +18,16 @@ namespace Orleans.Configuration
         public bool UseProvisionedThroughput { get; set; } = true;
 
         /// <summary>
+        /// Create the table if it doesn't exist
+        /// </summary>
+        public bool CreateIfNotExists { get; set; } = true;
+
+        /// <summary>
+        /// Update the table if it exists
+        /// </summary>
+        public bool UpdateIfExists { get; set; } = true;
+
+        /// <summary>
         /// Read capacity unit for DynamoDB storage
         /// </summary>
         public int ReadCapacityUnits { get; set; } = DynamoDBStorage.DefaultReadCapacityUnits;
