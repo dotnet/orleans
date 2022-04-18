@@ -1,0 +1,56 @@
+﻿<div class="card h-100">
+    <img src=@CartItem.Product.ImageUrl class="card-img-top" alt=@CartItem.Product.Name>
+    <div class="card-body">
+        <h5 class="card-title">@CartItem.Product.Name</h5>
+        <p class="card-text">@CartItem.Product.Description</p>
+        <p class="card-text">
+            <p class="text-muted">@CartItem.TotalPrice.ToString("C2")</p>
+        </p>
+    </div>
+    <div class="card-footer">
+        <div class="row text-center">
+            <div class="col">
+                <button type="button" class="btn btn-danger"
+                        @onclick=OnRemoveAsync
+                        title="Remove @(CartItem.Product.Name) from cart">
+                    <span class="oi oi-trash"></span>
+                </button>
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" 
+                    @bind="_desiredQuantity" min="1" max="@CartItem.Product.Quantity" />                            
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-primary"
+                        @onclick=OnUpdateAsync disabled=@(_desiredQuantity == CartItem.Quantity)
+                        title="Update @(CartItem.Product.Name) quantity in cart">
+                    <span class="oi oi-circle-check"></span>
+                </button>    
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    int _desiredQuantity;
+
+    [Parameter, EditorRequired]
+    public CartItem CartItem { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProductDetails> OnRemoved { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<(int Quantity, ProductDetails Product)> OnUpdated { get; set; }
+
+    protected override void OnParametersSet() => _desiredQuantity = CartItem.Quantity;
+
+    Task OnRemoveAsync() => TryInvokeDelegate(OnRemoved, CartItem.Product);
+
+    Task OnUpdateAsync() => TryInvokeDelegate(OnUpdated, (_desiredQuantity, CartItem.Product));
+
+    Task TryInvokeDelegate<TArg>(EventCallback<TArg> callback, TArg args) =>
+        callback.HasDelegate
+            ? callback.InvokeAsync(args)
+            : Task.CompletedTask;
+}

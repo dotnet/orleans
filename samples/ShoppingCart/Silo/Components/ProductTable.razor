@@ -1,0 +1,185 @@
+@using Blazor.Serialization.Extensions
+
+<div class="table sticky-top position-relative top-0">
+    <table class="table table-hover table-sm table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col"></th>
+                <th scope="col"
+                    @onclick=@(async _ => await ToggleSortingAsync("Name"))
+                    title=@GetTitle("Name")>
+                    Name
+                    <span class="oi ps-1 @GetSortClass("Name")"></span>
+                </th>
+                <th scope="col"
+                    @onclick=@(async _ => await ToggleSortingAsync("Description"))
+                    title=@GetTitle("Description")>
+                    Description
+                    <span class="oi ps-1 @GetSortClass("Description")"></span>
+                </th>
+                <th scope="col" class="text-end pe-5"
+                    @onclick=@(async _ => await ToggleSortingAsync("Quantity"))
+                    title=@GetTitle("Quantity")>
+                    Inventory Quantity
+                    <span class="oi ps-1 @GetSortClass("Quantity")"></span>
+                </th>
+                <th scope="col" class="text-end pe-5"
+                    @onclick=@(async _ => await ToggleSortingAsync("Price"))
+                    title=@GetTitle("Price")>
+                    Price
+                    <span class="oi ps-1 @GetSortClass("Price")"></span>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in _sortedProducts)
+            {
+                <tr>
+                    <th scope="row">
+                        <button class="btn btn-sm btn-secondary" title="Edit @(product.Name)?"
+                            @onclick=@(async _ => await OnEditAsync(product))>
+                            <span class="oi oi-pencil"></span>
+                        </button>
+                    </th>
+                    <td>@product.Name</td>
+                    <td>@product.Description</td>
+                    <td class="text-end pe-5">@product.Quantity.ToString("N0")</td>
+                    <td class="text-end pe-5">@product.UnitPrice.ToString("C2")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    const string Key = "product-table-sorting";
+
+    Dictionary<string, TriStateToggle>? _columnSorting;
+
+    IEnumerable<ProductDetails> _sortedProducts
+    {
+        get
+        {
+            IOrderedEnumerable<ProductDetails> products = (Products ?? new()).OrderBy(p => p.Id);
+            if (_columnSorting is not null)
+            {
+                static object KeySelector(string column, ProductDetails product) => column switch
+                {
+                    "Name" => product.Name,
+                    "Description" => product.Description,
+                    "Quantity" => product.Quantity,
+                    "Price" => product.UnitPrice,
+
+                    _ => throw new ArgumentOutOfRangeException(nameof(column))
+                };
+
+                var useThen = false;
+                foreach (var (column, toggle) in _columnSorting)
+                {
+                    if (toggle.Sort is SortBy.None)
+                    {
+                        continue;
+                    }
+
+                    if (useThen)
+                    {
+                        products = toggle.Sort is SortBy.Ascending
+                            ? products.ThenBy(product => KeySelector(column, product))
+                            : products.ThenByDescending(product => KeySelector(column, product));
+                    }
+                    else
+                    {
+                        products = toggle.Sort is SortBy.Ascending
+                            ? products.OrderBy(product => KeySelector(column, product))
+                            : products.OrderByDescending(product => KeySelector(column, product));
+                    }
+
+
+                    useThen = true;
+                }
+            }
+
+            return products;
+        }
+    }
+
+    [Inject]
+    public ISessionStorageService SessionStorage { get; set; } = null!;
+
+    [Parameter]
+    public HashSet<ProductDetails> Products { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProductDetails> OnEditProduct { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var sortingJson = await SessionStorage.GetItemAsync(Key);
+            _columnSorting = sortingJson is { Length: > 0 }
+                ? sortingJson.FromJson<Dictionary<string, TriStateToggle>>()
+                : new()
+                    {
+                        ["Name"] = new("Name", SortBy.None),
+                        ["Description"] = new("Description", SortBy.None),
+                        ["Quantity"] = new("Quantity", SortBy.None),
+                        ["Price"] = new("Price", SortBy.None),
+                    };
+            StateHasChanged();
+        }
+    }
+
+    async Task ToggleSortingAsync(string column)
+    {
+        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
+        {
+            var sort = toggle.Sort;
+            sort = Enum.IsDefined(typeof(SortBy), sort + 1) ? sort + 1 : default;
+            _columnSorting[column] = toggle with { Sort = sort };
+        }
+
+        if (_columnSorting?.ToJson() is { Length: > 0 } sortingJson)
+        {
+            await SessionStorage.SetItemAsync(Key, sortingJson);
+        }
+    }
+
+    string GetTitle(string column)
+    {
+        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
+        {
+            return toggle.Sort switch
+            {
+                SortBy.Ascending => $"Sort ascending by '{column}', click to sort by descending instead.",
+                SortBy.Descending => $"Sort descending by '{column}', click to sort not sort this column.",
+                _ => $"The '{column}' is not sorted, click to sort by ascending instead."
+            };
+        }
+
+        return "";
+    }
+
+    string GetSortClass(string column)
+    {
+        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
+        {
+            return toggle.Sort switch
+            {
+                SortBy.Ascending => "oi-sort-ascending",
+                SortBy.Descending => "oi-sort-descending",
+                _ => "oi-menu"
+            };
+        }
+
+        return "";
+    }
+
+    Task OnEditAsync(ProductDetails product) =>
+        OnEditProduct.HasDelegate
+            ? OnEditProduct.InvokeAsync(product)
+            : Task.CompletedTask;
+
+    public readonly record struct TriStateToggle(string Column, SortBy Sort);
+    public enum SortBy { None, Ascending, Descending };
+}

@@ -1,0 +1,47 @@
+﻿<div class="table-responsive">
+    <table class="table table-hover table-sm table-striped">
+      <thead class="table-dark">
+        <tr>
+          <th scope="col"></th>
+          <th scope="col">Name</th>
+          <th scope="col">Description</th>
+          <th scope="col" class="text-end pe-5">Available Quantity</th>
+          <th scope="col" class="text-end pe-5">Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var product in Products ?? new())
+        {
+            <tr>
+                <th scope="row">
+                   <button class="btn btn-sm btn-success" title="Add a @(product.Name) to your cart?"
+                        disabled=@(IsInCart?.Invoke(product) ?? false)
+                        @onclick=@(async _ => await AddToCartAsync(product.Id))>
+                        <span class="oi oi-plus"></span>
+                    </button>
+                </th>
+                <td>@product.Name</td>
+                <td>@product.Description</td>
+                <td class="text-end pe-5">@product.Quantity.ToString("N0")</td>
+                <td class="text-end pe-5">@product.UnitPrice.ToString("C2")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public HashSet<ProductDetails> Products { get; set; } = null!;
+    
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnAddedToCart { get; set; }
+
+    [Parameter, EditorRequired]
+    public Func<ProductDetails, bool> IsInCart { get; set; } = null!;
+
+    Task AddToCartAsync(string productId) =>
+        OnAddedToCart.HasDelegate
+            ? OnAddedToCart.InvokeAsync(productId)
+            : Task.CompletedTask;
+}

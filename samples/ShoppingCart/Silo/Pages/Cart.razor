@@ -1,0 +1,24 @@
+﻿@page "/cart"
+
+<h3>Shopping Cart</h3>
+
+<div class="pb-3">
+    <button type="button" @onclick=@EmptyCartAsync
+        class="btn btn-primary btn-lg">
+        Empty Cart?
+    </button>
+</div>
+
+<div class="row row-cols-4 row-cols-md-5 g-4">
+    <div class="col">
+        <ShoppingCartSummary Items=_cartItems />
+    </div>
+    @foreach (var item in _cartItems ?? new HashSet<CartItem>())
+    {
+    <div class="col">
+        <ShoppingCartItem CartItem=@item
+            OnRemoved=@OnItemRemovedAsync
+            OnUpdated=@OnItemUpdatedAsync />
+    </div>
+    }
+</div>

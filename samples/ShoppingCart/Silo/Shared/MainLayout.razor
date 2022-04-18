@@ -1,0 +1,66 @@
+﻿@inherits LayoutComponentBase
+
+<div class="sidebar">
+    <NavMenu />
+</div>
+
+<div class="main">
+    <div class="top-row px-4">
+        <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+        <div class="toast-container position-absolute p-3 top-0 end-0" style="z-index: 100">
+        @foreach (var toast in _toasts)
+        {
+             <div class="toast fade show text-white bg-success fs-6" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <strong class="me-auto">@toast.Title</strong>
+                    <button type="button" class="btn-close" 
+                        aria-label="Close" @onclick=@(_ => DismissToast(toast))></button>
+                </div>
+                <div class="toast-body text-dark bg-light">
+                    @toast.Message
+                </div>
+            </div>   
+        }
+        </div>
+    </div>
+
+    <div class="content px-4">
+        @Body
+    </div>
+</div>
+
+@code {
+    HashSet<ToastInfo> _toasts = new();
+
+    [Inject]
+    public ToastService ToastService { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastedRequested += OnToastRequested;
+
+        base.OnInitialized();
+    }
+
+    Task OnToastRequested((string Title, string Message) tuple) =>
+        InvokeAsync(() =>
+        {
+            var (title, message) = tuple;
+            var toast = new ToastInfo(title, message);
+            _toasts.Add(toast);
+
+            StateHasChanged();
+            
+            // Fire and forget, hide toast after 5 seconds.
+            _ = Task.Delay(TimeSpan.FromSeconds(5))
+                .ContinueWith(_ => InvokeAsync(() =>
+                {
+                    DismissToast(toast);
+                    StateHasChanged();
+                }));
+        });
+    
+    void DismissToast(ToastInfo toast) => _toasts.Remove(toast);
+    
+    readonly record struct ToastInfo(string Title, string Message);
+}

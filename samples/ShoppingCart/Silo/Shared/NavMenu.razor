@@ -1,0 +1,69 @@
+﻿@inject ShoppingCartService Cart
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <span class="ps-2">Orleans Shopping Cart</span>
+        </a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <!-- Details about how to use the various tabs -->
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="shop">
+                <!-- Inventory that is available for purchase -->
+                <span class="oi oi-credit-card" aria-hidden="true"></span> Shop Inventory
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="products">
+                <!-- Manage (and create) available products -->
+                <span class="oi oi-spreadsheet" aria-hidden="true"></span> Product Management
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="cart">
+                <!-- The shopping cart -->
+                <span class="oi oi-cart" aria-hidden="true"></span> <span class="pe-2">Cart</span>
+                <span class="badge rounded-pill bg-info">
+                    @_count
+                    <span class="visually-hidden">The number of items in your cart</span>
+                </span>
+            </NavLink>
+        </li>
+    </ul>
+</div>
+
+@code {
+    int _count = 0;
+    bool _collapseNavMenu = true;
+    string? NavMenuCssClass => _collapseNavMenu ? "collapse" : null;
+    void ToggleNavMenu() => _collapseNavMenu = !_collapseNavMenu;
+
+    [Inject]
+    public ComponentStateChangedObserver Observer { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Observer.OnStateChanged += UpdateCountAsync;
+
+        await UpdateCountAsync();
+    }
+
+    Task UpdateCountAsync() =>
+        InvokeAsync(async () =>
+        {
+            _count = await Cart.GetCartCountAsync();
+            StateHasChanged();
+        });
+}
