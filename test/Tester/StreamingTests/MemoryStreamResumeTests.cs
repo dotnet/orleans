@@ -1,23 +1,15 @@
 using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.TestingHost;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
-    [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingCacheMiss")]
-    public class MemoryStreamCacheMissTests : StreamingCacheMissTests
+    [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingResume")]
+    public class MemoryStreamResumeTests : StreamingResumeTests
     {
-        public MemoryStreamCacheMissTests(ITestOutputHelper output)
-            : base(output)
-        {
-        }
-
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -25,7 +17,6 @@ namespace Tester.StreamingTests
         }
 
         #region Configuration stuff
-
         private class MySiloBuilderConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
@@ -35,13 +26,11 @@ namespace Tester.StreamingTests
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b =>
                     {
-                        b.ConfigureCacheEviction(ob => ob.Configure(options =>
+                        b.ConfigurePullingAgent(ob => ob.Configure(options =>
                         {
-                            options.DataMaxAgeInCache = TimeSpan.FromSeconds(5);
-                            options.DataMinTimeInCache = TimeSpan.FromSeconds(0);
+                            options.StreamInactivityPeriod = StreamInactivityPeriod;
                         }));
-                    })
-                    .AddStreamFilter<CustomStreamFilter>(StreamProviderName);
+                    });
             }
         }
 
@@ -55,7 +44,5 @@ namespace Tester.StreamingTests
         }
 
         #endregion
-
-
     }
 }
