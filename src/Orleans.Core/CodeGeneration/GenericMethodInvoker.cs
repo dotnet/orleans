@@ -292,12 +292,9 @@ namespace Orleans.CodeGeneration
                     // Check that all constraints of the generic argument are satisfied by the provided type parameter
                     foreach (var constrain in genericArg.GetGenericParameterConstraints())
                     {
-                        var constraint = constrain.IsGenericParameter switch
-                        {
-                            true => typeGenericArgs[constrain.GenericParameterPosition],
-                            false => constrain,
-                        };
-
+                        var constraint = constrain.IsGenericParameter
+                            ? typeGenericArgs[constrain.GenericParameterPosition]
+                            : constrain;
                         if (!constraint.IsAssignableFrom(typeParameter))
                         {
                             constraintViolated = true;
