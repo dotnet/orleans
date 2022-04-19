@@ -259,6 +259,7 @@ namespace Orleans.CodeGeneration
         {
             MethodInfo methodInfo = null;
 
+            var typeGenericArgs = declaringType.GetGenericArguments();
             var typeParameterCountLocal = typeParameters.Length;
 
             bool skipMethod = false;
@@ -291,7 +292,13 @@ namespace Orleans.CodeGeneration
                     // Check that all constraints of the generic argument are satisfied by the provided type parameter
                     foreach (var constrain in genericArg.GetGenericParameterConstraints())
                     {
-                        if (!constrain.IsAssignableFrom(typeParameter))
+                        var constraint = constrain.IsGenericParameter switch
+                        {
+                            true => typeGenericArgs[constrain.GenericParameterPosition],
+                            false => constrain,
+                        };
+
+                        if (!constraint.IsAssignableFrom(typeParameter))
                         {
                             constraintViolated = true;
                             break;
