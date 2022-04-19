@@ -66,6 +66,16 @@ namespace CodeGenerator.Tests
         public Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar, ICommodity => Task.FromResult(2);
     }
 
+    public interface IDummyGrain<T1> : IGrainWithGuidKey
+    {
+        Task Method<T2>(T2 x) where T2 : T1;
+    }
+
+    public class BarGrain : IDummyGrain<IAnimal>
+    {
+        public Task Method<T2>(T2 x) where T2 : IAnimal => Task.CompletedTask;
+    }
+
     public class GenericMethodInvokerTests
     {
         [Fact]
@@ -117,6 +127,16 @@ namespace CodeGenerator.Tests
             await Assert.ThrowsAsync<ArgumentException>(async () =>
                 await invoker.Invoke(mock,
                     new object[] { typeof(Cat), typeof(string), "c" }));
+        }
+
+        [Fact]
+        public async Task Constraint_From_TypeParameter()
+        {
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain<IAnimal>), nameof(IDummyGrain<IAnimal>.Method), 1);
+            var mock = new BarGrain();
+
+            // Act<Cat>(new Cat())
+            await invoker.Invoke(mock, new object[] { typeof(Cat), typeof(Cat), new Cat() });
         }
 
         [Fact]
