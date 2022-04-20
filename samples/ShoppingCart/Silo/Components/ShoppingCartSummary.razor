@@ -22,14 +22,14 @@
                     <MudText Typo=Typo.caption>
                         @(item.Quantity)x @(item.Product.Name)
                     </MudText>
-                    <MudText Typo=Typo.body1 Align="Align.End">
+                    <MudText Typo=Typo.body2 Align="Align.End">
                         @item.TotalPrice.ToString("C2")
                     </MudText>
                 </MudListItem>
             }
             <MudDivider Light=true />
             <MudListItem Class="d-flex">
-                <MudText Typo=Typo.caption>Pretax Total:</MudText>
+                <MudText Typo=Typo.body1>Pretax Total:</MudText>
                 <MudText Typo=Typo.body1 Align="Align.End">@_totalCost</MudText>
             </MudListItem>
         }

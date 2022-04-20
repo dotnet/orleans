@@ -3,9 +3,6 @@
         <CardHeaderContent>
             <MudText Typo="Typo.h6">@CartItem.Product.Name</MudText>
         </CardHeaderContent>
-        <CardHeaderActions>
-            @CartItem.TotalPrice.ToString("C2")
-        </CardHeaderActions>
     </MudCardHeader>
     <MudCardMedia Image="@CartItem.Product.ImageUrl" Height="180" />
     <MudCardContent>
@@ -19,6 +16,10 @@
         <MudFab Icon="@Icons.Filled.Save" Color="Color.Primary"
             Disabled=@(_desiredQuantity == CartItem.Quantity)
             OnClick=OnUpdateAsync Size=Size.Small />
+        <MudText Typo="Typo.body1" Class="flex-1 align-self-end"
+            Align=Align.Right>
+            @CartItem.TotalPrice.ToString("C2")
+        </MudText>
     </MudCardActions>
 </MudCard>
 
