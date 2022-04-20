@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32228.430
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ShoppingCart.Silo", "Silo\Orleans.ShoppingCart.Silo.csproj", "{89101AD5-B75F-43B8-A9B0-604859AECFF0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ShoppingCart.Abstractions", "Abstractions\Orleans.ShoppingCart.Abstractions.csproj", "{86BCD0BF-64CE-4C1E-9F5A-3A16DAFA68D3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ShoppingCart.Grains", "Grains\Orleans.ShoppingCart.Grains.csproj", "{1424AF70-CB15-41A7-8F6B-A889B22D394A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{11BA234D-2EF9-4DA5-89CA-7FAF07ED27B7}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{89101AD5-B75F-43B8-A9B0-604859AECFF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89101AD5-B75F-43B8-A9B0-604859AECFF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89101AD5-B75F-43B8-A9B0-604859AECFF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89101AD5-B75F-43B8-A9B0-604859AECFF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86BCD0BF-64CE-4C1E-9F5A-3A16DAFA68D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86BCD0BF-64CE-4C1E-9F5A-3A16DAFA68D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86BCD0BF-64CE-4C1E-9F5A-3A16DAFA68D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86BCD0BF-64CE-4C1E-9F5A-3A16DAFA68D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1424AF70-CB15-41A7-8F6B-A889B22D394A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1424AF70-CB15-41A7-8F6B-A889B22D394A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1424AF70-CB15-41A7-8F6B-A889B22D394A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1424AF70-CB15-41A7-8F6B-A889B22D394A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E2B4C02A-4CF8-4599-8BBD-71338EEF9A1F}
+	EndGlobalSection
+EndGlobal

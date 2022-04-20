@@ -1,0 +1,13 @@
+﻿@page "/products/{id?}"
+
+<h3>Product Management</h3>
+
+<div class="pb-3">
+    <button type="button" @onclick=@CreateNewProduct
+        class="btn btn-primary btn-lg">
+        Create New Product?
+    </button>
+</div>
+
+<ProductTable Products=@_products OnEditProduct=@OnEditProduct />
+<ManageProductModal @ref=_modal OnProductUpdated=@OnProductUpdated />

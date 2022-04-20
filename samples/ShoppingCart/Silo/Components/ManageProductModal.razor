@@ -1,0 +1,86 @@
+<div id="new-product-modal" class="modal fade @_modalClass" role="dialog"
+     tabindex="-1" style="display:@_modalDisplay">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Product</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick=@Close></button>
+            </div>
+            <EditForm Model=@Product OnValidSubmit=@OnValidSubmitAsync>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <InputText id="name" class="form-control" @bind-Value="Product.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <InputTextArea id="description" class="form-control" @bind-Value="Product.Description" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <InputSelect id="category" class="form-control" @bind-Value="Product.Category">
+                            @foreach (var category in Enum.GetValues<ProductCategory>())
+                            {
+                                <option value=@category>@Enum.GetName(category)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <InputNumber id="quantity" class="form-control" @bind-Value="Product.Quantity" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Unit Price</label>
+                        <InputNumber id="price" class="form-control" @bind-Value="Product.UnitPrice" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick=@Close>Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@if (_showBackdrop)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    string _modalDisplay = "none";
+    string _modalClass = "";
+    bool _showBackdrop;
+
+    public ProductDetails Product { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProductDetails> OnProductUpdated { get; set; }
+
+    public void Open()
+    {
+        _modalDisplay = "block";
+        _modalClass = "show";
+        _showBackdrop = true;
+
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _modalDisplay = "none";
+        _modalClass = "";
+        _showBackdrop = false;
+
+        StateHasChanged();
+    }
+
+    async Task OnValidSubmitAsync()
+    {
+        if (Product is not null && OnProductUpdated.HasDelegate)
+        {
+            await OnProductUpdated.InvokeAsync(Product);
+        }
+    }
+}

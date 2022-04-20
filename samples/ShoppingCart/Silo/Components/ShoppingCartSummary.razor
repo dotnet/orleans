@@ -1,0 +1,39 @@
+﻿<div class="card h-100">
+    <div class="card-header">
+        <h5 class="card-title">Cart Summary</h5>
+    </div>
+    <div class="card-body">
+    <ul class="list-group list-group-flush">
+        @if (Items is null or { Count: 0 })
+        {
+            <li class="list-group-item">Your cart is empty... ☹️</li>
+        }
+        else foreach (var item in Items)
+        {
+           <li class="list-group-item">
+               <div class="row">
+                   <div class="col-8 text-truncate" title="@(item.Quantity)x @(item.Product.Name)">
+                       @(item.Quantity)x @(item.Product.Name)
+                   </div>
+                   <div class="col-4 text-end">
+                       @item.TotalPrice.ToString("C2")
+                   </div>
+               </div>
+           </li> 
+        }
+    </ul>
+    </div>
+    <div class="card-footer">
+        <p class="row">
+            <span class="col">Pretax Total:</span>
+            <span class="col text-end">@_totalCost</span>
+        </p>
+    </div>
+</div>
+
+@code {
+    string _totalCost => Items?.Sum(x => x.TotalPrice).ToString("C2") ?? "$0.00";
+
+    [Parameter, EditorRequired]
+    public HashSet<CartItem>? Items { get; set; }
+}
