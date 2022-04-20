@@ -1,36 +1,38 @@
-﻿<div class="table-responsive">
-    <table class="table table-hover table-sm table-striped">
-      <thead class="table-dark">
-        <tr>
-          <th scope="col"></th>
-          <th scope="col">Name</th>
-          <th scope="col">Description</th>
-          <th scope="col" class="text-end pe-5">Available Quantity</th>
-          <th scope="col" class="text-end pe-5">Price</th>
-        </tr>
-      </thead>
-      <tbody>
-        @foreach (var product in Products ?? new())
-        {
-            <tr>
-                <th scope="row">
-                   <button class="btn btn-sm btn-success" title="Add a @(product.Name) to your cart?"
-                        disabled=@(IsInCart?.Invoke(product) ?? false)
-                        @onclick=@(async _ => await AddToCartAsync(product.Id))>
-                        <span class="oi oi-plus"></span>
-                    </button>
-                </th>
-                <td>@product.Name</td>
-                <td>@product.Description</td>
-                <td class="text-end pe-5">@product.Quantity.ToString("N0")</td>
-                <td class="text-end pe-5">@product.UnitPrice.ToString("C2")</td>
-            </tr>
-        }
-        </tbody>
-    </table>
-</div>
+<MudTable Items=@Products Hover="true" Breakpoint="Breakpoint.Sm" AllowUnsorted=true
+    Context="product" Dense=true FixedHeader=true RowsPerPage=10>
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Products</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_filter" Placeholder="Search products" Adornment="Adornment.Start"
+            AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0">
+        </MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh></MudTh>
+        <MudTh>Name</MudTh>
+        <MudTh>Description</MudTh>
+        <MudTh>Quantity</MudTh>
+        <MudTh>Price</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <MudFab Disabled=@(IsInCart?.Invoke(product) ?? false) Size=Size.Small
+                Color=Color.Primary Icon=@Icons.Filled.AddShoppingCart
+                OnClick=@(async _ => await AddToCartAsync(product.Id))/>
+        </MudTd>
+        <MudTd DataLabel="Name">@product.Name</MudTd>
+        <MudTd DataLabel="Description">@product.Description</MudTd>
+        <MudTd DataLabel="Quantity">@product.Quantity.ToString("N0")</MudTd>
+        <MudTd DataLabel="Price">@product.UnitPrice.ToString("C2")</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
 
 @code {
+    string? _filter;
+
     [Parameter]
     public HashSet<ProductDetails> Products { get; set; } = null!;
     

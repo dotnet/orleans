@@ -1,35 +1,41 @@
-﻿<div class="card h-100">
-    <div class="card-header">
-        <h5 class="card-title">Cart Summary</h5>
-    </div>
-    <div class="card-body">
-    <ul class="list-group list-group-flush">
+<MudCard Class="mud-height-full">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Cart Summary</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudIconButton Icon="@Icons.Filled.AttachMoney" Color="Color.Default" />
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudList Dense=true>
         @if (Items is null or { Count: 0 })
         {
-            <li class="list-group-item">Your cart is empty... ☹️</li>
+            <MudListItem Text="Your cart is empty... ☹️" />
         }
-        else foreach (var item in Items)
+        else
         {
-           <li class="list-group-item">
-               <div class="row">
-                   <div class="col-8 text-truncate" title="@(item.Quantity)x @(item.Product.Name)">
-                       @(item.Quantity)x @(item.Product.Name)
-                   </div>
-                   <div class="col-4 text-end">
-                       @item.TotalPrice.ToString("C2")
-                   </div>
-               </div>
-           </li> 
+            foreach (var item in Items)
+            {
+                <MudDivider Light=false />
+                <MudListItem Class="d-flex">
+                    <MudText Typo=Typo.caption>
+                        @(item.Quantity)x @(item.Product.Name)
+                    </MudText>
+                    <MudText Typo=Typo.body1 Align="Align.End">
+                        @item.TotalPrice.ToString("C2")
+                    </MudText>
+                </MudListItem>
+            }
+            <MudDivider Light=true />
+            <MudListItem Class="d-flex">
+                <MudText Typo=Typo.caption>Pretax Total:</MudText>
+                <MudText Typo=Typo.body1 Align="Align.End">@_totalCost</MudText>
+            </MudListItem>
         }
-    </ul>
-    </div>
-    <div class="card-footer">
-        <p class="row">
-            <span class="col">Pretax Total:</span>
-            <span class="col text-end">@_totalCost</span>
-        </p>
-    </div>
-</div>
+        </MudList>
+    </MudCardContent>
+</MudCard>
 
 @code {
     string _totalCost => Items?.Sum(x => x.TotalPrice).ToString("C2") ?? "$0.00";

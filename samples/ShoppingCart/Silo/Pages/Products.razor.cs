@@ -1,11 +1,11 @@
-﻿using Orleans.ShoppingCart.Silo.Components;
+using Orleans.ShoppingCart.Silo.Components;
 
 namespace Orleans.ShoppingCart.Silo.Pages;
 
 public sealed partial class Products
 {
-    HashSet<ProductDetails>? _products;
-    ManageProductModal? _modal;
+    private HashSet<ProductDetails>? _products;
+    private ManageProductModal? _modal;
 
     [Parameter]
     public string? Id { get; set; }
@@ -16,10 +16,13 @@ public sealed partial class Products
     [Inject]
     public ProductService ProductService { get; set; } = null!;
 
+    [Inject]
+    public IDialogService DialogService  { get; set; } = null!;
+
     protected override async Task OnInitializedAsync() =>
         _products = await InventoryService.GetAllProductsAsync();
 
-    void CreateNewProduct()
+    private void CreateNewProduct()
     {
         if (_modal is not null)
         {
@@ -36,7 +39,7 @@ public sealed partial class Products
         }
     }
 
-    async Task OnProductUpdated(ProductDetails product)
+    private async Task OnProductUpdated(ProductDetails product)
     {
         await ProductService.CreateOrUpdateProductAsync(product);
         _products = await InventoryService.GetAllProductsAsync();
@@ -46,7 +49,7 @@ public sealed partial class Products
         StateHasChanged();
     }
 
-    Task OnEditProduct(ProductDetails product)
+    private Task OnEditProduct(ProductDetails product)
     {
         if (_modal is not null)
         {

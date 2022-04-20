@@ -1,13 +1,11 @@
-﻿@page "/products/{id?}"
+@page "/products/{id?}"
 
-<h3>Product Management</h3>
+<MudText Typo=Typo.h4 Class="pb-4">Product Management</MudText>
 
-<div class="pb-3">
-    <button type="button" @onclick=@CreateNewProduct
-        class="btn btn-primary btn-lg">
-        Create New Product?
-    </button>
-</div>
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+    Color="Color.Primary" Size="Size.Large" OnClick=@CreateNewProduct Class="mb-4">
+    Create New Product
+</MudButton>
 
 <ProductTable Products=@_products OnEditProduct=@OnEditProduct />
 <ManageProductModal @ref=_modal OnProductUpdated=@OnProductUpdated />

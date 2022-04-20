@@ -1,38 +1,30 @@
-﻿<div class="card h-100">
-    <img src=@CartItem.Product.ImageUrl class="card-img-top" alt=@CartItem.Product.Name>
-    <div class="card-body">
-        <h5 class="card-title">@CartItem.Product.Name</h5>
-        <p class="card-text">@CartItem.Product.Description</p>
-        <p class="card-text">
-            <p class="text-muted">@CartItem.TotalPrice.ToString("C2")</p>
-        </p>
-    </div>
-    <div class="card-footer">
-        <div class="row text-center">
-            <div class="col">
-                <button type="button" class="btn btn-danger"
-                        @onclick=OnRemoveAsync
-                        title="Remove @(CartItem.Product.Name) from cart">
-                    <span class="oi oi-trash"></span>
-                </button>
-            </div>
-            <div class="col">
-                <input type="number" class="form-control" 
-                    @bind="_desiredQuantity" min="1" max="@CartItem.Product.Quantity" />                            
-            </div>
-            <div class="col">
-                <button type="button" class="btn btn-primary"
-                        @onclick=OnUpdateAsync disabled=@(_desiredQuantity == CartItem.Quantity)
-                        title="Update @(CartItem.Product.Name) quantity in cart">
-                    <span class="oi oi-circle-check"></span>
-                </button>    
-            </div>
-        </div>
-    </div>
-</div>
+<MudCard Class="mud-height-full">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">@CartItem.Product.Name</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            @CartItem.TotalPrice.ToString("C2")
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardMedia Image="@CartItem.Product.ImageUrl" Height="180" />
+    <MudCardContent>
+        <MudText Typo="Typo.body1">@CartItem.Product.Description</MudText>
+        <MudNumericField Label="Desired quantity" Variant=Variant.Text
+            Min="1" Max="@CartItem.Product.Quantity" @bind-Value="_desiredQuantity" />
+    </MudCardContent>
+    <MudCardActions>
+        <MudFab Icon="@Icons.Filled.RemoveShoppingCart" Color="Color.Warning"
+            Title=@Title OnClick=OnRemoveAsync Size=Size.Small Class="ml-2 mr-4"/>
+        <MudFab Icon="@Icons.Filled.Save" Color="Color.Primary"
+            Disabled=@(_desiredQuantity == CartItem.Quantity)
+            OnClick=OnUpdateAsync Size=Size.Small />
+    </MudCardActions>
+</MudCard>
 
 @code {
     int _desiredQuantity;
+    string Title => $"Update {CartItem.Product.Name} quantity in cart";
 
     [Parameter, EditorRequired]
     public CartItem CartItem { get; set; } = null!;
