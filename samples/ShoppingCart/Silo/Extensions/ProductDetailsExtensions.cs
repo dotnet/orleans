@@ -1,4 +1,4 @@
-﻿namespace Orleans.ShoppingCart.Silo.Extensions;
+namespace Orleans.ShoppingCart.Silo.Extensions;
 
 internal static class ProductDetailsExtensions
 {
@@ -13,4 +13,20 @@ internal static class ProductDetailsExtensions
             .RuleFor(p => p.ImageUrl, (f, p) => f.Image.PicsumUrl())
             .RuleFor(p => p.Category, (f, p) => f.PickRandom<ProductCategory>())
             .RuleFor(p => p.DetailsUrl, (f, p) => f.Internet.Url());
+
+    internal static bool MatchesFilter(this ProductDetails product, string? filter)
+    {
+        if (filter is null or { Length: 0 })
+        {
+            return true;
+        }
+
+        if (product is not null)
+        {
+            return product.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || product.Description.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
 }

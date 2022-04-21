@@ -3,6 +3,7 @@
 <MudText Typo=Typo.h4 Class="pb-4">Shopping Cart</MudText>
 
 <MudButton Variant="Variant.Filled" StartIcon=@Icons.Filled.RemoveShoppingCart
+    Disabled=@(_cartItems?.Any() is false)
     Color="Color.Secondary" Size="Size.Large" OnClick=@EmptyCartAsync Class="mb-4">
     Empty Cart
 </MudButton>

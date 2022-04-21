@@ -2,7 +2,7 @@
 {
     public sealed class SeedProductStoreTask : IStartupTask
     {
-        readonly IGrainFactory _grainFactory;
+        private readonly IGrainFactory _grainFactory;
 
         public SeedProductStoreTask(IGrainFactory grainFactory) =>
             _grainFactory = grainFactory;

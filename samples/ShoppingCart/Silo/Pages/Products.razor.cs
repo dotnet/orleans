@@ -35,7 +35,7 @@ public sealed partial class Products
                 ImageUrl = fake.ImageUrl,
                 DetailsUrl = fake.DetailsUrl
             };
-            _modal.Open();
+            _modal.Open("Create Product");
         }
     }
 
@@ -49,14 +49,6 @@ public sealed partial class Products
         StateHasChanged();
     }
 
-    private Task OnEditProduct(ProductDetails product)
-    {
-        if (_modal is not null)
-        {
-            _modal.Product = product;
-            _modal.Open();
-        }
-
-        return Task.CompletedTask;
-    }
+    private Task OnEditProduct(ProductDetails product) =>
+        product is not null ? OnProductUpdated(product) : Task.CompletedTask;
 }

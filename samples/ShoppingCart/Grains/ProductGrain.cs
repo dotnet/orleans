@@ -2,7 +2,7 @@
 
 internal class ProductGrain : Grain, IProductGrain
 {
-    readonly IPersistentState<ProductDetails> _product;
+    private readonly IPersistentState<ProductDetails> _product;
 
     public ProductGrain(
         [PersistentState(

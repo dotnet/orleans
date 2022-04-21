@@ -1,10 +1,10 @@
-﻿namespace Orleans.ShoppingCart.Grains;
+namespace Orleans.ShoppingCart.Grains;
 
 [Reentrant]
 public sealed class InventoryGrain : Grain, IInventoryGrain
 {
-    readonly IPersistentState<HashSet<string>> _productIds;
-    readonly Dictionary<string, ProductDetails> _productCache = new();
+    private readonly IPersistentState<HashSet<string>> _productIds;
+    private readonly Dictionary<string, ProductDetails> _productCache = new();
 
     public InventoryGrain(
         [PersistentState(

@@ -11,7 +11,9 @@
         <MudList Dense=true>
         @if (Items is null or { Count: 0 })
         {
-            <MudListItem Text="Your cart is empty... ☹️" />
+            <MudListItem>
+                <MudText Typo=Typo.body1>Your cart is empty... ☹️</MudText>
+            </MudListItem>
         }
         else
         {

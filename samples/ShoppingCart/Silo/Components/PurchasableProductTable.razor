@@ -1,5 +1,5 @@
 <MudTable Items=@Products Hover="true" Breakpoint="Breakpoint.Sm" AllowUnsorted=true
-    Context="product" Dense=true FixedHeader=true RowsPerPage=10>
+    Context="product" Dense=true FixedHeader=true RowsPerPage=10 Filter=OnFilter SortLabel="Sort By">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Products</MudText>
         <MudSpacer />
@@ -9,10 +9,26 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh></MudTh>
-        <MudTh>Name</MudTh>
-        <MudTh>Description</MudTh>
-        <MudTh>Quantity</MudTh>
-        <MudTh>Price</MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Name))>
+                Name
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Description))>
+                Description
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Quantity))>
+                Quantity
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.UnitPrice))>
+                Price
+            </MudTableSortLabel>
+        </MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd>
@@ -33,7 +49,7 @@
 @code {
     string? _filter;
 
-    [Parameter]
+    [Parameter, EditorRequired]
     public HashSet<ProductDetails> Products { get; set; } = null!;
     
     [Parameter, EditorRequired]
@@ -46,4 +62,6 @@
         OnAddedToCart.HasDelegate
             ? OnAddedToCart.InvokeAsync(productId)
             : Task.CompletedTask;
+
+    bool OnFilter(ProductDetails product) => product.MatchesFilter(_filter);
 }

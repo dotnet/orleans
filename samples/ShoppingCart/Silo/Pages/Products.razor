@@ -7,5 +7,5 @@
     Create New Product
 </MudButton>
 
-<ProductTable Products=@_products OnEditProduct=@OnEditProduct />
-<ManageProductModal @ref=_modal OnProductUpdated=@OnProductUpdated />
+<ProductTable Products=@_products EditProduct=@OnEditProduct />
+<ManageProductModal @ref=_modal ProductUpdated=@OnProductUpdated />
