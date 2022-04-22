@@ -73,5 +73,41 @@ namespace Tester.StreamingTests
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(2, await grain.GetEventCounter());
         }
+
+        [SkippableFact]
+        public virtual async Task ResumeAfterDeactivationActiveStream()
+        {
+            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+
+            // Tested stream and corresponding grain
+            var key = Guid.NewGuid();
+            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
+            var otherStream = streamProvider.GetStream<byte[]>(Guid.NewGuid(), nameof(IImplicitSubscriptionCounterGrain));
+            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            await grain.DeactivateOnEvent(true);
+
+            // Data that will be sent to the grains
+            var interestingData = new byte[1] { 1 };
+
+            await stream.OnNextAsync(interestingData);
+            // Push other data
+            await otherStream.OnNextAsync(interestingData);
+            await otherStream.OnNextAsync(interestingData);
+            await otherStream.OnNextAsync(interestingData);
+            await stream.OnNextAsync(interestingData);
+
+            await Task.Delay(1_000);
+
+            // Wait for the stream to become inactive
+            await Task.Delay(StreamInactivityPeriod.Multiply(3));
+            await grain.Deactivate();
+
+            await stream.OnNextAsync(interestingData);
+
+            await Task.Delay(2_000);
+
+            Assert.Equal(0, await grain.GetErrorCounter());
+            Assert.Equal(3, await grain.GetEventCounter());
+        }
     }
 }

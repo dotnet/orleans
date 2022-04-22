@@ -10,5 +10,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetErrorCounter();
 
         Task Deactivate();
+
+        Task DeactivateOnEvent(bool deactivate);
     }
 }

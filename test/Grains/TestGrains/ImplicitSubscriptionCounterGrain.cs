@@ -13,6 +13,7 @@ namespace UnitTests.Grains
     public class ImplicitSubscriptionCounterGrain : Grain<ImplicitSubscriptionCounterGrain.MyState>, IImplicitSubscriptionCounterGrain, IStreamSubscriptionObserver
     {
         private readonly ILogger logger;
+        private bool deactivateOnEvent;
 
         [GenerateSerializer]
         public class MyState
@@ -34,6 +35,12 @@ namespace UnitTests.Grains
         {
             this.logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            this.logger.LogInformation($"OnDeactivateAsync: {reason}");
+            return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public Task<int> GetErrorCounter() => Task.FromResult(this.State.ErrorCounter);
@@ -58,6 +65,10 @@ namespace UnitTests.Grains
                 this.State.EventCounter++;
                 this.State.Token = token;
                 await this.WriteStateAsync();
+                if (this.deactivateOnEvent)
+                {
+                    this.DeactivateOnIdle();
+                }
             }
 
             async Task OnError(Exception ex)
@@ -68,6 +79,12 @@ namespace UnitTests.Grains
             }
 
             Task OnCompleted() => Task.CompletedTask;
+        }
+
+        public Task DeactivateOnEvent(bool deactivate)
+        {
+            this.deactivateOnEvent = deactivate;
+            return Task.CompletedTask;
         }
     }
 }
