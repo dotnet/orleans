@@ -21,63 +21,15 @@
         <MudSwitch Checked="@_isDarkTheme" CheckedChanged=OnCheckedChangedAsync Color="Color.Primary" Class="ma-4" T="bool" Label="Theme Toggle"/>
         <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Inherit" Link="https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart" Target="_blank" />
     </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="5" Color=Color.Dark>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0">
         <MudDrawerHeader>
             <MudText Typo="Typo.h5" Color=Color.Surface>Shopping Cart</MudText>
         </MudDrawerHeader>
         <NavMenu />
     </MudDrawer>
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="my-6 pt-6">
+    <MudMainContent Class="mt-3">
+        <MudContainer MaxWidth="MaxWidth.False">
             @Body
         </MudContainer>
     </MudMainContent>
 </MudLayout>
-
-@code {
-    const string PrefersDarkThemeKey = "prefers-dark-scheme";
-
-    MudTheme _theme = new();
-    bool _drawerOpen = true;
-    bool _isDarkTheme;
-
-    [Inject]
-    public ToastService ToastService { get; set; } = null!;
-
-    [Inject]
-    public ISnackbar Snackbar { get; set; } = null!;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            ToastService.OnToastedRequested += OnToastRequested;
-
-            if (await LocalStorage.GetItemAsync(PrefersDarkThemeKey)
-                is { Length: > 0 } isDarkTheme &&
-                bool.TryParse(isDarkTheme, out var parsedValue))
-            {
-                _isDarkTheme = parsedValue;
-            }
-
-            await base.OnAfterRenderAsync(firstRender);
-        }
-    }
-
-    async Task OnCheckedChangedAsync(bool value) =>
-        await LocalStorage.SetItemAsync(PrefersDarkThemeKey, (_isDarkTheme = value).ToString());
-
-    Task OnToastRequested((string Title, string Message) tuple) =>
-        InvokeAsync(() =>
-        {
-            var (_, message) = tuple;
-
-            Snackbar.Add(
-                message, Severity.Success, options =>
-                {
-                    options.CloseAfterNavigation = true;
-                });
-        });
-
-    void DrawerToggle() => _drawerOpen = !_drawerOpen;
-}

@@ -1,19 +1,18 @@
 @inject ShoppingCartService Cart
 
-<MudNavMenu Rounded="true" Margin=Margin.Normal Class="pa-2" Color=Color.Info>
+<MudNavMenu Rounded="true" Margin=Margin.Normal Class="pa-2" Color=Color.Tertiary>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Filled.Home">Home</MudNavLink>
     <MudNavLink Href="shop" Icon="@Icons.Filled.CreditCard">Shop Inventory</MudNavLink>
     <MudNavLink Href="products" Icon="@Icons.Filled.ProductionQuantityLimits">Product Management</MudNavLink>
-    <MudBadge Color=Color.Info Overlap=true Bordered=true Content=@_count Origin=Origin.CenterRight BadgeClass="ml-3">
-        <MudNavLink Href="cart" Class="flex-grow-1" Icon="@Icons.Filled.ShoppingCart">Cart</MudNavLink>
-    </MudBadge>
+    <MudNavLink Href="cart" Icon="@Icons.Filled.ShoppingCart">
+        <MudBadge Color="Color.Tertiary" Overlap="true" Bordered="true" Content="@_count" Origin="Origin.CenterRight" Class="mud-width-full">
+            Cart
+        </MudBadge>
+    </MudNavLink>
 </MudNavMenu>
 
 @code {
     int _count = 0;
-    bool _collapseNavMenu = true;
-    string? NavMenuCssClass => _collapseNavMenu ? "collapse" : null;
-    void ToggleNavMenu() => _collapseNavMenu = !_collapseNavMenu;
 
     [Inject]
     public ComponentStateChangedObserver Observer { get; set; } = null!;

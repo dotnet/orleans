@@ -1,11 +1,10 @@
 @page "/products/{id?}"
 
-<MudText Typo=Typo.h4 Class="pb-4">Product Management</MudText>
-
-<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-    Color="Color.Primary" Size="Size.Large" OnClick=@CreateNewProduct Class="mb-4">
-    Create New Product
-</MudButton>
-
-<ProductTable Products=@_products EditProduct=@OnEditProduct />
+<ProductTable Title="Product Management" Products=@_products EditProduct=@OnEditProduct>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+        Color="Color.Primary" Size="Size.Large" DisableElevation="true" OnClick=@CreateNewProduct>
+        Create New Product
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="my-3 mx-4"/>
+</ProductTable>
 <ManageProductModal @ref=_modal ProductUpdated=@OnProductUpdated />
