@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
