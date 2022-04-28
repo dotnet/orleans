@@ -35,7 +35,7 @@ public sealed partial class Products
                 ImageUrl = fake.ImageUrl,
                 DetailsUrl = fake.DetailsUrl
             };
-            _modal.Open("Create Product");
+            _modal.Open("Create Product", OnProductUpdated);
         }
     }
 
