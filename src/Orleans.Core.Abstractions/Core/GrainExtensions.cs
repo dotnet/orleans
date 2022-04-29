@@ -157,7 +157,7 @@ namespace Orleans
                 return legacyId.IsLongKey;
             }
 
-            throw new InvalidOperationException($"Unable to extract integer key from grain id {grainId}");
+            return false;
         }
 
         /// <summary>
