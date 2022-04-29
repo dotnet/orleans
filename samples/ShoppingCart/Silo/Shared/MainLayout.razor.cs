@@ -1,4 +1,7 @@
-﻿using MudSeverity = MudBlazor.Severity;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+using MudSeverity = MudBlazor.Severity;
 
 namespace Orleans.ShoppingCart.Silo.Shared;
 
@@ -45,7 +48,7 @@ public partial class MainLayout
             OverlayLight = "#1e1e2d80"
         },
     };
-    
+
     bool _drawerOpen = true;
     bool _isDarkTheme;
 
@@ -72,7 +75,7 @@ public partial class MainLayout
         }
     }
 
-    async Task OnCheckedChangedAsync(bool value) =>
+    async Task OnToggledChangedAsync(bool value) =>
         await LocalStorage.SetItemAsync(
             PrefersDarkThemeKey, (_isDarkTheme = value).ToString());
 

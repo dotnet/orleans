@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
 using Orleans.ShoppingCart.Silo.Components;
 
 namespace Orleans.ShoppingCart.Silo.Pages;

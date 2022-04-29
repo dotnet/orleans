@@ -10,7 +10,6 @@
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.6.0" />
     <PackageReference Include="Blazor.Serialization" Version="2.0.9" />
-    <PackageReference Include="Blazor.SessionStorage" Version="2.0.9" />
     <PackageReference Include="Blazor.LocalStorage" Version="2.0.9" />
     <PackageReference Include="Bogus" Version="34.0.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="3.6.2" />

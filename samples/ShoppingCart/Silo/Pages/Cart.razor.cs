@@ -1,4 +1,7 @@
-﻿namespace Orleans.ShoppingCart.Silo.Pages;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Silo.Pages;
 
 public sealed partial class Cart
 {

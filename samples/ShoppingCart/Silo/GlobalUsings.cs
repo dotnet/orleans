@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
 global using Bogus;
 global using Microsoft.AspNetCore.Components;
 global using MudBlazor;

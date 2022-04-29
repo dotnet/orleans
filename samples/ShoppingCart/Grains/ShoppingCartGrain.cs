@@ -1,4 +1,7 @@
-﻿namespace Orleans.ShoppingCart.Grains;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Grains;
 
 [Reentrant]
 public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain

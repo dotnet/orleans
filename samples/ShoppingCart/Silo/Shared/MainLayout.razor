@@ -18,7 +18,9 @@
     <MudAppBar Elevation="0">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
         <MudSpacer />
-        <MudSwitch Checked="@_isDarkTheme" CheckedChanged=OnCheckedChangedAsync Color="Color.Primary" Class="ma-4" T="bool" Label="Theme Toggle"/>
+        <MudToggleIconButton Toggled="@_isDarkTheme" ToggledChanged=@OnToggledChangedAsync 
+            Title="Switch to Dark Theme" Icon=@Icons.Material.Outlined.DarkMode Color=@Color.Inherit
+            ToggledTitle="Switch to Light Theme" ToggledIcon=@Icons.Material.Filled.WbSunny ToggledColor=@Color.Default />
         <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Inherit" Link="https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart" Target="_blank" />
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" Elevation="0">

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
 namespace Orleans.ShoppingCart.Silo.Extensions;
 
 internal static class ProductDetailsExtensions
