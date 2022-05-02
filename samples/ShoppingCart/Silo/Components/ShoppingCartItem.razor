@@ -1,27 +1,25 @@
-<MudCard Class="mud-height-full">
-    <MudCardHeader>
-        <CardHeaderContent>
-            <MudText Typo="Typo.h6">@CartItem.Product.Name</MudText>
-        </CardHeaderContent>
-    </MudCardHeader>
-    <MudCardMedia Image="@CartItem.Product.ImageUrl" Height="180" />
-    <MudCardContent>
-        <MudText Typo="Typo.body1">@CartItem.Product.Description</MudText>
-        <MudNumericField Label="Desired quantity" Variant=Variant.Text
-            Min="1" Max="@CartItem.Product.Quantity" @bind-Value="_desiredQuantity" />
-    </MudCardContent>
-    <MudCardActions>
-        <MudFab Icon="@Icons.Filled.RemoveShoppingCart" Color="Color.Warning"
-            Title=@Title OnClick=OnRemoveAsync Size=Size.Small Class="ml-2 mr-4"/>
-        <MudFab Icon="@Icons.Filled.Save" Color="Color.Primary"
-            Disabled=@(_desiredQuantity == CartItem.Quantity)
-            OnClick=OnUpdateAsync Size=Size.Small />
-        <MudText Typo="Typo.body1" Class="flex-1 align-self-end"
-            Align=Align.Right>
-            @CartItem.TotalPrice.ToString("C2")
-        </MudText>
-    </MudCardActions>
-</MudCard>
+<MudDivider/>
+<MudStack Row="true" Spacing="6">
+    <MudImage Src="@CartItem.Product.ImageUrl" Width="192" Height="192" Class="rounded"/>
+    <MudGrid>
+        <MudItem xs="6">
+            <MudText Typo="Typo.subtitle1"><b>@CartItem.Product.Name</b></MudText>
+            <MudText Typo="Typo.body2">@CartItem.Product.Description</MudText>
+        </MudItem>
+        <MudItem xs="2">
+            <MudNumericField Variant=Variant.Outlined Margin="Margin.Dense"
+                    Min="1" Max="@CartItem.Product.Quantity" T="int" Value="_desiredQuantity" ValueChanged="SaveOnUpdateAsync" />
+        </MudItem>
+        <MudItem xs="4">
+            <MudStack AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Class="mud-height-full">
+                <MudText Typo="Typo.subtitle1">
+                    <b>@CartItem.TotalPrice.ToString("C2")</b>
+                </MudText>
+                <MudButton OnClick=OnRemoveAsync Color="Color.Primary" Size="Size.Small">Remove</MudButton>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudStack>
 
 @code {
     int _desiredQuantity;
@@ -37,6 +35,12 @@
     public EventCallback<(int Quantity, ProductDetails Product)> OnUpdated { get; set; }
 
     protected override void OnParametersSet() => _desiredQuantity = CartItem.Quantity;
+
+    Task SaveOnUpdateAsync(int value)
+    {
+        _desiredQuantity = value;
+        return TryInvokeDelegate(OnUpdated, (_desiredQuantity, CartItem.Product));
+    }
 
     Task OnRemoveAsync() => TryInvokeDelegate(OnRemoved, CartItem.Product);
 

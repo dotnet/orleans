@@ -1,23 +1,28 @@
 @page "/cart"
 
-<MudText Typo=Typo.h4 Class="pb-4">Shopping Cart</MudText>
+<MudToolBar DisableGutters="true">
+    <MudText Typo="Typo.h4">Shopping Cart</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon=@Icons.Filled.RemoveShoppingCart
+        Disabled=@(_cartItems?.Any() is false) Size=@Size.Large
+        Color="Color.Secondary" OnClick=@EmptyCartAsync>
+        Empty Cart
+    </MudButton>
+</MudToolBar>
 
-<MudButton Variant="Variant.Filled" StartIcon=@Icons.Filled.RemoveShoppingCart
-    Disabled=@(_cartItems?.Any() is false)
-    Color="Color.Secondary" Size="Size.Large" OnClick=@EmptyCartAsync Class="mb-4">
-    Empty Cart
-</MudButton>
-
-<MudGrid Justify=Justify.FlexStart>
-    <MudItem xs="3" Class="mud-height-full">
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudStack Spacing="8">
+            @foreach (var item in _cartItems ?? new HashSet<CartItem>())
+            {
+                <ShoppingCartItem CartItem=@item
+                    OnRemoved=@OnItemRemovedAsync
+                    OnUpdated=@OnItemUpdatedAsync />
+            }
+            <MudDivider/>
+        </MudStack>
+    </MudItem>
+    <MudItem xs="12" md="4">
         <ShoppingCartSummary Items=_cartItems />
     </MudItem>
-    @foreach (var item in _cartItems ?? new HashSet<CartItem>())
-    {
-        <MudItem xs="3" Class="mud-height-full">
-            <ShoppingCartItem CartItem=@item
-                OnRemoved=@OnItemRemovedAsync
-                OnUpdated=@OnItemUpdatedAsync />
-        </MudItem>
-    }
 </MudGrid>
