@@ -101,7 +101,7 @@ namespace Orleans.Configuration
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Gets the period after which a silo that didn't updated its status in the table causes a warning to be logged.
+        /// /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
         /// </summary>
         internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
 
