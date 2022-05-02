@@ -118,7 +118,7 @@
     <AWSSDKDynamoDBv2Version>3.7.0.97</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.7.1.39</AWSSDKSQSVersion>
     <BondCoreCSharpVersion>9.0.5</BondCoreCSharpVersion>
-    <ConsulVersion>0.7.2.3</ConsulVersion>
+    <ConsulVersion>1.6.10.4</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.19.1</GoogleProtobufVersion>
     <ProtobufNetVersion>3.0.101</ProtobufNetVersion>
