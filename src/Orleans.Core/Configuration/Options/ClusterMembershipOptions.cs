@@ -1,4 +1,3 @@
-
 using System;
 
 namespace Orleans.Configuration
@@ -11,13 +10,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the number of missed "I am alive" updates in the table from a silo that causes warning to be logged.
         /// </summary>
-        /// <remarks>
-        /// This value does not affect the liveness protocol during runtime, but it is used to determine which silos are included
-        /// in the initial connectivity check which is performed at startup.
-        /// </remarks>
-        /// <seealso cref="ValidateInitialConnectivity"/>
         /// <seealso cref="IAmAliveTablePublishTimeout"/>
-        /// <value>The default value is two missed updates before a silo is ignored during the initial connectivity test.</value>
         public int NumMissedTableIAmAliveLimit { get; set; } = 2;
 
         /// <summary>
@@ -63,13 +56,6 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>Attempt to join for 5 minutes before giving up by default.</value>
         public TimeSpan MaxJoinAttemptTime { get; set; } = TimeSpan.FromMinutes(5);
-                
-        /// <summary>
-        /// Gets or sets a value indicating whether new silo that joins the cluster has to validate the initial connectivity with all other active silos.
-        /// </summary>
-        /// <remarks>Do not disable this for production services.</remarks>
-        /// <value>Connectivity is validated during startup by default.</value>
-        public bool ValidateInitialConnectivity { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether gossip membership updates between hosts.
@@ -115,7 +101,7 @@ namespace Orleans.Configuration
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
+        /// /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
         /// </summary>
         internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
 

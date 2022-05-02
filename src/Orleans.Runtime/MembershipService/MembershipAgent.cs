@@ -100,16 +100,7 @@ namespace Orleans.Runtime.MembershipService
                 (int)ErrorCode.MembershipBecomeActive,
                 "-BecomeActive");
 
-            if (this.clusterMembershipOptions.ValidateInitialConnectivity)
-            {
-                await this.ValidateInitialConnectivity();
-            }
-            else
-            {
-                this.log.LogWarning(
-                      (int)ErrorCode.MembershipSendingPreJoinPing,
-                      $"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ValidateInitialConnectivity)} is set to false. This is NOT recommended for a production environment.");
-            }
+            await this.ValidateInitialConnectivity();
 
             try
             {
