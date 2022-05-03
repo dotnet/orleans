@@ -1,4 +1,6 @@
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
@@ -7,24 +9,25 @@ namespace Orleans.Runtime.ReminderService
 {
     internal class AdoNetReminderTable : IReminderTable
     {
-        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly AdoNetReminderTableOptions options;
+        private readonly IServiceProvider serviceProvider;
         private readonly string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
         public AdoNetReminderTable(
-            GrainReferenceKeyStringConverter grainReferenceConverter, 
+            IServiceProvider serviceProvider, 
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<AdoNetReminderTableOptions> storageOptions)
         {
-            this.grainReferenceConverter = grainReferenceConverter;
+            this.serviceProvider = serviceProvider;
             this.serviceId = clusterOptions.Value.ServiceId;
             this.options = storageOptions.Value;
         }
 
         public async Task Init()
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString, this.grainReferenceConverter);
+            var grainReferenceConverter = serviceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
+            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString, grainReferenceConverter);
         }
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)
@@ -44,6 +47,11 @@ namespace Orleans.Runtime.ReminderService
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
+            if (entry.StartAt.Kind is DateTimeKind.Unspecified)
+            {
+                entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
+            }
+
             return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 

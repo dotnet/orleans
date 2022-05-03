@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Text;
 
@@ -23,7 +23,6 @@ namespace Orleans.Storage
 
         public bool IsStringKey { get; }
 
-
         public AdoGrainKey(long key, string keyExtension)
         {
             N0Key = 0;
@@ -33,9 +32,7 @@ namespace Orleans.Storage
             IsLongKey = true;
             IsGuidKey = false;
             IsStringKey = false;
-
         }
-
 
         public AdoGrainKey(Guid key, string keyExtension)
         {
@@ -49,7 +46,6 @@ namespace Orleans.Storage
             IsStringKey = false;
         }
 
-
         public AdoGrainKey(string key)
         {
             StringKey = key;
@@ -60,7 +56,6 @@ namespace Orleans.Storage
             IsGuidKey = false;
             IsStringKey = true;
         }
-
 
         public byte[] GetHashBytes()
         {
@@ -117,7 +112,6 @@ namespace Orleans.Storage
             const string GrainIdAndExtensionSeparator = "#";
             return string.Format($"{primaryKey}{(keyExtension != null ? GrainIdAndExtensionSeparator + keyExtension : string.Empty)}");
         }
-
 
         private static Guid ToGuidKey(long n0Key, long n1Key)
         {

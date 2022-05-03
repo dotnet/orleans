@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using System.Threading.Tasks;
@@ -23,7 +23,6 @@ namespace UnitTests.StorageTests.Relational
            new[] { new OrleansStorageDefaultJsonDeserializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag)
         }, new[] { new OrleansStorageDefaultJsonSerializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag) });
 
-
         private IStorageSerializationPicker XmlPicker { get; } = new DefaultRelationalStoragePicker(
             new[] { new OrleansStorageDefaultXmlDeserializer(AdoNetGrainStorage.XmlFormatSerializerTag) },
             new[] { new OrleansStorageDefaultXmlSerializer(AdoNetGrainStorage.XmlFormatSerializerTag) });
@@ -33,7 +32,6 @@ namespace UnitTests.StorageTests.Relational
             new[] { new OrleansStorageDefaultXmlSerializer(AdoNetGrainStorage.XmlFormatSerializerTag) });
 
         private IStorageHasherPicker ConstantHasher { get; } = new StorageHasherPicker(new[] { new ConstantHasher() });
-
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
@@ -61,12 +59,10 @@ namespace UnitTests.StorageTests.Relational
             }
         }
 
-
         internal async Task Relational_WriteReadWriteRead100StatesInParallel()
         {
             await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
         }
-
 
         internal async Task Relational_HashCollisionTests()
         {
@@ -74,13 +70,11 @@ namespace UnitTests.StorageTests.Relational
             await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_HashCollisionTests), 2);
         }
 
-
         internal async Task Relational_WriteDuplicateFailsWithInconsistentStateException()
         {
             var exception = await PersistenceStorageTests.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
         }
-
 
         internal async Task Relational_WriteInconsistentFailsWithIncosistentStateException()
         {
@@ -88,13 +82,11 @@ namespace UnitTests.StorageTests.Relational
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
         }
 
-
         internal async Task Relational_Json_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
-
 
         internal async Task Relational_Json_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
@@ -102,20 +94,17 @@ namespace UnitTests.StorageTests.Relational
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
-
         internal async Task Relational_Xml_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
-
         internal async Task Relational_Xml_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlStreamingPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
-
 
         internal async Task Relational_ChangeStorageFormatFromBinaryToJsonInMemory_WriteRead(string grainType, GrainReference grainReference, GrainState<TestState1> grainState)
         {

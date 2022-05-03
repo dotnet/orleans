@@ -45,6 +45,8 @@ namespace UnitTests.MembershipTests
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> gatewayOptions;
 
+        private static int generation;
+
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
@@ -69,8 +71,6 @@ namespace UnitTests.MembershipTests
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
-
-        public GrainReferenceKeyStringConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<GrainReferenceKeyStringConverter>();
 
         public IServiceProvider Services => this.environment.Services;
 
@@ -385,8 +385,7 @@ namespace UnitTests.MembershipTests
             bool ok = await membershipTable.InsertRow(newEntry, newTableVersion);
             Assert.True(ok);
 
-
-            var amAliveTime = DateTime.UtcNow;
+            var amAliveTime = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
 
             // This mimics the arguments MembershipOracle.OnIAmAliveUpdateInTableTimer passes in
             var entry = new MembershipEntry
@@ -398,10 +397,11 @@ namespace UnitTests.MembershipTests
             await membershipTable.UpdateIAmAlive(entry);
 
             tableData = await membershipTable.ReadAll();
-            Tuple<MembershipEntry, string> member = tableData.Members.First();
+            var member = tableData.Members.First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress));
+
             // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
             // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
-            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
+            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
         }
 
         protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
@@ -451,9 +451,6 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal(1, data.Members.Count);
         }
-
-        private static int generation;
-
 
         // Utility methods
         private static MembershipEntry CreateMembershipEntryForTest()

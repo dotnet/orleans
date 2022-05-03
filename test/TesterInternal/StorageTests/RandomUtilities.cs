@@ -111,7 +111,6 @@ namespace UnitTests.StorageTests.Relational
             })
         };
 
-
         /// <summary>
         /// Get a random value of the given type.
         /// </summary>
@@ -137,7 +136,6 @@ namespace UnitTests.StorageTests.Relational
 
             throw new ArgumentException(typeof(T).Name);
         }
-
 
         /// <summary>
         /// Get random symbols.

@@ -2,7 +2,7 @@
 CREATE TABLE OrleansMembershipVersionTable
 (
     DeploymentId varchar(150) NOT NULL,
-    Timestamp timestamp(3) NOT NULL DEFAULT (now() at time zone 'utc'),
+    Timestamp timestamptz(3) NOT NULL DEFAULT now(),
     Version integer NOT NULL DEFAULT 0,
 
     CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId)
@@ -20,8 +20,8 @@ CREATE TABLE OrleansMembershipTable
     Status integer NOT NULL,
     ProxyPort integer NULL,
     SuspectTimes varchar(8000) NULL,
-    StartTime timestamp(3) NOT NULL,
-    IAmAliveTime timestamp(3) NOT NULL,
+    StartTime timestamptz(3) NOT NULL,
+    IAmAliveTime timestamptz(3) NOT NULL,
 
     CONSTRAINT PK_MembershipTable_DeploymentId PRIMARY KEY(DeploymentId, Address, Port, Generation),
     CONSTRAINT FK_MembershipTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
@@ -155,7 +155,7 @@ BEGIN
 
         UPDATE OrleansMembershipVersionTable
         SET
-            Timestamp = (now() at time zone 'utc'),
+            Timestamp = now(),
             Version = Version + 1
         WHERE
             DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
@@ -215,7 +215,7 @@ BEGIN
 
     UPDATE OrleansMembershipVersionTable
     SET
-        Timestamp = (now() at time zone 'utc'),
+        Timestamp = now(),
         Version = Version + 1
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
