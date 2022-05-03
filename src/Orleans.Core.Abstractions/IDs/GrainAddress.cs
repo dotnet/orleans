@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 
@@ -34,6 +35,7 @@ namespace Orleans.Runtime
         [Id(3)]
         public MembershipVersion MembershipVersion { get; set; } = MembershipVersion.MinValue;
 
+        [JsonIgnore]
         public bool IsComplete => !GrainId.IsDefault && !ActivationId.IsDefault && SiloAddress != null;
 
         public override bool Equals(object obj)
