@@ -16,7 +16,7 @@ namespace Tester.AzureUtils.Persistence
     /// <summary>
     /// PersistenceStateTests using AzureStore - Requires access to external Azure blob storage
     /// </summary>
-    [TestCategory("Persistence"), TestCategory("Azure")]
+    [TestCategory("Persistence"), TestCategory("AzureStorage")]
     public class PersistenceStateTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture

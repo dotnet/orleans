@@ -64,7 +64,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
         public async Task PersistenceProvider_Azure_Read()
         {
             TestUtils.CheckForAzureStorage();
@@ -74,7 +74,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_Read(testName, store);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -94,7 +94,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -114,7 +114,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(15 * 32 * 1024 - 256, true, false)]
@@ -141,7 +141,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_Read(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(15 * 32 * 1024 - 256, true, false)]
@@ -171,7 +171,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -200,7 +200,7 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(initialState.C, convertedState.C);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
         public async Task AzureTableStorage_ConvertJsonToFromStorageFormatWithCustomJsonProperties()
         {
             TestUtils.CheckForAzureStorage();

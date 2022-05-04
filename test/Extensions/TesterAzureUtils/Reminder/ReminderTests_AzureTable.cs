@@ -16,7 +16,7 @@ using Orleans.Internal;
 
 namespace Tester.AzureUtils.TimerTests
 {
-    [TestCategory("Reminders"), TestCategory("Azure")]
+    [TestCategory("Reminders"), TestCategory("AzureStorage")]
     public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture

@@ -16,7 +16,7 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using Azure
     /// </summary>
-    [TestCategory("Reminders"), TestCategory("Azure")]
+    [TestCategory("Reminders"), TestCategory("AzureStorage")]
     public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
         public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

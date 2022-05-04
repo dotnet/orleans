@@ -18,7 +18,7 @@ namespace UnitTests
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AzureConnectionInfo()
         {
             string azureConnectionStringInput =
@@ -30,7 +30,7 @@ namespace UnitTests
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AdoNetConnectionInfo()
         {
             string sqlConnectionStringInput =

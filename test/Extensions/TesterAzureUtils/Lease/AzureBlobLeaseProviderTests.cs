@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Tester.AzureUtils.Lease
 {
-    [TestCategory("Functional"), TestCategory("Azure"), TestCategory("Lease")]
+    [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
     public class AzureBlobLeaseProviderTests : GoldenPathLeaseProviderTestRunner
     {
         public AzureBlobLeaseProviderTests(ITestOutputHelper output)

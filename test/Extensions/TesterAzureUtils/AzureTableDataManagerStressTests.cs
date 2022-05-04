@@ -12,7 +12,7 @@ using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePo
 
 namespace Tester.AzureUtils
 {
-    [TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+    [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Stress")]
     public class AzureTableDataManagerStressTests : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;

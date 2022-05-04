@@ -5,7 +5,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions")]
     public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunnerxUnit, IClassFixture<ControlledFaultInjectionTestFixture>
     {
         public TransactionFaultInjectionTests(ControlledFaultInjectionTestFixture fixture, ITestOutputHelper output)

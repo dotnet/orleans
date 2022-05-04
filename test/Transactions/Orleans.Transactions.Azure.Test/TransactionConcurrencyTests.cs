@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionConcurrencyTests : TransactionConcurrencyTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public TransactionConcurrencyTests(TestFixture fixture, ITestOutputHelper output)

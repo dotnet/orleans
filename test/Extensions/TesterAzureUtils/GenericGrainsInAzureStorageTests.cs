@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Tester.AzureUtils.General
 {
-    [TestCategory("Azure"), TestCategory("Generics")]
+    [TestCategory("AzureStorage"), TestCategory("Generics")]
     public class GenericGrainsInAzureTableStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureTableStorageTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.General
         }
     }
 
-    [TestCategory("Azure"), TestCategory("Generics")]
+    [TestCategory("AzureStorage"), TestCategory("Generics")]
     public class GenericGrainsInAzureBlobStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureBlobStorageTests.Fixture>
     {
         private readonly Fixture fixture;

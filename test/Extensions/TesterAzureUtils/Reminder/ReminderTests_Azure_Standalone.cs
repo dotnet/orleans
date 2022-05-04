@@ -22,7 +22,7 @@ using Orleans.Reminders.AzureStorage;
 namespace Tester.AzureUtils.TimerTests
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    [TestCategory("Azure")]
+    [TestCategory("AzureStorage")]
     public class ReminderTests_Azure_Standalone : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;
