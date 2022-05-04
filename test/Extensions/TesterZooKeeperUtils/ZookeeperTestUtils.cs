@@ -1,4 +1,4 @@
-﻿using org.apache.zookeeper;
+using org.apache.zookeeper;
 using System;
 using System.Threading.Tasks;
 using TestExtensions;
@@ -23,7 +23,8 @@ namespace Tester.ZooKeeperUtils
             {
                 return false;
             }
-            return await ZooKeeper.Using(connectionString, 2000, null, async zk =>
+
+            return await ZooKeeper.Using(connectionString, 2000, new ZooKeeperWatcher(), async zk =>
             {
                 try
                 {
@@ -35,6 +36,11 @@ namespace Tester.ZooKeeperUtils
                     return false;
                 }
             });
+        }
+
+        private class ZooKeeperWatcher : Watcher
+        {
+            public override Task process(WatchedEvent @event) => Task.CompletedTask;
         }
     }
 }
