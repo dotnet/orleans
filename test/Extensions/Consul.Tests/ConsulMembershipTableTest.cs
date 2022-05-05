@@ -55,7 +55,7 @@ namespace Consul.Tests
 
         protected override async Task<string> GetConnectionString()
         {
-            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.CONSUL_ENDPOINT : null;
+            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;
         }
 
         [SkippableFact, TestCategory("Functional")]
