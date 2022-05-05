@@ -1,6 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Runtime.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -9,6 +11,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, Immutable]
     [GenerateSerializer]
+    [JsonConverter(typeof(ActivationIdConverter))]
     public readonly struct ActivationId : IEquatable<ActivationId>
     {
         /// <summary>
@@ -100,5 +103,17 @@ namespace Orleans.Runtime
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(ActivationId left, ActivationId right) => !(left == right);
+    }
+
+    /// <summary>
+    /// Functionality for converting <see cref="ActivationId"/> instances to and from their JSON representation.
+    /// </summary>
+    public class ActivationIdConverter : JsonConverter<ActivationId>
+    {
+        /// <inheritdoc />
+        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString());
+
+        /// <inheritdoc />
+        public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToParsableString());
     }
 }

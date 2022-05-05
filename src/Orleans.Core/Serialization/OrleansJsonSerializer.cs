@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 using Orleans.GrainReferences;
 using Orleans.Serialization.TypeSystem;
+using System.Globalization;
 
 namespace Orleans.Serialization
 {
@@ -59,7 +60,9 @@ namespace Orleans.Serialization
             settings.Converters.Add(new IPAddressConverter());
             settings.Converters.Add(new IPEndPointConverter());
             settings.Converters.Add(new GrainIdConverter());
-            settings.Converters.Add(new SiloAddressConverter());
+            settings.Converters.Add(new ActivationIdConverter());
+            settings.Converters.Add(new SiloAddressJsonConverter());
+            settings.Converters.Add(new MembershipVersionJsonConverter());
             settings.Converters.Add(new UniqueKeyConverter());
             settings.Converters.Add(new GrainReferenceJsonConverter(services.GetRequiredService<GrainReferenceActivator>()));
 
@@ -152,10 +155,7 @@ namespace Orleans.Serialization
     public class GrainIdConverter : JsonConverter
     {
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(GrainId));
-        }
+        public override bool CanConvert(Type objectType) => objectType == typeof(GrainId);
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -179,10 +179,37 @@ namespace Orleans.Serialization
     }
 
     /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="ActivationId"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
+    public class ActivationIdConverter : JsonConverter
+    {
+        /// <inheritdoc/>
+        public override bool CanConvert(Type objectType) => objectType == typeof(ActivationId);
+
+        /// <inheritdoc/>
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            ActivationId id = (ActivationId)value;
+            writer.WriteValue(id.ToParsableString());
+        }
+
+        /// <inheritdoc/>
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            return reader.Value switch
+            {
+                string { Length: > 0 } str => ActivationId.FromParsableString(str),
+                _ => default
+            };
+        }
+    }
+
+    /// <summary>
     /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="SiloAddress"/>.
     /// </summary>
     /// <seealso cref="Newtonsoft.Json.JsonConverter" />
-    public class SiloAddressConverter : JsonConverter
+    public class SiloAddressJsonConverter : JsonConverter
     {
         /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
@@ -194,18 +221,49 @@ namespace Orleans.Serialization
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             SiloAddress addr = (SiloAddress)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("SiloAddress");
             writer.WriteValue(addr.ToParsableString());
-            writer.WriteEndObject();
         }
 
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
-            return addr;
+            switch (reader.TokenType)
+            {
+                case JsonToken.StartObject:
+                    var jo = JObject.Load(reader);
+                    return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+                case JsonToken.String:
+                    return SiloAddress.FromParsableString(reader.Value as string);
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="MembershipVersion"/>.
+    /// </summary>
+    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
+    public class MembershipVersionJsonConverter : JsonConverter
+    {
+        /// <inheritdoc/>
+        public override bool CanConvert(Type objectType) => objectType == typeof(MembershipVersion);
+
+        /// <inheritdoc/>
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            MembershipVersion typedValue = (MembershipVersion)value;
+            writer.WriteValue(typedValue.Value);
+        }
+
+        /// <inheritdoc/>
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            return reader.Value switch
+            {
+                long l => new MembershipVersion(l),
+                _ => default
+            };
         }
     }
 
