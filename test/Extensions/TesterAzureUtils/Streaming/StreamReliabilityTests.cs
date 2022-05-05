@@ -197,7 +197,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
         public async Task AQ_Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the AzureQueue test config is OK.
@@ -222,7 +222,7 @@ namespace UnitTests.Streaming.Reliability
             await Test_AddMany_Consumers(testName, SMS_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
+        [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
         public async Task AQ_AddMany_Consumers()
         {
             const string testName = "AQ_AddMany_Consumers";
@@ -269,7 +269,7 @@ namespace UnitTests.Streaming.Reliability
 
             await Test_AllSilosRestart(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_AllSilosRestart()
         {
             const string testName = "AQ_StreamRel_AllSilosRestart";
@@ -284,7 +284,7 @@ namespace UnitTests.Streaming.Reliability
 
             await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
             const string testName = "AQ_StreamRel_SiloJoins";
@@ -298,7 +298,7 @@ namespace UnitTests.Streaming.Reliability
             const string testName = "SMS_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Consumer";
@@ -311,7 +311,7 @@ namespace UnitTests.Streaming.Reliability
             const string testName = "SMS_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Producer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Producer";
@@ -324,7 +324,7 @@ namespace UnitTests.Streaming.Reliability
             const string testName = "SMS_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Consumer";
@@ -337,7 +337,7 @@ namespace UnitTests.Streaming.Reliability
             const string testName = "SMS_StreamRel_SiloRestarts_Producer";
             await Test_SiloRestarts_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Producer";

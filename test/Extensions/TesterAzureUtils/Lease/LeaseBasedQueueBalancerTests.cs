@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Tester.AzureUtils.Lease
 {
-    [TestCategory("Functional"), TestCategory("Azure"), TestCategory("Lease")]
+    [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
     public class LeaseBasedQueueBalancerTests : TestClusterPerTest
     {
         private const string StreamProviderName = "MemoryStreamProvider";

@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
-    [TestCategory("Membership"), TestCategory("Azure")]
+    [TestCategory("Membership"), TestCategory("AzureStorage")]
     public class LivenessTests_AzureTable : LivenessTestsBase
     {
         public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)

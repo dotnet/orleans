@@ -4,7 +4,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions-dev")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions-dev")]
     public class ConsistencyFaultInjectionTests: ConsistencyTransactionTestRunnerxUnit, IClassFixture<RandomFaultInjectedTestFixture>
     {
         public ConsistencyFaultInjectionTests(RandomFaultInjectedTestFixture fixture, ITestOutputHelper output)

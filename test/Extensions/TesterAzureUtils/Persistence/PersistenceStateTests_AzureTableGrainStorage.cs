@@ -11,7 +11,7 @@ namespace Tester.AzureUtils.Persistence
     /// <summary>
     /// PersistenceStateTests using AzureGrainStorage - Requires access to external Azure table storage
     /// </summary>
-    [TestCategory("Persistence"), TestCategory("Azure")]
+    [TestCategory("Persistence"), TestCategory("AzureStorage")]
     public class PersistenceStateTests_AzureTableGrainStorage : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureTableGrainStorage.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture
