@@ -30,18 +30,18 @@ namespace AWSUtils.Tests.StorageTests
         {
             this.output = output;
             this.fixture = fixture;
-            providerCfgProps["DataConnectionString"] = $"Service={AWSTestConstants.Service}";
+            providerCfgProps["DataConnectionString"] = $"Service={AWSTestConstants.DynamoDbService}";
             this.providerRuntime = new ClientProviderRuntime(
                 fixture.InternalGrainFactory,
                 fixture.Services,
                 fixture.Services.GetRequiredService<ClientGrainContext>());
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
+        [SkippableTheory, TestCategory("Functional")]
         [InlineData(null, false)]
         [InlineData(null, true)]
-        [InlineData(15 * 64 * 1024 - 256, false)]
-        [InlineData(15 * 32 * 1024 - 256, true)]
+        [InlineData(400_000, false)]
+        [InlineData(400_000, true)]
         public async Task PersistenceProvider_DynamoDB_WriteRead(int? stringLength, bool useJson)
         {
             var testName = string.Format("{0}({1} = {2}, {3} = {4})",
@@ -57,11 +57,11 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
+        [SkippableTheory, TestCategory("Functional")]
         [InlineData(null, false)]
         [InlineData(null, true)]
-        [InlineData(15 * 64 * 1024 - 256, false)]
-        [InlineData(15 * 32 * 1024 - 256, true)]
+        [InlineData(400_000, false)]
+        [InlineData(400_000, true)]
         public async Task PersistenceProvider_DynamoDB_WriteClearRead(int? stringLength, bool useJson)
         {
             var testName = string.Format("{0}({1} = {2}, {3} = {4})",
@@ -77,11 +77,11 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
+        [SkippableTheory, TestCategory("Functional")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
-        [InlineData(15 * 32 * 1024 - 256, true, false)]
-        [InlineData(15 * 32 * 1024 - 256, false, true)]
+        [InlineData(400_000, true, false)]
+        [InlineData(400_000, false, true)]
         public async Task PersistenceProvider_DynamoDB_ChangeReadFormat(int? stringLength, bool useJsonForWrite, bool useJsonForRead)
         {
             var testName = string.Format("{0}({1} = {2}, {3} = {4}, {5} = {6})",
@@ -104,11 +104,11 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_Read(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
+        [SkippableTheory, TestCategory("Functional")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
-        [InlineData(15 * 32 * 1024 - 256, true, false)]
-        [InlineData(15 * 32 * 1024 - 256, false, true)]
+        [InlineData(100_000, true, false)]
+        [InlineData(100_000, false, true)]
         public async Task PersistenceProvider_DynamoDB_ChangeWriteFormat(int? stringLength, bool useJsonForFirstWrite, bool useJsonForSecondWrite)
         {
             var testName = string.Format("{0}({1}={2},{3}={4},{5}={6})",
@@ -134,11 +134,11 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
+        [SkippableTheory, TestCategory("Functional")]
         [InlineData(null, false)]
         [InlineData(null, true)]
-        [InlineData(15 * 64 * 1024 - 256, false)]
-        [InlineData(15 * 32 * 1024 - 256, true)]
+        [InlineData(400_000, false)]
+        [InlineData(400_000, true)]
         public async Task DynamoDBStorage_ConvertToFromStorageFormat(int? stringLength, bool useJson)
         {
             var testName = string.Format("{0}({1} = {2}, {3} = {4})",
@@ -176,7 +176,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             var options = new DynamoDBStorageOptions
             {
-                Service = AWSTestConstants.Service,
+                Service = AWSTestConstants.DynamoDbService,
                 UseJson = useJson
             };
             return InitDynamoDBGrainStorage(options);

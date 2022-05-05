@@ -221,6 +221,10 @@ namespace Orleans.Transactions.DynamoDB
                 TableDescription tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
                 tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName);
             }
+            catch (ResourceInUseException)
+            {
+                // The table has already been created.
+            }
             catch (Exception exc)
             {
                 Logger.Error(ErrorCode.StorageProviderBase, $"Could not create table {tableName}", exc);

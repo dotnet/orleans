@@ -287,6 +287,9 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
             Assert.Equal(initialDeploymentId, this.HostedCluster.Options.ClusterId);  // "ClusterId same after restart."
 
+            // Since the client was destroyed and restarted, the grain reference needs to be recreated.
+            grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+
             val = await grain.GetValue();
             Assert.Equal(1, val);  // "Value after Write-1"
 
@@ -349,14 +352,13 @@ namespace AWSUtils.Tests.StorageTests
         }
 
 
-        protected async Task Persistence_Silo_StorageProvider_AWS(Type providerType)
+        protected async Task Persistence_Silo_StorageProvider_AWS(string providerName)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                string provider = providerType.FullName;
                 ICollection<string> providers = await this.HostedCluster.Client.GetTestHooks(silo).GetStorageProviderNames();
-                Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
+                Assert.True(providers.Contains(providerName), $"No storage provider found: {providerName}");
             }
         }
 

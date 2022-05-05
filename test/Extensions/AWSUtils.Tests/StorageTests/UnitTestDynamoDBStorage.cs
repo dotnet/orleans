@@ -56,7 +56,7 @@ namespace AWSUtils.Tests.StorageTests
 
             if (fields.ContainsKey("BinaryData"))
             {
-                BinaryData = fields["BinaryData"].B.ToArray();
+                BinaryData = fields["BinaryData"].B?.ToArray();
             }
         }
 
@@ -94,7 +94,7 @@ namespace AWSUtils.Tests.StorageTests
         public const string INSTANCE_TABLE_NAME = "UnitTestDDBTableData";
 
         public UnitTestDynamoDBStorage()
-            : base(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), AWSTestConstants.Service)
+            : base(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), AWSTestConstants.DynamoDbService)
         {
             if (AWSTestConstants.IsDynamoDbAvailable)
             {

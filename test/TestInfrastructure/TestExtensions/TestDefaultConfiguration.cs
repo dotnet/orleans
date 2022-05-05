@@ -47,6 +47,10 @@ namespace TestExtensions
         public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)];
         public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)];
         public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)];
+        public static string DynamoDbService => defaultConfiguration[nameof(DynamoDbService)];
+        public static string DynamoDbAccessKey => defaultConfiguration[nameof(DynamoDbAccessKey)];
+        public static string DynamoDbSecretKey => defaultConfiguration[nameof(DynamoDbSecretKey)];
+        public static string SqsConnectionString => defaultConfiguration[nameof(SqsConnectionString)];
 
         public static bool GetValue(string key, out string value)
         {

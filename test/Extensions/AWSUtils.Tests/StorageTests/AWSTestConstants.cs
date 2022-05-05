@@ -6,6 +6,7 @@ using Orleans.AWSUtils.Tests;
 using Orleans.Internal;
 using System;
 using System.Collections.Generic;
+using TestExtensions;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -13,22 +14,31 @@ namespace AWSUtils.Tests.StorageTests
     {
         private static readonly Lazy<bool> _isDynamoDbAvailable = new Lazy<bool>(() =>
         {
+            if (string.IsNullOrEmpty(DynamoDbService))
+            {
+                return false;
+            }
+
             try
             {
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), Service);
+                    storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), DynamoDbService);
                 }
                 catch (AmazonServiceException)
                 {
                     return false;
                 }
-                storage.InitializeTable("TestTable", new List<KeySchemaElement> {
-                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
-                }, new List<AttributeDefinition> {
-                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                }).WithTimeout(TimeSpan.FromSeconds(2)).Wait();
+                storage.InitializeTable(
+                    "TestTable",
+                    new List<KeySchemaElement> {
+                        new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
+                    },
+                    new List<AttributeDefinition> {
+                        new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
+                    })
+                .WithTimeout(TimeSpan.FromSeconds(2)).Wait();
                 return true;
             }
             catch (Exception exc)
@@ -40,13 +50,12 @@ namespace AWSUtils.Tests.StorageTests
             }
         });
 
-        public static string DefaultSQSConnectionString = "";
-
-        public static string AccessKey { get; set; }
-        public static string SecretKey { get; set; }
-        public static string Service { get; set; } = "http://localhost:8000";
+        public static string DynamoDbAccessKey { get; set; } = TestDefaultConfiguration.DynamoDbAccessKey;
+        public static string DynamoDbSecretKey { get; set; } = TestDefaultConfiguration.DynamoDbSecretKey;
+        public static string DynamoDbService { get; set; } = TestDefaultConfiguration.DynamoDbService;
+        public static string SqsConnectionString { get; set; } = TestDefaultConfiguration.SqsConnectionString;
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
-        public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(DefaultSQSConnectionString);
+        public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(SqsConnectionString);
     }
 }
