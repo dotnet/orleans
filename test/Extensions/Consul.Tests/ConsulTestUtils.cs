@@ -9,8 +9,7 @@ namespace Consul.Tests
 {
     public static class ConsulTestUtils
     {
-        public static string ConsulConnectionString = TestDefaultConfiguration.ConsulConnectionString;
-
+        public static readonly string ConsulConnectionString = TestDefaultConfiguration.ConsulConnectionString;
         private static readonly Lazy<bool> EnsureConsulLazy = new Lazy<bool>(() => EnsureConsulAsync().Result);
 
         public static void EnsureConsul()
@@ -19,8 +18,13 @@ namespace Consul.Tests
                 throw new SkipException("Consul cluster isn't running");
         }
 
-        public  static async Task<bool> EnsureConsulAsync()
+        public static async Task<bool> EnsureConsulAsync()
         {
+            if (string.IsNullOrWhiteSpace(ConsulConnectionString))
+            {
+                return false;
+            }
+
             try
             {
                 var client = new HttpClient();
