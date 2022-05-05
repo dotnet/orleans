@@ -1,14 +1,16 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using TestExtensions;
 using Xunit;
 
 namespace Consul.Tests
 {
     public static class ConsulTestUtils
     {
-        public const string CONSUL_ENDPOINT = "http://localhost:8500";
+        public static string ConsulConnectionString = TestDefaultConfiguration.ConsulConnectionString;
+
         private static readonly Lazy<bool> EnsureConsulLazy = new Lazy<bool>(() => EnsureConsulAsync().Result);
 
         public static void EnsureConsul()
@@ -23,7 +25,7 @@ namespace Consul.Tests
             {
                 var client = new HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(15);
-                var response = await client.GetAsync($"{CONSUL_ENDPOINT}/v1/health/service/consul?pretty");
+                var response = await client.GetAsync($"{ConsulConnectionString}/v1/health/service/consul?pretty");
                 return response.StatusCode == HttpStatusCode.OK;
             }
             catch (HttpRequestException)
