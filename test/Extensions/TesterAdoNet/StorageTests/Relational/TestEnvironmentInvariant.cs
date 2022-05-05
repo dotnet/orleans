@@ -9,7 +9,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnitTests.General;
-
+using TestExtensions;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -25,7 +25,6 @@ namespace UnitTests.StorageTests.Relational
         public string ConnectionString { get; set; }
     }
 
-
     [Serializable]
     [Orleans.GenerateSerializer]
     public class TestEnvironmentSettings
@@ -36,7 +35,6 @@ namespace UnitTests.StorageTests.Relational
         [Orleans.Id(1)]
         public string EnvironmentId { get; set; }
     }
-
 
     /// <summary>
     /// This enforces the necessary environment invariants hold before starting to run tests.
@@ -54,7 +52,6 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public const string FallBackCustomTestSettingsFileLocation = @"..\..\..\CustomTestSettings.json";
 
-
         /// <summary>
         /// The default test settings before merging with external ones.
         /// </summary>
@@ -65,28 +62,26 @@ namespace UnitTests.StorageTests.Relational
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameSqlServer,
-                    ConnectionString = @"Data Source = (localdb)\MSSQLLocalDB; Database = master; Integrated Security = True; Max Pool Size = 200; MultipleActiveResultSets = True"
+                    ConnectionString = TestDefaultConfiguration.MsSqlConnectionString
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameMySql,
-                    ConnectionString = "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;"
+                    ConnectionString = TestDefaultConfiguration.MySqlConnectionString
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNamePostgreSql,
-                    ConnectionString = "Server=127.0.0.1;Port=5432;Database=postgres;Integrated Security=true;Pooling=false;"
+                    ConnectionString = TestDefaultConfiguration.PostgresConnectionString
                 }
             })),
             EnvironmentId = "Default"
         };
 
-
         /// <summary>
         /// The active settings after merging the default ones with the active ones.
         /// </summary>
         public TestEnvironmentSettings ActiveSettings { get; set; }
-
 
         /// <summary>
         /// The default constructor.
@@ -95,7 +90,6 @@ namespace UnitTests.StorageTests.Relational
         {
             ActiveSettings = TryLoadAndMergeWithCustomSettings(DefaultSettings);
         }
-
 
         /// <summary>
         /// Ensures the storage with the given connection is functional and if not, tries to make it functional.
@@ -106,7 +100,7 @@ namespace UnitTests.StorageTests.Relational
         public RelationalStorageForTesting EnsureStorageForTesting(StorageConnection connection, string storageName = null)
         {
 
-            if(AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
+            if (AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
             {
                 const string RelationalStorageTestDb = "OrleansStorageTests";
                 return RelationalStorageForTesting.SetupInstance(connection.StorageInvariant, storageName ?? RelationalStorageTestDb, connection.ConnectionString).GetAwaiter().GetResult();
@@ -114,7 +108,6 @@ namespace UnitTests.StorageTests.Relational
 
             return null;
         }
-
 
         /// <summary>
         /// Tries to ensure the storage emulator is running before the tests start.
@@ -125,7 +118,6 @@ namespace UnitTests.StorageTests.Relational
             return StorageEmulator.TryStart();
         }
 
-
         /// <summary>
         /// Tries to load custom settings and if one is find, tries to merge them to the given default settings.
         /// </summary>
@@ -133,7 +125,7 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>The result settings after merge.</returns>
         private static TestEnvironmentSettings TryLoadAndMergeWithCustomSettings(TestEnvironmentSettings defaultSettings)
         {
-            string customTestSettingsFileLocation = System.Environment.GetEnvironmentVariable(EnvVariableForCustomSettingLocation, EnvironmentVariableTarget.User) ?? FallBackCustomTestSettingsFileLocation;
+            string customTestSettingsFileLocation = Environment.GetEnvironmentVariable(EnvVariableForCustomSettingLocation, EnvironmentVariableTarget.User) ?? FallBackCustomTestSettingsFileLocation;
 
             var codeBaseUrl = new Uri(Assembly.GetExecutingAssembly().Location);
             var codeBasePath = Uri.UnescapeDataString(codeBaseUrl.AbsolutePath);
@@ -141,7 +133,7 @@ namespace UnitTests.StorageTests.Relational
             var customFileLoc = Path.Combine(dirPath, customTestSettingsFileLocation);
 
             var finalSettings = JObject.FromObject(defaultSettings);
-            if(File.Exists(customFileLoc))
+            if (File.Exists(customFileLoc))
             {
                 //TODO: Print that parsing custom values...
                 var mergeSettings = new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Union };
@@ -152,7 +144,6 @@ namespace UnitTests.StorageTests.Relational
 
             return finalSettings.ToObject<TestEnvironmentSettings>();
         }
-
 
         /// <summary>
         /// Checks if a given storage is reachable.

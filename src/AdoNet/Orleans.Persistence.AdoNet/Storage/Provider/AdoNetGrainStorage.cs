@@ -487,21 +487,20 @@ namespace Orleans.Storage
         /// <remarks>This likely should exist in Orleans core in more optimized form.</remarks>
         private static AdoGrainKey GrainIdAndExtensionAsString(GrainReference grainReference)
         {
-            //Kudos for https://github.com/tsibelman for the algorithm. See more at https://github.com/dotnet/orleans/issues/1905.
-            string keyExtension;
-            AdoGrainKey key;
-            if(grainReference.IsPrimaryKeyBasedOnLong())
+            var grainId = grainReference.GrainId;
+            string keyExt;
+            if (grainId.TryGetGuidKey(out var guid, out keyExt))
             {
-                key = new AdoGrainKey(grainReference.GetPrimaryKeyLong(out keyExtension), keyExtension);
-            }
-            else
-            {
-                key = new AdoGrainKey(grainReference.GetPrimaryKey(out keyExtension), keyExtension);
+                return new AdoGrainKey(guid, keyExt);
             }
 
-            return key;
+            if (grainId.TryGetIntegerKey(out var integer, out keyExt))
+            {
+                return new AdoGrainKey(integer, keyExt);
+            }
+
+            return new AdoGrainKey(grainId.Key.ToString());
         }
-
 
         /// <summary>
         /// Extracts a base class from a string that is either <see cref="Type.AssemblyQualifiedName"/> or

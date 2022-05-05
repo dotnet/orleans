@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 
@@ -46,7 +46,6 @@ namespace UnitTests.StorageTests.Relational
         /// The set of symbols as defined by this set.
         /// </summary>
         public IList<Range<int>> SetRanges { get; }
-
 
         /// <summary>
         /// A constructor.

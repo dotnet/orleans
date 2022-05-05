@@ -1,4 +1,3 @@
-
 using System;
 using System.Data;
 using System.Data.Common;
@@ -20,87 +19,16 @@ namespace UnitTests.StorageTests.AdoNet
         public byte[] StreamData { get; set; }
     }
 
-
-    public class RelationalStoreTests : IClassFixture<RelationalStoreTests.Fixture>
+    public abstract class RelationalStoreTestsBase
     {
-        private const string testDatabaseName = "OrleansStreamTest";
-        
         //This timeout limit should be clearly less than that defined in RelationalStorageForTesting.CancellationTestQuery. 
-        private readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(1);
-        private readonly TimeSpan StreamCancellationTimeoutLimit = TimeSpan.FromSeconds(15);
-        private const int MiB = 1048576;
-        private const int StreamSizeToBeInsertedInBytes = MiB * 2;
-        private const int NumberOfParallelStreams = 5;
+        protected readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(5);
+        protected readonly TimeSpan StreamCancellationTimeoutLimit = TimeSpan.FromSeconds(15);
+        protected const int MiB = 1048576;
+        protected const int StreamSizeToBeInsertedInBytes = MiB * 2;
+        protected const int NumberOfParallelStreams = 5;
 
-        private readonly RelationalStorageForTesting sqlServerStorage;
-        private readonly RelationalStorageForTesting mySqlStorage;
-
-        public class Fixture
-        {
-            public Fixture()
-            {
-                try
-                {
-                    SqlServerStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, testDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Failed to initialize SQL Server for RelationalGeneralTests: {0}", ex);
-                }
-
-                try
-                {
-                    MySqlStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, testDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Failed to initialize MySQL for RelationalGeneralTests: {0}", ex);
-                }
-            }
-
-            public RelationalStorageForTesting SqlServerStorage { get; private set; }
-            public RelationalStorageForTesting MySqlStorage { get; private set; }
-        }
-
-        public RelationalStoreTests(Fixture fixture)
-        {
-            this.sqlServerStorage = fixture.SqlServerStorage;
-            this.mySqlStorage = fixture.MySqlStorage;
-        }
-
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("AdoNet")]
-        public async Task Streaming_SqlServer_Test()
-        {
-            using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
-            {                
-                var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(sqlServerStorage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
-                Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
-            }
-        }
-
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
-        public async Task Streaming_MySql_Test()
-        {
-            using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
-            {             
-                var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(mySqlStorage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
-                Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
-            }
-        }
-
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("AdoNet")]
-        public async Task CancellationToken_SqlServer_Test()
-        {
-            await CancellationTokenTest(sqlServerStorage, CancellationTestTimeoutLimit);
-        }
-
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
-        public async Task CancellationToken_MySql_Test()
-        {
-            await CancellationTokenTest(mySqlStorage, CancellationTestTimeoutLimit);
-        }
-
-        private static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
+        protected static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
         {
             Skip.If(sut == null, "Database was not initialized correctly");
 
@@ -122,7 +50,7 @@ namespace UnitTests.StorageTests.AdoNet
             return streamChecks;
         }
 
-        private static async Task InsertIntoDatabaseUsingStream(RelationalStorageForTesting sut, int streamId, byte[] dataToInsert, CancellationToken cancellationToken)
+        protected static async Task InsertIntoDatabaseUsingStream(RelationalStorageForTesting sut, int streamId, byte[] dataToInsert, CancellationToken cancellationToken)
         {
             Skip.If(sut == null, "Database was not initialized correctly");
             //The dataToInsert could be inserted here directly, but it wouldn't be streamed.
@@ -150,7 +78,7 @@ namespace UnitTests.StorageTests.AdoNet
             }
         }
 
-        private static async Task<StreamingTest> ReadFromDatabaseUsingAsyncStream(RelationalStorageForTesting sut, int streamId, CancellationToken cancellationToken)
+        protected static async Task<StreamingTest> ReadFromDatabaseUsingAsyncStream(RelationalStorageForTesting sut, int streamId, CancellationToken cancellationToken)
         {
             Skip.If(sut == null, "Database was not initialized correctly");
             return (await sut.Storage.ReadAsync(sut.StreamTestSelect, command =>
@@ -175,7 +103,7 @@ namespace UnitTests.StorageTests.AdoNet
             }, cancellationToken, CommandBehavior.SequentialAccess).ConfigureAwait(false)).Single();
         }
 
-        private static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
+        protected static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
         {
             Skip.If(sut == null, "Database was not initialized correctly");
             using (var tokenSource = new CancellationTokenSource(timeoutLimit))
@@ -185,7 +113,7 @@ namespace UnitTests.StorageTests.AdoNet
                     //Here one second is added to the task timeout limit in order to account for the delays.
                     //The delays are mainly in the underlying ADO.NET libraries and database.
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
-                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(1))))
+                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
                     {
                         Assert.True(false, string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }

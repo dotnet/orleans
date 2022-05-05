@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using Orleans.Tests.SqlUtils;
+using TestExtensions;
 using UnitTests.General;
 
 namespace Tester.RelationalUtilities
@@ -11,10 +13,7 @@ namespace Tester.RelationalUtilities
         {
         }
 
-        public override string DefaultConnectionString
-        {
-            get { return @"Server=127.0.0.1;Port=5432;Database=postgres;Integrated Security=true;Pooling=false;"; }
-        }
+        public override string DefaultConnectionString => TestDefaultConfiguration.PostgresConnectionString;
 
         public override string CancellationTestQuery { get { return "SELECT pg_sleep(10); SELECT 1; "; } }
 

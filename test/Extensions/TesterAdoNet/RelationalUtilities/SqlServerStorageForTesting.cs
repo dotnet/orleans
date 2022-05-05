@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Tests.SqlUtils;
+using TestExtensions;
 
 namespace UnitTests.General
 {
@@ -12,10 +13,7 @@ namespace UnitTests.General
         {
         }
 
-        public override string DefaultConnectionString
-        {
-            get { return @"Data Source = (localdb)\MSSQLLocalDB; Database = Master; Integrated Security = True; Max Pool Size = 200; MultipleActiveResultSets = True"; }
-        }
+        public override string DefaultConnectionString => TestDefaultConfiguration.MsSqlConnectionString;
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
 

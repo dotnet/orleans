@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
@@ -10,18 +11,18 @@ namespace Orleans.Runtime.MembershipService
     public class AdoNetClusteringTable: IMembershipTable
     {
         private string clusterId;
-        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
+        private readonly IServiceProvider serviceProvider;
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(
-            GrainReferenceKeyStringConverter grainReferenceConverter, 
+            IServiceProvider serviceProvider,
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<AdoNetClusteringSiloOptions> clusteringOptions, 
             ILogger<AdoNetClusteringTable> logger)
         {
-            this.grainReferenceConverter = grainReferenceConverter;
+            this.serviceProvider = serviceProvider;
             this.logger = logger;
             this.clusteringTableOptions = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
@@ -33,7 +34,11 @@ namespace Orleans.Runtime.MembershipService
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(clusteringTableOptions.Invariant, clusteringTableOptions.ConnectionString, this.grainReferenceConverter);
+            var grainReferenceConverter = this.serviceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(
+                clusteringTableOptions.Invariant,
+                clusteringTableOptions.ConnectionString,
+                grainReferenceConverter);
             
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
