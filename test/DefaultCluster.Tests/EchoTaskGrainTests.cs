@@ -239,17 +239,12 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo_Membership()
         {
-            Stopwatch clock = new Stopwatch();
+            while (true)
+            {
+                grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
-            string what = "CreateGrain";
-            clock.Start();
-            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
-
-            what = "EchoGrain.PingOtherSiloMembership";
-            clock.Restart();
-            await grain.PingClusterMemberAsync().WithTimeout(timeout);
-            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
+                await grain.PingClusterMemberAsync().WithTimeout(timeout);
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Echo")]

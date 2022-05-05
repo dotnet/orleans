@@ -13,6 +13,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost.InMemoryTransport;
 
 namespace Benchmarks.Ping
 {
@@ -29,6 +30,7 @@ namespace Benchmarks.Ping
 
         public PingBenchmark(int numSilos, bool startClient, bool grainsOnSecondariesOnly = false)
         {
+            var transportHub = new InMemoryTransportConnectionHub();
             for (var i = 0; i < numSilos; ++i)
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
@@ -38,6 +40,7 @@ namespace Benchmarks.Ping
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,
                         primarySiloEndpoint: primary);
+                    siloBuilder.UseInMemoryConnectionTransport(transportHub);
 
                     if (i == 0 && grainsOnSecondariesOnly)
                     {
@@ -66,6 +69,8 @@ namespace Benchmarks.Ping
                         var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
                         clientBuilder.UseStaticClustering(gateways);
                     }
+
+                    clientBuilder.UseInMemoryConnectionTransport(transportHub);
                 });
 
                 this.clientHost = hostBuilder.Build();

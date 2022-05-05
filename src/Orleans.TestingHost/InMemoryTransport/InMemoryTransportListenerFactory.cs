@@ -2,24 +2,21 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Networking.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using Orleans.Timers.Internal;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
-internal static class InMemoryTransportExtensions
+public static class InMemoryTransportExtensions
 {
     public static ISiloBuilder UseInMemoryConnectionTransport(this ISiloBuilder siloBuilder, InMemoryTransportConnectionHub hub)
     {
@@ -147,13 +144,11 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
     }
 }
 
-internal class InMemoryTransportConnectionHub
+public class InMemoryTransportConnectionHub
 {
     private readonly ConcurrentDictionary<EndPoint, InMemoryTransportListener> _listeners = new();
 
-    public static InMemoryTransportConnectionHub Instance { get; } = new();
-
-    public void RegisterConnectionListenerFactory(EndPoint endPoint, InMemoryTransportListener listener)
+    internal void RegisterConnectionListenerFactory(EndPoint endPoint, InMemoryTransportListener listener)
     {
         _listeners[endPoint] = listener;
         listener.OnDisposed.Register(() =>
@@ -162,7 +157,7 @@ internal class InMemoryTransportConnectionHub
         });
     }
 
-    public InMemoryTransportListener GetConnectionListenerFactory(EndPoint endPoint)
+    internal InMemoryTransportListener GetConnectionListenerFactory(EndPoint endPoint)
     {
         _listeners.TryGetValue(endPoint, out var listener);
         return listener;
