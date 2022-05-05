@@ -43,7 +43,7 @@ namespace UnitTests.MembershipTests
             var options = new ZooKeeperGatewayListProviderOptions();
             options.ConnectionString = this.connectionString;
 
-            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options));
+            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options), this.clusterOptions);
         }
 
         protected override async Task<string> GetConnectionString()
