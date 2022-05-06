@@ -71,6 +71,7 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public async Task AzureTableDataManager_UpdateTableEntryAsync()
         {
+            StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             var data = GenerateNewData();
             try
             {
@@ -159,6 +160,7 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public async Task AzureTableDataManager_MergeTableAsync()
         {
+            StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             var data = GenerateNewData();
             try
             {
