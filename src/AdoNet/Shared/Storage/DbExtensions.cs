@@ -108,7 +108,6 @@ namespace Orleans.Tests.SqlUtils
             command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
         }
 
-
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.
         /// </summary>

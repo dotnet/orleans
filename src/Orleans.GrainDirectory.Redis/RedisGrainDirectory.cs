@@ -91,7 +91,7 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = address.ActivationId });
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = address.ActivationId.ToParsableString() });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");

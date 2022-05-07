@@ -16,7 +16,7 @@ namespace Tester.AzureUtils
     /// <summary>
     /// Tests for operation of Orleans Membership Table using AzureStore - Requires access to external Azure storage
     /// </summary>
-    [TestCategory("Membership"), TestCategory("Azure")]
+    [TestCategory("Membership"), TestCategory("AzureStorage")]
     public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
         public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

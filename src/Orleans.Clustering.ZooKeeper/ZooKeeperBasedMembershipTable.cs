@@ -40,20 +40,22 @@ namespace Orleans.Runtime.Membership
 
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
 
-        private ZooKeeperWatcher watcher;
+        private readonly ZooKeeperWatcher watcher;
 
         /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
-        private string deploymentConnectionString;
+        private readonly string deploymentConnectionString;
+
         /// <summary>
         /// the node name for this deployment. for eg. /ClusterId
         /// </summary>
-        private string clusterPath;
+        private readonly string clusterPath;
+
         /// <summary>
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
-        private string rootConnectionString;
+        private readonly string rootConnectionString;
         
         public ZooKeeperBasedMembershipTable(
             ILogger<ZooKeeperBasedMembershipTable> logger, 
@@ -63,7 +65,9 @@ namespace Orleans.Runtime.Membership
             this.logger = logger;
             var options = membershipTableOptions.Value;
             watcher = new ZooKeeperWatcher(logger);
-            InitConfig(options.ConnectionString, clusterOptions.Value.ClusterId);
+            this.clusterPath = "/" + clusterOptions.Value.ClusterId;
+            rootConnectionString = options.ConnectionString;
+            deploymentConnectionString = options.ConnectionString + this.clusterPath;
         }
 
         /// <summary>
@@ -91,13 +95,6 @@ namespace Orleans.Runtime.Membership
                     this.logger.Debug("Deployment path already exists: " + this.clusterPath);
                 }
             });
-        }
-
-        private void InitConfig(string dataConnectionString, string clusterId)
-        {
-            this.clusterPath = "/" + clusterId;
-            deploymentConnectionString = dataConnectionString + this.clusterPath;
-            rootConnectionString = dataConnectionString;
         }
 
         /// <summary>

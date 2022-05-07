@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
-    [TestCategory("Azure"), TestCategory("Storage")]
+    [TestCategory("AzureStorage"), TestCategory("Storage")]
     public class AzureTableErrorCodeTests
     {
 

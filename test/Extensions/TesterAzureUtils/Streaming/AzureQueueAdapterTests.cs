@@ -22,7 +22,7 @@ using Orleans.Serialization;
 namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    [TestCategory("Azure"), TestCategory("Streaming")]
+    [TestCategory("AzureStorage"), TestCategory("Streaming")]
     public class AzureQueueAdapterTests : AzureStorageBasicTests, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;

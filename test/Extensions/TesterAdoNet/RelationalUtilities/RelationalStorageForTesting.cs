@@ -137,7 +137,6 @@ namespace UnitTests.General
             return CreateTestInstance(invariantName, CreateTestInstance(invariantName, "notempty").DefaultConnectionString);
         }
 
-
         /// <summary>
         /// Constructor
         /// </summary>

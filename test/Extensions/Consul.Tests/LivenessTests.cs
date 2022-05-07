@@ -30,7 +30,7 @@ namespace Consul.Tests
             {
                 hostBuilder.UseConsulSiloClustering(options =>
                 {
-                    var address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
+                    var address = new Uri(ConsulTestUtils.ConsulConnectionString);
                     options.ConfigureConsulClient(address);
                 });
             }
@@ -43,7 +43,7 @@ namespace Consul.Tests
                 clientBuilder
                     .UseConsulClientClustering(gatewayOptions =>
                     {
-                        var address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
+                        var address = new Uri(ConsulTestUtils.ConsulConnectionString);
                         gatewayOptions.ConfigureConsulClient(address);
                     });
             }

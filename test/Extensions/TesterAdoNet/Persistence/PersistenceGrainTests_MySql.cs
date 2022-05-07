@@ -13,13 +13,14 @@ using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
-    [TestCategory("Persistence"), TestCategory("SqlServer")]
-    public class PersistenceGrainTests_Sql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Sql.Fixture>
+    [TestCategory("Persistence"), TestCategory("MySql")]
+    public class PersistenceGrainTests_MySql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_MySql.Fixture>
     {
-        public const string TestDatabaseName = "OrleansTest";
-        public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        public static Guid ServiceId = Guid.NewGuid();
-        public static string ConnectionStringKey = "AdoNetConnectionString";
+        public const string TestDatabaseName = "OrleansTest_MySql_Storage";
+        public const string AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+        public const string ConnectionStringKey = "AdoNetConnectionString";
+        public static readonly Guid ServiceId = Guid.NewGuid();
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -45,6 +46,11 @@ namespace Tester.AdoNet.Persistence
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
+                            .UseAdoNetClustering(options =>
+                            {
+                                options.ConnectionString = connectionString;
+                                options.Invariant = AdoInvariant;
+                            })
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                             {
                                 options.ConnectionString = (string)connectionString;
@@ -58,7 +64,7 @@ namespace Tester.AdoNet.Persistence
 
         private Fixture fixture;
 
-        public PersistenceGrainTests_Sql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_MySql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             this.fixture = fixture;
             this.fixture.EnsurePreconditionsMet();

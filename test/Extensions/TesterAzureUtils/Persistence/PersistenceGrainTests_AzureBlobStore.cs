@@ -16,7 +16,7 @@ namespace Tester.AzureUtils.Persistence
     /// <summary>
     /// PersistenceGrainTests using AzureStore - Requires access to external Azure blob storage
     /// </summary>
-    [TestCategory("Persistence"), TestCategory("Azure")]
+    [TestCategory("Persistence"), TestCategory("AzureStorage")]
     public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture
@@ -45,6 +45,7 @@ namespace Tester.AzureUtils.Persistence
                     {
                         options.ConfigureTestDefaults();
                     })
+                    .AddMemoryGrainStorage("test1")
                     .AddMemoryGrainStorage("MemoryStore");
                 }
             }

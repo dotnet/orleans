@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions-dev")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions-dev")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {
         public ConsistencySkewedClockTests(SkewedClockTestFixture fixture, ITestOutputHelper output)

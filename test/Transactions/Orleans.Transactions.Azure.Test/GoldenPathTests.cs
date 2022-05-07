@@ -4,7 +4,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class GoldenPathTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public GoldenPathTests(TestFixture fixture, ITestOutputHelper output)

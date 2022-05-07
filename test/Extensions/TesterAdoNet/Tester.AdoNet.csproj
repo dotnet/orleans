@@ -28,12 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Data\TestDb.mdf">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="$(SourceRoot)src\AdoNet\Shared\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

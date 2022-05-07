@@ -10,28 +10,6 @@ using Xunit;
 
 namespace Tester.Directories
 {
-    [TestCategory("Azure")]
-    public class AzureMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
-    {
-        public class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder siloBuilder)
-            {
-                siloBuilder.AddAzureTableGrainDirectory(
-                    CustomDirectoryGrain.DIRECTORY,
-                    options => options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
-            }
-        }
-
-        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
-
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            base.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
-    }
-
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

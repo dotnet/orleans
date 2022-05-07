@@ -26,7 +26,8 @@ namespace Orleans.Reminders.DynamoDB
         private const string REMINDER_ID_PROPERTY_NAME = "ReminderId";
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
-        private const string SERVICE_ID_INDEX = "ServiceIdIndex";
+        private const string SERVICE_ID_GRAIN_HASH_INDEX = "ServiceIdIndex";
+        private const string SERVICE_ID_GRAIN_REFERENCE_INDEX = "ServiceIdGrainReferenceIndex";
 
         private readonly ILogger logger;
         private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
@@ -55,19 +56,40 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
         public Task Init()
         {
-            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                this.options.Token, this.options.ProfileName, this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+            this.storage = new DynamoDBStorage(
+                this.logger,
+                this.options.Service,
+                this.options.AccessKey,
+                this.options.SecretKey,
+                this.options.Token,
+                this.options.ProfileName,
+                this.options.ReadCapacityUnits,
+                this.options.WriteCapacityUnits,
+                this.options.UseProvisionedThroughput,
+                this.options.CreateIfNotExists,
+                this.options.UpdateIfExists);
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
-            var secondaryIndex = new GlobalSecondaryIndex
+            var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
-                IndexName = SERVICE_ID_INDEX,
+                IndexName = SERVICE_ID_GRAIN_HASH_INDEX,
                 Projection = new Projection { ProjectionType = ProjectionType.ALL },
                 KeySchema = new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
                     new KeySchemaElement { AttributeName = GRAIN_HASH_PROPERTY_NAME, KeyType = KeyType.RANGE }
+                }
+            };
+
+            var serviceIdGrainReferenceGlobalSecondaryIndex = new GlobalSecondaryIndex
+            {
+                IndexName = SERVICE_ID_GRAIN_REFERENCE_INDEX,
+                Projection = new Projection { ProjectionType = ProjectionType.ALL },
+                KeySchema = new List<KeySchemaElement>
+                {
+                    new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
+                    new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.RANGE }
                 }
             };
 
@@ -81,9 +103,10 @@ namespace Orleans.Reminders.DynamoDB
                 {
                     new AttributeDefinition { AttributeName = REMINDER_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_HASH_PROPERTY_NAME, AttributeType = ScalarAttributeType.N },
-                    new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
+                    new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
+                    new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
-                new List<GlobalSecondaryIndex> { secondaryIndex });
+                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
         }
 
         /// <summary>
@@ -131,7 +154,7 @@ namespace Orleans.Reminders.DynamoDB
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
-                var records = await this.storage.ScanAsync(this.options.TableName, expressionValues, expression, this.Resolve).ConfigureAwait(false);
+                var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
@@ -146,31 +169,48 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>
         /// Reads reminder table data for a given hash range.
         /// </summary>
-        /// <param name="beginHash"></param>
-        /// <param name="endHash"></param>
+        /// <param name="begin"></param>
+        /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            var expressionValues = new Dictionary<string, AttributeValue>
-                {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
-                    { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = beginHash.ToString() } },
-                    { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = endHash.ToString() } }
-                };
+            Dictionary<string, AttributeValue> expressionValues = null;
 
             try
             {
                 string expression = string.Empty;
-                if (beginHash < endHash)
+                List<ReminderEntry> records;
+
+                if (begin < end)
                 {
-                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = (begin + 1).ToString() } },
+                        { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
                 }
                 else
                 {
-                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND ({GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME} OR {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME})";
-                }
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
+                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
 
-                var records = await this.storage.ScanAsync(this.options.TableName, expressionValues, expression, this.Resolve).ConfigureAwait(false);
+                    expressionValues = new Dictionary<string, AttributeValue>
+                    {
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } }
+                    };
+                    expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME}";
+                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false));
+
+                }
 
                 return new ReminderTableData(records);
             }

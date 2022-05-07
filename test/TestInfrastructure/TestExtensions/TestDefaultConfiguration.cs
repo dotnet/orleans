@@ -42,7 +42,11 @@ namespace TestExtensions
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)];
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+        public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)];
+        public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)];
+        public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)];
 
         public static bool GetValue(string key, out string value)
         {

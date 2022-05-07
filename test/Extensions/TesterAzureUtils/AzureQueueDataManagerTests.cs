@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
-    [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+    [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("AzureQueue")]
     public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IAsyncLifetime
     {
         private readonly ILogger logger;
