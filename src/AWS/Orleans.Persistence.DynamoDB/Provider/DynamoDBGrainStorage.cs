@@ -152,7 +152,7 @@ namespace Orleans.Storage
                         GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
                         ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N),
                         BinaryState = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B?.ToArray() : null,
-                        StringState = fields.ContainsKey(STRING_STATE_PROPERTY_NAME) ? fields[STRING_STATE_PROPERTY_NAME].S : string.Empty
+                        StringState = fields.ContainsKey(STRING_STATE_PROPERTY_NAME) ? fields[STRING_STATE_PROPERTY_NAME].S : null
                     };
                 }).ConfigureAwait(false);
 
