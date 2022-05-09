@@ -20,7 +20,7 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StorageConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+        private string StorageConnectionString = AWSTestConstants.SqsConnectionString;
 
         private readonly ITestOutputHelper output;
         private ClientStreamTestRunner runner;
@@ -54,7 +54,7 @@ namespace AWSUtils.Tests.Streaming
                 hostBuilder
                     .AddSqsStreams(SQSStreamProviderName, options => 
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
                     })
                     .AddMemoryGrainStorage("PubSubStore")
                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
@@ -66,10 +66,10 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    .AddSqsStreams(SQSStreamProviderName, (Action<SqsOptions>)(options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                    }));
             }
         }
 

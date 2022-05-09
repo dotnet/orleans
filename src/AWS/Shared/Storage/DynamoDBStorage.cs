@@ -217,7 +217,15 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                await ddbClient.CreateTableAsync(request);
+                try
+                {
+                    await ddbClient.CreateTableAsync(request);
+                }
+                catch (ResourceInUseException)
+                {
+                    // The table has already been created.
+                }
+
                 TableDescription tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
                 tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName);
             }

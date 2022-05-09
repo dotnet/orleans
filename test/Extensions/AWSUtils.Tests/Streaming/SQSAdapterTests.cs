@@ -48,12 +48,12 @@ namespace AWSUtils.Tests.Streaming
 
         public async Task DisposeAsync()
         {
-            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
             {
                 await SQSStreamProviderUtils.DeleteAllUsedQueues(
                     SQS_STREAM_PROVIDER_NAME,
                     this.clusterId,
-                    AWSTestConstants.DefaultSQSConnectionString,
+                    AWSTestConstants.SqsConnectionString,
                     NullLoggerFactory.Instance);
             }
         }
@@ -63,7 +63,7 @@ namespace AWSUtils.Tests.Streaming
         {
             var options = new SqsOptions
             {
-                ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
+                ConnectionString = AWSTestConstants.SqsConnectionString,
             };
             var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), null, null);
             adapterFactory.Init();
