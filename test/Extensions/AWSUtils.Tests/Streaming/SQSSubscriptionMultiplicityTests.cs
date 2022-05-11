@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StreamConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+        private string StreamConnectionString = AWSTestConstants.SqsConnectionString;
         private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -38,10 +38,10 @@ namespace AWSUtils.Tests.Streaming
             {
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")
-                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    .AddSqsStreams(SQSStreamProviderName, (Action<Orleans.Configuration.SqsOptions>)(options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                    }));
             }
         }
 
@@ -50,10 +50,10 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    .AddSqsStreams(SQSStreamProviderName, (Action<Orleans.Configuration.SqsOptions>)(options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                    }));
             }
         }
 

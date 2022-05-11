@@ -38,25 +38,25 @@ namespace AWSUtils.Tests.Streaming
                     .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
                     })
                     .AddSqsStreams("SQSProvider2", options =>
                      {
-                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
                      })
                     .AddDynamoDBGrainStorage("DynamoDBStore", options =>
                     {
-                        options.Service = AWSTestConstants.Service;
-                        options.SecretKey = AWSTestConstants.SecretKey;
-                        options.AccessKey = AWSTestConstants.AccessKey;
+                        options.Service = AWSTestConstants.DynamoDbService;
+                        options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
+                        options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                         options.DeleteStateOnClear = true;
                         options.UseJson = true;
                     })
                     .AddDynamoDBGrainStorage("PubSubStore", options =>
                     {
-                        options.Service = AWSTestConstants.Service;
-                        options.SecretKey = AWSTestConstants.SecretKey;
-                        options.AccessKey = AWSTestConstants.AccessKey;
+                        options.Service = AWSTestConstants.DynamoDbService;
+                        options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
+                        options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                     })
                     .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
             }
@@ -68,10 +68,10 @@ namespace AWSUtils.Tests.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider("SMSProvider")
-                    .AddSqsStreams("SQSProvider", options =>
+                    .AddSqsStreams("SQSProvider", (System.Action<Orleans.Configuration.SqsOptions>)(options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                    }));
             }
         }
         
@@ -85,9 +85,9 @@ namespace AWSUtils.Tests.Streaming
         {
             var clusterId = HostedCluster.Options.ClusterId;
             await base.DisposeAsync();
-            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
             {
-                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.SqsConnectionString, NullLoggerFactory.Instance).Wait();
             }
         }
 
