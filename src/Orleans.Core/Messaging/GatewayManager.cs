@@ -235,10 +235,6 @@ namespace Orleans.Messaging
                 // the listProvider.GetGateways() is not under lock.
                 var allGateways = await gatewayListProvider.GetGateways();
                 var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
-                }
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
             }
