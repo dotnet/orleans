@@ -426,7 +426,10 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo shutting down");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated");
+            }            
 
             bool gracefully = !cancellationToken.IsCancellationRequested;
             bool stopAlreadyInProgress = false;
@@ -441,7 +444,7 @@ namespace Orleans.Runtime
                 }
                 else if (!this.SystemStatus.Equals(SystemStatus.Running))
                 {
-                    throw new InvalidOperationException($"Attempted to stop a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {this.SystemStatus} state.");
+                    throw new InvalidOperationException($"Attempted to shutdown a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {this.SystemStatus} state.");
                 }
                 else
                 {
@@ -454,11 +457,18 @@ namespace Orleans.Runtime
 
             if (stopAlreadyInProgress)
             {
-                logger.Info(ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
-                var pause = TimeSpan.FromSeconds(1);
-                while (!this.SystemStatus.Equals(SystemStatus.Terminated))
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
+                    logger.Debug(ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
+                }
+                var pause = TimeSpan.FromSeconds(1);                
+
+                while (!this.SystemStatus.Equals(SystemStatus.Terminated))
+                {                    
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.Debug(ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...", pause);
+                    }
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
 
@@ -473,7 +483,10 @@ namespace Orleans.Runtime
             finally
             {
                 // Signal to all awaiters that the silo has terminated.
-                logger.LogInformation((int)ErrorCode.SiloShutDown, "Silo shutdown completed");
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug((int)ErrorCode.SiloShutDown, "Silo shutdown completed!");
+                }
                 await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
             }
         }

@@ -281,7 +281,11 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeShuttingDown()
         {
-            this.log.Info(ErrorCode.MembershipShutDown, "-Shutdown");
+            if (this.log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.Debug(ErrorCode.MembershipShutDown, "-Shutdown");
+            }
+            
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);
@@ -295,7 +299,11 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeStopping()
         {
-            log.Info(ErrorCode.MembershipStop, "-Stop");
+            if (this.log.IsEnabled(LogLevel.Debug))
+            {
+                log.Debug(ErrorCode.MembershipStop, "-Stop");
+            }
+
             try
             {
                 await this.UpdateStatus(SiloStatus.Stopping);
@@ -309,9 +317,12 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeDead()
         {
-            this.log.LogInformation(
-                (int)ErrorCode.MembershipKillMyself,
-                "Updating status to Dead");
+            if (this.log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug(
+                   (int)ErrorCode.MembershipKillMyself,
+                    "Updating status to Dead");
+            }
 
             try
             {

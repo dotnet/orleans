@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         {
             this.loggerFactory = loggerFactory;
             reportFrequency = writeInterval;
-            logger = loggerFactory.CreateLogger("Orleans.Runtime." + (isSilo ? "SiloLogStatistics" : "ClientLogStatistics"));
+            logger = loggerFactory.CreateLogger($"Orleans.Runtime.{nameof(LogStatistics)}" + (isSilo ? ".Silo" : ".Client"));
         }
 
         internal void Start()
@@ -87,7 +87,10 @@ namespace Orleans.Runtime
             if (counterData == null)
             {
                 // Flush remaining data
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.Debug(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                }
                 logMsgBuilder.Clear();
                 return;
             }
@@ -99,7 +102,10 @@ namespace Orleans.Runtime
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.Debug(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                }
                 logMsgBuilder.Clear();
             }
 

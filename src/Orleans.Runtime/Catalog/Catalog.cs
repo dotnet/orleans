@@ -364,7 +364,10 @@ namespace Orleans.Runtime
 
         public Task DeactivateAllActivations()
         {
-            logger.Info(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.Debug(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
+            }
             var activationsToShutdown = new List<IGrainContext>();
             foreach (var pair in activations)
             {

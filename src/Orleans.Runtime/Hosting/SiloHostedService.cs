@@ -15,7 +15,7 @@ namespace Orleans.Hosting
         public SiloHostedService(
             Silo silo,
             IEnumerable<IConfigurationValidator> configurationValidators,
-            ILogger<Silo> logger)
+            ILogger<SiloHostedService> logger)
         {
             this.ValidateSystemConfiguration(configurationValidators);
             this.silo = silo;

@@ -472,11 +472,14 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.LogMissedIAmAlives(table);
 
-                this.log.LogInformation(
-                    (int)ErrorCode.MembershipReadAll_2,
-                    nameof(ProcessTableUpdate) + " (called from {Caller}) membership table: {Table}",
-                    caller,
-                    table.WithoutDuplicateDeads().ToString());
+                if (this.log.IsEnabled(LogLevel.Debug))
+                {
+                    this.log.Debug(
+                        (int)ErrorCode.MembershipReadAll_2,
+                        nameof(ProcessTableUpdate) + " (called from {Caller}) membership table: {Table}",
+                        caller,
+                        table.WithoutDuplicateDeads().ToString());
+                }
             }
         }
 
