@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Xunit;
 
@@ -112,7 +113,7 @@ namespace Tester
 
         private class TestLifecycleSubject : LifecycleSubject
         {
-            public TestLifecycleSubject(ILogger logger) : base(logger)
+            public TestLifecycleSubject() : base(NullLogger.Instance)
             {
             }
         }
@@ -120,7 +121,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task MultiStageObserverLifecycleTest()
         {
-            var lifecycle = new TestLifecycleSubject(null);
+            var lifecycle = new TestLifecycleSubject();
             var multiStageObserver = new MultiStageObserver();
             multiStageObserver.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -135,7 +136,7 @@ namespace Tester
         {
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
-            var lifecycle = new TestLifecycleSubject(null);
+            var lifecycle = new TestLifecycleSubject();
             foreach (KeyValuePair<TestStages, int> kvp in observerCountByStage)
             {
                 List<Observer> observers = Enumerable
