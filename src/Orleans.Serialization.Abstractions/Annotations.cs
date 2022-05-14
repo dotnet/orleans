@@ -493,7 +493,7 @@ namespace Orleans
     /// Indicates that the source generator should also inspect and generate code for the assembly containing the specified type.
     /// </summary>
     /// <seealso cref="System.Attribute" />
-    [AttributeUsage(AttributeTargets.Assembly)]
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class GenerateCodeForDeclaringAssemblyAttribute : Attribute
     {
         /// <summary>
