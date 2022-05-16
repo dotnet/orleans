@@ -477,7 +477,7 @@ namespace Orleans.Runtime
                 {                    
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        logger.Debug(ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...", pause);
+                        logger.Debug(ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
                     }
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
