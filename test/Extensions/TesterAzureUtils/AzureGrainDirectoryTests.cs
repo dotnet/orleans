@@ -23,6 +23,7 @@ namespace Tester.AzureUtils
         protected override AzureTableGrainDirectory GetGrainDirectory()
         {
             TestUtils.CheckForAzureStorage();
+            StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
 
             var clusterOptions = new ClusterOptions
             {

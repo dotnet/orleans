@@ -37,7 +37,10 @@ namespace Orleans.Runtime.ConsistentRing
             running = true;
             myRange = RangeFactory.CreateFullRange();
 
-            logger.Info("Starting {0} on silo {1}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.Debug("Starting {0} on silo {1}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
+            }            
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             IntValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RINGSIZE, () => GetRingSize());
@@ -92,7 +95,11 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            logger.Info(ErrorCode.CRP_Notify, "-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old.ToString(), now.ToString(), increased);
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.Trace(ErrorCode.CRP_Notify, "-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old.ToString(), now.ToString(), increased);
+            }
+            
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
@@ -130,7 +137,10 @@ namespace Orleans.Runtime.ConsistentRing
 
                 var myOldRange = myRange;
                 var myNewRange = UpdateRange();
-                logger.Info(ErrorCode.CRP_Added_Silo, "Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.Trace(ErrorCode.CRP_Added_Silo, "Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                }                
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
             }
@@ -156,7 +166,11 @@ namespace Orleans.Runtime.ConsistentRing
 
                 var myOldRange = this.myRange;
                 var myNewRange = UpdateRange();
-                logger.Info(ErrorCode.CRP_Removed_Silo, "Removed Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.Trace(ErrorCode.CRP_Removed_Silo, "Removed Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                }
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
             }
@@ -298,7 +312,10 @@ namespace Orleans.Runtime.ConsistentRing
                     s = snapshotBucketsList.Length > 1 ? snapshotBucketsList[1] : default;
                 }
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.SiloAddress, hash, hash, s.Hash);
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.SiloAddress, hash, hash, s.Hash);
+            }
             return s.SiloAddress;
         }
     }

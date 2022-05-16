@@ -235,10 +235,6 @@ namespace Orleans.Messaging
                 // the listProvider.GetGateways() is not under lock.
                 var allGateways = await gatewayListProvider.GetGateways();
                 var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
-                }
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
             }
@@ -316,9 +312,9 @@ namespace Orleans.Messaging
 
                 DateTime prevRefresh = lastRefreshTime;
                 lastRefreshTime = now;
-                if (logger.IsEnabled(LogLevel.Information))
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
+                    logger.Debug(ErrorCode.GatewayManager_FoundKnownGateways,
                             "Refreshed the live gateway list. Found {0} gateways from gateway list provider: {1}. Picked only known live out of them. Now has {2} live gateways: {3}. Previous refresh time was = {4}",
                             knownGateways.Count,
                             Utils.EnumerableToString(knownGateways),
