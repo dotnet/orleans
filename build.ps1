@@ -25,7 +25,7 @@ $Platform = $null
  $DOTNET_MULTILEVEL_LOOKUP = 0
 
  # Set DateTime suffix for debug builds
- if ($BuildConfiguration -eq "Debug")
+ if ($env:BuildConfiguration -eq "Debug")
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
     $AdditionalConfigurationProperties=";VersionDateSuffix=$dateSuffix"
