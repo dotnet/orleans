@@ -158,6 +158,7 @@ jobs:
       env:
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
   test-azure-storage:
+    if: ${{ false }}
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
     strategy:
