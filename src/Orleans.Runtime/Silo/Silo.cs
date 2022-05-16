@@ -426,12 +426,22 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated");
-            }            
-
             bool gracefully = !cancellationToken.IsCancellationRequested;
+            if (gracefully)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (graceful)");
+                }
+            }
+            else
+            {
+                if (logger.IsEnabled(LogLevel.Warning))
+                {
+                    logger.LogWarning((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (non-graceful)");
+                }
+            }
+
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
@@ -482,11 +492,23 @@ namespace Orleans.Runtime
             }
             finally
             {
-                // Signal to all awaiters that the silo has terminated.
-                if (logger.IsEnabled(LogLevel.Debug))
+                // log final status                
+                if (gracefully)
                 {
-                    logger.LogDebug((int)ErrorCode.SiloShutDown, "Silo shutdown completed!");
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug((int)ErrorCode.SiloShutDown, "Silo shutdown completed (graceful)!");
+                    }
                 }
+                else
+                {
+                    if (logger.IsEnabled(LogLevel.Warning))
+                    {
+                        logger.LogWarning((int)ErrorCode.SiloShutDown, "Silo shutdown completed (non-graceful)!");
+                    }
+                }
+
+                // signal to all awaiters that the silo has terminated.
                 await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
             }
         }
