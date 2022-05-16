@@ -1,0 +1,50 @@
+name: "Verifiable CodeQL analysis"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  analyze:
+    name: CodeQL Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      with:
+        languages: 'csharp'
+
+    - name: Setup .NET 6.* SDK
+      uses: actions/setup-dotnet@v1.8.2
+      with:
+        dotnet-version: '6.*'
+
+    - name: Autobuild
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      uses: github/codeql-action/autobuild@v1
+
+    - name: CodeQL Analysis
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      uses: github/codeql-action/analyze@v1
+      timeout-minutes: 100
