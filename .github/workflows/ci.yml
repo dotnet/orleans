@@ -1,14 +1,18 @@
-name: .NET Core CI
+name: .NET CI
 on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
 jobs:
   build:
+    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,3 +31,252 @@ jobs:
       uses: actions/setup-dotnet@v1
     - name: Build
       run: dotnet build
+  test-redis:
+    name: Redis provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["Redis"]
+    services:
+      redis:
+        image: redis
+        ports:
+        - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
+  test-postgres:
+    name: PostgreSQL provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["PostgreSql"]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+        - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
+  test-mariadb:
+    name: MariaDB/MySQL provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["MySql"]
+    services:
+      mariadb:
+        image: mariadb
+        ports:
+          - 3306:3306
+        env:
+          MARIADB_ROOT_PASSWORD: "mariadb"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
+  test-sqlserver:
+    name: Microsoft SQL Server provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["SqlServer"]
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:latest
+        ports:
+          - 1433:1433
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: "Developer"
+          SA_PASSWORD: "yourWeak(!)Password"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
+  test-azure-storage:
+    if: ${{ false }}
+    name: Azure Storage provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        suite: ["BVT", "SlowBVT", "Functional"]
+        framework: ["netcoreapp3.1", "net5.0", "net6.0"]
+        provider: ["AzureStorage"]
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+  test-consul:
+    name: Consul provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["Consul"]
+    services:
+      consul:
+        image: hashicorp/consul
+        ports:
+          - 8500:8500
+          - 8600:8600/tcp
+          - 8600:8600/udp
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
+  test-zookeeper:
+    name: ZooKeeper provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["ZooKeeper"]
+    services:
+      consul:
+        image: bitnami/zookeeper
+        ports:
+          - 2181:2181
+        env:
+          ALLOW_ANONYMOUS_LOGIN: "yes"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
+  test-dynamodb:
+    name: AWS DynamoDB provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["DynamoDB"]
+    services:
+      postgres:
+        image: amazon/dynamodb-local:latest
+        ports:
+        - 8000:8000
+        env:
+          AWS_ACCESS_KEY_ID: root
+          AWS_SECRET_ACCESS_KEY: pass
+          AWS_REGION: us-east-1
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
+        ORLEANSDYNAMODBACCESSKEY: "root"
+        ORLEANSDYNAMODBSECRETKEY: "pass"
