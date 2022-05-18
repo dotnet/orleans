@@ -15,6 +15,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
+using Orleans.TestingHost.UnixSocketTransport;
 
 namespace Orleans.TestingHost
 {
@@ -578,9 +579,14 @@ namespace Orleans.TestingHost
                     hostBuilder.UseOrleansClient((context, clientBuilder) =>
                     {
                         bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseInMemoryTransport)], out var useInMemoryTransport);
+                        bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseUnixSocketTransport)], out var useUnixSocketTransport);
                         if (useInMemoryTransport)
                         {
                             clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+                        }
+                        else if (useUnixSocketTransport)
+                        {
+                            clientBuilder.UseUnixSocketConnection();
                         }
                     });
                 });
@@ -629,9 +635,14 @@ namespace Orleans.TestingHost
                 hostBuilder.UseOrleans((context, siloBuilder) =>
                 {
                     bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseInMemoryTransport)], out var useInMemoryTransport);
+                    bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseUnixSocketTransport)], out var useUnixSocketTransport);
                     if (useInMemoryTransport)
                     {
                         siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                    }
+                    else if (useUnixSocketTransport)
+                    {
+                        siloBuilder.UseUnixSocketConnection();
                     }
                 });
             });

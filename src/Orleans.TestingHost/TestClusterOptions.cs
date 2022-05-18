@@ -98,6 +98,15 @@ namespace Orleans.TestingHost
         public bool UseInMemoryTransport { get; set; } = true;
 
         /// <summary>
+        ///  Gets or sets a value indicating whether to use Unix socket as transport  for connecting silos and clients, instead of TCP.
+        ///  Ignored if <see cref="UseInMemoryTransport"/> is enabled.
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="false"/>
+        /// </remarks>
+        public bool UseUnixSocketTransport { get; set; } = false;
+
+        /// <summary>
         /// Converts these options into a dictionary.
         /// </summary>
         /// <returns>The options dictionary.</returns>
