@@ -15,7 +15,7 @@ namespace Tester.ClientConnectionTests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.UseInMemoryTransport = false;
+            builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
         }
 
         [Fact, TestCategory("Functional")]

@@ -23,7 +23,7 @@ namespace Tests.GeoClusterTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.Options.UseInMemoryTransport = false;
+                builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }

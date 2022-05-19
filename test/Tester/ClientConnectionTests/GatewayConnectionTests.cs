@@ -54,7 +54,7 @@ namespace Tester
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.UseTestClusterMembership = false;
-            builder.Options.UseInMemoryTransport = false;
+            builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
             builder.Options.InitialSilosCount = 1;
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
