@@ -29,14 +29,16 @@ namespace Orleans.Configuration.Internal
         public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
         {
             var registration = services.FirstOrDefault(s => s.ServiceType == implementation);
-            if (registration != null)
+            if (registration == null)
             {
-                var newRegistration = new ServiceDescriptor(
-                    service,
-                    sp => sp.GetRequiredService(implementation),
-                    registration.Lifetime);
-                services.Add(newRegistration);
+                throw new ArgumentNullException(nameof(implementation), $"Unable to find previously registered ServiceType of '{implementation.FullName}'");
             }
+
+            var newRegistration = new ServiceDescriptor(
+                service,
+                sp => sp.GetRequiredService(implementation),
+                registration.Lifetime);
+            services.Add(newRegistration);
         }
 
         /// <summary>
