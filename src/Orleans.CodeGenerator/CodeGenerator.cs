@@ -94,7 +94,7 @@ namespace Orleans.CodeGenerator
             }
 
             // Generate metadata.
-            var metadataClassNamespace = CodeGeneratorName + "." + _compilation.AssemblyName;
+            var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
             var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
             AddMember(ns: metadataClassNamespace, member: metadataClass);
             var metadataAttribute = AttributeList()
