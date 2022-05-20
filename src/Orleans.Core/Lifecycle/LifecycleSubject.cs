@@ -24,11 +24,12 @@ namespace Orleans
     public abstract class LifecycleSubject : ILifecycleSubject
     {
         private readonly List<OrderedObserver> subscribers;
-        private readonly ILogger logger;
+        protected readonly ILogger logger;
         private int? highStage = null;
 
         protected LifecycleSubject(ILogger logger)
         {
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
             this.logger = logger;
             this.subscribers = new List<OrderedObserver>();
         }
@@ -86,7 +87,7 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStart"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+            if (this.logger.IsEnabled(LogLevel.Trace))
             {
                 this.logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
@@ -123,7 +124,7 @@ namespace Orleans
             }
             catch (Exception ex) when (!(ex is OrleansLifecycleCanceledException))
             {
-                this.logger?.LogError(
+                this.logger.LogError(
                     (int)ErrorCode.LifecycleStartFailure,
                     "Lifecycle start canceled due to errors at stage {Stage}: {Exception}",
                     this.highStage,
@@ -157,7 +158,7 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStop"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+            if (this.logger.IsEnabled(LogLevel.Trace))
             {
                 this.logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
@@ -181,7 +182,7 @@ namespace Orleans
             {
                 if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
-                    this.logger?.LogWarning("Lifecycle stop operations canceled by request.");
+                    this.logger.LogWarning("Lifecycle stop operations canceled by request.");
                     loggedCancellation = true;
                 }
 
@@ -196,7 +197,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    this.logger?.LogError(
+                    this.logger.LogError(
                         (int)ErrorCode.LifecycleStopFailure,
                         "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop. Exception: {Exception}", this.highStage, ex);
                 }

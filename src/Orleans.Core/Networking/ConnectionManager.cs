@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionFactory connectionFactory,
             NetworkingTrace trace)
         {
+            if (trace == null) throw new ArgumentNullException(nameof(trace));
             this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionFactory;
             this.trace = trace;
@@ -269,9 +270,9 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                if (this.trace.IsEnabled(LogLevel.Information))
+                if (this.trace.IsEnabled(LogLevel.Debug))
                 {
-                    this.trace.LogInformation("Shutting down connections");
+                    this.trace.LogDebug("Shutting down connections");
                 }
 
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
@@ -305,13 +306,13 @@ namespace Orleans.Runtime.Messaging
                     await Task.Delay(10);
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
-                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
+                        this.trace.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
                     }
                 }
             }
             catch (Exception exception)
             {
-                this.trace?.LogWarning(exception, "Exception during shutdown");
+                this.trace.LogWarning(exception, "Exception during shutdown");
             }
             finally
             {

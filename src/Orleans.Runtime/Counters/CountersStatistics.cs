@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Counters
         {
             if (writeInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(writeInterval), "Creating CounterStatsPublisher with negative or zero writeInterval");
             if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
-            this.logger = loggerFactory.CreateLogger<CounterStatistic>();
+            this.logger = loggerFactory.CreateLogger<CountersStatistics>();
             this.loggerFactory = loggerFactory;
             PerfCountersWriteInterval = writeInterval;
             this.telemetryProducer = telemetryProducer;
@@ -52,7 +52,10 @@ namespace Orleans.Runtime.Counters
         /// </summary>
         public void Stop()
         {
-            logger.Info(ErrorCode.PerfCounterStopping, "Stopping  Windows perf counter stats collection");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.Debug(ErrorCode.PerfCounterStopping, "Stopping  Windows perf counter stats collection");
+            }
             if (timer != null)
                 timer.Dispose(); // Stop timer
 

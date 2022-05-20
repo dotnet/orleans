@@ -200,7 +200,10 @@ namespace Orleans.Runtime
                     var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
-                        this.logger.LogInformation($"{nameof(HostedClient)} completed processing all messages. Shutting down.");
+                        if (this.logger.IsEnabled(LogLevel.Debug))
+                        {
+                            this.logger.LogDebug($"{nameof(HostedClient)} completed processing all messages. Shutting down.");
+                        }
                         break;
                     }
 

@@ -25,11 +25,14 @@ namespace Orleans.Runtime.MembershipService
         {
             if (gossipPartners.Count == 0) return Task.CompletedTask;
 
-            this.log.LogInformation(
-                "Gossiping {Silo} status {Status} to {NumPartners} partners",
-                updatedSilo,
-                updatedStatus,
-                gossipPartners.Count);
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug(
+                    "Gossiping {Silo} status {Status} to {NumPartners} partners",
+                    updatedSilo,
+                    updatedStatus,
+                    gossipPartners.Count);
+            }
 
             var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
             return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);

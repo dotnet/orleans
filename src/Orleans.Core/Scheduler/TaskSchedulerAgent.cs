@@ -122,10 +122,17 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                // ignore. Just make sure stop does not throw.
-                Log.Debug("Ignoring error during Stop: {0}", exc);
+                if (Log.IsEnabled(LogLevel.Debug))
+                {
+                    // ignore. Just make sure stop does not throw.
+                    Log.Debug("Ignoring error during Stop: {0}", exc);
+                }
             }
-            Log.Debug("Stopped agent");
+
+            if (Log.IsEnabled(LogLevel.Debug))
+            {
+                Log.Debug("Stopped agent");
+            }
         }
 
         public void Dispose()
