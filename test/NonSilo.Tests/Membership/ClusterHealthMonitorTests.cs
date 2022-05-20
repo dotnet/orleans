@@ -215,7 +215,7 @@ namespace NonSilo.Tests.Membership
             lastVersion = testAccessor.ObservedVersion;
 
             // Now that this silo is active, it should be monitoring some fraction of the other active silos
-            Assert.NotEmpty(testAccessor.MonitoredSilos);
+            await Until(() => testAccessor.MonitoredSilos.Count > 0);
             Assert.NotEmpty(this.timers);
             Assert.DoesNotContain(testAccessor.MonitoredSilos, s => s.Key.Equals(this.localSilo));
             Assert.Equal(clusterMembershipOptions.NumProbedSilos, testAccessor.MonitoredSilos.Count);
