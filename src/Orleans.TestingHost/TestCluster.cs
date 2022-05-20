@@ -15,6 +15,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
+using Orleans.TestingHost.UnixSocketTransport;
 
 namespace Orleans.TestingHost
 {
@@ -577,10 +578,19 @@ namespace Orleans.TestingHost
                 {
                     hostBuilder.UseOrleansClient((context, clientBuilder) =>
                     {
-                        bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseInMemoryTransport)], out var useInMemoryTransport);
-                        if (useInMemoryTransport)
+                        Enum.TryParse<ConnectionTransportType>(context.Configuration[nameof(TestClusterOptions.ConnectionTransport)], out var transport);
+                        switch (transport)
                         {
-                            clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+                            case ConnectionTransportType.TcpSocket:
+                                break;
+                            case ConnectionTransportType.InMemory:
+                                clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+                                break;
+                            case ConnectionTransportType.UnixSocket:
+                                clientBuilder.UseUnixSocketConnection();
+                                break;
+                            default:
+                                throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                         }
                     });
                 });
@@ -628,10 +638,19 @@ namespace Orleans.TestingHost
             {
                 hostBuilder.UseOrleans((context, siloBuilder) =>
                 {
-                    bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseInMemoryTransport)], out var useInMemoryTransport);
-                    if (useInMemoryTransport)
+                    Enum.TryParse<ConnectionTransportType>(context.Configuration[nameof(TestClusterOptions.ConnectionTransport)], out var transport);
+                    switch (transport)
                     {
-                        siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                        case ConnectionTransportType.TcpSocket:
+                            break;
+                        case ConnectionTransportType.InMemory:
+                            siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                            break;
+                        case ConnectionTransportType.UnixSocket:
+                            siloBuilder.UseUnixSocketConnection();
+                            break;
+                        default:
+                            throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }
                 });
             });

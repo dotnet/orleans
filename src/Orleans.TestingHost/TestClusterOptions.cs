@@ -90,12 +90,12 @@ namespace Orleans.TestingHost
         public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
 
         /// <summary>
-        /// Gets or sets a value indicating whether to use an in-memory transport for connecting silos and clients, instead of TCP.
+        /// Gets or sets a value indicating what transport to use for connecting silos and clients.
         /// </summary>
         /// <remarks>
-        /// Defaults to <see langword="true"/>
+        /// Defaults to InMemory.
         /// </remarks>
-        public bool UseInMemoryTransport { get; set; } = true;
+        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.InMemory;
 
         /// <summary>
         /// Converts these options into a dictionary.
@@ -116,7 +116,7 @@ namespace Orleans.TestingHost
                 [nameof(ConfigureFileLogging)] = this.ConfigureFileLogging.ToString(),
                 [nameof(AssumeHomogenousSilosForTesting)] = this.AssumeHomogenousSilosForTesting.ToString(),
                 [nameof(GatewayPerSilo)] = this.GatewayPerSilo.ToString(),
-                [nameof(UseInMemoryTransport)] = this.UseInMemoryTransport.ToString(),
+                [nameof(ConnectionTransport)] = this.ConnectionTransport.ToString(),
             };
             
             if (this.SiloBuilderConfiguratorTypes != null)
@@ -217,5 +217,24 @@ namespace Orleans.TestingHost
             [nameof(SiloName)] = this.SiloName,
             [nameof(PrimarySiloPort)] = this.PrimarySiloPort.ToString()
         };
+    }
+
+    /// <summary>
+    /// Describe a transport method
+    /// </summary>
+    public enum ConnectionTransportType
+    {
+        /// <summary>
+        /// Uses real TCP socket.
+        /// </summary>
+        TcpSocket = 0,
+        /// <summary>
+        /// Uses in memory socket.
+        /// </summary>
+        InMemory = 1,
+        /// <summary>
+        /// Uses in Unix socket.
+        /// </summary>
+        UnixSocket = 2,
     }
 }

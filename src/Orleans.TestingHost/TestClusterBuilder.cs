@@ -77,7 +77,7 @@ namespace Orleans.TestingHost
                 _createSiloAsync = value;
 
                 // The custom builder does not have access to the in-memory transport.
-                Options.UseInMemoryTransport = false;
+                Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
             }
         }
         
