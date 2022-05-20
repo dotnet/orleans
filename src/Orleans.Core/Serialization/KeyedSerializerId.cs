@@ -1,9 +1,9 @@
-﻿namespace Orleans.Serialization
+namespace Orleans.Serialization
 {
     /// <summary>
     /// Values for identifying <see cref="IKeyedSerializer"/> serializers.
     /// </summary>
-    internal enum KeyedSerializerId : byte
+    public enum KeyedSerializerId : byte
     {
         /// <summary>
         /// <see cref="Orleans.Serialization.ILBasedSerializer"/>
