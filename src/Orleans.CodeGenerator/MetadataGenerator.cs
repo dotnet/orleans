@@ -150,7 +150,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
 
             var interfaceType = libraryTypes.ITypeManifestProvider;
-            return ClassDeclaration("Metadata_" + compilation.AssemblyName.Replace('.', '_'))
+            return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(compilation.AssemblyName))
                 .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))

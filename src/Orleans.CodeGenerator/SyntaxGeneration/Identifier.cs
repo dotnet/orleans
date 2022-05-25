@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Orleans.CodeGenerator.SyntaxGeneration
 {
     internal static class Identifier
@@ -113,5 +115,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     return false;
             }
         }
+
+        public static string SanitizeIdentifierName(string input) => Regex.Replace(input, "[-\\.]", "_");
     }
 }
