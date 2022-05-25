@@ -12,12 +12,13 @@ using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
 using Xunit;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.TestKit
 {
     [Trait("Category", "BVT")]
     [ExcludeFromCodeCoverage]
-    public abstract class FieldCodecTester<TValue, TCodec> where TCodec : class, IFieldCodec<TValue>
+    public abstract class FieldCodecTester<TValue, TCodec> : IDisposable where TCodec : class, IFieldCodec<TValue>
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly SerializerSessionPool _sessionPool;
@@ -54,6 +55,8 @@ namespace Orleans.Serialization.TestKit
         protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
 
         protected virtual Action<Action<TValue>> ValueProvider { get; }
+
+        void IDisposable.Dispose() => (_serviceProvider as IDisposable)?.Dispose();
 
         [Fact]
         public void CorrectlyAdvancesReferenceCounterStream()
@@ -110,7 +113,6 @@ namespace Orleans.Serialization.TestKit
 
         [Fact]
         public void CorrectlyAdvancesReferenceCounter()
-
         {
             var pipe = new Pipe();
             using var writerSession = _sessionPool.GetSession(); 
@@ -661,6 +663,68 @@ namespace Orleans.Serialization.TestKit
                 isEqual,
                 isEqual ? string.Empty : $"Deserialized value \"{deserialized}\" must equal original value \"{original}\"");
             Assert.Equal(writerSession.ReferencedObjects.CurrentReferenceId, readerSession.ReferencedObjects.CurrentReferenceId);
+        }
+
+        protected T RoundTripThroughCodec<T>(T original)
+        {
+            T result;
+            var pipe = new Pipe();
+            using (var readerSession = SessionPool.GetSession())
+            using (var writeSession = SessionPool.GetSession())
+            {
+                var writer = Writer.Create(pipe.Writer, writeSession);
+                var codec = ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<T>();
+                codec.WriteField(
+                    ref writer,
+                    0,
+                    null,
+                    original);
+                writer.Commit();
+                _ = pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+                pipe.Writer.Complete();
+
+                _ = pipe.Reader.TryRead(out var readResult);
+                var reader = Reader.Create(readResult.Buffer, readerSession);
+
+                var previousPos = reader.Position;
+                var initialHeader = reader.ReadFieldHeader();
+                Assert.True(reader.Position > previousPos);
+
+                result = codec.ReadValue(ref reader, initialHeader);
+                pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                pipe.Reader.Complete();
+            }
+
+            return result;
+        }
+
+        protected object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)
+        {
+            var pipe = new Pipe();
+            object result;
+            using (var readerSession = SessionPool.GetSession())
+            using (var writeSession = SessionPool.GetSession())
+            {
+                var writer = Writer.Create(pipe.Writer, writeSession);
+                var serializer = ServiceProvider.GetService<Serializer<object>>();
+                serializer.Serialize(original, ref writer);
+
+                _ = pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+                pipe.Writer.Complete();
+
+                _ = pipe.Reader.TryRead(out var readResult);
+
+                using var analyzerSession = SessionPool.GetSession();
+                formattedBitStream = BitStreamFormatter.Format(readResult.Buffer, analyzerSession);
+
+                var reader = Reader.Create(readResult.Buffer, readerSession);
+
+                result = serializer.Deserialize(ref reader);
+                pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                pipe.Reader.Complete();
+            }
+
+            return result;
         }
     }
 }

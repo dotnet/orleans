@@ -1,50 +1,52 @@
+using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using Newtonsoft.Json;
 using System;
-using System.Runtime.CompilerServices;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Buffers.Adaptors;
-using System.IO;
-using Microsoft.Extensions.Options;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace Orleans.Serialization;
 
+/// <summary>
+/// A serialization codec which uses <see cref="JsonSerializer"/>.
+/// </summary>
 [WellKnownAlias(WellKnownAlias)]
-public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
+public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {
-    private static readonly Type SelfType = typeof(NewtonsoftJsonCodec);
-    private readonly NewtonsoftJsonCodecOptions _options;
+    private static readonly Type SelfType = typeof(JsonCodec);
     private readonly ICodecSelector[] _serializableTypeSelectors;
     private readonly ICopierSelector[] _copyableTypeSelectors;
-    private readonly JsonSerializer _serializer;
+    private readonly JsonCodecOptions _options;
 
     /// <summary>
     /// The well-known type alias for this codec.
     /// </summary>
-    public const string WellKnownAlias = "json.net";
+    public const string WellKnownAlias = "json";
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NewtonsoftJsonCodec"/> class.
+    /// Initializes a new instance of the <see cref="JsonCodec"/> class.
     /// </summary>
     /// <param name="serializableTypeSelectors">Filters used to indicate which types should be serialized by this codec.</param>
     /// <param name="copyableTypeSelectors">Filters used to indicate which types should be copied by this codec.</param>
     /// <param name="options">The JSON codec options.</param>
-    public NewtonsoftJsonCodec(
+    public JsonCodec(
         IEnumerable<ICodecSelector> serializableTypeSelectors,
         IEnumerable<ICopierSelector> copyableTypeSelectors,
-        IOptions<NewtonsoftJsonCodecOptions> options)
+        IOptions<JsonCodecOptions> options)
     {
-        _options = options.Value;
         _serializableTypeSelectors = serializableTypeSelectors.Where(t => string.Equals(t.CodecName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
         _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
-        _serializer = JsonSerializer.Create(_options.SerializerSettings);
+        _options = options.Value;
     }
 
+    /// <inheritdoc/>
     void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -66,12 +68,23 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         writer.Session.TypeCodec.WriteLengthPrefixed(ref writer, type);
 
         // Write the serialized payload
-        var serializedValue = JsonConvert.SerializeObject(value, _options.SerializerSettings);
-        StringCodec.WriteField(ref writer, 1, typeof(string), serializedValue);
+        // Note that the Utf8JsonWriter and PooledArrayBufferWriter could be pooled as long as they're correctly
+        // reset at the end of each use.
+        var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
+        using var jsonWriter = new Utf8JsonWriter(bufferWriter);
+        JsonSerializer.Serialize(jsonWriter, value, _options.SerializerOptions);
+        jsonWriter.Flush();
+
+        ReferenceCodec.MarkValueField(writer.Session);
+        writer.WriteFieldHeader(1, typeof(byte[]), typeof(byte[]), WireType.LengthPrefixed);
+        writer.WriteVarUInt32((uint)bufferWriter.Value.Length);
+        bufferWriter.Value.CopyTo(ref writer);
+        bufferWriter.Value.Reset();
 
         writer.WriteEndObject();
     }
 
+    /// <inheritdoc/>
     object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -109,10 +122,25 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
                         ThrowTypeFieldMissing();
                     }
 
+                    ReferenceCodec.MarkValueField(reader.Session);
+                    var length = reader.ReadVarUInt32();
+
                     // To possibly improve efficiency, this could be converted to read a ReadOnlySequence<byte> instead of a byte array.
-                    var serializedValue = StringCodec.ReadValue(ref reader, header);
-                    result = JsonConvert.DeserializeObject(serializedValue, type, _options.SerializerSettings);
-                    ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+                    ReadOnlySequence<byte> sequence = default;
+                    var tempBuffer = new PooledArrayBufferWriter();
+                    try
+                    {
+                        reader.ReadBytes(ref tempBuffer, (int)length);
+                        sequence = tempBuffer.RentReadOnlySequence();
+                        var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
+                        result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
+                    }
+                    finally
+                    {
+                        tempBuffer.ReturnReadOnlySequence(sequence);
+                        tempBuffer.Reset();
+                    }
+
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -120,9 +148,11 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
             }
         }
 
+        ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         return result;
     }
 
+    /// <inheritdoc/>
     bool IGeneralizedCodec.IsSupportedType(Type type)
     {
         if (type == SelfType)
@@ -151,27 +181,20 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
     {
         if (input is null) return null;
 
-        var stream = PooledBufferStream.Rent();
+        var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
+        using var jsonWriter = new Utf8JsonWriter(bufferWriter);
+        JsonSerializer.Serialize(jsonWriter, input, _options.SerializerOptions);
+        var sequence = bufferWriter.Value.RentReadOnlySequence();
         try
         {
-            var type = input.GetType();
-            using var streamWriter = new StreamWriter(stream);
-            using var textWriter = new JsonTextWriter(streamWriter);
-            _serializer.Serialize(textWriter, input, type);
-            textWriter.Flush();
-
-            stream.Position = 0;
-
-            using var streamReader = new StreamReader(stream);
-            using var jsonReader = new JsonTextReader(streamReader);
-            var result = _serializer.Deserialize(jsonReader, type);
-
+            var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
+            var result = JsonSerializer.Deserialize(ref jsonReader, input.GetType(), _options.SerializerOptions);
             context.RecordCopy(input, result);
             return result;
         }
         finally
         {
-            PooledBufferStream.Return(stream);
+            bufferWriter.Value.ReturnReadOnlySequence(sequence);
         }
     }
 
@@ -194,13 +217,13 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         return false;
     }
 
+    /// <inheritdoc/>
+    bool? ITypeFilter.IsTypeAllowed(Type type) => (((IGeneralizedCopier)this).IsSupportedType(type) || ((IGeneralizedCodec)this).IsSupportedType(type)) ? true : null;
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
         $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for JSON fields. {field}");
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");
-
-    private bool IsSupportedType(Type type) => ((IGeneralizedCodec)this).IsSupportedType(type) || ((IGeneralizedCopier)this).IsSupportedType(type);
-    bool? ITypeFilter.IsTypeAllowed(Type type) => IsSupportedType(type) ? true : null;
 }

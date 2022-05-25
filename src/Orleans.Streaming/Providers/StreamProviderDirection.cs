@@ -1,8 +1,8 @@
 namespace Orleans.Streams
 {    
-    ///<summary>
+    /// <summary>
     /// Identifies whether a stream provider is read-only, read-write, or write-only.
-    ///</summary>
+    /// </summary>
     public enum StreamProviderDirection
     {
         /// <summary>

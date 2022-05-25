@@ -40,7 +40,7 @@ namespace Orleans.Serialization.UnitTests
         protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
         protected override void Configure(ISerializerBuilder builder)
         {
-            ((ISerializerBuilderImplementation)builder).ConfigureServices(services => services.RemoveAll(typeof(IFieldCodec<MyEnum>)));
+            builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
         }
 
         protected override Action<Action<MyEnum>> ValueProvider => Gen.Int.Select(v => (MyEnum)v).ToValueProvider();
@@ -53,7 +53,7 @@ namespace Orleans.Serialization.UnitTests
         protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
         protected override void Configure(ISerializerBuilder builder)
         {
-            ((ISerializerBuilderImplementation)builder).ConfigureServices(services => services.RemoveAll(typeof(IFieldCodec<MyEnum>)));
+            builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
         }
 
         protected override Action<Action<MyEnum>> ValueProvider => Gen.Int.Select(v => (MyEnum)v).ToValueProvider();

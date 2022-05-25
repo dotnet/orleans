@@ -27,15 +27,7 @@ namespace Orleans.Serialization.UnitTests
         public ISerializableTests(ITestOutputHelper log)
         {
             var services = new ServiceCollection();
-            _ = services.AddSerializer(builder =>
-            {
-                builder.Configure(options =>
-                {
-                    options.AllowedTypes.Add("Orleans.Serialization.UnitTests.ISerializableTests");
-                    options.AllowedTypes.Add("Orleans.Serialization.UnitTests.ISerializableTests+SimpleISerializableObject");
-                    options.AllowedTypes.Add("Orleans.Serialization.UnitTests.ISerializableTests+SimpleISerializableStruct");
-                });
-            });
+            _ = services.AddSerializer();
             services.RemoveAll(typeof(TypeResolver));
             services.AddSingleton<TypeResolver>(sp => new BanningTypeResolver(typeof(UnserializableConformingException), typeof(UnserializableNonConformingException)));
             services.AddSingleton<IGeneralizedCodec, DotNetSerializableCodec>();

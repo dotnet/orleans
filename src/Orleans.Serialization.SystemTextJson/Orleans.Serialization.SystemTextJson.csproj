@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Serialization.SystemTextJson</PackageId>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <PackageDescription>System.Text.Json integration for Orleans.Serialization</PackageDescription>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+  </ItemGroup>
+
+</Project>

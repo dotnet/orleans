@@ -5,18 +5,15 @@ using System.Reflection;
 using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
+using System;
+using System.Text;
+using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
+
+using Orleans.Serialization;
 
 namespace UnitTests.Serialization
 {
-    using System;
-    using System.Text;
-    using FluentAssertions.Common;
-    using Microsoft.Extensions.Hosting;
-    using Newtonsoft.Json;
-
-    using Orleans.Serialization;
-    using Orleans.Serialization.Serializers;
-
     [TestCategory("Serialization"), TestCategory("BVT")]
     public class OrleansJsonSerializerTests
     {
@@ -25,10 +22,12 @@ namespace UnitTests.Serialization
         public OrleansJsonSerializerTests()
         {
             this.environment = SerializationTestEnvironment.InitializeWithDefaults(
-                builder => builder.ConfigureServices(services =>
-                {
-                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.GetCustomAttribute<JsonTypeAttribute>() != null));
-                }));
+                builder =>
+                    builder.ConfigureServices(services =>
+                        services.AddSerializer(serializerBuilder =>
+                        {
+                            serializerBuilder.AddNewtonsoftJsonSerializer(type => type.GetCustomAttribute<JsonTypeAttribute>() is not null);
+                        })));
         }
 
         [Fact]
@@ -46,11 +45,11 @@ namespace UnitTests.Serialization
                     siloBuilder
                     .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")
                     .UseLocalhostClustering()
-                    .ConfigureServices(
-                    services =>
-                    {
-                        services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.GetCustomAttribute<JsonTypeAttribute>() != null));
-                    });
+                    .ConfigureServices(services =>
+                        services.AddSerializer(serializerBuilder =>
+                        {
+                            serializerBuilder.AddNewtonsoftJsonSerializer(type => type.GetCustomAttribute<JsonTypeAttribute>() is not null);
+                        }));
                 })
                 .Build();
             var serializer = silo.Services.GetRequiredService<Serializer>();
