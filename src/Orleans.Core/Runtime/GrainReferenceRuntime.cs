@@ -17,22 +17,19 @@ namespace Orleans.Runtime
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
-        private readonly DeepCopier deepCopier;
 
         public GrainReferenceRuntime(
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceTypeResolver interfaceTypeResolver,
-            DeepCopier deepCopier)
+            GrainInterfaceTypeResolver interfaceTypeResolver)
         {
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
-            this.deepCopier = deepCopier;
             this.sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
         }
 
@@ -56,9 +53,8 @@ namespace Orleans.Runtime
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var copy = this.deepCopier.Copy(request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                this.RuntimeClient.SendRequest(reference, copy, responseCompletionSource, options);
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsValueTask();
             }
             else
@@ -73,9 +69,8 @@ namespace Orleans.Runtime
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var copy = this.deepCopier.Copy(request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                this.RuntimeClient.SendRequest(reference, copy, responseCompletionSource, options);
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsVoidValueTask();
             }
             else
@@ -87,8 +82,7 @@ namespace Orleans.Runtime
         private async ValueTask<TResult> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var copy = this.deepCopier.Copy(request);
-            var invoker = new OutgoingCallInvoker<TResult>(reference, copy, options, this.sendRequest, this.filters);
+            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
             return invoker.TypedResult;
         }
@@ -96,8 +90,7 @@ namespace Orleans.Runtime
         private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var copy = this.deepCopier.Copy(request);
-            var invoker = new OutgoingCallInvoker<object>(reference, copy, options, this.sendRequest, this.filters);
+            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
         }
 

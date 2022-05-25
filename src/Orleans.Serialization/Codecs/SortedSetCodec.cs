@@ -112,7 +112,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(SortedSet<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new SortedSet<T>(input.Comparer);

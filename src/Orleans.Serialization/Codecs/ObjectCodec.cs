@@ -91,7 +91,7 @@ namespace Orleans.Serialization.Codecs
             var type = input.GetType();
             if (type != typeof(object))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new object();

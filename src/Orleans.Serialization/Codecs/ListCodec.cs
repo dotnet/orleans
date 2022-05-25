@@ -161,7 +161,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(List<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new List<T>(input.Count);

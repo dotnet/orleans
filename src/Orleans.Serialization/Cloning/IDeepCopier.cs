@@ -210,7 +210,7 @@ namespace Orleans.Serialization.Cloning
         /// <typeparam name="T">The value type.</typeparam>
         /// <param name="value">The value.</param>
         /// <returns>A copy of the provided value.</returns>
-        public T Copy<T>(T value)
+        public T DeepCopy<T>(T value)
         {
             if (!typeof(T).IsValueType)
             {

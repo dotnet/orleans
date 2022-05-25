@@ -157,7 +157,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(HashSet<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new HashSet<T>(input.Comparer);

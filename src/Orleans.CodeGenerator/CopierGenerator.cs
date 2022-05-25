@@ -8,6 +8,7 @@ using System.Reflection;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System;
 
 namespace Orleans.CodeGenerator
 {
@@ -156,7 +157,7 @@ namespace Orleans.CodeGenerator
                                     ThisExpression().Member(field.FieldName.ToIdentifierName()),
                                     Unwrapped(field.FieldName.ToIdentifierName())));
                             break;
-                        case CopierFieldDescription codec when !field.IsInjected:
+                        case CopierFieldDescription codec:
                             {
                                 yield return ExpressionStatement(
                                     AssignmentExpression(
@@ -207,10 +208,7 @@ namespace Orleans.CodeGenerator
             }
 
             // Add a codec field for any field in the target which does not have a static codec.
-            fields.AddRange(serializableTypeDescription.Members
-                .Distinct(MemberDescriptionTypeComparer.Default)
-                .Where(t => !libraryTypes.StaticCopiers.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t.Type)))
-                .Select(member => GetCopierDescription(member)));
+            fields.AddRange(GetCopierFieldDescriptions(serializableTypeDescription.Members, libraryTypes));
 
             foreach (var member in members)
             {
@@ -232,8 +230,21 @@ namespace Orleans.CodeGenerator
             }
 
             return fields;
+        }
 
-            CopierFieldDescription GetCopierDescription(IMemberDescription member)
+        public static IEnumerable<CopierFieldDescription> GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes)
+        {
+            var filteredMembers = members
+                .Distinct(MemberDescriptionTypeComparer.Default)
+                .Where(t => !libraryTypes.StaticCopiers.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t.Type)));
+
+            var fieldIndex = 0;
+            foreach (var member in filteredMembers)
+            {
+                yield return GetCopierDescription(member, fieldIndex++, libraryTypes);
+            }
+
+            static CopierFieldDescription GetCopierDescription(IMemberDescription member, int fieldIndex, LibraryTypes libraryTypes)
             {
                 TypeSyntax copierType = null;
                 var t = member.Type;
@@ -270,10 +281,9 @@ namespace Orleans.CodeGenerator
                     copierType = libraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Copier";
+                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Copier" + fieldIndex;
                 return new CopierFieldDescription(copierType, fieldName, t);
             }
-
 
             static string ToLowerCamelCase(string input) => char.IsLower(input, 0) ? input : char.ToLowerInvariant(input[0]) + input.Substring(1);
         }
@@ -315,13 +325,13 @@ namespace Orleans.CodeGenerator
 
                 if (!type.IsSealedType)
                 {
-                    // C#: if (original.GetType() != typeof(<codec>)) { return context.Copy(original); }
+                    // C#: if (original.GetType() != typeof(<codec>)) { return context.DeepCopy(original); }
                     var exactTypeMatch = BinaryExpression(
                         SyntaxKind.NotEqualsExpression,
                         InvocationExpression(
                             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, originalParam, IdentifierName("GetType"))),
                             TypeOfExpression(type.TypeSyntax));
-                    var contextCopy = InvocationExpression(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, contextParam, IdentifierName("Copy")))
+                    var contextCopy = InvocationExpression(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, contextParam, IdentifierName("DeepCopy")))
                         .WithArgumentList(ArgumentList(SingletonSeparatedList(Argument(originalParam))));
                     body.Add(IfStatement(exactTypeMatch, ReturnStatement(contextCopy)));
                 }
@@ -427,7 +437,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static IEnumerable<StatementSyntax> GenerateMemberwiseCopy(
+        public static IEnumerable<StatementSyntax> GenerateMemberwiseCopy(
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
             LibraryTypes libraryTypes,
@@ -439,16 +449,50 @@ namespace Orleans.CodeGenerator
                     .Concat(libraryTypes.StaticCopiers)
                     .ToList();
 
-            var orderedMembers = members.OrderBy(m => m.Member.FieldId).ToList();
+            var orderedMembers = members.OrderBy(m => m.Member.FieldId);
             foreach (var member in orderedMembers)
             {
-                var description = member.Member;
+                var getValueExpression = GenerateMemberCopy(
+                    copierFields,
+                    libraryTypes,
+                    inputValue: member.GetGetter(sourceVar),
+                    contextVar,
+                    codecs,
+                    member);
+                var memberAssignment = ExpressionStatement(member.GetSetter(destinationVar, getValueExpression));
+                yield return memberAssignment;
+            }
+        }
 
-                // Copiers can either be static classes or injected into the constructor.
-                // Either way, the member signatures are the same.
-                var codec = codecs.First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
-                var memberType = description.Type;
-                var staticCopier = libraryTypes.StaticCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+        public static ExpressionSyntax GenerateMemberCopy(
+            List<GeneratedFieldDescription> copierFields,
+            LibraryTypes libraryTypes,
+            ExpressionSyntax inputValue,
+            ExpressionSyntax copyContextVar,
+            List<ICopierDescription> codecs,
+            ISerializableMember member)
+        {
+            var description = member.Member;
+
+            // Copiers can either be static classes or injected into the constructor.
+            // Either way, the member signatures are the same.
+            var memberType = description.Type;
+            var codec = codecs.FirstOrDefault(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
+            var staticCopier = libraryTypes.StaticCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+            ExpressionSyntax getValueExpression;
+
+            if (member.IsShallowCopyable)
+            {
+                getValueExpression = inputValue;
+            }
+            else if (codec is null)
+            {
+                getValueExpression = InvocationExpression(
+                    copyContextVar.Member(DeepCopyMethodName),
+                    ArgumentList(SeparatedList(new[] { Argument(inputValue) })));
+            }
+            else
+            {
                 ExpressionSyntax codecExpression;
                 if (staticCopier != null)
                 {
@@ -460,28 +504,17 @@ namespace Orleans.CodeGenerator
                     codecExpression = ThisExpression().Member(instanceCopier.FieldName);
                 }
 
-                ExpressionSyntax getValueExpression;
-
-                if (member.IsShallowCopyable)
+                getValueExpression = InvocationExpression(
+                    codecExpression.Member(DeepCopyMethodName),
+                    ArgumentList(SeparatedList(new[] { Argument(inputValue), Argument(copyContextVar) })));
+                if (!SymbolEqualityComparer.Default.Equals(codec.UnderlyingType, member.Member.Type))
                 {
-                    getValueExpression = member.GetGetter(sourceVar);
+                    // If the member type type differs from the codec type (eg because the member is an array), cast the result.
+                    getValueExpression = CastExpression(description.TypeSyntax, getValueExpression);
                 }
-                else
-                {
-                    getValueExpression = InvocationExpression(
-                        codecExpression.Member(DeepCopyMethodName),
-                        ArgumentList(SeparatedList(new[] { Argument(member.GetGetter(sourceVar)), Argument(contextVar) })));
-                    if (!SymbolEqualityComparer.Default.Equals(codec.UnderlyingType, member.Member.Type))
-                    {
-                        // If the member type type differs from the codec type (eg because the member is an array), cast the result.
-                        getValueExpression = CastExpression(description.TypeSyntax, getValueExpression);
-                    }
-                }
-
-                var memberAssignment = ExpressionStatement(member.GetSetter(destinationVar, getValueExpression));
-
-                yield return memberAssignment;
             }
+
+            return getValueExpression;
         }
 
         private static MemberDeclarationSyntax GenerateImmutableTypeCopyMethod(
@@ -539,7 +572,6 @@ namespace Orleans.CodeGenerator
             }
         }
 
-
         internal class BaseCopierFieldDescription : GeneratedFieldDescription
         {
             public BaseCopierFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
@@ -549,7 +581,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => true;
         }
 
-        internal class CopierFieldDescription : GeneratedFieldDescription, ICopierDescription
+        internal sealed class CopierFieldDescription : GeneratedFieldDescription, ICopierDescription
         {
             public CopierFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {

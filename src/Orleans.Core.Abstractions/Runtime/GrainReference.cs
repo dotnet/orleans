@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -24,12 +25,16 @@ namespace Orleans.Runtime
             ushort interfaceVersion,
             IGrainReferenceRuntime runtime,
             InvokeMethodOptions invokeMethodOptions,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
             IServiceProvider serviceProvider)
         {
             this.GrainType = grainType;
             this.InterfaceType = grainInterfaceType;
             this.Runtime = runtime;
             this.InvokeMethodOptions = invokeMethodOptions;
+            this.CodecProvider = codecProvider;
+            this.CopyContextPool = copyContextPool;
             this.ServiceProvider = serviceProvider;
             this.InterfaceVersion = interfaceVersion;
         }
@@ -53,6 +58,16 @@ namespace Orleans.Runtime
         /// Gets the common invocation options.
         /// </summary>
         public InvokeMethodOptions InvokeMethodOptions { get; }
+
+        /// <summary>
+        /// Gets the serialization codec provider.
+        /// </summary>
+        public CodecProvider CodecProvider { get; }
+
+        /// <summary>
+        /// Gets the serialization copy context pool.
+        /// </summary>
+        public CopyContextPool CopyContextPool { get; }
 
         /// <summary>
         /// Gets the service provider.
@@ -282,6 +297,16 @@ namespace Orleans.Runtime
         /// </summary>
         public GrainInterfaceType InterfaceType => _shared.InterfaceType;
 
+        /// <summary>
+        /// Gets the serialization copy context pool.
+        /// </summary>
+        protected CopyContextPool CopyContextPool => _shared.CopyContextPool;
+
+        /// <summary>
+        /// Gets the serialization codec provider.
+        /// </summary>
+        protected CodecProvider CodecProvider => _shared.CodecProvider;
+
         /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
         /// <param name="shared">
         /// The grain reference functionality which is shared by all grain references of a given type.
@@ -295,20 +320,10 @@ namespace Orleans.Runtime
             _key = key;
         }
 
-        /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
-        /// <param name="shared">
-        /// The grain reference functionality which is shared by all grain references of a given type.
-        /// </param>
-        /// <param name="grainId">
-        /// The grain id.
-        /// </param>
-        /// <returns>
-        /// A new <see cref="GrainReference"/> instance.
-        /// </returns>
-        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId)
-        {
-            return new GrainReference(shared, grainId.Key);
-        }
+        /// <summary>
+        /// Creates a new <see cref="GrainReference"/> instance for the specified <paramref name="grainId"/>.
+        /// </summary>
+        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId) => new(shared, grainId.Key);
 
         /// <summary>
         /// Creates a new grain reference which implements the specified grain interface.
@@ -421,6 +436,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Base type used for method requests.
     /// </summary>
+    [SuppressReferenceTracking]
     [GenerateSerializer]
     public abstract class RequestBase : IInvokable
     {

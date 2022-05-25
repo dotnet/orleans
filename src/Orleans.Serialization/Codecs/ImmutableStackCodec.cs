@@ -217,7 +217,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(Stack<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             result = new Stack<T>(input.Count);

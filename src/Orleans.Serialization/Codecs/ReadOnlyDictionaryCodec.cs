@@ -69,7 +69,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(ReadOnlyDictionary<TKey, TValue>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             var temp = new Dictionary<TKey, TValue>(input.Count);

@@ -88,7 +88,7 @@ namespace Orleans.Serialization.Codecs
 
             if (input.GetType() != typeof(ReadOnlyCollection<T>))
             {
-                return context.Copy(input);
+                return context.DeepCopy(input);
             }
 
             var tempResult = new T[input.Count];
