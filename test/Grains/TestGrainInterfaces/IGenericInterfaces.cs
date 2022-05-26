@@ -3,6 +3,18 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
+public interface IMyGenericGrainWithNoNamespace<T> : IGrainWithStringKey
+{
+    Task SetValue(T value);
+    Task<T> GetValue();
+}
+
+public interface IMyGrainWithNoNamespace : IGrainWithStringKey
+{
+    Task SetValue(object value);
+    Task<object> GetValue();
+}
+
 namespace UnitTests.GrainInterfaces
 {
     public interface IGenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> : IGrainWithGuidKey

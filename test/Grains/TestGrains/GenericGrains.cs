@@ -11,6 +11,28 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
+public class MyGenericGrainWithNoNamespace<T> : Grain, IMyGenericGrainWithNoNamespace<T>
+{
+    T _value;
+    public Task<T> GetValue() => Task.FromResult(_value);
+    public Task SetValue(T value)
+    {
+        _value = value;
+        return Task.CompletedTask;
+    }
+}
+
+public class MyGrainWithNoNamespace : Grain, IMyGrainWithNoNamespace
+{
+    object _value;
+    public Task<object> GetValue() => Task.FromResult(_value);
+    public Task SetValue(object value)
+    {
+        _value = value;
+        return Task.CompletedTask;
+    }
+}
+
 namespace UnitTests.Grains
 {
     [Serializable]
