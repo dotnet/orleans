@@ -33,12 +33,27 @@ namespace DefaultCluster.Tests.General
             return  this.GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Generics")]
+        public async Task GenericGrainTests_GlobalNamespace()
+        {
+            var genericGrain = GrainFactory.GetGrain<IMyGenericGrainWithNoNamespace<int>>(Guid.NewGuid().ToString());
+
+            await genericGrain.SetValue(4);
+            var genericValue = await genericGrain.GetValue();
+            Assert.Equal(4, genericValue);
+
+            var grain = GrainFactory.GetGrain<IMyGrainWithNoNamespace>(Guid.NewGuid().ToString());
+
+            await grain.SetValue("hi");
+            var value = await grain.GetValue();
+            Assert.Equal("hi", value);
+        }
+
         /// Can instantiate multiple concrete grain types that implement
         /// different specializations of the same generic interface
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceGetGrain()
         {
-
             var grainOfIntFloat1 = GetGrain<IGenericGrain<int, float>>();
             var grainOfIntFloat2 = GetGrain<IGenericGrain<int, float>>();
             var grainOfFloatString = GetGrain<IGenericGrain<float, string>>();

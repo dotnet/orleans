@@ -324,7 +324,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
-            return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
+            return t.FullName ?? ((t.IsGenericParameter || string.IsNullOrWhiteSpace(t.Namespace)) ? t.Name : t.Namespace + "." + t.Name);
         }
 
         /// <summary>
