@@ -50,6 +50,10 @@ namespace Orleans.BroadcastChannel
         public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
         {
             _subscriptionObserver = grainContextAccessor.GrainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
+            if (_subscriptionObserver == null)
+            {
+                throw new ArgumentException($"The grain doesn't implement interface {nameof(IOnBroadcastChannelSubscribed)}");
+            }
         }
 
         public async Task OnError(InternalChannelId streamId, Exception exception)
@@ -88,6 +92,7 @@ namespace Orleans.BroadcastChannel
                 {
                     return callback;
                 }
+                // Give a chance to the grain to attach a handler for this streamId
                 var subscription = new BroadcastChannelSubscription(this, streamId);
                 await _subscriptionObserver.OnSubscribed(subscription);
             }

@@ -10,7 +10,7 @@ namespace Orleans.BroadcastChannel
 {
     public interface IBroadcastChannelProvider
     {
-        IBroadcastChannel<T> GetChannel<T>(ChannelId streamId);
+        IBroadcastChannelWriter<T> GetChannelWriter<T>(ChannelId streamId);
     }
 
     internal class BroadcastChannelProvider : IBroadcastChannelProvider
@@ -35,9 +35,9 @@ namespace Orleans.BroadcastChannel
             _loggerFactory = loggerFactory;
         }
 
-        public IBroadcastChannel<T> GetChannel<T>(ChannelId streamId)
+        public IBroadcastChannelWriter<T> GetChannelWriter<T>(ChannelId streamId)
         {
-            return new BroadcastChannel<T>(
+            return new BroadcastChannelWriter<T>(
                 new InternalChannelId(_providerName, streamId),
                 _grainFactory,
                 _subscriberTable,

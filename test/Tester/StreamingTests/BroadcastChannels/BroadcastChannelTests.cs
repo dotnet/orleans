@@ -91,7 +91,7 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("some-namespace", grainKey);
-            var stream = provider.GetChannel<int>(channelId);
+            var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
             await stream.Publish(2);
@@ -127,7 +127,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
                 channels.Add((id, value));
 
-                await provider.GetChannel<int>(id).Publish(value);
+                await provider.GetChannelWriter<int>(id).Publish(value);
             }
 
             var grain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
@@ -145,7 +145,7 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
-            var stream = provider.GetChannel<int>(channelId);
+            var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
             await stream.Publish(2);
@@ -181,7 +181,7 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
-            var stream = provider.GetChannel<int>(channelId);
+            var stream = provider.GetChannelWriter<int>(channelId);
 
             var badGrain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
             var goodGrain = _fixture.Client.GetGrain<IRegexNamespaceSubscriberGrain>(grainKey);

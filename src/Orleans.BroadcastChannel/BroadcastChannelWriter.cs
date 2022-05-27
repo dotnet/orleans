@@ -9,20 +9,22 @@ using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {
-    public interface IBroadcastChannel<T>
+    public interface IBroadcastChannelWriter<T>
     {
         Task Publish(T item);
     }
 
-    internal class BroadcastChannel<T> : IBroadcastChannel<T>
+    internal class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
     {
+        private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
+
         private readonly InternalChannelId _channelId;
         private readonly IGrainFactory _grainFactory;
         private readonly ImplicitChannelSubscriberTable _subscriberTable;
         private readonly bool _fireAndForgetDelivery;
         private readonly ILogger _logger;
 
-        public BroadcastChannel(
+        public BroadcastChannelWriter(
             InternalChannelId channelId,
             IGrainFactory grainFactory,
             ImplicitChannelSubscriberTable subscriberTable,
@@ -33,7 +35,7 @@ namespace Orleans.BroadcastChannel
             _grainFactory = grainFactory;
             _subscriberTable = subscriberTable;
             _fireAndForgetDelivery = fireAndForgetDelivery;
-            _logger = loggerFactory.CreateLogger($"{nameof(BroadcastChannel<T>)}-{_channelId}");
+            _logger = loggerFactory.CreateLogger(LoggingCategory);
         }
 
         public async Task Publish(T item)
