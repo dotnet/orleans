@@ -42,6 +42,12 @@ namespace UnitTests.General
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
                             }
 
+                            if (string.Equals(context.InterfaceMethod?.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker)))
+                            {
+                                // explicitely do not continue calling Invoke
+                                return Task.CompletedTask;
+                            }
+
                             return context.Invoke();
                         })
                         .AddIncomingGrainCallFilter<GrainCallFilterWithDependencies>()
@@ -52,6 +58,12 @@ namespace UnitTests.General
                                 // Concatenate the input to itself.
                                 var orig = (string)ctx.Arguments[0];
                                 ctx.Arguments[0] = orig + orig;
+                            }
+
+                            if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IMethodInterceptionGrain.SystemWideCallFilterMarker)))
+                            {
+                                // explicitely do not continue calling Invoke
+                                return;
                             }
 
                             await ctx.Invoke();
@@ -366,6 +378,48 @@ namespace UnitTests.General
             RequestContext.Set("tag", "hungry-eatwith");
             await caterpillar.EatWith(new Apple(), "butter");
             await hungry.EatWith(new Apple(), "butter");
+        }
+
+        /// <summary>
+        /// Tests that if a grain call filter does not call <see cref="IGrainCallContext.Invoke"/>,
+        /// an exception is thrown on the caller.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_SystemWideDoesNotCallContextInvoke_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+
+            // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
+            // InvalidOperationException, not an NullReferenceException.
+            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.SystemWideCallFilterMarker());
+        }
+
+        /// <summary>
+        /// Tests that if a grain call filter does not call <see cref="IGrainCallContext.Invoke"/>,
+        /// an exception is thrown on the caller.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_GrainSpecificDoesNotCallContextInvoke_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+
+            // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
+            // InvalidOperationException, not an NullReferenceException.
+            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.GrainSpecificCallFilterMarker());
+        }
+
+        /// <summary>
+        /// Tests that if an outgoing grain call filter does not call <see cref="IGrainCallContext.Invoke"/>,
+        /// an exception is thrown on the caller.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Outgoing_SystemWideDoesNotCallContextInvoke_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+
+            // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
+            // InvalidOperationException, not an NullReferenceException.
+            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.SystemWideCallFilterMarker());
         }
     }
 }

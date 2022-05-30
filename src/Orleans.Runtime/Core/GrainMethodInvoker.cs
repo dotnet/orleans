@@ -105,6 +105,13 @@ namespace Orleans.Runtime
                     var systemWideFilter = this.filters[stage];
                     stage++;
                     await systemWideFilter.Invoke(this);
+
+                    // If Response is null some filter did not continue the call chain
+                    if (this.Response is null)
+                    {
+                        ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
+                    }
+
                     return;
                 }
 
@@ -116,6 +123,12 @@ namespace Orleans.Runtime
                     if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
                     {
                         await grainClassLevelFilter.Invoke(this);
+
+                        // If Response is null some filter did not continue the call chain
+                        if (this.Response is null)
+                        {
+                            ThrowBrokenCallFilterChain(this.Grain.GetType().Name);
+                        }
                         return;
                     }
                 }
@@ -151,6 +164,12 @@ namespace Orleans.Runtime
             throw new InvalidOperationException(
                 $"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() received an invalid call.");
         }
+
+        private static void ThrowBrokenCallFilterChain(string filterName)
+        {
+            throw new InvalidOperationException($"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
+        }
+
 
         private InterfaceToImplementationMappingCache.Entry GetMethodEntry()
         {
