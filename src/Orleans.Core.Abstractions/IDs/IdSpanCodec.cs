@@ -15,8 +15,6 @@ namespace Orleans.Runtime;
 [RegisterSerializer]
 public sealed class IdSpanCodec : IFieldCodec<IdSpan>
 {
-    private static readonly ConcurrentDictionary<int, IdSpan> _cache = new ConcurrentDictionary<int, IdSpan>();
-
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteField<TBufferWriter>(
@@ -63,44 +61,10 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     /// <returns>An <see cref="IdSpan"/>.</returns>
     public static unsafe IdSpan ReadRaw<TInput>(ref Reader<TInput> reader)
     {
-        byte[] payloadArray = default;
         var hashCode = reader.ReadInt32();
         var length = reader.ReadVarUInt32();
-        if (!reader.TryReadBytes((int)length, out var payloadSpan))
-        {
-            payloadSpan = payloadArray = reader.ReadBytes(length);
-        }
-
-        // Search through 
-        var candidateHashCode = hashCode;
-        while (_cache.TryGetValue(candidateHashCode, out var existing))
-        {
-            if (existing.GetHashCode() != hashCode)
-            {
-                break;
-            }
-
-            var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-            if (existingSpan.SequenceEqual(payloadSpan))
-            {
-                return existing;
-            }
-
-            // Try the next slot. 
-            ++candidateHashCode;
-        }
-
-        if (payloadArray is null)
-        {
-            payloadArray = new byte[length];
-            payloadSpan.CopyTo(payloadArray);
-        }
-
+        var payloadArray = reader.ReadBytes(length);
         var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-        while (!_cache.TryAdd(candidateHashCode++, value))
-        {
-            // Insert the value at the first available position.
-        }
 
         return value;
     }
@@ -111,44 +75,11 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     {
         ReferenceCodec.MarkValueField(reader.Session);
 
-        byte[] payloadArray = default;
         var length = reader.ReadVarUInt32() - sizeof(int);
         var hashCode = reader.ReadInt32();
-        if (!reader.TryReadBytes((int)length, out var payloadSpan))
-        {
-            payloadSpan = payloadArray = reader.ReadBytes(length);
-        }
 
-        // Search through 
-        var candidateHashCode = hashCode;
-        while (_cache.TryGetValue(candidateHashCode, out var existing))
-        {
-            if (existing.GetHashCode() != hashCode)
-            {
-                break;
-            }
-
-            var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-            if (existingSpan.SequenceEqual(payloadSpan))
-            {
-                return existing;
-            }
-
-            // Try the next slot. 
-            ++candidateHashCode;
-        }
-
-        if (payloadArray is null)
-        {
-            payloadArray = new byte[length];
-            payloadSpan.CopyTo(payloadArray);
-        }
-
+        var payloadArray = reader.ReadBytes(length);
         var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-        while (!_cache.TryAdd(candidateHashCode++, value))
-        {
-            // Insert the value at the first available position.
-        }
 
         return value;
     }
