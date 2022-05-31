@@ -66,7 +66,7 @@ namespace Orleans.ServiceBus.Providers.Testing
 
                 eventDataList.Add(wrapper);
 
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId}");
+                this.logger.LogInformation("Generate data of SequenceNumber {SequenceNumber} for stream {StreamId}", SequenceNumberCounter.Value, this.StreamId);
             }
 
             events = eventDataList;
@@ -124,7 +124,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             var generator =  this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
-            this.logger.Info($"Data generator set up on stream {streamId}.");
+            this.logger.LogInformation("Data generator set up on stream {StreamId}.", streamId);
             this.generators.Add(generator);
         }
         /// <inheritdoc />
@@ -134,7 +134,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;
-                    this.logger.Info($"Stop producing data on stream {streamId}.");
+                    this.logger.LogInformation("Stop producing data on stream {StreamId}.", streamId);
                 }
             });
         }

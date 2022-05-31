@@ -83,12 +83,12 @@ namespace Orleans.ServiceBus.Providers.Testing
                 if (this.EventHubReceivers.TryGetValue(queueToAssign, out receiverToAssign))
                 {
                     receiverToAssign.ConfigureDataGeneratorForStream(streamId);
-                    logger.Info($"Stream {streamId} is assigned to queue {queueToAssign.ToString()}");
+                    logger.LogInformation("Stream {StreamId} is assigned to queue {QueueId}", streamId, queueToAssign.ToString());
                 }
             }
             else
             {
-                logger.Info("Cannot get queues in the cluster, current streamQueueMapper is not EventHubQueueMapper");
+                logger.LogInformation("Cannot get queues in the cluster, current streamQueueMapper is not EventHubQueueMapper");
             }
         }
 
