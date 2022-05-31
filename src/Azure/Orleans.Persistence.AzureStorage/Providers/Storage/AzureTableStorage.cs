@@ -176,8 +176,7 @@ namespace Orleans.Storage
                     grainType,
                     grainReference,
                     grainState.ETag,
-                    this.options.TableName,
-                    exc.Message);
+                    this.options.TableName);
                 throw;
             }
         }
