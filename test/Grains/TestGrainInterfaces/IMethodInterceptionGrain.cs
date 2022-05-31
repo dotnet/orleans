@@ -20,6 +20,8 @@ namespace UnitTests.GrainInterfaces
         Task<string> Throw();
         Task<string> IncorrectResultType();
         Task FilterThrows();
+
+        Task SystemWideCallFilterMarker();
     }
 
     [GrainInterfaceType("custom-outgoing-interception-grain")]
@@ -55,6 +57,9 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRequestContext();
 
         Task<int> SumSet(HashSet<int> numbers);
+
+        Task SystemWideCallFilterMarker();
+        Task GrainSpecificCallFilterMarker();
     }
 
     public interface IHungryGrain<T> : IGrainWithIntegerKey

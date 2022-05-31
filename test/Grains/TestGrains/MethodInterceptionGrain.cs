@@ -53,6 +53,8 @@ namespace UnitTests.Grains
 
         public Task FilterThrows() => Task.CompletedTask;
 
+        public Task SystemWideCallFilterMarker() => Task.CompletedTask;
+
         public Task<string> IncorrectResultType() => Task.FromResult("hop scotch");
 
         async Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext context)
@@ -192,6 +194,12 @@ namespace UnitTests.Grains
                         throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
                     }
 
+                    if (string.Equals(implementationMethod.Name, nameof(GrainSpecificCallFilterMarker)))
+                    {
+                        // explicitely do not continue calling Invoke
+                        return;
+                    }
+
                     if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
                     await ctx.Invoke();
                     return;
@@ -211,6 +219,16 @@ namespace UnitTests.Grains
         public Task<int> SumSet(HashSet<int> numbers)
         {
             return Task.FromResult(numbers.Sum());
+        }
+
+        public Task SystemWideCallFilterMarker()
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task GrainSpecificCallFilterMarker()
+        {
+            return Task.CompletedTask;
         }
     }
 

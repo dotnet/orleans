@@ -100,12 +100,26 @@ namespace Orleans.Runtime
                     var systemWideFilter = this.filters[stage];
                     stage++;
                     await systemWideFilter.Invoke(this);
+
+                    // If Response is null some filter did not continue the call chain
+                    if (this.Response is null)
+                    {
+                        ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
+                    }
+
                     return;
                 }
                 else if (stage < this.stages)
                 {
                     stage++;
                     await this.requestFilter.Invoke(this);
+
+                    // If Response is null some filter did not continue the call chain
+                    if (this.Response is null)
+                    {
+                        ThrowBrokenCallFilterChain(this.requestFilter.GetType().Name);
+                    }
+
                     return;
                 }
                 else if (stage == this.stages)
@@ -131,6 +145,11 @@ namespace Orleans.Runtime
         private static void ThrowInvalidCall()
         {
             throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() received an invalid call.");
+        }
+
+        private static void ThrowBrokenCallFilterChain(string filterName)
+        {
+            throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
         }
     }
 }
