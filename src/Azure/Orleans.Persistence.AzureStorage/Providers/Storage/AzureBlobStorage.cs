@@ -148,7 +148,7 @@ namespace Orleans.Storage
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Writing,
-                    "Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName] in Container={ContainerName}",
+                    "Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -162,7 +162,7 @@ namespace Orleans.Storage
                 await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
-                    "Written: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName] in Container={ContainerName}",
+                    "Written: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -173,7 +173,7 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
                     ex,
-                    "Error writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName] in Container={ContainerName} Exception={5}",
+                    "Error writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName} Exception={5}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -193,7 +193,7 @@ namespace Orleans.Storage
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ClearingData,
-                    "Clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName] in Container={ContainerName}",
+                    "Clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -216,7 +216,7 @@ namespace Orleans.Storage
                 {
                     var properties = await blob.GetPropertiesAsync();
                     this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Cleared,
-                        "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName] in Container={ContainerName}",
+                        "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         properties.Value.ETag,
@@ -228,7 +228,7 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
                     ex,
-                    "Error clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName] in Container={ContainerName} Exception={5}",
+                    "Error clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName} Exception={5}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -267,7 +267,7 @@ namespace Orleans.Storage
             {
                 // if the container does not exist, create it, and make another attempt
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
-                    "Creating container: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName] in Container={ContainerName}",
+                    "Creating container: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,

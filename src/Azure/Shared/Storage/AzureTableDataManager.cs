@@ -575,7 +575,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
 
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} {Count} entries table {TableName", operation, collection.Count, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} {Count} entries table {TableName}", operation, collection.Count, TableName);
 
             try
             {
