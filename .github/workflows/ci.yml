@@ -73,6 +73,7 @@ jobs:
       postgres:
         image: postgres
         env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
           POSTGRES_PASSWORD: postgres
         ports:
         - 5432:5432
@@ -96,6 +97,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
   test-mariadb:
     name: MariaDB/MySQL provider tests
@@ -109,6 +111,7 @@ jobs:
         ports:
           - 3306:3306
         env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
           MARIADB_ROOT_PASSWORD: "mariadb"
     steps:
     - uses: actions/checkout@v2
@@ -125,6 +128,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
   test-sqlserver:
     name: Microsoft SQL Server provider tests
@@ -140,6 +144,7 @@ jobs:
         env:
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
           SA_PASSWORD: "yourWeak(!)Password"
     steps:
     - uses: actions/checkout@v2
@@ -156,6 +161,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
   test-azure-storage:
     if: ${{ false }}
@@ -188,6 +194,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
   test-consul:
     name: Consul provider tests
@@ -217,6 +224,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
   test-zookeeper:
     name: ZooKeeper provider tests
@@ -259,7 +267,9 @@ jobs:
         ports:
         - 8000:8000
         env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
           AWS_ACCESS_KEY_ID: root
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
           AWS_SECRET_ACCESS_KEY: pass
           AWS_REGION: us-east-1
     steps:
@@ -278,5 +288,7 @@ jobs:
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBACCESSKEY: "root"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBSECRETKEY: "pass"
