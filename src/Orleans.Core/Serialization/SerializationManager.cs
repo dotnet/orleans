@@ -36,8 +36,8 @@ namespace Orleans.Serialization
         private readonly Dictionary<Type, DeepCopier> copiers;
         private readonly Dictionary<Type, Serializer> serializers;
 
-        private readonly CachedReadConcurrentDictionary<Type, IKeyedSerializer> typeToKeyedSerializer =
-            new CachedReadConcurrentDictionary<Type, IKeyedSerializer>();
+        private readonly CachedReadConcurrentDictionary<(Type Type, bool IsFallback), IKeyedSerializer> typeToKeyedSerializer =
+            new CachedReadConcurrentDictionary<(Type Type, bool IsFallback), IKeyedSerializer>();
         private readonly Dictionary<Type, Deserializer> deserializers;
         private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
@@ -1641,13 +1641,13 @@ namespace Orleans.Serialization
                 return false;
             }
 
-            if (this.typeToKeyedSerializer.TryGetValue(type, out serializer)) return true;
+            if (this.typeToKeyedSerializer.TryGetValue((type, fallback), out serializer)) return true;
 
             foreach (var keyedSerializer in this.orderedKeyedSerializers)
             {
                 if (keyedSerializer.IsSupportedType(type, isFallback: fallback))
                 {
-                    this.typeToKeyedSerializer[type] = keyedSerializer;
+                    this.typeToKeyedSerializer[(type, fallback)] = keyedSerializer;
                     serializer = keyedSerializer;
                     return true;
                 }
