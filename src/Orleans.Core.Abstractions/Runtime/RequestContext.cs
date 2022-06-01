@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-        internal static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
+        internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
 
         /// <summary>Gets or sets an activity ID that can be used for correlation.</summary>
         public static Guid ActivityId
@@ -58,9 +58,10 @@ namespace Orleans.Runtime
         /// </returns>
         public static object Get(string key)
         {
-            var values = CallContextData.Value;
-            object result;
-            if ((values != null) && values.TryGetValue(key, out result))
+            var properties = CallContextData.Value;
+            var values = properties.Values;
+
+            if (values != null && values.TryGetValue(key, out var result))
             {
                 return result;
             }
@@ -75,7 +76,8 @@ namespace Orleans.Runtime
         /// <param name="value">The value to be stored into the request context.</param>
         public static void Set(string key, object value)
         {
-            var values = CallContextData.Value;
+            var properties = CallContextData.Value;
+            var values = properties.Values;
 
             if (values == null)
             {
@@ -95,8 +97,13 @@ namespace Orleans.Runtime
 
                 values = newValues;
             }
+
             values[key] = value;
-            CallContextData.Value = values;
+            CallContextData.Value = new ContextProperties
+            {
+                RequestObject = properties.RequestObject,
+                Values = values
+            };
         }
 
         /// <summary>
@@ -106,7 +113,8 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if the value was previously in the request context and has now been removed, otherwise <see langword="false"/>.</returns>
         public static bool Remove(string key)
         {
-            var values = CallContextData.Value;
+            var properties = CallContextData.Value;
+            var values = properties.Values;
 
             if (values == null || values.Count == 0 || !values.ContainsKey(key))
             {
@@ -115,14 +123,22 @@ namespace Orleans.Runtime
 
             if (values.Count == 1)
             {
-                CallContextData.Value = null;
+                CallContextData.Value = new ContextProperties
+                {
+                    RequestObject = properties.RequestObject,
+                    Values = null
+                };
                 return true;
             }
             else
             {
                 var newValues = new Dictionary<string, object>(values);
                 newValues.Remove(key);
-                CallContextData.Value = newValues;
+                CallContextData.Value = new ContextProperties
+                {
+                    RequestObject = properties.RequestObject,
+                    Values = newValues
+                };
                 return true;
             }
         }
@@ -133,10 +149,24 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-            if (CallContextData.Value != null)
+            if (!CallContextData.Value.IsDefault)
             {
-                CallContextData.Value = null;
+                CallContextData.Value = default;
             }
+        }
+
+        /// <summary>
+        /// Gets the currently executing request.
+        /// </summary>
+        internal static object RequestObject => CallContextData.Value.RequestObject;
+
+        internal readonly struct ContextProperties
+        {
+            public object RequestObject { get; init; }
+
+            public Dictionary<string, object> Values { get; init; }
+
+            public bool IsDefault => RequestObject is null && Values is null;
         }
     }
 }

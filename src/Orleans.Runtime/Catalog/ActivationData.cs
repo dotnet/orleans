@@ -881,6 +881,14 @@ namespace Orleans.Runtime
                     return true;
                 }
 
+                // Handle call-chain reentrancy
+                if (_shared.SchedulingOptions.AllowCallChainReentrancy
+                    && incoming.CallChainId == _blockingRequest.CallChainId
+                    && incoming.CallChainId != Guid.Empty)
+                {
+                    return true;
+                }
+
                 if (GetComponent<GrainCanInterleave>() is GrainCanInterleave canInterleave)
                 {
                     try
@@ -1058,13 +1066,8 @@ namespace Orleans.Runtime
                 return;
             }
 
-            ActivationState state;
-            Message blockingMessage;
             lock (this)
             {
-                state = State;
-                blockingMessage = _blockingRequest;
-
                 _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
             }
 

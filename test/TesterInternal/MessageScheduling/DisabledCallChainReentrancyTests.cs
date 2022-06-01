@@ -2,7 +2,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests
+namespace UnitTests.General
 {
     public class DisabledCallChainReentrancyTests : OrleansTestingBase, IClassFixture<DisabledCallChainReentrancyTests.Fixture>
     {
