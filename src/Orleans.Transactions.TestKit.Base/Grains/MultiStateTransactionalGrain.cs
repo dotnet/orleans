@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+
 using Orleans.Transactions.Abstractions;
+
 using System;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -18,9 +20,11 @@ namespace Orleans.Transactions.TestKit
 
     public class MaxStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
-        public MaxStateTransactionalGrain(ITransactionalStateFactory stateFactory,
+        public MaxStateTransactionalGrain(
+            ITransactionalScopeFactory transactionalScopeFactory,
+            ITransactionalStateFactory stateFactory,
             ILoggerFactory loggerFactory)
-            : base(Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
+            : base(transactionalScopeFactory, Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
                 .Select(i => stateFactory.Create<GrainData>(new TransactionalStateConfiguration(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore))))
                 .ToArray(),
                   loggerFactory)
@@ -31,12 +35,13 @@ namespace Orleans.Transactions.TestKit
     public class DoubleStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public DoubleStateTransactionalGrain(
+            ITransactionalScopeFactory transactionalScopeFactory,
             [TransactionalState("data1", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data1,
             [TransactionalState("data2", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data2,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<GrainData>[2] { data1, data2 }, loggerFactory)
+            : base(transactionalScopeFactory, new ITransactionalState<GrainData>[2] { data1, data2 }, loggerFactory)
         {
         }
     }
@@ -44,10 +49,11 @@ namespace Orleans.Transactions.TestKit
     public class SingleStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public SingleStateTransactionalGrain(
+            ITransactionalScopeFactory transactionalScopeFactory,
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<GrainData>[1] { data }, loggerFactory)
+            : base(transactionalScopeFactory, new ITransactionalState<GrainData>[1] { data }, loggerFactory)
         {
         }
     }
@@ -55,24 +61,28 @@ namespace Orleans.Transactions.TestKit
     public class NoStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public NoStateTransactionalGrain(
+            ITransactionalScopeFactory transactionalScopeFactory,
             ILoggerFactory loggerFactory)
-            : base(Array.Empty<ITransactionalState<GrainData>>(), loggerFactory)
+            : base(transactionalScopeFactory, Array.Empty<ITransactionalState<GrainData>>(), loggerFactory)
         {
         }
     }
 
     public class MultiStateTransactionalGrainBaseClass : Grain, ITransactionTestGrain
     {
+        protected ITransactionalScopeFactory transactionalScopeFactory;
         protected ITransactionalState<GrainData>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
         protected ILogger logger;
 
         public MultiStateTransactionalGrainBaseClass(
+            ITransactionalScopeFactory transactionalScopeFactory,
             ITransactionalState<GrainData>[] dataArray,
             ILoggerFactory loggerFactory)
         {
             this.dataArray = dataArray;
             this.loggerFactory = loggerFactory;
+            this.transactionalScopeFactory = transactionalScopeFactory;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -83,7 +93,7 @@ namespace Orleans.Transactions.TestKit
 
         public async Task Set(int newValue)
         {
-            foreach(var data in this.dataArray)
+            foreach (var data in this.dataArray)
             {
                 await data.PerformUpdate(state =>
                 {
@@ -97,7 +107,7 @@ namespace Orleans.Transactions.TestKit
         public async Task<int[]> Add(int numberToAdd)
         {
             var result = new int[dataArray.Length];
-            for(int i = 0; i < dataArray.Length; i++)
+            for (int i = 0; i < dataArray.Length; i++)
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {
@@ -129,6 +139,18 @@ namespace Orleans.Transactions.TestKit
             await Add(numberToAdd);
             throw new AddAndThrowException($"{GetType().Name} test exception");
         }
+
+        public async Task CreateScopeAndSetValueWithoutAmbientTransaction(int newValue)
+            => await transactionalScopeFactory.CreateScope(async () => await Set(57));
+
+        public async Task CreateScopeAndSetValueAndFailWithoutAmbientTransaction(int newValue)
+            => await transactionalScopeFactory.CreateScope(async () => await AddAndThrow(57));
+
+        public async Task CreateScopeAndSetValueWithAmbientTransaction(int newValue)
+            => await transactionalScopeFactory.CreateScope(async () => await Set(57));
+
+        public async Task CreateScopeAndSetValueAndFailWithAmbientTransaction(int newValue)
+            => await transactionalScopeFactory.CreateScope(async () => await AddAndThrow(57));
 
         public Task Deactivate()
         {

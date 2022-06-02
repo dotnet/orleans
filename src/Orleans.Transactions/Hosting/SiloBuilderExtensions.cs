@@ -24,6 +24,7 @@ namespace Orleans.Hosting
         internal static IServiceCollection UseTransactions(this IServiceCollection services, bool withReporter)
         {
             services.TryAddSingleton<IClock,Clock>();
+            services.TryAddSingleton<ITransactionalScopeFactory, TransactionalScopeFactory>();
             services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
             services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
