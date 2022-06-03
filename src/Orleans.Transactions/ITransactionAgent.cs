@@ -37,5 +37,11 @@ namespace Orleans.Transactions
         /// <returns>None.</returns>
         /// <remarks>This method is exception-free</remarks>
         Task Abort(TransactionInfo transactionInfo);
+
+        /// <summary>
+        /// Create transaction scope
+        /// </summary>
+        /// <returns></returns>
+        TransactionalScope CreateScope();
     }
 }

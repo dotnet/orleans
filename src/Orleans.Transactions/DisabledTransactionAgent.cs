@@ -19,5 +19,7 @@ namespace Orleans.Transactions
         {
             throw new OrleansStartTransactionFailedException(new OrleansTransactionsDisabledException());
         }
+
+        public TransactionalScope CreateScope() => throw new OrleansTransactionsDisabledException();
     }
 }
