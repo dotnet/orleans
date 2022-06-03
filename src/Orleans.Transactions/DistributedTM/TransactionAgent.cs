@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Serialization;
 
 namespace Orleans.Transactions
 {
@@ -16,13 +17,15 @@ namespace Orleans.Transactions
         private readonly CausalClock clock;
         private readonly ITransactionAgentStatistics statistics;
         private readonly ITransactionOverloadDetector overloadDetector;
+        private readonly Serializer<OrleansTransactionAbortedException> serializer;
 
-        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
+        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector, Serializer<OrleansTransactionAbortedException> serializer)
         {
             this.clock = new CausalClock(clock);
             this.logger = logger;
             this.statistics = statistics;
             this.overloadDetector = overloadDetector;
+            this.serializer = serializer;
         }
 
         public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
@@ -227,6 +230,8 @@ namespace Orleans.Transactions
             await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
                  .Abort(p.Name, transactionInfo.TransactionId)));
         }
+
+        public TransactionalScope CreateScope() => new(this, serializer);
 
         private void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId> writers, out List<KeyValuePair<ParticipantId, AccessCounter>> resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)
         {
