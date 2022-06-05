@@ -12,23 +12,30 @@ public class TransactionalScope : IAsyncDisposable
     private readonly TransactionInfo _transactionInfo;
     private readonly ITransactionAgent _transactionAgent;
     private readonly TransactionInfo _ambientTransactionInfo;
+    private static readonly ValueTask CompletedValueTask = new();
     private readonly Serializer<OrleansTransactionAbortedException> _serializer;
+    private const string NoCommitExceptionMessage = "Missing transaction commit detected";
 
     internal TransactionalScope(ITransactionAgent transactionAgent, Serializer<OrleansTransactionAbortedException> serializer)
     {
         _serializer = serializer;
         _transactionAgent = transactionAgent;
 
-        // Try to pick up ambient transaction scope
+        // Pick up ambient transaction scope
         _ambientTransactionInfo = TransactionContext.GetTransactionInfo();
 
-        // TODO: this should be a configurable parameter
-        var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
+        if (_ambientTransactionInfo == null)
+        {
+            // TODO: this should be a configurable parameter
+            var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
-        // Start transaction
-        // Note - 'StartTransaction' method is really not async, ending with 'return Task.FromResult<TransactionInfo>(...)'
-        // Transaction can not be started in the constructor if 'StartTransaction' really gets to be an async method in the future
-        _transactionInfo = _transactionAgent.StartTransaction(false, transactionTimeout).Result;
+            // Start transaction
+            _transactionInfo = _transactionAgent.StartTransaction(false, transactionTimeout).Result;
+        }
+        else
+        {   // Fork ambient transaction
+            _transactionInfo = _ambientTransactionInfo.Fork();
+        }
 
         // Set current transaction context
         TransactionContext.SetTransactionInfo(_transactionInfo);
@@ -48,51 +55,69 @@ public class TransactionalScope : IAsyncDisposable
     /// </remarks>
     public ValueTask DisposeAsync()
     {
-        // Set last known transaction context
-        TransactionContext.SetTransactionInfo(_ambientTransactionInfo);
+        if (_ambientTransactionInfo != null)
+        {
+            if (!_resolveTransaction && _transactionInfo.OriginalException == null)
+            {   // User didn't commit transaction
+                _transactionInfo.RecordException(new OrleansTransactionAbortedException(_transactionInfo.Id, NoCommitExceptionMessage), _serializer);
+            }
+
+            // Gather pending transactions
+            _transactionInfo.ReconcilePending();
+
+            // Join into ambient transaction
+            _ambientTransactionInfo.Join(_transactionInfo);
+
+            // Set last known transaction context
+            TransactionContext.SetTransactionInfo(_ambientTransactionInfo);
+        }
+        else
+        {
+            // Clear transaction context
+            TransactionContext.Clear();
+        }
 
         // Tell garbage collector that we're done
         GC.SuppressFinalize(this);
 
-        // Housekeeping
-        return HandlePendingTransactions();
+        return _ambientTransactionInfo == null
+            ? ResolveTransaction()
+            : CompletedValueTask;
     }
 
-    private async ValueTask HandlePendingTransactions()
+    private async ValueTask ResolveTransaction()
     {
         // Gather pending transactions
         _transactionInfo.ReconcilePending();
 
-        if (!_resolveTransaction)
-        {   // User didn't commit transaction - abort the transaction
+        if (!_resolveTransaction && _transactionInfo.OriginalException == null)
+        {   // User didn't commit transaction
+            _transactionInfo.RecordException(new OrleansTransactionAbortedException(_transactionInfo.Id, NoCommitExceptionMessage), _serializer);
+        }
+
+        // Prepare for exception, if any
+        OrleansTransactionException transactionException;
+
+        // Check if transaction is pending for abortion
+        transactionException = _transactionInfo.MustAbort(_serializer);
+
+        if (transactionException is not null)
+        {   // Transaction is pending for abortion - abort the transaction
             await _transactionAgent.Abort(_transactionInfo);
         }
         else
-        {
-            // Prepare for exception, if any
-            OrleansTransactionException transactionException;
+        {   // Try to resolve transaction
+            var (status, exception) = await _transactionAgent.Resolve(_transactionInfo);
 
-            // Check if transaction is pending for abortion
-            transactionException = _transactionInfo.MustAbort(_serializer);
-
-            if (transactionException is not null)
-            {   // Transaction is pending for abortion - abort the transaction
-                await _transactionAgent.Abort(_transactionInfo);
+            if (status != TransactionalStatus.Ok)
+            {   // Resolving transaction failed
+                transactionException = status.ConvertToUserException(_transactionInfo.Id, exception);
             }
-            else
-            {   // Try to resolve transaction
-                var (status, exception) = await _transactionAgent.Resolve(_transactionInfo);
+        }
 
-                if (status != TransactionalStatus.Ok)
-                {   // Resolving transaction failed
-                    transactionException = status.ConvertToUserException(_transactionInfo.Id, exception);
-                }
-            }
-
-            if (transactionException != null)
-            {   // Transaction failed - buble up to user code
-                throw transactionException;
-            }
+        if (transactionException != null)
+        {   // Transaction failed - buble up to user code
+            throw transactionException;
         }
     }
 }
