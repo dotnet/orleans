@@ -7,55 +7,82 @@ namespace Orleans.Transactions.TestKit
 {
     public abstract class ScopedTransactionsTestRunner : TransactionTestRunnerBase
     {
-        protected ScopedTransactionsTestRunner(IGrainFactory grainFactory, Action<string> output)
-            : base(grainFactory, output) { }
+        private readonly ITransactionAgent _transactionAgent;
 
-        public virtual async Task CreateTransactionScopeAndSetValueWithTransactionAttribute(string grainStates)
+        protected ScopedTransactionsTestRunner(IGrainFactory grainFactory, ITransactionAgent transactionAgent, Action<string> output)
+            : base(grainFactory, output)
         {
-            // Arrange
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
-
-            // Act
-            Func<Task> act = () => grain.CreateScopeAndSetValueWithAmbientTransaction(57);
-
-            // Assert
-            await act.Should().NotThrowAsync(because: "No failure expected");
+            _transactionAgent = transactionAgent;
         }
 
-        public virtual async Task CreateTransactionScopeAndSetValueWithoutTransactionAttribute(string grainStates)
+        public virtual async Task CreateTransactionScopeAndSetValue(string grainStates)
         {
             // Arrange
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            var grain = RandomTestGrain(grainStates);
 
             // Act
-            Func<Task> act = () => grain.CreateScopeAndSetValueWithoutAmbientTransaction(57);
+            Func<Task> act = () => grain.Set(57);
 
-            // Assert
-            await act.Should().NotThrowAsync(because: "No failure expected");
+            await _transactionAgent.Transaction(TransactionOption.Create, async () =>
+                // Assert
+                await act.Should().NotThrowAsync(because: "No failure expected"));
         }
 
-        public virtual async Task CreateTransactionScopeAndSetValueAndFailWithTransactionAttribute(string grainStates)
+        public virtual async Task CreateTransactionScopeAndSetValueWithFailure(string grainStates)
         {
             // Arrange
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            var grain = RandomTestGrain(grainStates);
 
             // Act
-            Func<Task> act = () => grain.CreateScopeAndSetValueAndFailWithAmbientTransaction(57);
+            Func<Task> act = () => grain.SetAndThrow(57);
 
-            // Assert
-            await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected");
+            await _transactionAgent.Transaction(TransactionOption.Create, async () =>
+                // Assert
+                await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected"));
         }
 
-        public virtual async Task CreateTransactionScopeAndSetValueAndFailWithoutTransactionAttribute(string grainStates)
+        public virtual async Task CreateTransactionScopeAndSetValueAndAssert(string grainStates)
         {
+            var result = Array.Empty<int>();
+
             // Arrange
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            var grain = RandomTestGrain(grainStates);
 
             // Act
-            Func<Task> act = () => grain.CreateScopeAndSetValueAndFailWithoutAmbientTransaction(57);
+            await _transactionAgent.Transaction(TransactionOption.Create, async () =>
+            {
+                await grain.Set(57);
+                result = await grain.Get();
+            });
 
             // Assert
-            await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected");
+            result.Should().OnlyContain(number => number == 57);
+        }
+
+        public virtual async Task CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(string grainStates)
+        {
+            var result = Array.Empty<int>();
+
+            // Arrange
+            var grain = RandomTestGrain(grainStates);
+
+            // Act
+            await _transactionAgent.Transaction(TransactionOption.Create, async () =>
+            {
+                await grain.Set(57);
+
+                try
+                {
+                    await _transactionAgent.Transaction(TransactionOption.Create, async () => await grain.SetAndThrow(67));
+                }
+                catch
+                { }
+
+                result = await grain.Get();
+            });
+
+            // Assert
+            result.Should().OnlyContain(number => number == 57);
         }
     }
 }

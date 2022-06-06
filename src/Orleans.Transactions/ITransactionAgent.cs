@@ -39,9 +39,11 @@ namespace Orleans.Transactions
         Task Abort(TransactionInfo transactionInfo);
 
         /// <summary>
-        /// Create transaction scope
+        /// Run transactional scope
         /// </summary>
+        /// <param name="transactionOption"></param>
+        /// <param name="transactionScope"></param>
         /// <returns></returns>
-        TransactionalScope CreateScope();
+        Task Transaction(TransactionOption transactionOption, Func<Task> transactionScope);
     }
 }
