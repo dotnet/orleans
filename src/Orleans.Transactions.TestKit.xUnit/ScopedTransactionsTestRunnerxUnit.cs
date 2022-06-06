@@ -7,43 +7,43 @@ namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class ScopedTransactionsTestRunnerxUnit : ScopedTransactionsTestRunner
     {
-        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
-        : base(grainFactory, output.WriteLine) { }
+        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionAgent transactionAgent, ITestOutputHelper output)
+        : base(grainFactory, transactionAgent, output.WriteLine) { }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task CreateTransactionScopeAndSetValueWithTransactionAttribute(string grainStates)
+        public override Task CreateTransactionScopeAndSetValue(string grainStates)
         {
-            return base.CreateTransactionScopeAndSetValueWithTransactionAttribute(grainStates);
+            return base.CreateTransactionScopeAndSetValue(grainStates);
         }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task CreateTransactionScopeAndSetValueWithoutTransactionAttribute(string grainStates)
+        public override Task CreateTransactionScopeAndSetValueWithFailure(string grainStates)
         {
-            return base.CreateTransactionScopeAndSetValueWithoutTransactionAttribute(grainStates);
+            return base.CreateTransactionScopeAndSetValueWithFailure(grainStates);
         }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task CreateTransactionScopeAndSetValueAndFailWithTransactionAttribute(string grainStates)
+        public override Task CreateTransactionScopeAndSetValueAndAssert(string grainStates)
         {
-            return base.CreateTransactionScopeAndSetValueAndFailWithTransactionAttribute(grainStates);
+            return base.CreateTransactionScopeAndSetValueAndAssert(grainStates);
         }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task CreateTransactionScopeAndSetValueAndFailWithoutTransactionAttribute(string grainStates)
+        public override Task CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(string grainStates)
         {
-            return base.CreateTransactionScopeAndSetValueAndFailWithoutTransactionAttribute(grainStates);
+            return base.CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(grainStates);
         }
     }
 }

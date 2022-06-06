@@ -30,35 +30,9 @@ namespace Orleans.Transactions.TestKit
 
         [Transaction(TransactionOption.CreateOrJoin)]
         Task AddAndThrow(int numberToAdd);
-        /// <summary>
-        /// create scope from client and run transactional grain
-        /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
-        Task CreateScopeAndSetValueWithoutAmbientTransaction(int newValue);
 
-        /// <summary>
-        /// create scope from client and run transactional grain, fail transaction with client
-        /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
-        Task CreateScopeAndSetValueAndFailWithoutAmbientTransaction(int newValue);
-
-        /// <summary>
-        /// create scope from client and run transactional grain
-        /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
         [Transaction(TransactionOption.CreateOrJoin)]
-        Task CreateScopeAndSetValueWithAmbientTransaction(int newValue);
-
-        /// <summary>
-        /// create scope from client and run transactional grain, fail transaction with client
-        /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
-        [Transaction(TransactionOption.CreateOrJoin)]
-        Task CreateScopeAndSetValueAndFailWithAmbientTransaction(int newValue);
+        Task SetAndThrow(int numberToAdd);
 
         Task Deactivate();
     }

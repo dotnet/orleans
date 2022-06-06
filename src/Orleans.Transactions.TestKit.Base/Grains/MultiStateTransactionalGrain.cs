@@ -21,10 +21,9 @@ namespace Orleans.Transactions.TestKit
     public class MaxStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public MaxStateTransactionalGrain(
-            ITransactionAgent transactionAgent,
             ITransactionalStateFactory stateFactory,
             ILoggerFactory loggerFactory)
-            : base(transactionAgent, Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
+            : base(Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
                 .Select(i => stateFactory.Create<GrainData>(new TransactionalStateConfiguration(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore))))
                 .ToArray(),
                   loggerFactory)
@@ -35,13 +34,12 @@ namespace Orleans.Transactions.TestKit
     public class DoubleStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public DoubleStateTransactionalGrain(
-            ITransactionAgent transactionAgent,
             [TransactionalState("data1", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data1,
             [TransactionalState("data2", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data2,
             ILoggerFactory loggerFactory)
-            : base(transactionAgent, new ITransactionalState<GrainData>[2] { data1, data2 }, loggerFactory)
+            : base(new ITransactionalState<GrainData>[2] { data1, data2 }, loggerFactory)
         {
         }
     }
@@ -49,11 +47,10 @@ namespace Orleans.Transactions.TestKit
     public class SingleStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public SingleStateTransactionalGrain(
-            ITransactionAgent transactionAgent,
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data,
             ILoggerFactory loggerFactory)
-            : base(transactionAgent, new ITransactionalState<GrainData>[1] { data }, loggerFactory)
+            : base(new ITransactionalState<GrainData>[1] { data }, loggerFactory)
         {
         }
     }
@@ -61,28 +58,24 @@ namespace Orleans.Transactions.TestKit
     public class NoStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
         public NoStateTransactionalGrain(
-            ITransactionAgent transactionAgent,
             ILoggerFactory loggerFactory)
-            : base(transactionAgent, Array.Empty<ITransactionalState<GrainData>>(), loggerFactory)
+            : base(Array.Empty<ITransactionalState<GrainData>>(), loggerFactory)
         {
         }
     }
 
     public class MultiStateTransactionalGrainBaseClass : Grain, ITransactionTestGrain
     {
-        protected ITransactionAgent transactionAgent;
         protected ITransactionalState<GrainData>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
         protected ILogger logger;
 
         public MultiStateTransactionalGrainBaseClass(
-            ITransactionAgent transactionAgent,
             ITransactionalState<GrainData>[] dataArray,
             ILoggerFactory loggerFactory)
         {
             this.dataArray = dataArray;
             this.loggerFactory = loggerFactory;
-            this.transactionAgent = transactionAgent;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -140,40 +133,10 @@ namespace Orleans.Transactions.TestKit
             throw new AddAndThrowException($"{GetType().Name} test exception");
         }
 
-        public async Task CreateScopeAndSetValueWithoutAmbientTransaction(int newValue)
+        public async Task SetAndThrow(int numberToSet)
         {
-            await using (var scope = transactionAgent.CreateScope())
-            {
-                await Set(57);
-                scope.Commit();
-            }
-        }
-
-        public async Task CreateScopeAndSetValueAndFailWithoutAmbientTransaction(int newValue)
-        {
-            await using (var scope = transactionAgent.CreateScope())
-            {
-                await AddAndThrow(57);
-                scope.Commit();
-            }
-        }
-
-        public async Task CreateScopeAndSetValueWithAmbientTransaction(int newValue)
-        {
-            await using (var scope = transactionAgent.CreateScope())
-            {
-                await Set(57);
-                scope.Commit();
-            }
-        }
-
-        public async Task CreateScopeAndSetValueAndFailWithAmbientTransaction(int newValue)
-        {
-            await using (var scope = transactionAgent.CreateScope())
-            {
-                await AddAndThrow(57);
-                scope.Commit();
-            }
+            await Set(numberToSet);
+            throw new SetAndThrowException($"{GetType().Name} test exception");
         }
 
         public Task Deactivate()
@@ -194,6 +157,22 @@ namespace Orleans.Transactions.TestKit
         public AddAndThrowException(string message, Exception innerException) : base(message, innerException) { }
 
         protected AddAndThrowException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    [Serializable]
+    [GenerateSerializer]
+    public class SetAndThrowException : Exception
+    {
+        public SetAndThrowException() : base("Unexpected error.") { }
+
+        public SetAndThrowException(string message) : base(message) { }
+
+        public SetAndThrowException(string message, Exception innerException) : base(message, innerException) { }
+
+        protected SetAndThrowException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

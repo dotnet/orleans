@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 using Orleans.Transactions.TestKit.xUnit;
 
 using Xunit;
@@ -9,10 +11,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     public class TransactionScopeTests : ScopedTransactionsTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public TransactionScopeTests(TestFixture fixture, ITestOutputHelper output)
-            : base(fixture.GrainFactory, output)
+            : base(fixture.GrainFactory, fixture.HostedCluster.ServiceProvider.GetRequiredService<ITransactionAgent>(), output)
         {
             fixture.EnsurePreconditionsMet();
         }
     }
-
 }
