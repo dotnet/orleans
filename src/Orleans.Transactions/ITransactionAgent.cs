@@ -37,13 +37,5 @@ namespace Orleans.Transactions
         /// <returns>None.</returns>
         /// <remarks>This method is exception-free</remarks>
         Task Abort(TransactionInfo transactionInfo);
-
-        /// <summary>
-        /// Run transactional scope
-        /// </summary>
-        /// <param name="transactionOption"></param>
-        /// <param name="transactionScope"></param>
-        /// <returns></returns>
-        Task Transaction(TransactionOption transactionOption, Func<Task> transactionScope);
     }
 }

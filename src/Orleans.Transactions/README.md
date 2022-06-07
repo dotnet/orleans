@@ -1,12 +1,15 @@
-# Transaction scope
+# Transaction frame
 
-The scope allows using transaction in a unit of work of a set of code lines, where the ambient transaction can either be joined or suppressed if there exist one. 
+The transaction frame allows a set of code lines to be executed as a unit of work within a transaction.
+Any ambient transaction can be either joined or suppressed with the frame, if there exist one.
 
-The following section illustrates the pattern using scope.
+The frame type is injected with the type `ITransactionFrame` when needed.
+
+The following section illustrates the pattern using frame.
 
 ## Create transaction
 
-    await transactionAgent.Transaction(Create, async () =>
+    await transactionFrame.RunScope(Create, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -14,11 +17,11 @@ The following section illustrates the pattern using scope.
         ...
     });
 
-Scope always create a new transaction (isolated within ambient transaction).
+A new transaction is always created (isolated within ambient transaction).
 
 ## Create or join transaction
 
-    await transactionAgent.Transaction(CreateOrJoin, async () =>
+    await transactionFrame.RunScope(CreateOrJoin, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -26,11 +29,11 @@ Scope always create a new transaction (isolated within ambient transaction).
         ...
     });
 
-Scope will join ambient transaction, or create a new transaction.
+The transaction will join the ambient transaction, or a new transaction will be created.
 
 ## Join transaction
 
-    await transactionAgent.Transaction(Join, async () =>
+    await transactionFrame.RunScope(Join, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -38,11 +41,11 @@ Scope will join ambient transaction, or create a new transaction.
         ...
     });
 
-Scope will join ambient transaction, or fail.
+The transaction will join the ambient transaction, or fail.
 
 ## Suppress transaction
 
-    await transactionAgent.Transaction(Suppress, async () =>
+    await transactionFrame.RunScope(Suppress, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -54,7 +57,7 @@ Any ambient transaction will not be passed on, nor will transaction be used.
 
 ## Supported transaction
 
-    await transactionAgent.Transaction(Supported, async () =>
+    await transactionFrame.RunScope(Supported, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -62,11 +65,11 @@ Any ambient transaction will not be passed on, nor will transaction be used.
         ...
     });
 
-Scope is not transactional but supports transactions. Ambient transaction will be passed on.
+The frame is not transactional but supports transactions. Ambient transaction will be passed on.
 
 ## Not allowed
 
-    await transactionAgent.Transaction(NotAllowed, async () =>
+    await transactionFrame.RunScope(NotAllowed, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
@@ -74,23 +77,23 @@ Scope is not transactional but supports transactions. Ambient transaction will b
         ...
     });
 
-If scope is created within ambient transaction, it will throw a not supported exception.
+A not supported exception will be thrown if the frame is used within any ambient transaction.
 
 # Supported scenarios
 
-The configured scopes can be arbitrarily nested, e.g.,
+The configured transactions can be arbitrarily nested, e.g.,
 
-    await transactionAgent.Transaction(CreateOrJoin, async () =>
+    await transactionFrame.RunScope(CreateOrJoin, async () =>
     {
         ...
         await grainA.SetPhrase("Hi");
         ...
-        await transactionAgent.Transaction(Create, async () =>
+        await transactionFrame.RunScope(Create, async () =>
         {
             ...
             await grainA.SetPhrase("Hi");
             ...
-            await transactionAgent.Transaction(Suppress, async () =>
+            await transactionFrame.RunScope(Suppress, async () =>
             {
                 ...
                 await grainA.DoWork();
