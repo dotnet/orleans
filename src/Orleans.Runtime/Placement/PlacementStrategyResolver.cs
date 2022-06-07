@@ -66,7 +66,7 @@ namespace Orleans.Runtime.Placement
                 }
             }
 
-            if (properties is object
+            if (properties is not null
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
                 && !string.IsNullOrWhiteSpace(placementStrategyId))
             {

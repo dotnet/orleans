@@ -205,7 +205,7 @@ namespace Orleans.Runtime
         public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId legacyId)
         {
             legacyId = FromGrainIdInternal(id);
-            return legacyId is object;
+            return legacyId is not null;
         }
 
         public static LegacyGrainId FromGrainId(GrainId id)

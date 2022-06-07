@@ -69,7 +69,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (properties is object
+            if (properties is not null
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.GrainDirectory, out var directoryName)
                 && !string.IsNullOrWhiteSpace(directoryName))
             {

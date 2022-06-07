@@ -524,7 +524,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
-                if (forwardAddress is object)
+                if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)address.GrainId.GetUniformHashCode());
                     this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
@@ -764,7 +764,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
-                if (forwardAddress is object)
+                if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)grainId.GetUniformHashCode());
                     this.log.LogWarning($"LookupAsync - It seems we are not the owner of grain {grainId} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");

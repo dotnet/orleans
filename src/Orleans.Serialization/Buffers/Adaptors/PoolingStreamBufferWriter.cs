@@ -91,7 +91,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <inheritdoc />
         public void Dispose()
         {
-            if (_buffer is object)
+            if (_buffer is not null)
             {
                 ArrayPool<byte>.Shared.Return(_buffer);
             }

@@ -167,7 +167,7 @@ namespace Orleans
             {
                 var manifest = _clusterManifestProvider.Current;
                 cache = _cache;
-                if (cache is object && cache.Version == manifest.Version)
+                if (cache is not null && cache.Version == manifest.Version)
                 {
                     return cache;
                 }

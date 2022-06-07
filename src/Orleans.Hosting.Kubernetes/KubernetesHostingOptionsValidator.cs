@@ -35,7 +35,7 @@ namespace Orleans.Hosting.Kubernetes
                 failures.Add($"{nameof(SiloOptions)}.{nameof(SiloOptions.SiloName)} is not equal to the current pod name as defined by {nameof(KubernetesHostingOptions)}.{nameof(KubernetesHostingOptions.PodName)}");
             }
 
-            if (failures is object) return ValidateOptionsResult.Fail(failures);
+            if (failures is not null) return ValidateOptionsResult.Fail(failures);
 
             return ValidateOptionsResult.Success;
         }

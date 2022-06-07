@@ -221,7 +221,7 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{LocalClusterId}""");
                 }
 
-                if (preamble.SiloAddress is object)
+                if (preamble.SiloAddress is not null)
                 {
                     this.RemoteSiloAddress = preamble.SiloAddress;
                     this.connectionManager.OnConnected(preamble.SiloAddress, this);
@@ -252,7 +252,7 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogDebug("Sending ping message {Message}", msg);
             }
 
-            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
+            if (this.RemoteSiloAddress is not null && msg.TargetSilo is not null && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
             {
                 this.Log.LogWarning(
                     "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",
