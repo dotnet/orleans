@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions;
@@ -19,15 +18,13 @@ internal class TransactionAgent : ITransactionAgent
     private readonly CausalClock clock;
     private readonly ITransactionAgentStatistics statistics;
     private readonly ITransactionOverloadDetector overloadDetector;
-    private readonly Serializer<OrleansTransactionAbortedException> serializer;
 
-    public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector, Serializer<OrleansTransactionAbortedException> serializer)
+    public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
     {
         this.clock = new CausalClock(clock);
         this.logger = logger;
         this.statistics = statistics;
         this.overloadDetector = overloadDetector;
-        this.serializer = serializer;
     }
 
     public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
@@ -231,152 +228,6 @@ internal class TransactionAgent : ITransactionAgent
         // send one-way abort messages to release the locks and roll back any updates
         await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
              .Abort(p.Name, transactionInfo.TransactionId)));
-    }
-
-    public async Task Transaction(TransactionOption transactionOption, Func<Task> transactionScope)
-    {
-        if (transactionScope is null)
-        {
-            throw new ArgumentNullException(nameof(transactionScope));
-        }
-
-        // Pick up ambient transaction scope
-        var ambientTransactionInfo = TransactionContext.GetTransactionInfo();
-
-        if (ambientTransactionInfo is not null && transactionOption == TransactionOption.Suppress)
-        {
-            throw new NotSupportedException("Scope cannot be executed within a transaction.");
-        }
-
-        if (ambientTransactionInfo is null && transactionOption == TransactionOption.Join)
-        {
-            throw new NotSupportedException("Scope cannot be executed outside of a transaction.");
-        }
-
-        try
-        {
-            switch (transactionOption)
-            {
-                case TransactionOption.Create:
-                    await RunTransaction(null, transactionScope);
-                    break;
-                case TransactionOption.Join:
-                    await RunTransaction(ambientTransactionInfo, transactionScope);
-                    break;
-                case TransactionOption.CreateOrJoin:
-                    await RunTransaction(ambientTransactionInfo, transactionScope);
-                    break;
-                case TransactionOption.Suppress:
-                    await RunSupressedTransaction(transactionScope);
-                    break;
-                case TransactionOption.Supported:
-                    await RunSupportedTransaction(transactionScope);
-                    break;
-                case TransactionOption.NotAllowed:
-                    await RunDisallowedTransaction(ambientTransactionInfo, transactionScope);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-        }
-        finally
-        {
-            // Restore ambient transaction context, if any
-            TransactionContext.SetTransactionInfo(ambientTransactionInfo);
-        }
-    }
-
-    private static async Task RunDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task> transactionScope)
-    {
-        if (ambientTransactionInfo is not null)
-        {   // No transaction is allowed within scope
-            throw new InvalidOperationException();
-        }
-
-        // Run scope
-        await transactionScope.Invoke();
-    }
-
-    private static async Task RunSupportedTransaction(Func<Task> transactionScope) => await transactionScope.Invoke();
-
-    private static async Task RunSupressedTransaction(Func<Task> transactionScope)
-    {
-        // Clear transaction context
-        TransactionContext.Clear();
-
-        // Run scope
-        await transactionScope.Invoke();
-    }
-
-    private async Task RunTransaction(TransactionInfo ambientTransactionInfo, Func<Task> transactionScope)
-    {
-        TransactionInfo transactionInfo;
-
-        if (ambientTransactionInfo is null)
-        {
-            // TODO: this should be a configurable parameter
-            var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
-
-            // Start transaction
-            transactionInfo = await StartTransaction(false, transactionTimeout);
-        }
-        else
-        {   // Fork ambient transaction
-            transactionInfo = ambientTransactionInfo.Fork();
-        }
-
-        // Set transaction context
-        TransactionContext.SetTransactionInfo(transactionInfo);
-
-        try
-        {   // Run scope
-            await transactionScope.Invoke();
-        }
-        catch (Exception exception)
-        {   // Record exception with transaction
-            transactionInfo.RecordException(exception, serializer);
-        }
-
-        // Gather pending actions into transaction
-        transactionInfo.ReconcilePending();
-
-        if (ambientTransactionInfo is null)
-        {
-            await FinalizeTransaction(transactionInfo);
-        }
-        else
-        {
-            // Join transaction into ambient transaction
-            ambientTransactionInfo.Join(transactionInfo);
-        }
-    }
-
-    private async Task FinalizeTransaction(TransactionInfo transactionInfo)
-    {
-        // Prepare for exception, if any
-        OrleansTransactionException transactionException;
-
-        // Check if transaction is pending for abortion
-        transactionException = transactionInfo.MustAbort(serializer);
-
-        if (transactionException is not null)
-        {   // Transaction is pending for abortion - abort the transaction
-            await Abort(transactionInfo);
-        }
-        else
-        {   // Try to resolve transaction
-            var (status, exception) = await Resolve(transactionInfo);
-
-            if (status != TransactionalStatus.Ok)
-            {   // Resolving transaction failed
-                transactionException = status.ConvertToUserException(transactionInfo.Id, exception);
-            }
-        }
-
-        if (transactionException != null)
-        {   // Transaction failed - bubble up exception
-            throw transactionException;
-        }
     }
 
     private static void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId> writers, out List<KeyValuePair<ParticipantId, AccessCounter>> resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)

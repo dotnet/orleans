@@ -5,10 +5,10 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
-    public abstract class ScopedTransactionsTestRunnerxUnit : ScopedTransactionsTestRunner
+    public abstract class ScopedTransactionsTestRunnerxUnit : FramedTransactionsTestRunner
     {
-        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionAgent transactionAgent, ITestOutputHelper output)
-        : base(grainFactory, transactionAgent, output.WriteLine) { }
+        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionFrame transactionFrame, ITestOutputHelper output)
+        : base(grainFactory, transactionFrame, output.WriteLine) { }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]

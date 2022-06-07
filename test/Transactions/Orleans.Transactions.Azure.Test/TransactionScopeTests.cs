@@ -11,7 +11,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
     public class TransactionScopeTests : ScopedTransactionsTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public TransactionScopeTests(TestFixture fixture, ITestOutputHelper output)
-            : base(fixture.GrainFactory, fixture.HostedCluster.ServiceProvider.GetRequiredService<ITransactionAgent>(), output)
+            : base(fixture.GrainFactory, fixture.HostedCluster.ServiceProvider.GetRequiredService<ITransactionFrame>(), output)
         {
             fixture.EnsurePreconditionsMet();
         }
