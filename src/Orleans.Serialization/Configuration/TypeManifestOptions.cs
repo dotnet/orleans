@@ -38,6 +38,11 @@ namespace Orleans.Serialization.Configuration
         public HashSet<Type> Copiers { get; } = new HashSet<Type>();
 
         /// <summary>
+        /// Gets the set of converters, which are responsible for converting from one type to another.
+        /// </summary>
+        public HashSet<Type> Converters { get; } = new HashSet<Type>();
+
+        /// <summary>
         /// Gets the set of known interfaces, which are interfaces that have corresponding proxies in the <see cref="InterfaceProxies"/> collection.
         /// </summary>
         public HashSet<Type> Interfaces { get; } = new HashSet<Type>();

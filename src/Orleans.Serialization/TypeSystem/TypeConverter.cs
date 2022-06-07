@@ -87,7 +87,7 @@ namespace Orleans.Serialization.TypeSystem
             AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
             AddFromMetadata(metadata.Activators, typeof(IActivator<>));
             AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
-            AddFromMetadata(metadata.Copiers, typeof(IBaseCopier<>));
+            AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
             foreach (var type in metadata.InterfaceProxies)
             {
                 AddAllowedType(type switch {
@@ -98,7 +98,7 @@ namespace Orleans.Serialization.TypeSystem
 
             void AddFromMetadata(IEnumerable<Type> metadataCollection, Type genericType)
             {
-                Debug.Assert(genericType.GetGenericArguments().Length == 1);
+                Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
                 foreach (var type in metadataCollection)
                 {
@@ -115,25 +115,32 @@ namespace Orleans.Serialization.TypeSystem
                             continue;
                         }
 
-                        var genericArgument = @interface.GetGenericArguments()[0];
-                        if (typeof(object) == genericArgument)
+                        foreach (var genericArgument in @interface.GetGenericArguments())
                         {
-                            continue;
+                            InspectGenericArgument(genericArgument);
                         }
-
-                        if (genericArgument.IsConstructedGenericType && genericArgument.GenericTypeArguments.Any(arg => arg.IsGenericParameter))
-                        {
-                            genericArgument = genericArgument.GetGenericTypeDefinition();
-                        }
-
-                        if (genericArgument.IsGenericParameter || genericArgument.IsArray)
-                        {
-                            continue;
-                        }
-
-                        AddAllowedType(genericArgument);
                     }
                 }
+            }
+
+            void InspectGenericArgument(Type genericArgument)
+            {
+                if (typeof(object) == genericArgument)
+                {
+                    return;
+                }
+
+                if (genericArgument.IsConstructedGenericType && genericArgument.GenericTypeArguments.Any(arg => arg.IsGenericParameter))
+                {
+                    genericArgument = genericArgument.GetGenericTypeDefinition();
+                }
+
+                if (genericArgument.IsGenericParameter || genericArgument.IsArray)
+                {
+                    return;
+                }
+
+                AddAllowedType(genericArgument);
             }
 
             void AddAllowedType(Type type)

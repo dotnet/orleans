@@ -43,7 +43,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Marker interface for codecs which directly support serializing all derived types of their specified type.
     /// </summary>
-    public interface IDerivedTypeCodec
+    public interface IDerivedTypeCodec : IFieldCodec
     {
     }
 

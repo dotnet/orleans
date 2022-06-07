@@ -4,6 +4,7 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
@@ -13,7 +14,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="TField">The type which the implementation of this class supports.</typeparam>
     /// <typeparam name="TSurrogate">The surrogate type serialized in place of <typeparamref name="TField"/>.</typeparam>
-    public abstract class ReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField> where TField : class where TSurrogate : struct
+    public abstract class ReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField> where TSurrogate : struct
     {
         private static readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
@@ -54,7 +55,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             ThrowSerializerNotFoundException(fieldType);
-            return null;
+            return default;
         }
 
         /// <inheritdoc/>
@@ -109,6 +110,7 @@ namespace Orleans.Serialization.Codecs
         public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate); 
 
         [MethodImpl(MethodImplOptions.NoInlining)]
+        [DoesNotReturn]
         private static void ThrowSerializerNotFoundException(Type type) => throw new KeyNotFoundException($"Could not find a serializer of type {type}.");
     }
 }
