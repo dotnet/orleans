@@ -69,5 +69,11 @@ namespace Orleans.Serialization.Configuration
         /// Gets the mapping of allowed type names.
         /// </summary>
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to allow all types by default.
+        /// Default: <see langword="false"/>.
+        /// </summary>
+        public bool AllowAllTypes { get; set; }
     }
 }

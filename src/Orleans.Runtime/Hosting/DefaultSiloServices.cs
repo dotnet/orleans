@@ -365,7 +365,7 @@ namespace Orleans.Hosting
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
 
             services.AddSerializer();
-            services.AddSingleton<ITypeFilter, AllowOrleansTypes>();
+            services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
@@ -387,7 +387,7 @@ namespace Orleans.Hosting
             services.AddSingleton<SharedMemoryPool>();
         }
 
-        private class AllowOrleansTypes : ITypeFilter
+        private class AllowOrleansTypes : ITypeNameFilter
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {

@@ -5,7 +5,7 @@ namespace Orleans.Serialization.TypeSystem
     /// <summary>
     /// Type which allows any exception type to be resolved.
     /// </summary>
-    public sealed class DefaultTypeFilter : ITypeFilter
+    public sealed class DefaultTypeFilter : ITypeNameFilter
     {
         /// <inheritdoc/>
         public bool? IsTypeNameAllowed(string typeName, string assemblyName)
