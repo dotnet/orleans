@@ -259,7 +259,23 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
-        /// Allocates room for the specified number of bytes.
+        /// Allocates additional buffer space.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void AllocateUnspecified()
+        {
+            // Commit the bytes which have been written.
+            _output.Advance(_bufferPos);
+
+            _currentSpan = _output.GetSpan();
+
+            // Update internal state for the new buffer.
+            _previousBuffersSize += _bufferPos;
+            _bufferPos = 0;
+        }
+
+        /// <summary>
+        /// Allocates buffer space for the specified number of bytes.
         /// </summary>
         /// <param name="length">The number of bytes to reserve.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -303,10 +319,10 @@ namespace Orleans.Serialization.Buffers
             {
                 // Write as much as possible/necessary into the current segment.
                 var writeSize = Math.Min(_currentSpan.Length - _bufferPos, input.Length);
-                input.Slice(0, writeSize).CopyTo(WritableSpan);
+                input[..writeSize].CopyTo(WritableSpan);
                 _bufferPos += writeSize;
 
-                input = input.Slice(writeSize);
+                input = input[writeSize..];
 
                 if (input.Length == 0)
                 {
@@ -314,7 +330,7 @@ namespace Orleans.Serialization.Buffers
                 }
 
                 // The current segment is full but there is more to write.
-                Allocate(input.Length);
+                AllocateUnspecified();
             }
         }
 

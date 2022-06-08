@@ -2,7 +2,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Serialization.Utilities
+namespace Orleans.Serialization.Buffers
 {
     /// <summary>
     /// Extension method for working with variable-width integers.
