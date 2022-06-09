@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     {
         private const string asyncTimerName ="Orleans.Runtime.AsyncTaskSafeTimer";
         private const string syncTimerName = "Orleans.Runtime.SafeTimerBase";
+        private const double maxPeriod = 2 ^ 32 - 2;
 
         private Timer               timer;
         private Func<object, Task>  asyncTaskCallback;
@@ -49,7 +50,8 @@ namespace Orleans.Runtime
         {
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
-           
+            if (period.TotalSeconds >= maxPeriod) throw new ArgumentOutOfRangeException("period", period, "Time-out interval must be less than 2^32-2.");
+
             timerFrequency = period;
             dueTime = due;
             timerStarted = true;
@@ -63,6 +65,7 @@ namespace Orleans.Runtime
             int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
             if (numNonNulls > 1) throw new ArgumentNullException("synCallback", "Cannot define more than one timer callbacks. Pick one.");
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
+            if (period.TotalSeconds >= maxPeriod) throw new ArgumentOutOfRangeException("period", period, "Time-out interval must be less than 2^32-2.");
 
             this.asyncTaskCallback = asynCallback;
             syncCallbackFunc = synCallback;
