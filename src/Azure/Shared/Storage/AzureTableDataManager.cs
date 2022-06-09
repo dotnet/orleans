@@ -90,9 +90,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (TimeoutException te)
             {
-                var errorMsg = "Unable to create or connect to the Azure table in {TableName}";
-                this.Logger.LogError((int)Utilities.ErrorCode.AzureTable_TableNotCreated, te, errorMsg, this.StoragePolicyOptions.CreationTimeout);
-                throw new OrleansException(errorMsg, te);
+                Logger.LogError(
+                    (int)Utilities.ErrorCode.AzureTable_TableNotCreated,
+                    te,
+                    "Unable to create or connect to the Azure table in {CreationTimeout}",
+                    StoragePolicyOptions.CreationTimeout);
+                throw new OrleansException($"Unable to create or connect to the Azure table in {StoragePolicyOptions.CreationTimeout}", te);
             }
             catch (Exception exc)
             {
@@ -538,13 +541,12 @@ namespace Orleans.GrainDirectory.AzureStorage
                 catch (Exception exc)
                 {
                     // Out of retries...
-                    var errorMsg = "Failed to read Azure storage table {TableName}";
                     if (!AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, errorMsg, TableName);
+                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, "Failed to read Azure Storage table {TableName}", TableName);
                     }
 
-                    throw new OrleansException(errorMsg, exc);
+                    throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
                 }
             }
             finally

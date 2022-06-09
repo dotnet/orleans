@@ -173,13 +173,12 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
                     ex,
-                    "Error writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName} Exception={5}",
+                    "Error writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
                     blobName,
-                    container.Name,
-                    ex.Message);
+                    container.Name);
 
                 throw;
             }
@@ -228,13 +227,12 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
                     ex,
-                    "Error clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName} Exception={5}",
+                    "Error clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
                     blobName,
-                    container.Name,
-                    ex.Message);
+                    container.Name);
 
                 throw;
             }
@@ -318,8 +316,8 @@ namespace Orleans.Storage
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",
                     this.name,
                     this.GetType().Name,
-                    this.options.InitStage, stopWatch
-                    .ElapsedMilliseconds);
+                    this.options.InitStage,
+                    stopWatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {

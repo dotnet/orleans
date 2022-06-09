@@ -434,11 +434,10 @@ namespace Orleans.Storage
                     {
                         if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound,
                             exc,
-                            "DataNotFound reading (exception): PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName} Exception={Exception}",
+                            "DataNotFound reading (exception): PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
                             partitionKey,
                             rowKey,
-                            TableName,
-                            LogFormatter.PrintException(exc));
+                            TableName);
 
                         return default;  // No data
                     }
