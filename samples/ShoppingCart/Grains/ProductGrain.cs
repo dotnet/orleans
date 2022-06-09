@@ -1,8 +1,11 @@
-﻿namespace Orleans.ShoppingCart.Grains;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Grains;
 
 internal class ProductGrain : Grain, IProductGrain
 {
-    readonly IPersistentState<ProductDetails> _product;
+    private readonly IPersistentState<ProductDetails> _product;
 
     public ProductGrain(
         [PersistentState(

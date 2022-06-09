@@ -1,9 +1,12 @@
-﻿namespace Orleans.ShoppingCart.Silo.Pages;
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Silo.Pages;
 
 public sealed partial class Shop
 {
-    HashSet<ProductDetails>? _products;
-    HashSet<CartItem>? _cartItems;
+    private HashSet<ProductDetails>? _products;
+    private HashSet<CartItem>? _cartItems;
 
     [Inject]
     public ShoppingCartService ShoppingCartService { get; set; } = null!;
@@ -23,7 +26,7 @@ public sealed partial class Shop
         _cartItems = await ShoppingCartService.GetAllItemsAsync();
     }
 
-    async Task OnAddedToCart(string productId)
+    private async Task OnAddedToCart(string productId)
     {
         var product = _products?.FirstOrDefault(p => p.Id == productId);
         if (product is null)
@@ -45,6 +48,6 @@ public sealed partial class Shop
         }
     }
 
-    bool IsProductAlreadyInCart(ProductDetails product) =>
+    private bool IsProductAlreadyInCart(ProductDetails product) =>
         _cartItems?.Any(c => c.Product.Id == product.Id) ?? false;
 }

@@ -1,4 +1,7 @@
-﻿namespace Orleans.ShoppingCart.Abstractions;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Abstractions;
 
 public interface IShoppingCartGrain : IGrainWithStringKey
 {

@@ -1,13 +1,10 @@
-﻿@page "/products/{id?}"
+@page "/products/{id?}"
 
-<h3>Product Management</h3>
-
-<div class="pb-3">
-    <button type="button" @onclick=@CreateNewProduct
-        class="btn btn-primary btn-lg">
-        Create New Product?
-    </button>
-</div>
-
-<ProductTable Products=@_products OnEditProduct=@OnEditProduct />
-<ManageProductModal @ref=_modal OnProductUpdated=@OnProductUpdated />
+<ProductTable Title="Product Management" Products=@_products EditProduct=@OnEditProduct>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+        Color="Color.Primary" Size="Size.Large" DisableElevation="true" OnClick=@CreateNewProduct>
+        Create New Product
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="my-3 mx-4"/>
+</ProductTable>
+<ManageProductModal @ref=_modal ProductUpdated=@OnProductUpdated />
