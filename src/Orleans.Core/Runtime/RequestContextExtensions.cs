@@ -93,5 +93,39 @@ namespace Orleans.Runtime
                 : null;
             return (resultValues, properties.RequestObject);
         }
+
+        /// <summary>
+        /// Suppresses the flow of the currently executing call chain.
+        /// </summary>
+        internal static object SuppressCurrentCallChainFlow()
+        {
+            var properties = RequestContext.CallContextData.Value;
+            var result = properties.RequestObject;
+            if (result is not null)
+            {
+                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
+                {
+                    Values = properties.Values,
+                };
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Restores the flow of a previously suppressed call chain.
+        /// </summary>
+        internal static void RestoreCurrentCallChainFlow(object requestMessage)
+        {
+            if (requestMessage is not null)
+            {
+                var properties = RequestContext.CallContextData.Value;
+                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
+                {
+                    Values = properties.Values,
+                    RequestObject = requestMessage,
+                };
+            }
+        }
     }
 }
