@@ -67,7 +67,12 @@ namespace Orleans.Storage
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, this.options.TableName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData,
+                "Reading: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} from Table={TableName}",
+                grainType,
+                pk,
+                grainReference,
+                this.options.TableName);
             string partitionKey = pk;
             string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
@@ -89,7 +94,13 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainReference);
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.ETag, this.options.TableName);
+                logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
+                    "Writing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} to Table={TableName}",
+                    grainType,
+                    pk,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
 
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
@@ -105,8 +116,12 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
-                    $"Error Writing: GrainType={grainType} GrainId={grainReference.GrainId} ETag={grainState.ETag} to Table={this.options.TableName} Exception={exc.Message}", exc);
+                logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_WriteError, exc,
+                    "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}",
+                    grainType,
+                    grainReference.GrainId,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -123,7 +138,14 @@ namespace Orleans.Storage
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
+                "Clearing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
+                grainType,
+                pk,
+                grainReference,
+                grainState.ETag,
+                this.options.DeleteStateOnClear,
+                this.options.TableName);
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
             {
@@ -147,8 +169,14 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_DeleteError,
+                    exc,
+                    "Error {Operation}: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from Table={TableName}",
+                    operation,
+                    grainType,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -202,7 +230,7 @@ namespace Orleans.Storage
             if (dataSize > maxDataSize)
             {
                 var msg = string.Format("Data too large to write to Azure table. Size={0} MaxSize={1}", dataSize, maxDataSize);
-                logger.Error(0, msg);
+                logger.LogError(0, "Data too large to write to Azure table. Size={Size} MaxSize={MaxSize}", dataSize, maxDataSize);
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }
@@ -332,6 +360,7 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
                 }
+
                 if (dataValue != null)
                 {
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
@@ -370,26 +399,46 @@ namespace Orleans.Storage
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading, "Reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading,
+                    "Reading: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
+                    partitionKey,
+                    rowKey,
+                    TableName);
                 try
                 {
                     var data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey).ConfigureAwait(false);
                     if (data.Entity == null)
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound,
+                            "DataNotFound reading: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
+                            partitionKey,
+                            rowKey,
+                            TableName);
                         return default;
                     }
                     TableEntity stateEntity = data.Entity;
                     var record = stateEntity;
                     record.ETag = new ETag(data.ETag);
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead, "Read: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", stateEntity.PartitionKey, stateEntity.RowKey, TableName, record.ETag);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead,
+                        "Read: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName} with ETag={ETag}",
+                        stateEntity.PartitionKey,
+                        stateEntity.RowKey,
+                        TableName,
+                        record.ETag);
+
                     return record;
                 }
                 catch (Exception exc)
                 {
                     if (AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, LogFormatter.PrintException(exc));
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound,
+                            exc,
+                            "DataNotFound reading (exception): PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
+                            partitionKey,
+                            rowKey,
+                            TableName);
+
                         return default;  // No data
                     }
                     throw;
@@ -398,7 +447,13 @@ namespace Orleans.Storage
 
             public async Task Write(TableEntity entity)
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Writing: PartitionKey={0} RowKey={1} to Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, entity.ETag);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing,
+                    "Writing: PartitionKey={PartitionKey} RowKey={RowKey} to Table={TableName} with ETag={ETag}",
+                    entity.PartitionKey,
+                    entity.RowKey,
+                    TableName,
+                    entity.ETag);
+
                 string eTag = string.IsNullOrEmpty(entity.ETag.ToString()) ?
                     await tableManager.CreateTableEntryAsync(entity).ConfigureAwait(false) :
                     await tableManager.UpdateTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
@@ -409,11 +464,21 @@ namespace Orleans.Storage
             {
                 if (string.IsNullOrWhiteSpace(entity.ETag.ToString()))
                 {
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "Not attempting to delete non-existent persistent state: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, entity.ETag);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound,
+                        "Not attempting to delete non-existent persistent state: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName} with ETag={ETag}",
+                        entity.PartitionKey,
+                        entity.RowKey,
+                        TableName,
+                        entity.ETag);
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, entity.ETag);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing,
+                    "Deleting: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName} with ETag={ETag}",
+                    entity.PartitionKey,
+                    entity.RowKey,
+                    TableName,
+                    entity.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
                 entity.ETag = default;
             }
@@ -430,16 +495,29 @@ namespace Orleans.Storage
             var stopWatch = Stopwatch.StartNew();
             try
             {
-                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage {name} initializing: {this.options.ToString()}");
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
+                    "AzureTableGrainStorage {ProviderName} initializing: {Options}",
+                    name,
+                    this.options.ToString());
                 this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
-                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
+                    "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",
+                    this.name,
+                    this.GetType().Name,
+                    this.options.InitStage,
+                    stopWatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, ex,
+                    "Initialization failed for provider {ProviderName} of type {ProviderType} in stage {Stage} in {ElapsedMilliseconds} Milliseconds.",
+                    this.name,
+                    this.GetType().Name,
+                    this.options.InitStage,
+                    stopWatch.ElapsedMilliseconds);
                 throw;
             }
         }
