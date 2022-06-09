@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Services;
 using Orleans.Timers;

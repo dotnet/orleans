@@ -112,7 +112,7 @@ namespace Tester
             return builder.AddGrainService<TestGrainService>()
                 .ConfigureServices(services => services
                     .AddSingleton<ITestGrainServiceClient, TestGrainServiceClient>()
-                    .AddOptions<TestGrainServiceOptions>().Configure( o => o.ConfigProperty = configProperty));
+                    .AddOptions<TestGrainServiceOptions>().Configure(o => o.ConfigProperty = configProperty));
         }
     }
 

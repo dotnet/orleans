@@ -257,8 +257,6 @@ namespace Orleans.Runtime
             return result;
         }
 
-        /// <summary>
-        /// </summary>
         public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
         {
             var batch = new List<T>(batchSize);

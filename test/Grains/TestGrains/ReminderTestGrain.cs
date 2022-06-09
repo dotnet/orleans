@@ -13,12 +13,12 @@ namespace UnitTests.Grains
             return reminder != null;
         }
 
-        public Task AddReminder(string reminderName) => RegisterOrUpdateReminder(reminderName, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
+        public Task AddReminder(string reminderName) => this.RegisterOrUpdateReminder(reminderName, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
 
         public async Task RemoveReminder(string reminderName)
         {
-            var r = await GetReminder(reminderName) ?? throw new Exception("Reminder not found");
-            await UnregisterReminder(r);
+            var r = await this.GetReminder(reminderName) ?? throw new Exception("Reminder not found");
+            await this.UnregisterReminder(r);
         }
 
         public Task ReceiveReminder(string reminderName, Orleans.Runtime.TickStatus status) => throw new NotSupportedException();
