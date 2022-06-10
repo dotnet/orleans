@@ -30,6 +30,152 @@ public class SomeClassWithSerializers
 
 namespace Orleans.Serialization.UnitTests
 {
+    public class MyForeignLibraryType
+    {
+        public MyForeignLibraryType() { }
+
+        public MyForeignLibraryType(int num, string str, DateTimeOffset dto)
+        {
+            Num = num;
+            String = str;
+            DateTimeOffset = dto;
+        }
+
+        public int Num { get; set; }
+        public string String { get; set; }
+        public DateTimeOffset DateTimeOffset { get; set; }
+
+        public override bool Equals(object obj) =>
+            obj is MyForeignLibraryType type
+            && Num == type.Num
+            && string.Equals(String, type.String, StringComparison.Ordinal)
+            && DateTimeOffset.Equals(type.DateTimeOffset);
+
+        public override int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
+    }
+
+    [GenerateSerializer]
+    public struct MyForeignLibraryTypeSurrogate
+    {
+        [Id(0)]
+        public int Num { get; set; }
+
+        [Id(1)]
+        public string String { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset DateTimeOffset { get; set; }
+    }
+
+    [RegisterConverter]
+    public sealed class MyForeignLibraryTypeSurrogateConverter : IConverter<MyForeignLibraryType, MyForeignLibraryTypeSurrogate>, IPopulator<MyForeignLibraryType, MyForeignLibraryTypeSurrogate>
+    {
+        public MyForeignLibraryType ConvertFromSurrogate(in MyForeignLibraryTypeSurrogate surrogate)
+            => new(surrogate.Num, surrogate.String, surrogate.DateTimeOffset);
+
+        public MyForeignLibraryTypeSurrogate ConvertToSurrogate(in MyForeignLibraryType value)
+            => new() { Num = value.Num, String = value.String, DateTimeOffset = value.DateTimeOffset };
+        public void Populate(in MyForeignLibraryTypeSurrogate surrogate, MyForeignLibraryType value)
+        {
+            value.Num = surrogate.Num;
+            value.String = surrogate.String;
+            value.DateTimeOffset = surrogate.DateTimeOffset;
+        }
+    }
+
+    [GenerateSerializer]
+    public class WrapsMyForeignLibraryType
+    {
+        [Id(0)]
+        public int IntValue { get; set; }
+
+        [Id(1)]
+        public MyForeignLibraryType ForeignValue { get; set; }
+
+        [Id(2)]
+        public int OtherIntValue { get; set; }
+
+        public override bool Equals(object obj) => obj is WrapsMyForeignLibraryType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
+        public override int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
+    }
+
+    [GenerateSerializer]
+    public class DerivedFromMyForeignLibraryType : MyForeignLibraryType
+    {
+        public DerivedFromMyForeignLibraryType() { }
+        public DerivedFromMyForeignLibraryType(int intValue, int num, string str, DateTimeOffset dto) : base(num, str, dto)
+        {
+            IntValue = intValue;
+        }
+
+        [Id(0)]
+        public int IntValue { get; set; }
+        
+        public override bool Equals(object obj) => obj is DerivedFromMyForeignLibraryType type && base.Equals(obj) && Num == type.Num && String == type.String && DateTimeOffset.Equals(type.DateTimeOffset) && IntValue == type.IntValue;
+        public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), Num, String, DateTimeOffset, IntValue);
+    }
+
+    public struct MyForeignLibraryValueType
+    {
+        public MyForeignLibraryValueType(int num, string str, DateTimeOffset dto)
+        {
+            Num = num;
+            String = str;
+            DateTimeOffset = dto;
+        }
+
+        public int Num { get; }
+        public string String { get; }
+        public DateTimeOffset DateTimeOffset { get; }
+
+        public override bool Equals(object obj) =>
+            obj is MyForeignLibraryValueType type
+            && Num == type.Num
+            && string.Equals(String, type.String, StringComparison.Ordinal)
+            && DateTimeOffset.Equals(type.DateTimeOffset);
+
+        public override int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
+    }
+
+    [GenerateSerializer]
+    public struct MyForeignLibraryValueTypeSurrogate
+    {
+        [Id(0)]
+        public int Num { get; set; }
+
+        [Id(1)]
+        public string String { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset DateTimeOffset { get; set; }
+    }
+
+    [RegisterConverter]
+    public sealed class MyForeignLibraryValueTypeSurrogateConverter : IConverter<MyForeignLibraryValueType, MyForeignLibraryValueTypeSurrogate>
+    {
+        public MyForeignLibraryValueType ConvertFromSurrogate(in MyForeignLibraryValueTypeSurrogate surrogate)
+            => new(surrogate.Num, surrogate.String, surrogate.DateTimeOffset);
+
+        public MyForeignLibraryValueTypeSurrogate ConvertToSurrogate(in MyForeignLibraryValueType value)
+            => new() { Num = value.Num, String = value.String, DateTimeOffset = value.DateTimeOffset };
+    }
+
+    [GenerateSerializer]
+    public struct WrapsMyForeignLibraryValueType
+    {
+        [Id(0)]
+        public int IntValue { get; set; }
+
+        [Id(1)]
+        public MyForeignLibraryValueType ForeignValue { get; set; }
+
+        [Id(2)]
+        public int OtherIntValue { get; set; }
+
+        public override bool Equals(object obj) => obj is WrapsMyForeignLibraryValueType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryValueType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
+        public override int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
+    }
+
     [GenerateSerializer]
     [WellKnownId(3201)]
     public class SomeClassWithSerializers
