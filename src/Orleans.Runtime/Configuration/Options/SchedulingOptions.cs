@@ -54,5 +54,11 @@ namespace Orleans.Configuration
         /// Gets or sets the period of time after which to log errors for tasks scheduled to stopped activations.
         /// </summary>
         public TimeSpan StoppedActivationWarningInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+        /// <summary>
+        /// Whether or not to allow reentrancy for calls within the same call chain.
+        /// </summary>
+        public bool AllowCallChainReentrancy { get; set; } = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = true;
     }
 }

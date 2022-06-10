@@ -260,7 +260,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContextExtensions.Import(message.RequestContextData);
+                RequestContextExtensions.Import(message.RequestContextData, message);
 
                 Response response;
                 try

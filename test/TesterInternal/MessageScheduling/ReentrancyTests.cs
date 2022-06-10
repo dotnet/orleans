@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime;
@@ -17,10 +18,15 @@ namespace UnitTests
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
-            hostBuilder.AddSimpleMessageStreamProvider("sms")
+            hostBuilder
+                .AddSimpleMessageStreamProvider("sms")
                 .AddMemoryGrainStorage("MemoryStore")
-                    .AddMemoryGrainStorage("PubSubStore")
-                    .AddMemoryGrainStorageAsDefault();
+                .AddMemoryGrainStorage("PubSubStore")
+                .AddMemoryGrainStorageAsDefault()
+                .Configure<SchedulingOptions>(options =>
+                {
+                    options.AllowCallChainReentrancy = false;
+                });
         }
     }
 
