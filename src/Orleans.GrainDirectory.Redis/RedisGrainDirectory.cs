@@ -66,7 +66,8 @@ namespace Orleans.GrainDirectory.Redis
                     this.GetKey(address.GrainId),
                     value,
                     this.directoryOptions.EntryExpiry,
-                    When.NotExists);
+                    When.NotExists,
+                    CommandFlags.None);
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
@@ -128,7 +129,6 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.ConnectionFailed += this.LogConnectionFailed;
             this.redis.ErrorMessage += this.LogErrorMessage;
             this.redis.InternalError += this.LogInternalError;
-            this.redis.IncludeDetailInExceptions = true;
 
             this.database = this.redis.GetDatabase();
 
