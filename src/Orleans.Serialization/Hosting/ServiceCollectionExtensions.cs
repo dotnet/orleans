@@ -67,7 +67,7 @@ namespace Orleans.Serialization
                 services.TryAddSingleton(typeof(IBaseCopier<>), typeof(BaseCopierHolder<>));
 
                 // Type filtering
-                services.AddSingleton<ITypeFilter, DefaultTypeFilter>();
+                services.AddSingleton<ITypeNameFilter, DefaultTypeFilter>();
 
                 // Session
                 services.TryAddSingleton<SerializerSessionPool>();
