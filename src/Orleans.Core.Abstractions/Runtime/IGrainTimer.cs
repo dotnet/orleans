@@ -24,4 +24,9 @@ namespace Orleans.Runtime
         /// <returns>The currently executing grain timer task.</returns>
         Task GetCurrentlyExecutingTickTask();
     }
+
+    internal interface IMutableGrainTimer : IGrainTimer
+    {
+        void Change(TimeSpan dueTime, TimeSpan period);
+    }
 }

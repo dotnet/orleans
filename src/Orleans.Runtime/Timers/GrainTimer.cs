@@ -6,6 +6,27 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
+    internal sealed class MutableGrainTimer : IMutableGrainTimer
+    {
+        private readonly GrainTimer _grainTimer;
+
+
+        public MutableGrainTimer(GrainTimer grainTimer)
+        {
+            _grainTimer = grainTimer;
+        }
+
+        public void Dispose() => _grainTimer.Dispose();
+
+        public void Start() => _grainTimer.Start();
+
+        public void Stop() => _grainTimer.Stop();
+
+        public Task GetCurrentlyExecutingTickTask() => _grainTimer.GetCurrentlyExecutingTickTask();
+
+        public void Change(TimeSpan dueTime, TimeSpan period) => _grainTimer.GetTimer().Change(dueTime, period);
+    }
+
     internal sealed class GrainTimer : IGrainTimer
     {
         private Func<object, Task> asyncCallback;
@@ -189,6 +210,11 @@ namespace Orleans.Runtime
             }
 
             grainContext?.GetComponent<IGrainTimerRegistry>().OnTimerDisposed(this);
+        }
+
+        internal AsyncTaskSafeTimer GetTimer()
+        {
+            return timer;
         }
     }
 }
