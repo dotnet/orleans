@@ -34,6 +34,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             if (_bytesWritten > _buffer.Length)
             {
                 ThrowInvalidCount();
+
                 [MethodImpl(MethodImplOptions.NoInlining)]
                 static void ThrowInvalidCount() => throw new InvalidOperationException("Cannot advance past the end of the buffer");
             }
@@ -44,7 +45,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <inheritdoc />
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
-            if (_bytesWritten + sizeHint > _buffer.Length)
+            if (_bytesWritten + sizeHint >= _buffer.Length)
             {
                 ThrowInsufficientCapacity(sizeHint);
             }
@@ -55,7 +56,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <inheritdoc />
         public Span<byte> GetSpan(int sizeHint = 0)
         {
-            if (_bytesWritten + sizeHint > _buffer.Length)
+            if (_bytesWritten + sizeHint >= _buffer.Length)
             {
                 ThrowInsufficientCapacity(sizeHint);
             }

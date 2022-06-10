@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Serialization.Utilities
+namespace Orleans.Serialization.Buffers
 {
     /// <summary>
     /// Extension methods for writing variable-width integers.

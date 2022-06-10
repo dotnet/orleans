@@ -10,10 +10,17 @@ namespace Orleans.Serialization.Buffers.Adaptors
     public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     {
         private static readonly ArrayPool<byte> Pool = ArrayPool<byte>.Shared;
-        private readonly List<(byte[], int)> _committed;
+        private readonly List<(byte[] Array, int Length)> _committed;
         private readonly int _minAllocationSize;
         private byte[] _current;
         private long _totalLength;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
+        /// </summary>
+        public PooledArrayBufferWriter() : this(0)
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
@@ -27,11 +34,14 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _minAllocationSize = minAllocationSize > 0 ? minAllocationSize : 4096;
         }
 
+        /// <summary>Gets the total length which has been written.</summary>
+        public readonly long Length => _totalLength;
+
         /// <summary>
         /// Returns the data which has been written as an array.
         /// </summary>
         /// <returns>The data which has been written.</returns>
-        public byte[] ToArray()
+        public readonly byte[] ToArray()
         {
             var result = new byte[_totalLength];
             var resultSpan = result.AsSpan();
@@ -57,8 +67,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _current = Array.Empty<byte>();
         }
 
-        /// <inheritdoc/>
-        public void Dispose()
+        public void Reset()
         {
             foreach (var (array, _) in _committed)
             {
@@ -71,6 +80,14 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
 
             _committed.Clear();
+            _current = Array.Empty<byte>();
+            _totalLength = 0;
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            Reset();
         }
 
         /// <inheritdoc/>
@@ -111,6 +128,68 @@ namespace Orleans.Serialization.Buffers.Adaptors
             Pool.Return(_current);
             _current = newBuffer;
             return newBuffer;
+        }
+
+        /// <summary>Copies the contents of this writer to another writer.</summary>
+        public readonly void CopyTo<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
+        {
+            foreach (var (buffer, length) in _committed)
+            {
+                writer.Write(buffer.AsSpan(0, length));
+            }
+        }
+
+        /// <summary>
+        /// Returns a new <see cref="ReadOnlySequence{T}"/> which must be used and returned before resetting this instance via the <see cref="ReturnReadOnlySequence(in ReadOnlySequence{byte})"/> method.
+        /// </summary>
+        public readonly ReadOnlySequence<byte> RentReadOnlySequence()
+        {
+            if (_totalLength == 0)
+            {
+                return ReadOnlySequence<byte>.Empty;
+            }
+
+            if (_committed.Count == 1)
+            {
+                var value = _committed[0];
+                return new ReadOnlySequence<byte>(value.Array, 0, value.Length);
+            }
+            
+            var runningIndex = 0;
+            var firstSegment = default(BufferSegment);
+            var previousSegment = default(BufferSegment);
+            foreach (var (buffer, length) in _committed)
+            {
+                var segment = BufferSegment.Pool.Get();
+                segment.Initialize(new ReadOnlyMemory<byte>(buffer, 0, length), runningIndex);
+
+                runningIndex += length;
+
+                previousSegment?.SetNext(segment);
+
+                firstSegment ??= segment;
+                previousSegment = segment;
+            }
+
+            return new ReadOnlySequence<byte>(firstSegment, 0, previousSegment, previousSegment.Memory.Length);
+        }
+
+        /// <summary>
+        /// Returns a <see cref="ReadOnlySequence{T}"/> previously rented by <see cref="RentReadOnlySequence"/>;
+        /// </summary>
+        public readonly void ReturnReadOnlySequence(in ReadOnlySequence<byte> sequence)
+        {
+            if (sequence.Start.GetObject() is not BufferSegment segment)
+            {
+                return;
+            }
+            
+            while (segment is not null)
+            {
+                var next = segment.Next as BufferSegment;
+                BufferSegment.Pool.Return(segment);
+                segment = next;
+            }
         }
     }
 }
