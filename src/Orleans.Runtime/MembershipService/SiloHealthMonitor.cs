@@ -102,7 +102,7 @@ namespace Orleans.Runtime.MembershipService
                     throw new InvalidOperationException("This instance has already been stopped and cannot be started again");
                 }
 
-                if (_runTask is Task)
+                if (_runTask is not null)
                 {
                     throw new InvalidOperationException("This instance has already been started");
                 }

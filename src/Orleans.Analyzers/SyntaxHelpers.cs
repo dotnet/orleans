@@ -113,13 +113,13 @@ namespace Orleans.Analyzers
                     break;
                 case PropertyDeclarationSyntax property:
                     {
-                        bool hasBody = property.ExpressionBody is object;
+                        bool hasBody = property.ExpressionBody is not null;
                         var accessors = property.AccessorList?.Accessors;
                         if (!hasBody && accessors.HasValue)
                         {
                             foreach (var accessor in accessors)
                             {
-                                if (accessor.ExpressionBody is object || accessor.Body is object)
+                                if (accessor.ExpressionBody is not null || accessor.Body is not null)
                                 {
                                     hasBody = true;
                                     break;

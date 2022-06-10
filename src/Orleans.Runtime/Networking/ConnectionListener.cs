@@ -110,7 +110,7 @@ namespace Orleans.Runtime.Messaging
             {
                 await listener.UnbindAsync(cancellationToken);
 
-                if (acceptLoopTask is object)
+                if (acceptLoopTask is not null)
                 {
                     await acceptLoopTask;
                 }

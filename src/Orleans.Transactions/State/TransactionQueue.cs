@@ -291,7 +291,7 @@ namespace Orleans.Transactions.State
                         }
 
                         // reply to transaction agent
-                        if (exception is object)
+                        if (exception is not null)
                         {
                             entry.PromiseForTA.TrySetException(exception);
                         }
@@ -308,7 +308,7 @@ namespace Orleans.Transactions.State
                             logger.Trace("aborting status={Status} {Entry}", status, entry);
 
                         // reply to transaction agent
-                        if (exception is object)
+                        if (exception is not null)
                         {
                             entry.PromiseForTA.TrySetException(exception);
                         }

@@ -403,7 +403,7 @@ namespace Orleans.Serialization.UnitTests
             public string BaseTypeString { get; set; }
             public string AddedLaterString { get; set; }
 
-            public bool Equals(BaseType other) => other is object
+            public bool Equals(BaseType other) => other is not null
                     && string.Equals(BaseTypeString, other.BaseTypeString, StringComparison.Ordinal)
                     && string.Equals(AddedLaterString, other.AddedLaterString, StringComparison.Ordinal);
 

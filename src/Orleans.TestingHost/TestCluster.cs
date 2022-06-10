@@ -757,7 +757,7 @@ namespace Orleans.TestingHost
                     await DisposeAsync(handle).ConfigureAwait(false);
                 }
 
-                if (this.Primary is object)
+                if (this.Primary is not null)
                 {
                     await DisposeAsync(Primary).ConfigureAwait(false);
                 }

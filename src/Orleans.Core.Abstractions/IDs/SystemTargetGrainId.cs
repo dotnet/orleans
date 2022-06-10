@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         public static SystemTargetGrainId Create(GrainType kind, SiloAddress address, string extraIdentifier)
         {
             var addr = address.ToUtf8String();
-            if (extraIdentifier is string)
+            if (extraIdentifier is not null)
             {
                 var extraLen = Encoding.UTF8.GetByteCount(extraIdentifier);
                 var buf = new byte[addr.Length + 1 + extraLen];

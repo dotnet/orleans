@@ -121,7 +121,7 @@ namespace Orleans.Hosting.Kubernetes
             _enableMonitoring = false;
             _pauseMonitoringSemaphore.Release();
 
-            if (_runTask is object)
+            if (_runTask is not null)
             {
                 await Task.WhenAny(_runTask, Task.Delay(TimeSpan.FromMinutes(1), cancellationToken));
             }

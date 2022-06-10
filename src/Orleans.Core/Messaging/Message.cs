@@ -109,7 +109,7 @@ namespace Orleans.Runtime
 
         public bool HasDirection => _direction.HasValue;
 
-        public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
+        public bool IsFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
 
         public GrainAddress TargetAddress
         {

@@ -63,7 +63,7 @@ namespace Orleans.Runtime
             {
                 dispatcherReceivedByContext[0].Increment();
             }
-            else if (context is IGrainContext)
+            else if (context is not null)
             {
                 dispatcherReceivedByContext[1].Increment();
             }
@@ -101,7 +101,7 @@ namespace Orleans.Runtime
             {
                 imaEnqueuedByContext[1].Increment();
             }
-            else if (context is IGrainContext)
+            else if (context is not null)
             {
                 imaEnqueuedByContext[2].Increment();
             }

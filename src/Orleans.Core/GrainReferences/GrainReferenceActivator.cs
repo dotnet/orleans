@@ -288,7 +288,7 @@ namespace Orleans.GrainReferences
                 return false;
             }
 
-            if (args is Type[])
+            if (args is not null)
             {
                 result = result.MakeGenericType(args);
             }
