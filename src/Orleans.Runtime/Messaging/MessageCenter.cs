@@ -532,7 +532,8 @@ namespace Orleans.Runtime.Messaging
                     else
                     {
                         var targetActivation = catalog.GetOrCreateActivation(
-                            msg.TargetAddress,
+                            msg.TargetGrain,
+                            msg.TargetActivation,
                             msg.RequestContextData);
 
                         if (targetActivation is null)

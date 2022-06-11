@@ -253,14 +253,16 @@ namespace Orleans.Runtime
         /// Return immediately using a dummy that will queue messages.
         /// Concurrently start creating and initializing the real activation and replace it when it is ready.
         /// </summary>
-        /// <param name="address">Grain's activation address</param>
+        /// <param name="grainId">The grain identity</param>
+        /// <param name="activationId">The activation identity</param>
         /// <param name="requestContextData">Request context data.</param>
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
-            GrainAddress address,
+            in GrainId grainId,
+            in ActivationId activationId,
             Dictionary<string, object> requestContextData)
         {
-            if (TryGetGrainContext(address.GrainId, out var result))
+            if (TryGetGrainContext(grainId, out var result))
             {
                 return result;
             }
@@ -268,13 +270,14 @@ namespace Orleans.Runtime
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
             lock (activations)
             {
-                if (TryGetGrainContext(address.GrainId, out result))
+                if (TryGetGrainContext(grainId, out result))
                 {
                     return result;
                 }
 
                 if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
+                    var address = GrainAddress.GetAddress(Silo, grainId, activationId);
                     result = this.grainActivator.CreateInstance(address);
                     RegisterMessageTarget(result);
                 }
@@ -282,6 +285,8 @@ namespace Orleans.Runtime
 
             if (result is null)
             {
+                var address = GrainAddress.GetAddress(Silo, grainId, activationId);
+
                 // Did not find and did not start placing new
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
