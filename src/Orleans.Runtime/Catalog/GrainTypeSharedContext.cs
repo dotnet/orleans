@@ -55,6 +55,7 @@ namespace Orleans.Runtime
             PlacementStrategyResolver placementStrategyResolver,
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
+            IOptions<SchedulingOptions> schedulingOptions,
             IGrainRuntime grainRuntime,
             ILogger logger,
             GrainReferenceActivator grainReferenceActivator,
@@ -75,6 +76,7 @@ namespace Orleans.Runtime
             MaxWarningRequestProcessingTime = messagingOptions.Value.ResponseTimeout.Multiply(5);
             MaxRequestProcessingTime = messagingOptions.Value.MaxRequestProcessingTime;
             PlacementStrategy = placementStrategyResolver.GetPlacementStrategy(grainType);
+            SchedulingOptions = schedulingOptions.Value;
             Runtime = grainRuntime;
 
             CollectionAgeLimit = GetCollectionAgeLimit(
@@ -150,6 +152,7 @@ namespace Orleans.Runtime
         public TimeSpan MaxWarningRequestProcessingTime { get; }
 
         public PlacementStrategy PlacementStrategy { get; }
+        public SchedulingOptions SchedulingOptions { get; }
         public IGrainRuntime Runtime { get; }
 
         internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();

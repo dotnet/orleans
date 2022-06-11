@@ -174,7 +174,7 @@ namespace Orleans.Runtime
         /// </returns>
         public string ToStringUtf8()
         {
-            if (_value is object) return Encoding.UTF8.GetString(_value);
+            if (_value is not null) return Encoding.UTF8.GetString(_value);
             return null;
         }
 

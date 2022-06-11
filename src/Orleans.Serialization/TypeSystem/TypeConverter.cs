@@ -11,6 +11,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -20,27 +22,60 @@ namespace Orleans.Serialization.TypeSystem
     public class TypeConverter
     {
         private readonly ITypeConverter[] _converters;
-        private readonly ITypeFilter[] _filters;
+        private readonly ITypeNameFilter[] _typeNameFilters;
+        private readonly ITypeFilter[] _typeFilters;
+        private readonly bool _allowAllTypes;
         private readonly TypeResolver _resolver;
-        private readonly RuntimeTypeNameRewriter.Rewriter _convertToDisplayName;
-        private readonly RuntimeTypeNameRewriter.Rewriter _convertFromDisplayName;
+        private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
+        private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
         private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
         private readonly HashSet<string> _allowedTypesConfiguration;
+        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases = new()
+        {
+            ("object", "System.Object"),
+            ("string", "System.String"),
+            ("char", "System.Char"),
+            ("sbyte", "System.SByte"),
+            ("byte", "System.Byte"),
+            ("bool", "System.Boolean"),
+            ("short", "System.Int16"),
+            ("ushort", "System.UInt16"),
+            ("int", "System.Int32"),
+            ("uint", "System.UInt32"),
+            ("long", "System.Int64"),
+            ("ulong", "System.UInt64"),
+            ("float", "System.Single"),
+            ("double", "System.Double"),
+            ("decimal", "System.Decimal"),
+            ("Guid", "System.Guid"),
+            ("TimeSpan", "System.TimeSpan"),
+            ("DateTime", "System.DateTime"),
+            ("DateTimeOffset", "System.DateTimeOffset"),
+            ("Type", "System.Type"),
+        };
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TypeConverter"/> class.
         /// </summary>
         /// <param name="formatters">The type name formatters.</param>
-        /// <param name="filters">The type filters.</param>
+        /// <param name="typeNameFilters">The type name filters.</param>
+        /// <param name="typeFilters">The type filters.</param>
         /// <param name="options">The options.</param>
         /// <param name="typeResolver">The type resolver.</param>
-        public TypeConverter(IEnumerable<ITypeConverter> formatters, IEnumerable<ITypeFilter> filters, IOptions<TypeManifestOptions> options, TypeResolver typeResolver)
+        public TypeConverter(
+            IEnumerable<ITypeConverter> formatters,
+            IEnumerable<ITypeNameFilter> typeNameFilters,
+            IEnumerable<ITypeFilter> typeFilters,
+            IOptions<TypeManifestOptions> options,
+            TypeResolver typeResolver)
         {
             _resolver = typeResolver;
             _converters = formatters.ToArray();
-            _filters = filters.ToArray();
+            _typeNameFilters = typeNameFilters.ToArray();
+            _typeFilters = typeFilters.ToArray();
+            _allowAllTypes = options.Value.AllowAllTypes;
             _convertToDisplayName = ConvertToDisplayName;
             _convertFromDisplayName = ConvertFromDisplayName;
 
@@ -49,12 +84,16 @@ namespace Orleans.Serialization.TypeSystem
 
             _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
             _allowedTypesConfiguration = new(StringComparer.Ordinal);
-            foreach (var t in options.Value.AllowedTypes)
-            {
-                _allowedTypesConfiguration.Add(t);
-            }
 
-            ConsumeMetadata(options.Value);
+            if (!_allowAllTypes)
+            {
+                foreach (var t in options.Value.AllowedTypes)
+                {
+                    _allowedTypesConfiguration.Add(t);
+                }
+
+                ConsumeMetadata(options.Value);
+            }
 
             var aliases = options.Value.WellKnownTypeAliases;
             foreach (var item in aliases)
@@ -87,18 +126,19 @@ namespace Orleans.Serialization.TypeSystem
             AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
             AddFromMetadata(metadata.Activators, typeof(IActivator<>));
             AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
-            AddFromMetadata(metadata.Copiers, typeof(IBaseCopier<>));
+            AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
             foreach (var type in metadata.InterfaceProxies)
             {
-                AddAllowedType(type switch {
-                    { IsGenericType: true} => type.GetGenericTypeDefinition(),
+                AddAllowedType(type switch
+                {
+                    { IsGenericType: true } => type.GetGenericTypeDefinition(),
                     _ => type
                 });
             }
 
             void AddFromMetadata(IEnumerable<Type> metadataCollection, Type genericType)
             {
-                Debug.Assert(genericType.GetGenericArguments().Length == 1);
+                Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
                 foreach (var type in metadataCollection)
                 {
@@ -115,25 +155,32 @@ namespace Orleans.Serialization.TypeSystem
                             continue;
                         }
 
-                        var genericArgument = @interface.GetGenericArguments()[0];
-                        if (typeof(object) == genericArgument)
+                        foreach (var genericArgument in @interface.GetGenericArguments())
                         {
-                            continue;
+                            InspectGenericArgument(genericArgument);
                         }
-
-                        if (genericArgument.IsConstructedGenericType && genericArgument.GenericTypeArguments.Any(arg => arg.IsGenericParameter))
-                        {
-                            genericArgument = genericArgument.GetGenericTypeDefinition();
-                        }
-
-                        if (genericArgument.IsGenericParameter || genericArgument.IsArray)
-                        {
-                            continue;
-                        }
-
-                        AddAllowedType(genericArgument);
                     }
                 }
+            }
+
+            void InspectGenericArgument(Type genericArgument)
+            {
+                if (typeof(object) == genericArgument)
+                {
+                    return;
+                }
+
+                if (genericArgument.IsConstructedGenericType && genericArgument.GenericTypeArguments.Any(arg => arg.IsGenericParameter))
+                {
+                    genericArgument = genericArgument.GetGenericTypeDefinition();
+                }
+
+                if (genericArgument.IsGenericParameter || genericArgument.IsArray)
+                {
+                    return;
+                }
+
+                AddAllowedType(genericArgument);
             }
 
             void AddAllowedType(Type type)
@@ -157,10 +204,11 @@ namespace Orleans.Serialization.TypeSystem
                 var parsed = RuntimeTypeNameParser.Parse(formatted);
 
                 // Use the type name rewriter to visit every component of the type.
-                _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType);
-                QualifiedType AddQualifiedType(in QualifiedType type)
+                var converter = this;
+                _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType, ref converter);
+                static QualifiedType AddQualifiedType(in QualifiedType type, ref TypeConverter self)
                 {
-                    _allowedTypes[type] = true;
+                    self._allowedTypes[type] = true;
                     return type;
                 }
             }
@@ -170,16 +218,18 @@ namespace Orleans.Serialization.TypeSystem
         /// Formats the provided type.
         /// </summary>
         /// <param name="type">The type.</param>
+        /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
         /// <returns>The formatted type name.</returns>
-        public string Format(Type type) => FormatInternal(type);
+        public string Format(Type type, bool allowAllTypes = false) => FormatInternal(type);
 
         /// <summary>
         /// Formats the provided type, rewriting elements using the provided delegate.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <param name="rewriter">A delegate used to rewrite the type.</param>
+        /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
         /// <returns>The formatted type name.</returns>
-        public string Format(Type type, Func<TypeSpec, TypeSpec> rewriter) => FormatInternal(type, rewriter);
+        public string Format(Type type, Func<TypeSpec, TypeSpec> rewriter, bool allowAllTypes = false) => FormatInternal(type, rewriter);
 
         /// <summary>
         /// Parses the provided type string.
@@ -231,13 +281,27 @@ namespace Orleans.Serialization.TypeSystem
             }
 
             var runtimeTypeSpec = RuntimeTypeNameParser.Parse(runtimeType);
-            var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName);
-            if (rewriter is object)
+            ValidationResult validationState = default;
+            var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName, ref validationState);
+            if (rewriter is not null)
             {
                 displayTypeSpec = rewriter(displayTypeSpec);
             }
 
             var formatted = displayTypeSpec.Format();
+
+            if (validationState.IsTypeNameAllowed == false)
+            {
+                ThrowTypeNotAllowed(formatted, validationState.ErrorTypes);
+            }
+
+            if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
+            {
+                if (InspectType(_typeFilters, type) == false)
+                {
+                    ThrowTypeNotAllowed(type);
+                }
+            }
 
             return formatted;
         }
@@ -245,8 +309,14 @@ namespace Orleans.Serialization.TypeSystem
         private bool ParseInternal(string formatted, out Type type)
         {
             var parsed = RuntimeTypeNameParser.Parse(formatted);
-            var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName);
+            ValidationResult validationState = default;
+            var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName, ref validationState);
             var runtimeType = runtimeTypeSpec.Format();
+
+            if (validationState.IsTypeNameAllowed == false)
+            {
+                ThrowTypeNotAllowed(formatted, validationState.ErrorTypes);
+            }
 
             foreach (var converter in _converters)
             {
@@ -256,14 +326,40 @@ namespace Orleans.Serialization.TypeSystem
                 }
             }
 
-            return _resolver.TryResolveType(runtimeType, out type);
+            if (_resolver.TryResolveType(runtimeType, out type))
+            {
+                if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
+                {
+                    if (InspectType(_typeFilters, type) == false)
+                    {
+                        ThrowTypeNotAllowed(type);
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
-        private bool IsTypeAllowed(in QualifiedType type)
+        private bool? IsNameTypeAllowed(in QualifiedType type)
         {
+            if (_allowAllTypes)
+            {
+                return true;
+            }
+
             if (_allowedTypes.TryGetValue(type, out var allowed))
             {
                 return allowed;
+            }
+
+            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+            {
+                if (displayName.Equals(type.Type) || runtimeName.Equals(type.Type))
+                {
+                    return true;
+                }
             }
 
             if (_allowedTypesConfiguration.Contains(type.Type))
@@ -271,7 +367,7 @@ namespace Orleans.Serialization.TypeSystem
                 return true;
             }
 
-            foreach (var filter in _filters)
+            foreach (var filter in _typeNameFilters)
             {
                 var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly);
                 if (isAllowed.HasValue)
@@ -281,79 +377,166 @@ namespace Orleans.Serialization.TypeSystem
                 }
             }
 
-            return false;
+            return null;
         }
 
-        private QualifiedType ConvertToDisplayName(in QualifiedType input) => input switch
+        private QualifiedType ConvertToDisplayName(in QualifiedType input, ref ValidationResult state)
         {
-            (_, "System.Object") => new QualifiedType(null, "object"),
-            (_, "System.String") => new QualifiedType(null, "string"),
-            (_, "System.Char") => new QualifiedType(null, "char"),
-            (_, "System.SByte") => new QualifiedType(null, "sbyte"),
-            (_, "System.Byte") => new QualifiedType(null, "byte"),
-            (_, "System.Boolean") => new QualifiedType(null, "bool"),
-            (_, "System.Int16") => new QualifiedType(null, "short"),
-            (_, "System.UInt16") => new QualifiedType(null, "ushort"),
-            (_, "System.Int32") => new QualifiedType(null, "int"),
-            (_, "System.UInt32") => new QualifiedType(null, "uint"),
-            (_, "System.Int64") => new QualifiedType(null, "long"),
-            (_, "System.UInt64") => new QualifiedType(null, "ulong"),
-            (_, "System.Single") => new QualifiedType(null, "float"),
-            (_, "System.Double") => new QualifiedType(null, "double"),
-            (_, "System.Decimal") => new QualifiedType(null, "decimal"),
-            (_, "System.Guid") => new QualifiedType(null, "Guid"),
-            (_, "System.TimeSpan") => new QualifiedType(null, "TimeSpan"),
-            (_, "System.DateTime") => new QualifiedType(null, "DateTime"),
-            (_, "System.DateTimeOffset") => new QualifiedType(null, "DateTimeOffset"),
-            (_, "System.Type") => new QualifiedType(null, "Type"),
-            (_, "System.RuntimeType") => new QualifiedType(null, "Type"),
-            _ when _wellKnownTypeToAlias.TryGetValue(input, out var alias) => alias,
-            var value when IsTypeAllowed(in value) => input,
-            var value => ThrowTypeNotAllowed(in value)
-        };
+            state = UpdateValidationResult(input, state);
 
-        private QualifiedType ConvertFromDisplayName(in QualifiedType input) => input switch
-        {
-            (_, "object") => new QualifiedType(null, "System.Object"),
-            (_, "string") => new QualifiedType(null, "System.String"),
-            (_, "char") => new QualifiedType(null, "System.Char"),
-            (_, "sbyte") => new QualifiedType(null, "System.SByte"),
-            (_, "byte") => new QualifiedType(null, "System.Byte"),
-            (_, "bool") => new QualifiedType(null, "System.Boolean"),
-            (_, "short") => new QualifiedType(null, "System.Int16"),
-            (_, "ushort") => new QualifiedType(null, "System.UInt16"),
-            (_, "int") => new QualifiedType(null, "System.Int32"),
-            (_, "uint") => new QualifiedType(null, "System.UInt32"),
-            (_, "long") => new QualifiedType(null, "System.Int64"),
-            (_, "ulong") => new QualifiedType(null, "System.UInt64"),
-            (_, "float") => new QualifiedType(null, "System.Single"),
-            (_, "double") => new QualifiedType(null, "System.Double"),
-            (_, "decimal") => new QualifiedType(null, "System.Decimal"),
-            (_, "Guid") => new QualifiedType(null, "System.Guid"),
-            (_, "TimeSpan") => new QualifiedType(null, "System.TimeSpan"),
-            (_, "DateTime") => new QualifiedType(null, "System.DateTime"),
-            (_, "DateTimeOffset") => new QualifiedType(null, "System.DateTimeOffset"),
-            (_, "Type") => new QualifiedType(null, "System.Type"),
-            _ when _wellKnownAliasToType.TryGetValue(input, out var type) => type,
-            var value when IsTypeAllowed(in value) => input,
-            var value => ThrowTypeNotAllowed(in value)
-        };
-
-        private static QualifiedType ThrowTypeNotAllowed(in QualifiedType value)
-
-        {
-            string message;
-
-            if (!string.IsNullOrWhiteSpace(value.Assembly))
+            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
             {
-                message = $"Type \"{value.Type}\" from assembly \"{value.Assembly}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeFilter)} instance which allows it.";
-            }
-            else
-            {
-                message = $"Type \"{value.Type}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeFilter)} instance which allows it.";
+                if (string.Equals(input.Type, runtimeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new QualifiedType(null, displayName);
+                }
             }
 
+            if (_wellKnownTypeToAlias.TryGetValue(input, out var alias))
+            {
+                return alias;
+            }
+
+            return input;
+        }
+
+        private QualifiedType ConvertFromDisplayName(in QualifiedType input, ref ValidationResult state)
+        {
+            state = UpdateValidationResult(input, state);
+
+            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+            {
+                if (string.Equals(input.Type, displayName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new QualifiedType(null, runtimeName);
+                }
+            }
+
+            if (_wellKnownAliasToType.TryGetValue(input, out var type))
+            {
+                return type;
+            }
+
+            return input;
+        }
+
+        private ValidationResult UpdateValidationResult(QualifiedType input, ValidationResult state)
+        {
+            // If there has not been an error yet, inspect this type to ensure it is allowed.
+            if (IsNameTypeAllowed(input) is bool allowed)
+            {
+                var newAllowed = allowed && (state.IsTypeNameAllowed ?? true);
+                var newErrorList = state.ErrorTypes ?? new List<QualifiedType>();
+                if (!allowed)
+                {
+                    newErrorList.Add(input);
+                }
+
+                return new(newAllowed, newErrorList);
+            }
+
+            return state;
+        }
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static QualifiedType ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
+        {
+            if (errors is { Count: 1 })
+            {
+                var value = errors[0];
+
+                if (!string.IsNullOrWhiteSpace(value.Assembly))
+                {
+                    throw new InvalidOperationException($"Type \"{value.Type}\" from assembly \"{value.Assembly}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Type \"{value.Type}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
+                }
+            }
+
+            StringBuilder message = new($"Some types in the type string \"{fullTypeName}\" are not allowed by configuration. To allow them, add them to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows them.");
+            foreach (var value in errors)
+            {
+                if (!string.IsNullOrWhiteSpace(value.Assembly))
+                {
+                    message.AppendLine($"Type \"{value.Type}\" from assembly \"{value.Assembly}\"");
+                }
+                else
+                {
+                    message.AppendLine($"Type \"{value.Type}\"");
+                }
+            }
+
+            throw new InvalidOperationException(message.ToString());
+        }
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowTypeNotAllowed(Type value)
+        {
+            var message = $"Type \"{value.FullName}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it.";
             throw new InvalidOperationException(message);
+        }
+
+        private readonly struct ValidationResult
+        {
+            public ValidationResult(bool? isTypeNameAllowed, List<QualifiedType> errorTypes)
+            {
+                IsTypeNameAllowed = isTypeNameAllowed;
+                ErrorTypes = errorTypes;
+            }
+
+            public bool? IsTypeNameAllowed { get; }
+            public List<QualifiedType> ErrorTypes { get; }
+        }
+
+        private static bool? InspectType(ITypeFilter[] filters, Type type)
+        {
+            bool? result = null;
+            if (type.HasElementType)
+            {
+                result = Combine(result, InspectType(filters, type.GetElementType()));
+                return result;
+            }
+
+            foreach (var filter in filters)
+            {
+                result = Combine(result, filter.IsTypeAllowed(type));
+                if (result == false)
+                {
+                    return false;
+                }
+            }
+
+            if (type.IsConstructedGenericType)
+            {
+                foreach (var parameter in type.GenericTypeArguments)
+                {
+                    result = Combine(result, InspectType(filters, parameter));
+                    if (result == false)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return result;
+
+            static bool? Combine(bool? left, bool? right)
+            {
+                if (left == false || right == false)
+                {
+                    return false;
+                }
+                else if (left == true || right == true)
+                {
+                    return true;
+                }
+
+                return null;
+            }
         }
     }
 }

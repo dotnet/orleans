@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         public int _forwardCount;
         public CorrelationId _id;
 
-        public CorrelationId _callChainId;
+        public Guid _callChainId;
         public Dictionary<string, object> _requestContextData;
 
         public SiloAddress _targetSilo;
@@ -109,7 +109,7 @@ namespace Orleans.Runtime
 
         public bool HasDirection => _direction.HasValue;
 
-        public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
+        public bool IsFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault && !TargetActivation.IsDefault;
 
         public GrainAddress TargetAddress
         {
@@ -312,7 +312,7 @@ namespace Orleans.Runtime
             set => _requestContextData = value;
         }
 
-        public CorrelationId CallChainId
+        public Guid CallChainId
         {
             get => _callChainId;
             set => _callChainId = value;
@@ -556,7 +556,7 @@ namespace Orleans.Runtime
             headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
             headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
             headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
-            headers = _callChainId.ToInt64() == 0 ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
+            headers = _callChainId == Guid.Empty ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
             headers = _interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
             return headers;
         }

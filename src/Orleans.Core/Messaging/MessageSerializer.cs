@@ -260,7 +260,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
             {
-                writer.WriteInt64(value.CallChainId.ToInt64());
+                GuidCodec.WriteRaw(ref writer, value.CallChainId);
             }
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)
@@ -354,7 +354,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
             {
-                result.CallChainId = new CorrelationId(reader.ReadInt64());
+                result.CallChainId = GuidCodec.ReadRaw(ref reader);
             }
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)

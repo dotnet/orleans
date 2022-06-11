@@ -1,86 +1,98 @@
-<div id="new-product-modal" class="modal fade @_modalClass" role="dialog"
-     tabindex="-1" style="display:@_modalDisplay">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Manage Product</h5>
-                <button type="button" class="btn-close" aria-label="Close" @onclick=@Close></button>
-            </div>
-            <EditForm Model=@Product OnValidSubmit=@OnValidSubmitAsync>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Name</label>
-                        <InputText id="name" class="form-control" @bind-Value="Product.Name" />
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <InputTextArea id="description" class="form-control" @bind-Value="Product.Description" />
-                    </div>
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Category</label>
-                        <InputSelect id="category" class="form-control" @bind-Value="Product.Category">
-                            @foreach (var category in Enum.GetValues<ProductCategory>())
-                            {
-                                <option value=@category>@Enum.GetName(category)</option>
-                            }
-                        </InputSelect>
-                    </div>
-                    <div class="mb-3">
-                        <label for="quantity" class="form-label">Quantity</label>
-                        <InputNumber id="quantity" class="form-control" @bind-Value="Product.Quantity" />
-                    </div>
-                    <div class="mb-3">
-                        <label for="price" class="form-label">Unit Price</label>
-                        <InputNumber id="price" class="form-control" @bind-Value="Product.UnitPrice" />
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick=@Close>Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-</div>
-
-@if (_showBackdrop)
-{
-    <div class="modal-backdrop fade show"></div>
-}
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model=@Product autocomplete="off">
+            <MudTextField Label="Name" HelperText="Product name"
+                          @bind-Value="Product.Name" For="@(() => Product.Name)" autocomplete="off" />
+            <MudTextField Label="Description" HelperText="Product description"
+                          @bind-Value="Product.Description" For="@(() => Product.Description)" autocomplete="off" />
+            <MudSelect T="ProductCategory" Label="Category" Variant=Variant.Text AnchorOrigin=Origin.BottomCenter>
+                @foreach (var category in Enum.GetValues<ProductCategory>())
+                {
+                    <MudSelectItem T="ProductCategory" Value=@category />
+                }
+            </MudSelect>
+            <MudNumericField @bind-Value=Product.Quantity Label="Quantity" Variant="Variant.Text" />
+            <MudNumericField @bind-Value=Product.UnitPrice Label="Unit Price" Variant="Variant.Text" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick=@Bogus Color=Color.Tertiary Variant=Variant.Filled
+                   Size=Size.Large Disabled=@_isSaving>Bogus</MudButton>
+        <MudButton OnClick=@Close Color=Color.Secondary Variant=Variant.Filled
+                   Size=Size.Large Disabled=@_isSaving>Cancel</MudButton>
+        <MudButton StartIcon=@Icons.Filled.Save
+                   Color=Color.Primary Size=Size.Large Variant=Variant.Filled
+                   OnClick=@Save Disabled=@_isSaving>
+            @if (_isSaving)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Saving</MudText>
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
-    string _modalDisplay = "none";
-    string _modalClass = "";
-    bool _showBackdrop;
+    bool _isSaving;
+    MudForm? _form;
 
     public ProductDetails Product { get; set; } = new();
 
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+
     [Parameter, EditorRequired]
-    public EventCallback<ProductDetails> OnProductUpdated { get; set; }
+    public EventCallback<ProductDetails> ProductUpdated { get; set; }
 
-    public void Open()
+    [Inject]
+    public IDialogService DialogService { get; set; } = null!;
+
+    public void Open(string title, Func<ProductDetails, Task> onProductUpdated) =>
+        DialogService.Show<ManageProductModal>(
+            title, new DialogParameters()
+            {
+                { 
+                    nameof(ProductUpdated),
+                    new EventCallbackFactory().Create(
+                        this, new Func<ProductDetails, Task>(onProductUpdated)) 
+                }
+            });
+
+    public void Close() => MudDialog?.Cancel();
+
+    private void Bogus() => Product = Product.GetBogusFaker().Generate();
+
+    private Task Save()
     {
-        _modalDisplay = "block";
-        _modalClass = "show";
-        _showBackdrop = true;
-
-        StateHasChanged();
-    }
-
-    public void Close()
-    {
-        _modalDisplay = "none";
-        _modalClass = "";
-        _showBackdrop = false;
-
-        StateHasChanged();
-    }
-
-    async Task OnValidSubmitAsync()
-    {
-        if (Product is not null && OnProductUpdated.HasDelegate)
+        if (_form is not null)
         {
-            await OnProductUpdated.InvokeAsync(Product);
+            _form.Validate();
+            if (_form.IsValid)
+            {
+                return OnValidSubmitAsync();
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (Product is not null && ProductUpdated.HasDelegate)
+        {
+            try
+            {
+                _isSaving = true;
+                await ProductUpdated.InvokeAsync(Product);
+            }
+            finally
+            {
+                _isSaving = false;
+                Close();
+            }
         }
     }
 }

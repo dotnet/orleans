@@ -46,7 +46,7 @@ namespace Orleans.Transactions.AzureStorage
                 if (string.IsNullOrEmpty(key.ETag.ToString()))
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug($"{partition} Loaded v0, fresh");
+                        logger.LogDebug("{Partition} Loaded v0, fresh", partition);
 
                     // first time load
                     return new TransactionalStorageLoadResponse<TState>();
@@ -102,7 +102,7 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
+                        logger.LogDebug("{PartitionKey} Loaded v{CommittedSequenceId} rows={Data}", partition, this.key.CommittedSequenceId, string.Join(",", states.Select(s => s.Key.ToString("x16"))));
 
                     TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
                     return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
@@ -110,7 +110,7 @@ namespace Orleans.Transactions.AzureStorage
             }
             catch (Exception ex)
             {
-                this.logger.LogError("Transactional state load failed {Exception}.", ex);
+                this.logger.LogError(ex, "Transactional state load failed");
                 throw;
             }
         }
@@ -140,7 +140,7 @@ namespace Orleans.Transactions.AzureStorage
                     states.RemoveAt(states.Count - 1);
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition}.{entity.RowKey} Delete {entity.TransactionId}");
+                        logger.LogTrace("{PartitionKey}.{RowKey} Delete {TransactionId}", partition, entity.RowKey, entity.TransactionId);
                 }
             }
 
@@ -162,7 +162,7 @@ namespace Orleans.Transactions.AzureStorage
                             key.ETag = batchOperation.KeyETag;
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{existing.RowKey} Update {existing.TransactionId}");
+                                logger.LogTrace("{PartitionKey}.{RowKey} Update {TransactionId}", partition, existing.RowKey, existing.TransactionId);
                         }
                         else
                         {
@@ -172,7 +172,7 @@ namespace Orleans.Transactions.AzureStorage
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{entity.RowKey} Insert {entity.TransactionId}");
+                                logger.LogTrace("{PartitionKey}.{RowKey} Insert {TransactionId}", partition, entity.RowKey, entity.TransactionId);
                         }
                     }
 
@@ -188,7 +188,7 @@ namespace Orleans.Transactions.AzureStorage
                 key.ETag = batchOperation.KeyETag;
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
+                    logger.LogTrace("{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c", partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
             }
             else
             {
@@ -196,7 +196,7 @@ namespace Orleans.Transactions.AzureStorage
                 key.ETag = batchOperation.KeyETag;
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
+                    logger.LogTrace("{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c", partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
             }
 
             // fourth, remove obsolete records
@@ -209,7 +209,7 @@ namespace Orleans.Transactions.AzureStorage
                     key.ETag = batchOperation.KeyETag;
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition}.{states[i].Value.RowKey} Delete {states[i].Value.TransactionId}");
+                        logger.LogTrace("{PartitionKey}.{RowKey} Delete {TransactionId}", partition, states[i].Value.RowKey, states[i].Value.TransactionId);
                 }
                 states.RemoveRange(0, pos);
             }
@@ -217,7 +217,7 @@ namespace Orleans.Transactions.AzureStorage
             await batchOperation.Flush().ConfigureAwait(false);
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
+                logger.LogDebug("{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}", partition, this.key.CommittedSequenceId, key.ETag);
 
             return key.ETag.ToString();
         }
@@ -344,7 +344,7 @@ namespace Orleans.Transactions.AzureStorage
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                logger.LogTrace($"{batchOperation[i].Entity.PartitionKey}.{batchOperation[i].Entity.RowKey} batch-op ok     {i}");
+                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op ok     {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
                         }
                     }
@@ -354,11 +354,11 @@ namespace Orleans.Transactions.AzureStorage
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                logger.LogTrace($"{batchOperation[i].Entity.PartitionKey}.{batchOperation[i].Entity.RowKey} batch-op failed {i}");
+                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op failed {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
                         }
 
-                        this.logger.LogError("Transactional state store failed {Exception}.", ex);
+                        this.logger.LogError(ex, "Transactional state store failed.");
                         throw;
                     }
                 }

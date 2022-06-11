@@ -1,5 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Codecs;
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.Serializers
 {

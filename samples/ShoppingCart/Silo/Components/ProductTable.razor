@@ -1,185 +1,111 @@
 @using Blazor.Serialization.Extensions
 
-<div class="table sticky-top position-relative top-0">
-    <table class="table table-hover table-sm table-striped">
-        <thead class="table-dark">
-            <tr>
-                <th scope="col"></th>
-                <th scope="col"
-                    @onclick=@(async _ => await ToggleSortingAsync("Name"))
-                    title=@GetTitle("Name")>
+<MudStack>
+    <MudToolBar DisableGutters="true">
+        <MudText Typo="Typo.h4">@Title</MudText>
+        <MudSpacer />
+        @ChildContent
+        <MudPaper Outlined="true" Class="flex-grow-1 pb-2 pl-3">
+            <MudTextField @bind-Value="_filter" Placeholder="Search products" Adornment="Adornment.Start"
+                AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-n2" DisableUnderLine="true">
+            </MudTextField>
+        </MudPaper>
+    </MudToolBar>
+    <MudTable Items=@Products Hover="true" Breakpoint="Breakpoint.Sm" AllowUnsorted=true Filter=OnFilter
+              CanCancelEdit=true Context="product" Dense=true FixedHeader=true RowsPerPage=10 RowEditCommit=OnEdit
+              RowEditPreview=BackupItem RowEditCancel=RevertEditChanges ReadOnly=false SortLabel="Sort By"
+              CancelEditTooltip="Discard changes..." CommitEditTooltip="Save changes..." Outlined="true"
+              IsEditRowSwitchingBlocked=true>
+        <HeaderContent>
+            <MudTh>
+                <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Name))>
                     Name
-                    <span class="oi ps-1 @GetSortClass("Name")"></span>
-                </th>
-                <th scope="col"
-                    @onclick=@(async _ => await ToggleSortingAsync("Description"))
-                    title=@GetTitle("Description")>
+                </MudTableSortLabel>
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Description))>
                     Description
-                    <span class="oi ps-1 @GetSortClass("Description")"></span>
-                </th>
-                <th scope="col" class="text-end pe-5"
-                    @onclick=@(async _ => await ToggleSortingAsync("Quantity"))
-                    title=@GetTitle("Quantity")>
-                    Inventory Quantity
-                    <span class="oi ps-1 @GetSortClass("Quantity")"></span>
-                </th>
-                <th scope="col" class="text-end pe-5"
-                    @onclick=@(async _ => await ToggleSortingAsync("Price"))
-                    title=@GetTitle("Price")>
+                </MudTableSortLabel>
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.Quantity))>
+                    Quantity
+                </MudTableSortLabel>
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortBy=@(new Func<ProductDetails, object>(p => p.UnitPrice))>
                     Price
-                    <span class="oi ps-1 @GetSortClass("Price")"></span>
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var product in _sortedProducts)
-            {
-                <tr>
-                    <th scope="row">
-                        <button class="btn btn-sm btn-secondary" title="Edit @(product.Name)?"
-                            @onclick=@(async _ => await OnEditAsync(product))>
-                            <span class="oi oi-pencil"></span>
-                        </button>
-                    </th>
-                    <td>@product.Name</td>
-                    <td>@product.Description</td>
-                    <td class="text-end pe-5">@product.Quantity.ToString("N0")</td>
-                    <td class="text-end pe-5">@product.UnitPrice.ToString("C2")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
+                </MudTableSortLabel>
+            </MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@product.Name</MudTd>
+            <MudTd DataLabel="Description">@product.Description</MudTd>
+            <MudTd DataLabel="Quantity">@product.Quantity.ToString("N0")</MudTd>
+            <MudTd DataLabel="Price">@product.UnitPrice.ToString("C2")</MudTd>
+        </RowTemplate>
+        <RowEditingTemplate>
+            <MudTd DataLabel="Name">
+                <MudTextField @bind-Value=@product.Name Required />
+            </MudTd>
+            <MudTd DataLabel="Description">
+                <MudTextField @bind-Value=@product.Description Required />
+            </MudTd>
+            <MudTd DataLabel="Quantity">
+                <MudNumericField @bind-Value=@product.Quantity Required Min="1" />
+            </MudTd>
+            <MudTd DataLabel="Price">
+                <MudNumericField T="decimal" @bind-Value=@product.UnitPrice Required Min="0.01m" />
+            </MudTd>
+        </RowEditingTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudStack>
 
 @code {
-    const string Key = "product-table-sorting";
+    string? _filter;
 
-    Dictionary<string, TriStateToggle>? _columnSorting;
+    ProductDetails? _productBeforeEdit;
 
-    IEnumerable<ProductDetails> _sortedProducts
-    {
-        get
-        {
-            IOrderedEnumerable<ProductDetails> products = (Products ?? new()).OrderBy(p => p.Id);
-            if (_columnSorting is not null)
-            {
-                static object KeySelector(string column, ProductDetails product) => column switch
-                {
-                    "Name" => product.Name,
-                    "Description" => product.Description,
-                    "Quantity" => product.Quantity,
-                    "Price" => product.UnitPrice,
-
-                    _ => throw new ArgumentOutOfRangeException(nameof(column))
-                };
-
-                var useThen = false;
-                foreach (var (column, toggle) in _columnSorting)
-                {
-                    if (toggle.Sort is SortBy.None)
-                    {
-                        continue;
-                    }
-
-                    if (useThen)
-                    {
-                        products = toggle.Sort is SortBy.Ascending
-                            ? products.ThenBy(product => KeySelector(column, product))
-                            : products.ThenByDescending(product => KeySelector(column, product));
-                    }
-                    else
-                    {
-                        products = toggle.Sort is SortBy.Ascending
-                            ? products.OrderBy(product => KeySelector(column, product))
-                            : products.OrderByDescending(product => KeySelector(column, product));
-                    }
-
-
-                    useThen = true;
-                }
-            }
-
-            return products;
-        }
-    }
-
-    [Inject]
-    public ISessionStorageService SessionStorage { get; set; } = null!;
-
-    [Parameter]
+    [Parameter, EditorRequired]
     public HashSet<ProductDetails> Products { get; set; } = null!;
 
     [Parameter, EditorRequired]
-    public EventCallback<ProductDetails> OnEditProduct { get; set; }
+    public string Title { get; set; } = null!;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProductDetails> EditProduct { get; set; }
+
+    void OnEdit(object model)
     {
-        if (firstRender)
+        if (model is ProductDetails product &&
+            EditProduct.HasDelegate)
         {
-            var sortingJson = await SessionStorage.GetItemAsync(Key);
-            _columnSorting = sortingJson is { Length: > 0 }
-                ? sortingJson.FromJson<Dictionary<string, TriStateToggle>>()
-                : new()
-                    {
-                        ["Name"] = new("Name", SortBy.None),
-                        ["Description"] = new("Description", SortBy.None),
-                        ["Quantity"] = new("Quantity", SortBy.None),
-                        ["Price"] = new("Price", SortBy.None),
-                    };
-            StateHasChanged();
+            _ = EditProduct.InvokeAsync(product);
         }
     }
 
-    async Task ToggleSortingAsync(string column)
+    void BackupItem(object model)
     {
-        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
+        if (model is ProductDetails product)
         {
-            var sort = toggle.Sort;
-            sort = Enum.IsDefined(typeof(SortBy), sort + 1) ? sort + 1 : default;
-            _columnSorting[column] = toggle with { Sort = sort };
-        }
-
-        if (_columnSorting?.ToJson() is { Length: > 0 } sortingJson)
-        {
-            await SessionStorage.SetItemAsync(Key, sortingJson);
+            _productBeforeEdit = product;
         }
     }
 
-    string GetTitle(string column)
+    void RevertEditChanges(object model)
     {
-        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
+        if (model is ProductDetails product &&
+            _productBeforeEdit is not null)
         {
-            return toggle.Sort switch
-            {
-                SortBy.Ascending => $"Sort ascending by '{column}', click to sort by descending instead.",
-                SortBy.Descending => $"Sort descending by '{column}', click to sort not sort this column.",
-                _ => $"The '{column}' is not sorted, click to sort by ascending instead."
-            };
+            model = _productBeforeEdit with { };
         }
-
-        return "";
     }
 
-    string GetSortClass(string column)
-    {
-        if (_columnSorting?.TryGetValue(column, out var toggle) ?? false)
-        {
-            return toggle.Sort switch
-            {
-                SortBy.Ascending => "oi-sort-ascending",
-                SortBy.Descending => "oi-sort-descending",
-                _ => "oi-menu"
-            };
-        }
-
-        return "";
-    }
-
-    Task OnEditAsync(ProductDetails product) =>
-        OnEditProduct.HasDelegate
-            ? OnEditProduct.InvokeAsync(product)
-            : Task.CompletedTask;
-
-    public readonly record struct TriStateToggle(string Column, SortBy Sort);
-    public enum SortBy { None, Ascending, Descending };
+    bool OnFilter(ProductDetails product) => product.MatchesFilter(_filter);
 }

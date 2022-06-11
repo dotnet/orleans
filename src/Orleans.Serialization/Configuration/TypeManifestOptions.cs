@@ -38,6 +38,11 @@ namespace Orleans.Serialization.Configuration
         public HashSet<Type> Copiers { get; } = new HashSet<Type>();
 
         /// <summary>
+        /// Gets the set of converters, which are responsible for converting from one type to another.
+        /// </summary>
+        public HashSet<Type> Converters { get; } = new HashSet<Type>();
+
+        /// <summary>
         /// Gets the set of known interfaces, which are interfaces that have corresponding proxies in the <see cref="InterfaceProxies"/> collection.
         /// </summary>
         public HashSet<Type> Interfaces { get; } = new HashSet<Type>();
@@ -69,5 +74,11 @@ namespace Orleans.Serialization.Configuration
         /// Gets the mapping of allowed type names.
         /// </summary>
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to allow all types by default.
+        /// Default: <see langword="false"/>.
+        /// </summary>
+        public bool AllowAllTypes { get; set; }
     }
 }

@@ -51,7 +51,7 @@ namespace Orleans.Metadata
                 return false;
             }
 
-            if (args is object)
+            if (args is not null)
             {
                 grainClass = grainClass.MakeGenericType(args);
             }

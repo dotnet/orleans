@@ -689,6 +689,26 @@ namespace Orleans.Serialization.Buffers
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         /// <summary>
+        /// Reads the specified number of bytes into the provided writer.
+        /// </summary>
+        public void ReadBytes<TBufferWriter>(ref TBufferWriter writer, int count) where TBufferWriter : IBufferWriter<byte>
+        {
+            int chunkSize;
+            for (var remaining = count; remaining > 0; remaining -= chunkSize)
+            {
+                var span = writer.GetSpan();
+                if (span.Length > remaining)
+                {
+                    span = span[..remaining];
+                }
+
+                ReadBytes(in span);
+                chunkSize = span.Length;
+                writer.Advance(chunkSize);
+            }
+        }
+
+        /// <summary>
         /// Reads an array of bytes from the input.
         /// </summary>
         /// <param name="count">The length of the array to read.</param>

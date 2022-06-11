@@ -1,24 +1,28 @@
-﻿@page "/cart"
+@page "/cart"
 
-<h3>Shopping Cart</h3>
+<MudToolBar DisableGutters="true">
+    <MudText Typo="Typo.h4">Shopping Cart</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon=@Icons.Filled.RemoveShoppingCart
+        Disabled=@(_cartItems?.Any() is false) Size=@Size.Large
+        Color="Color.Secondary" OnClick=@EmptyCartAsync>
+        Empty Cart
+    </MudButton>
+</MudToolBar>
 
-<div class="pb-3">
-    <button type="button" @onclick=@EmptyCartAsync
-        class="btn btn-primary btn-lg">
-        Empty Cart?
-    </button>
-</div>
-
-<div class="row row-cols-4 row-cols-md-5 g-4">
-    <div class="col">
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudStack Spacing="8">
+            @foreach (var item in _cartItems ?? new HashSet<CartItem>())
+            {
+                <ShoppingCartItem CartItem=@item
+                    OnRemoved=@OnItemRemovedAsync
+                    OnUpdated=@OnItemUpdatedAsync />
+            }
+            <MudDivider/>
+        </MudStack>
+    </MudItem>
+    <MudItem xs="12" md="4">
         <ShoppingCartSummary Items=_cartItems />
-    </div>
-    @foreach (var item in _cartItems ?? new HashSet<CartItem>())
-    {
-    <div class="col">
-        <ShoppingCartItem CartItem=@item
-            OnRemoved=@OnItemRemovedAsync
-            OnUpdated=@OnItemUpdatedAsync />
-    </div>
-    }
-</div>
+    </MudItem>
+</MudGrid>

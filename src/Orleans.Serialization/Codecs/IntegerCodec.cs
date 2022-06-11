@@ -56,7 +56,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public bool DeepCopy(bool input, CopyContext _) => input; 
+        public bool DeepCopy(bool input, CopyContext _) => input;
     }
 
     /// <summary>

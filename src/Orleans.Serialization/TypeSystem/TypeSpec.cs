@@ -231,7 +231,7 @@ namespace Orleans.Serialization.TypeSystem
 
             static void GetQualifiedNameInternal(NamedTypeSpec n, StringBuilder b)
             {
-                if (n.ContainingType is object)
+                if (n.ContainingType is not null)
                 {
                     GetQualifiedNameInternal(n.ContainingType, b);
                     _ = b.Append('+');
@@ -245,7 +245,7 @@ namespace Orleans.Serialization.TypeSystem
         public override string Format() => ToString();
 
         /// <inheritdoc/>
-        public override string ToString() => ContainingType is object ? $"{ContainingType}+{Name}" : Name;
+        public override string ToString() => ContainingType is not null ? $"{ContainingType}+{Name}" : Name;
     }
 
     /// <summary>

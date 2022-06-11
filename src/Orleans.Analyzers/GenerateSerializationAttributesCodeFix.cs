@@ -82,7 +82,7 @@ namespace Orleans.Analyzers
             var ns = root.DescendantNodesAndSelf()
                 .OfType<UsingDirectiveSyntax>()
                 .FirstOrDefault(directive => string.Equals(directive.Name.ToString(), Constants.SystemNamespace));
-            if (ns is object)
+            if (ns is not null)
             {
                 insertUsingDirective = false;
             }
@@ -91,7 +91,7 @@ namespace Orleans.Analyzers
             {
                 var usingDirective = UsingDirective(IdentifierName(Constants.SystemNamespace)).WithTrailingTrivia(EndOfLine("\r\n"));
                 var lastUsing = root.DescendantNodesAndSelf().OfType<UsingDirectiveSyntax>().LastOrDefault();
-                if (lastUsing is object)
+                if (lastUsing is not null)
                 {
                     editor.InsertAfter(lastUsing, usingDirective);
                 }
