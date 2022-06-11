@@ -35,7 +35,7 @@ namespace Orleans.Runtime
             set
             {
                 this.responseTimeout = value;
-                this.ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
+                this.ResponseTimeoutStopwatchTicks = (long)value.TotalMilliseconds;
             }
         }
     }
