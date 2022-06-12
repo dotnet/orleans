@@ -526,7 +526,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (runTask is null)
                 {
-                    using var _ = new ExecutionContextSuppressor();
+                    using var suppressExecutionContext = new ExecutionContextSuppressor();
                     this.runTask = this.RunAsync();
                 }
                 else

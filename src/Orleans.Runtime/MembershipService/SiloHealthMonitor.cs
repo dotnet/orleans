@@ -96,7 +96,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         public void Start()
         {
-            using var _ = new ExecutionContextSuppressor();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             lock (_lockObj)
             {
                 if (_stoppingCancellation.IsCancellationRequested)
