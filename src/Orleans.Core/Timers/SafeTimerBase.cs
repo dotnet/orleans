@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     {
         private const string asyncTimerName ="Orleans.Runtime.AsyncTaskSafeTimer";
         private const string syncTimerName = "Orleans.Runtime.SafeTimerBase";
+        private const uint MaxSupportedTimeout = 0xfffffffe;
 
         private Timer               timer;
         private Func<object, Task>  asyncTaskCallback;
@@ -49,7 +50,15 @@ namespace Orleans.Runtime
         {
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
-           
+
+            long dueTm = (long)dueTime.TotalMilliseconds;
+            if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
+            if (dueTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time interval must be less than 2^32-2.");
+
+            long periodTm = (long)period.TotalMilliseconds;
+            if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
+            if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
+
             timerFrequency = period;
             dueTime = due;
             timerStarted = true;
@@ -63,6 +72,14 @@ namespace Orleans.Runtime
             int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
             if (numNonNulls > 1) throw new ArgumentNullException("synCallback", "Cannot define more than one timer callbacks. Pick one.");
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
+
+            long dueTm = (long)dueTime.TotalMilliseconds;
+            if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
+            if (dueTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time interval must be less than 2^32-2.");
+
+            long periodTm = (long)period.TotalMilliseconds;
+            if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
+            if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
 
             this.asyncTaskCallback = asynCallback;
             syncCallbackFunc = synCallback;
