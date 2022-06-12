@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Services;
 using Orleans.Timers;
 
@@ -72,12 +73,14 @@ namespace Orleans.Runtime.ReminderService
             }
 
             var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainReference, reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
         {
             this.EnsureReminderServiceRegistered();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             return GetGrainService(callingGrainId).UnregisterReminder(reminder);
         }
 
@@ -89,6 +92,7 @@ namespace Orleans.Runtime.ReminderService
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
             }
 
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
             return GetGrainService(callingGrainId).GetReminder(callingGrainReference, reminderName);
         }
@@ -96,6 +100,8 @@ namespace Orleans.Runtime.ReminderService
         public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
             this.EnsureReminderServiceRegistered();
+
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
             return GetGrainService(callingGrainId).GetReminders(callingGrainReference);
         }
