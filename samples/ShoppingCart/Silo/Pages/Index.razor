@@ -1,9 +1,16 @@
-﻿@page "/"
+@page "/"
 
-<h1>Welcome to the Orleans Shopping Cart</h1>
-
-<ul class="fs-5">
-    <li>Use the <strong>Shop Inventory</strong> link to add items to your cart.</li>
-    <li>Use the <strong>Product Management</strong> link to manage or create new products.</li>
-    <li>Use the <strong>Cart</strong> link to manage or view all the items you've placed in your cart.</li>
-</ul>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-16">
+    <MudText Typo=Typo.h4 Class="pb-4">Welcome to the Orleans Shopping Cart</MudText>
+    <MudList>
+        <MudListItem>
+            Use the <strong>Shop Inventory</strong> link to add items to your cart.
+        </MudListItem>
+        <MudListItem>
+            Use the <strong>Product Management</strong> link to manage or create new products.
+        </MudListItem>
+        <MudListItem>
+            Use the <strong>Cart</strong> link to manage or view all the items you've placed in your cart.
+        </MudListItem>
+    </MudList>
+</MudContainer>

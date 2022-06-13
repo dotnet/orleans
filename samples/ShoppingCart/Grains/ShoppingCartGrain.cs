@@ -1,9 +1,12 @@
-﻿namespace Orleans.ShoppingCart.Grains;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Grains;
 
 [Reentrant]
 public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
 {
-    readonly IPersistentState<Dictionary<string, CartItem>> _cart;
+    private readonly IPersistentState<Dictionary<string, CartItem>> _cart;
 
     public ShoppingCartGrain(
         [PersistentState(
@@ -58,6 +61,6 @@ public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
         }
     }
 
-    CartItem ToCartItem(int quantity, ProductDetails product) =>
+    private CartItem ToCartItem(int quantity, ProductDetails product) =>
         new(this.GetPrimaryKeyString(), quantity, product);
 }

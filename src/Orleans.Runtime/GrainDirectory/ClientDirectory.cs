@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
                         var delta = await remoteDirectory.GetClientRoutes(versionVector);
 
                         // If updates were found, update our view
-                        if (delta is object && delta.Count > 0)
+                        if (delta is not null && delta.Count > 0)
                         {
                             UpdateRoutingTable(delta);
                         }
@@ -221,7 +221,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var table = default(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Builder);
 
                 // Incorporate updates.
-                if (update is object)
+                if (update is not null)
                 {
                     foreach (var pair in update)
                     {
@@ -293,7 +293,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 // If there were changes to the routing table then the table and snapshot need to be rebuilt.
-                if (table is object)
+                if (table is not null)
                 {
                     _table = table.ToImmutable();
                     var clientsBuilder = ImmutableDictionary.CreateBuilder<GrainId, List<GrainAddress>>();
@@ -456,7 +456,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             // Try to find the minimum amount of information required to update the successor.
             var builder = newRoutes.ToBuilder();
-            if (previousRoutes is object)
+            if (previousRoutes is not null)
             {
                 foreach (var pair in previousRoutes)
                 {

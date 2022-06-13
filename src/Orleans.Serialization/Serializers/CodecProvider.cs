@@ -38,10 +38,12 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedActivators = new();
+        private readonly ConcurrentDictionary<Type, object> _instantiatedConverters = new();
         private readonly Dictionary<Type, Type> _baseCodecs = new();
         private readonly Dictionary<Type, Type> _valueSerializers = new();
         private readonly Dictionary<Type, Type> _fieldCodecs = new();
         private readonly Dictionary<Type, Type> _copiers = new();
+        private readonly Dictionary<Type, Type> _converters = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -112,11 +114,12 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(_fieldCodecs, metadata.FieldCodecs, typeof(IFieldCodec<>));
             AddFromMetadata(_activators, metadata.Activators, typeof(IActivator<>));
             AddFromMetadata(_copiers, metadata.Copiers, typeof(IDeepCopier<>));
+            AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
             AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
 
             static void AddFromMetadata(IDictionary<Type, Type> resultCollection, IEnumerable<Type> metadataCollection, Type genericType)
             {
-                Debug.Assert(genericType.GetGenericArguments().Length == 1);
+                Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
                 foreach (var type in metadataCollection)
                 {
@@ -626,19 +629,27 @@ namespace Orleans.Serialization.Serializers
 
         private IValueSerializer<TField> GetValueSerializerInner<TField>(Type concreteType, Type searchType) where TField : struct
         {
-            if (!_valueSerializers.TryGetValue(searchType, out var serializerType))
+            object[] constructorArguments = null;
+            if (_valueSerializers.TryGetValue(searchType, out var serializerType))
+            {
+                if (serializerType.IsGenericTypeDefinition)
+                {
+                    serializerType = serializerType.MakeGenericType(concreteType.GetGenericArguments());
+                }
+            }
+            else if (TryGetSurrogateCodec(concreteType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IValueSerializer).IsAssignableFrom(surrogateCodecType))
+            {
+                serializerType = surrogateCodecType;
+            }
+
+            if (serializerType is null)
             {
                 return null;
             }
 
-            if (serializerType.IsGenericTypeDefinition)
-            {
-                serializerType = serializerType.MakeGenericType(concreteType.GetGenericArguments());
-            }
-
             if (!_instantiatedValueSerializers.TryGetValue(serializerType, out var result))
             {
-                result = GetServiceOrCreateInstance(serializerType);
+                result = GetServiceOrCreateInstance(serializerType, constructorArguments);
                 _ = _instantiatedValueSerializers.TryAdd(serializerType, result);
             }
 
@@ -647,19 +658,28 @@ namespace Orleans.Serialization.Serializers
 
         private IBaseCopier<T> GetBaseCopierInner<T>(Type concreteType, Type searchType) where T : class
         {
-            if (!_baseCopiers.TryGetValue(searchType, out var copierType))
+            object[] constructorArguments = null;
+            if (_baseCopiers.TryGetValue(searchType, out var copierType))
+            {
+               // Use the detected copier type. 
+                if (copierType.IsGenericTypeDefinition)
+                {
+                    copierType = copierType.MakeGenericType(concreteType.GetGenericArguments());
+                }
+            }
+            else if (TryGetSurrogateCodec(concreteType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IBaseCopier).IsAssignableFrom(surrogateCodecType))
+            {
+                copierType = surrogateCodecType;
+            }
+
+            if (copierType is null)
             {
                 return null;
             }
 
-            if (copierType.IsGenericTypeDefinition)
-            {
-                copierType = copierType.MakeGenericType(concreteType.GetGenericArguments());
-            }
-
             if (!_instantiatedBaseCopiers.TryGetValue(copierType, out var result))
             {
-                result = GetServiceOrCreateInstance(copierType);
+                result = GetServiceOrCreateInstance(copierType, constructorArguments);
                 _ = _instantiatedBaseCopiers.TryAdd(copierType, result);
             }
 
@@ -765,6 +785,11 @@ namespace Orleans.Serialization.Serializers
             {
                 return CreateCodecInstance(fieldType, fieldType.GetEnumUnderlyingType());
             }
+            else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
+            {
+                // Use the converter
+                codecType = surrogateCodecType;
+            }
             else if (searchType.BaseType is object
                 && CreateCodecInstance(
                     fieldType,
@@ -772,16 +797,55 @@ namespace Orleans.Serialization.Serializers
                     {
                         { IsConstructedGenericType: true } => searchType.BaseType.GetGenericTypeDefinition(),
                         _ => searchType.BaseType
-                    }) is IFieldCodec fieldCodec)
+                    }) is IDerivedTypeCodec fieldCodec)
             {
                 // Find codecs which generalize over all subtypes.
-                if (fieldCodec is IDerivedTypeCodec)
-                {
-                    return fieldCodec;
-                }
+                return fieldCodec;
             }
 
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
+        }
+
+        private bool TryGetSurrogateCodec(Type fieldType, Type searchType, out Type surrogateCodecType, out object[] constructorArguments)
+        {
+            if (_converters.TryGetValue(searchType, out var converterType))
+            {
+                if (converterType.IsGenericTypeDefinition)
+                {
+                    converterType = converterType.MakeGenericType(fieldType.GetGenericArguments());
+                }
+
+                var converterInterfaceArgs = Array.Empty<Type>();
+                foreach (var @interface in converterType.GetInterfaces())
+                {
+                    if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>))
+                    {
+                        converterInterfaceArgs = @interface.GetGenericArguments();
+                    }
+                }
+
+                if (converterInterfaceArgs is { Length: 0 })
+                {
+                    throw new InvalidOperationException($"A registered type converter {converterType} does not implement {typeof(IConverter<,>)}");
+                }
+
+                var typeArgs = new Type[3] { converterInterfaceArgs[0], converterInterfaceArgs[1], converterType };
+                constructorArguments = new object[] { GetServiceOrCreateInstance(converterType) };
+                if (typeArgs[0].IsValueType)
+                {
+                    surrogateCodecType = typeof(ValueTypeSurrogateCodec<,,>).MakeGenericType(typeArgs);
+                }
+                else
+                {
+                    surrogateCodecType = typeof(SurrogateCodec<,,>).MakeGenericType(typeArgs);
+                }
+
+                return true;
+            }
+
+            surrogateCodecType = null;
+            constructorArguments = null;
+            return false;
         }
 
         private IBaseCodec CreateBaseCodecInstance(Type fieldType, Type searchType)
@@ -793,6 +857,10 @@ namespace Orleans.Serialization.Serializers
                 {
                     codecType = codecType.MakeGenericType(fieldType.GetGenericArguments());
                 }
+            }
+            else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IBaseCodec).IsAssignableFrom(surrogateCodecType))
+            {
+                codecType = surrogateCodecType;
             }
 
             return codecType != null ? (IBaseCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
@@ -818,13 +886,14 @@ namespace Orleans.Serialization.Serializers
                 var arrayCopierType = fieldType.GetArrayRank() == 1 ? typeof(ArrayCopier<>) : typeof(MultiDimensionalArrayCopier<>);
                 copierType = arrayCopierType.MakeGenericType(fieldType.GetElementType());
             }
-            else if (searchType.BaseType is object && CreateCopierInstance(fieldType, searchType.BaseType) is IDeepCopier baseCopier)
+            else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
+            {
+                copierType = surrogateCodecType;
+            }
+            else if (searchType.BaseType is object && CreateCopierInstance(fieldType, searchType.BaseType) is IDerivedTypeCopier baseCopier)
             {
                 // Find copiers which generalize over all subtypes.
-                if (baseCopier is IDerivedTypeCopier)
-                {
-                    return baseCopier;
-                }
+                return baseCopier;
             }
 
             return copierType != null ? (IDeepCopier)GetServiceOrCreateInstance(copierType, constructorArguments) : null;

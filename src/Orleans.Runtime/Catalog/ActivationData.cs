@@ -210,7 +210,7 @@ namespace Orleans.Runtime
             {
                 result = contextResult;
             }
-            else if (_components is object && _components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_components is not null && _components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -485,7 +485,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (_blockingRequest is object)
+                if (_blockingRequest is not null)
                 {
                     var message = _blockingRequest;
                     TimeSpan? timeSinceQueued = default;
@@ -558,7 +558,7 @@ namespace Orleans.Runtime
 
             void GetStatusList(ref List<string> diagnostics)
             {
-                if (diagnostics is object) return;
+                if (diagnostics is not null) return;
 
                 diagnostics = new List<string>
                 {
@@ -881,6 +881,14 @@ namespace Orleans.Runtime
                     return true;
                 }
 
+                // Handle call-chain reentrancy
+                if (_shared.SchedulingOptions.AllowCallChainReentrancy
+                    && incoming.CallChainId == _blockingRequest.CallChainId
+                    && incoming.CallChainId != Guid.Empty)
+                {
+                    return true;
+                }
+
                 if (GetComponent<GrainCanInterleave>() is GrainCanInterleave canInterleave)
                 {
                     try
@@ -1058,13 +1066,8 @@ namespace Orleans.Runtime
                 return;
             }
 
-            ActivationState state;
-            Message blockingMessage;
             lock (this)
             {
-                state = State;
-                blockingMessage = _blockingRequest;
-
                 _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
             }
 
@@ -1485,7 +1488,7 @@ namespace Orleans.Runtime
         private void UnregisterMessageTarget()
         {
             _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
-            if (GrainInstance is object)
+            if (GrainInstance is not null)
             {
                 SetGrainInstance(null);
             }

@@ -49,7 +49,7 @@ namespace Orleans.Runtime.GrainDirectory
                 unadjustedResult = results[ThreadSafeRandom.Next(results.Count)];
             }
 
-            if (unadjustedResult is object)
+            if (unadjustedResult is not null)
             {
                 return GrainAddress.GetAddress(unadjustedResult.SiloAddress, grainId, unadjustedResult.ActivationId);
             }

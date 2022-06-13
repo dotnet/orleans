@@ -348,7 +348,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public bool Equals(GrainReference other) => other is GrainReference && this.GrainId.Equals(other.GrainId);
+        public bool Equals(GrainReference other) => other is not null && this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc />
         public override int GetHashCode() => this.GrainId.GetHashCode();

@@ -47,7 +47,6 @@ namespace Benchmarks.Comparison
 
         static ClassSerializeBenchmark()
         {
-            // 
             var services = new ServiceCollection()
                 .AddSerializer()
                 .BuildServiceProvider();

@@ -56,7 +56,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
             if (constant.Kind == TypedConstantKind.Type)
             {
-                Debug.Assert(constant.Value is object);
+                Debug.Assert(constant.Value is not null);
                 return TypeOfExpression(((ITypeSymbol)constant.Value).ToTypeSyntax());
             }
 

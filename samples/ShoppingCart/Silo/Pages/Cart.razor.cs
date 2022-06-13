@@ -1,4 +1,7 @@
-﻿namespace Orleans.ShoppingCart.Silo.Pages;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT License.
+
+namespace Orleans.ShoppingCart.Silo.Pages;
 
 public sealed partial class Cart
 {
@@ -12,14 +15,14 @@ public sealed partial class Cart
 
     protected override Task OnInitializedAsync() => GetCartItemsAsync();
 
-    Task GetCartItemsAsync() =>
+    private Task GetCartItemsAsync() =>
         InvokeAsync(async () =>
         {
             _cartItems = await ShoppingCart.GetAllItemsAsync();
             StateHasChanged();
         });
 
-    async Task OnItemRemovedAsync(ProductDetails product)
+    private async Task OnItemRemovedAsync(ProductDetails product)
     {
         await ShoppingCart.RemoveItemAsync(product);
         await Observer.NotifyStateChangedAsync();
@@ -27,13 +30,13 @@ public sealed partial class Cart
         _ = _cartItems?.RemoveWhere(item => item.Product == product);
     }
 
-    async Task OnItemUpdatedAsync((int Quantity, ProductDetails Product) tuple)
+    private async Task OnItemUpdatedAsync((int Quantity, ProductDetails Product) tuple)
     {
         await ShoppingCart.AddOrUpdateItemAsync(tuple.Quantity, tuple.Product);
         await GetCartItemsAsync();
     }
 
-    async Task EmptyCartAsync()
+    private async Task EmptyCartAsync()
     {
         await ShoppingCart.EmptyCartAsync();
         await Observer.NotifyStateChangedAsync();

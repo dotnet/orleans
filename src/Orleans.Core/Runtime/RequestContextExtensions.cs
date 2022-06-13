@@ -15,7 +15,14 @@ namespace Orleans.Runtime
         /// Imports the specified context data into the current <see cref="RequestContext"/>, clearing all existing values.
         /// </summary>
         /// <param name="contextData">The context data.</param>
-        public static void Import(Dictionary<string, object> contextData)
+        public static void Import(Dictionary<string, object> contextData) => Import(contextData, null); 
+
+        /// <summary>
+        /// Imports the specified context data into the current <see cref="RequestContext"/>, clearing all existing values.
+        /// </summary>
+        /// <param name="contextData">The context data.</param>
+        /// <param name="requestMessage">The request message, or <see langword="null"/> if no request is present.</param>
+        internal static void Import(Dictionary<string, object> contextData, object requestMessage)
         {
             if (RequestContext.PropagateActivityId)
             {
@@ -30,18 +37,17 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (contextData != null && contextData.Count > 0)
+            var values = contextData switch
             {
-                var values = contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                // We have some data, so store RC data into the async local field.
-                RequestContext.CallContextData.Value = values;
-            }
-            else
+                { Count: > 0 } => contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                _ => null,
+            };
+
+            RequestContext.CallContextData.Value = new RequestContext.ContextProperties
             {
-                // Clear any previous RC data from the async local field.
-                // MUST CLEAR the LLC, so that previous request LLC does not leak into this one.
-                RequestContext.Clear();
-            }
+                RequestObject = requestMessage,
+                Values = values,
+            };
         }
 
         /// <summary>
@@ -51,7 +57,19 @@ namespace Orleans.Runtime
         /// <returns>A copy of the current request context.</returns>
         public static Dictionary<string, object> Export(DeepCopier copier)
         {
-            var values = RequestContext.CallContextData.Value;
+            var (values, _) = ExportInternal(copier);
+            return values;
+        }
+
+        /// <summary>
+        /// Exports a copy of the current <see cref="RequestContext"/>.
+        /// </summary>
+        /// <param name="copier">The copier.</param>
+        /// <returns>A copy of the current request context.</returns>
+        internal static (Dictionary<string, object> Values, object RequestObject) ExportInternal(DeepCopier copier)
+        {
+            var properties = RequestContext.CallContextData.Value;
+            var values = properties.Values;
 
             if (RequestContext.PropagateActivityId)
             {
@@ -70,9 +88,44 @@ namespace Orleans.Runtime
                 }
             }
 
-            return (values != null && values.Count > 0)
+            var resultValues = (values != null && values.Count > 0)
                 ? copier.Copy(values)
                 : null;
+            return (resultValues, properties.RequestObject);
+        }
+
+        /// <summary>
+        /// Suppresses the flow of the currently executing call chain.
+        /// </summary>
+        internal static object SuppressCurrentCallChainFlow()
+        {
+            var properties = RequestContext.CallContextData.Value;
+            var result = properties.RequestObject;
+            if (result is not null)
+            {
+                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
+                {
+                    Values = properties.Values,
+                };
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Restores the flow of a previously suppressed call chain.
+        /// </summary>
+        internal static void RestoreCurrentCallChainFlow(object requestMessage)
+        {
+            if (requestMessage is not null)
+            {
+                var properties = RequestContext.CallContextData.Value;
+                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
+                {
+                    Values = properties.Values,
+                    RequestObject = requestMessage,
+                };
+            }
         }
     }
 }

@@ -106,7 +106,7 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Indicates that an <see cref="IDeepCopier"/> implementation generalizes over all sub-types.
     /// </summary>
-    public interface IDerivedTypeCopier
+    public interface IDerivedTypeCopier : IDeepCopier
     {
     }
 
