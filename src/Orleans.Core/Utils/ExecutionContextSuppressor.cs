@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 
 namespace Orleans.Runtime.Internal;
@@ -6,7 +5,10 @@ namespace Orleans.Runtime.Internal;
 /// <summary>
 /// Suppresses the flow of <see cref="ExecutionContext"/> until it is disposed.
 /// </summary>
-public struct ExecutionContextSuppressor : IDisposable
+/// <remarks>
+/// Note that this is a ref-struct to avoid it being used in an async method.
+/// </remarks>
+public ref struct ExecutionContextSuppressor
 {
     private readonly bool _restoreFlow;
 
@@ -26,7 +28,9 @@ public struct ExecutionContextSuppressor : IDisposable
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+    /// </summary>
     public void Dispose()
     {
         if (_restoreFlow)
