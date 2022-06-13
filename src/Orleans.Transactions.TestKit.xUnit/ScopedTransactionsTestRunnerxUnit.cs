@@ -7,7 +7,7 @@ namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class ScopedTransactionsTestRunnerxUnit : FramedTransactionsTestRunner
     {
-        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionFrame transactionFrame, ITestOutputHelper output)
+        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionScope transactionFrame, ITestOutputHelper output)
         : base(grainFactory, transactionFrame, output.WriteLine) { }
 
         [SkippableTheory]

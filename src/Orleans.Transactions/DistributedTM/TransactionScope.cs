@@ -6,12 +6,12 @@ using Orleans.Serialization;
 
 namespace Orleans.Transactions;
 
-internal class TransactionFrame : ITransactionFrame
+internal class TransactionScope : ITransactionScope
 {
     private readonly ITransactionAgent _transactionAgent;
     private readonly Serializer<OrleansTransactionAbortedException> _serializer;
 
-    public TransactionFrame(ITransactionAgent transactionAgent, Serializer<OrleansTransactionAbortedException> serializer)
+    public TransactionScope(ITransactionAgent transactionAgent, Serializer<OrleansTransactionAbortedException> serializer)
     {
         _transactionAgent = transactionAgent;
         _serializer = serializer;

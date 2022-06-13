@@ -7,12 +7,12 @@ namespace Orleans.Transactions.TestKit
 {
     public abstract class FramedTransactionsTestRunner : TransactionTestRunnerBase
     {
-        private readonly ITransactionFrame _transactionFrame;
+        private readonly ITransactionScope _transactionScope;
 
-        protected FramedTransactionsTestRunner(IGrainFactory grainFactory, ITransactionFrame transactionFrame, Action<string> output)
+        protected FramedTransactionsTestRunner(IGrainFactory grainFactory, ITransactionScope transactionScope, Action<string> output)
             : base(grainFactory, output)
         {
-            _transactionFrame = transactionFrame;
+            _transactionScope = transactionScope;
         }
 
         public virtual async Task CreateTransactionScopeAndSetValue(string grainStates)
@@ -23,7 +23,7 @@ namespace Orleans.Transactions.TestKit
             // Act
             Func<Task> act = () => grain.Set(57);
 
-            await _transactionFrame.RunScope(TransactionOption.Create, async () =>
+            await _transactionScope.RunScope(TransactionOption.Create, async () =>
                 // Assert
                 await act.Should().NotThrowAsync(because: "No failure expected"));
         }
@@ -36,7 +36,7 @@ namespace Orleans.Transactions.TestKit
             // Act
             Func<Task> act = () => grain.SetAndThrow(57);
 
-            await _transactionFrame.RunScope(TransactionOption.Create, async () =>
+            await _transactionScope.RunScope(TransactionOption.Create, async () =>
                 // Assert
                 await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected"));
         }
@@ -49,7 +49,7 @@ namespace Orleans.Transactions.TestKit
             var grain = RandomTestGrain(grainStates);
 
             // Act
-            await _transactionFrame.RunScope(TransactionOption.Create, async () =>
+            await _transactionScope.RunScope(TransactionOption.Create, async () =>
             {
                 await grain.Set(57);
                 result = await grain.Get();
@@ -67,13 +67,13 @@ namespace Orleans.Transactions.TestKit
             var grain = RandomTestGrain(grainStates);
 
             // Act
-            await _transactionFrame.RunScope(TransactionOption.Create, async () =>
+            await _transactionScope.RunScope(TransactionOption.Create, async () =>
             {
                 await grain.Set(57);
 
                 try
                 {
-                    await _transactionFrame.RunScope(TransactionOption.Create, async () => await grain.SetAndThrow(67));
+                    await _transactionScope.RunScope(TransactionOption.Create, async () => await grain.SetAndThrow(67));
                 }
                 catch
                 { }

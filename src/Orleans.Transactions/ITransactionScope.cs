@@ -3,7 +3,7 @@ using System;
 
 namespace Orleans.Transactions;
 
-public interface ITransactionFrame
+public interface ITransactionScope
 {
     /// <summary>
     /// Run transaction scope
