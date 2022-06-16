@@ -66,10 +66,6 @@ namespace UnitTests.Grains
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _logger.Info("Consumer.BecomeConsumer");
-            if (streamId == null)
-            {
-                throw new ArgumentNullException("streamId");
-            }
             if (String.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException("providerToUse");

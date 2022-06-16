@@ -37,10 +37,6 @@ namespace UnitTests.Grains
         public Task BecomeProducer(Guid streamId, string providerToUse)
         {
             _logger.Info("Producer.BecomeProducer");
-            if (streamId == null)
-            {
-                throw new ArgumentNullException("streamId");
-            }
             if (String.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException("providerToUse");
