@@ -13,12 +13,10 @@ namespace Orleans.Runtime
         private readonly LogStatistics logStatistics;
 
         public ClientStatisticsManager(
-            ILoggerFactory loggerFactory, 
+            ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions)
         {
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, false, loggerFactory);
-            MessagingStatisticsGroup.Init();
-            NetworkingStatisticsGroup.Init();
         }
 
         internal void Start(IMessageCenter transport, GrainId clientId)

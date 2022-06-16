@@ -200,7 +200,7 @@ namespace Orleans.Runtime.MembershipService
                 task = remoteOracle.Ping(probeNumber);
 
                 // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.
-                MessagingStatisticsGroup.OnPingSend(remoteSilo);
+                MessagingInstruments.OnPingSend(remoteSilo);
             }
             finally
             {

@@ -17,9 +17,9 @@ namespace Orleans.Runtime.Messaging
 {
     internal class Gateway : IConnectedClientCollection
     {
-        // clients is the main authorative collection of all connected clients. 
-        // Any client currently in the system appears in this collection. 
-        // In addition, we use clientConnections collection for fast retrival of ClientState. 
+        // clients is the main authorative collection of all connected clients.
+        // Any client currently in the system appears in this collection.
+        // In addition, we use clientConnections collection for fast retrival of ClientState.
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
@@ -29,7 +29,6 @@ namespace Orleans.Runtime.Messaging
 
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
-        private readonly CounterStatistic gatewaySends;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -39,13 +38,12 @@ namespace Orleans.Runtime.Messaging
 
         public Gateway(
             MessageCenter messageCenter,
-            ILocalSiloDetails siloDetails, 
+            ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
             IAsyncTimerFactory timerFactory)
         {
             this.messageCenter = messageCenter;
-            this.gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
@@ -137,7 +135,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     clientState = new ClientState(this, clientId);
                     clients[clientId] = clientState;
-                    MessagingStatisticsGroup.ConnectedClientCount.Increment();
+                    MessagingInstruments.ConnectedClient.Add(1);
                 }
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
@@ -168,7 +166,7 @@ namespace Orleans.Runtime.Messaging
         internal SiloAddress TryToReroute(Message msg)
         {
             // ** Special routing rule for system target here **
-            // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either 
+            // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either
             //  - the GatewayAddress of the target silo (for example, when the client want get the cluster typemap)
             //  - the "internal" Silo-to-Silo address, if the client want to send a message to a specific SystemTarget
             //    activation that is on a silo on which there is no gateway available (or if the client is not
@@ -245,7 +243,7 @@ namespace Orleans.Runtime.Messaging
                             }
 
                             clientsCollectionVersion++;
-                            MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
+                            MessagingInstruments.ConnectedClient.Add(-1);
                         }
                     }
                 }
@@ -270,7 +268,7 @@ namespace Orleans.Runtime.Messaging
             {
                 return false;
             }
-            
+
             // when this Gateway receives a message from client X to client addressale object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
             // it will use this Gateway to re-route the REPLY from Y back to X.
@@ -280,7 +278,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             msg.TargetSilo = null;
-            // Override the SendingSilo only if the sending grain is not 
+            // Override the SendingSilo only if the sending grain is not
             // a system target
             if (!msg.SendingGrain.IsSystemTarget())
             {
@@ -445,7 +443,8 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    _gateway.gatewaySends.Increment();
+                    // ? why record it twice
+                    GatewayInstruments.GatewaySent.Add(1);
                     return true;
                 }
                 catch (Exception exception)
@@ -459,7 +458,7 @@ namespace Orleans.Runtime.Messaging
 
         // this cache is used to record the addresses of Gateways from which clients connected to.
         // it is used to route replies to clients from client addressable objects
-        // without this cache this Gateway will not know how to route the reply back to the client 
+        // without this cache this Gateway will not know how to route the reply back to the client
         // (since clients are not registered in the directory and this Gateway may not be proxying for the client for whom the reply is destined).
         private class ClientsReplyRoutingCache
         {

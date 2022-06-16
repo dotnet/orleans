@@ -251,7 +251,6 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_Success()
         {
-            MessagingStatisticsGroup.Init();
             var otherSilos = new[]
             {
                 Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active),
@@ -288,7 +287,7 @@ namespace NonSilo.Tests.Membership
             var started = this.lifecycle.OnStart();
 
             await Until(() => remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
-            
+
 
             await Until(() => started.IsCompleted);
             await started;
@@ -299,8 +298,6 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_Failure()
         {
-            MessagingStatisticsGroup.Init();
-
             this.timerFactory.CreateDelegate = (period, name) => new DelegateAsyncTimer(_ => Task.FromResult(false));
 
             var otherSilos = new[]

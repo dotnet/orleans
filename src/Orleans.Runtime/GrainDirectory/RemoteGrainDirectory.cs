@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -23,8 +24,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
-            router.RegistrationsSingleActRemoteReceived.Increment();
-            
+            DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+
             return await router.RegisterAsync(address, hopCount);
         }
 
@@ -64,7 +65,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
-            router.CacheValidationsReceived.Increment();
+            DirectoryInstruments.ValidationsCacheReceived.Add(1);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("LookUpMany for {Count} entries", grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();

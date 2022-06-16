@@ -38,7 +38,6 @@ namespace NonSilo.Tests.Membership
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
-            MessagingStatisticsGroup.Init();
             this.output = output;
             this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
 
@@ -148,7 +147,7 @@ namespace NonSilo.Tests.Membership
                 {
                     IntermediaryHealthScore = 0,
                     ProbeResponseTime = TimeSpan.FromMilliseconds(1),
-                    Succeeded = true 
+                    Succeeded = true
                 });
             });
 
@@ -328,7 +327,7 @@ namespace NonSilo.Tests.Membership
                 {
                     IntermediaryHealthScore = 0,
                     ProbeResponseTime = TimeSpan.FromMilliseconds(1),
-                    Succeeded = true 
+                    Succeeded = true
                 });
             });
 

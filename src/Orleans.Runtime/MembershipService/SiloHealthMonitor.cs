@@ -263,7 +263,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (failureException is null)
             {
-                MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                 if (_log.IsEnabled(LogLevel.Trace))
                 {
@@ -281,7 +281,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                 var failedProbes = ++_failedProbes;
                 _log.LogWarning(
@@ -348,14 +348,14 @@ namespace Orleans.Runtime.MembershipService
                             roundTripTimer.Elapsed,
                             indirectResult.ProbeResponseTime);
 
-                        MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                        MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                         _failedProbes = 0;
                         probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
                     }
                     else
                     {
-                        MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                        MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                         if (indirectResult.IntermediaryHealthScore > 0)
                         {

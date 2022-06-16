@@ -17,17 +17,13 @@ namespace Orleans.Runtime
             Action<Message> unregister,
             ILogger logger,
             MessagingOptions messagingOptions,
-            ApplicationRequestsStatisticsGroup requestStatistics,
             TimeSpan responseTimeout)
         {
-            RequestStatistics = requestStatistics;
             this.Unregister = unregister;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;
             this.ResponseTimeout = responseTimeout;
         }
-
-        public ApplicationRequestsStatisticsGroup RequestStatistics { get; }
 
         public TimeSpan ResponseTimeout
         {

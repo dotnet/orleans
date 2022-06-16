@@ -48,7 +48,6 @@ namespace Orleans.Runtime
         private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime;
-        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -58,7 +57,6 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
-            ApplicationRequestsStatisticsGroup appRequestStatistics,
             MessagingTrace messagingTrace,
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceIdResolver,
@@ -77,7 +75,6 @@ namespace Orleans.Runtime
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
-            this.appRequestStatistics = appRequestStatistics;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
 
@@ -85,14 +82,12 @@ namespace Orleans.Runtime
                 msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.appRequestStatistics,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.appRequestStatistics,
                 this.messagingOptions.SystemResponseTimeout);
         }
 
@@ -103,7 +98,7 @@ namespace Orleans.Runtime
         private SiloAddress MySilo { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
-        
+
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private GrainLocator GrainLocator
@@ -197,7 +192,7 @@ namespace Orleans.Runtime
             // Don't process messages that have already timed out
             if (request.IsExpired)
             {
-                this.messagingTrace.OnDropExpiredMessage(request, MessagingStatisticsGroup.Phase.Respond);
+                this.messagingTrace.OnDropExpiredMessage(request, MessagingInstruments.Phase.Respond);
                 return;
             }
 
@@ -228,12 +223,12 @@ namespace Orleans.Runtime
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
                 //// We don't record sending addresses for requests, since it is not clear that this silo ever wants to send messages to the grain sending this request.
-                //// However, it is sure that this silo does send messages to the sender of a reply. 
+                //// However, it is sure that this silo does send messages to the sender of a reply.
                 //// In most cases it will already have its address cached, unless it had a wrong outdated address cached and now this is a fresher address.
                 //// It is anyway always safe to cache the replier address.
-                //// 2: 
+                //// 2:
                 //// after further thought decided not to do it.
-                //// It seems to better not bother caching the sender of a response at all, 
+                //// It seems to better not bother caching the sender of a response at all,
                 //// and instead to take a very occasional hit of a full remote look-up instead of this small but non-zero hit on every response.
                 //if (message.Direction.Equals(Message.Directions.Response) && message.Result.Equals(Message.ResponseTypes.Success))
                 //{
@@ -260,7 +255,7 @@ namespace Orleans.Runtime
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
-                    this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
+                    this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
                     return;
                 }
 
@@ -363,7 +358,7 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-        
+
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(
@@ -454,7 +449,7 @@ namespace Orleans.Runtime
                         if (message.CacheInvalidationHeader == null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
+                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability.
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
                             this.GrainLocator.InvalidateCache(message.SendingAddress);
                         }
@@ -502,7 +497,7 @@ namespace Orleans.Runtime
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
+                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
                 callbackData.DoCallback(message);
             }
             else
