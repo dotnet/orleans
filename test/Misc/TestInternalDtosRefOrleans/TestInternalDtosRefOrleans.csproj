@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>TestInternalDtosRefOrleans</RootNamespace>
     <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
