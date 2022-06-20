@@ -1,0 +1,67 @@
+# This file is the main entry point for the Build Promotion build definition.
+
+parameters:
+  - name: PublishingInfraVersion
+    displayName: Which version of publishing should be used to promote the build definition?
+    type: number
+    default: 3
+    values:
+      - 3
+      
+  - name: BARBuildId
+    displayName: "Maestro ID of the build to be promoted:"
+    type: number
+
+  - name: PromoteToChannelIds
+    displayName: Which Maestro channels' IDs should the build be promoted to? (comma separated)
+    type: string 
+    default: ' '
+
+  - name: SymbolPublishingAdditionalParameters
+    displayName: Additional (MSBuild) properties for symbol publishing
+    type: string 
+    default: ' '
+
+  - name: ArtifactsPublishingAdditionalParameters
+    displayName: Additional (MSBuild) properties for general asset publishing
+    type: string 
+    default: ' '
+
+  # The parameters below here are legacy. They are passed by add-build-to-channel
+  # to the build pipeline, and if they are not present in the pipeline, then queueing
+  # will fail. Remove once add-build-to-channel has been updated to remove the parameters.
+
+  - name: EnableSourceLinkValidation
+    displayName: Should Sourcelink validation be performed?
+    type: boolean 
+    default: false
+    
+  - name: EnableNugetValidation
+    displayName: Should NuGet metadata validation be performed?
+    type: boolean 
+    default: false
+    
+  - name: EnableSigningValidation
+    displayName: Should signing validation be performed?
+    type: boolean 
+    default: false
+       
+  - name: PublishInstallersAndChecksums
+    displayName: Should installers and checksums be published?
+    type: boolean 
+    default: true
+    
+  - name: SigningValidationAdditionalParameters
+    displayName: Additional (MSBuild) properties for signing validation
+    type: string 
+    default: ' '
+
+trigger: none
+
+stages:
+- template: \eng\publishing\v3\publish.yml
+  parameters:
+    PromoteToChannelIds: ${{ parameters.PromoteToChannelIds }}
+    BARBuildId: ${{ parameters.BARBuildId }}
+    symbolPublishingAdditionalParameters: ${{ parameters.SymbolPublishingAdditionalParameters }}
+    artifactsPublishingAdditionalParameters: ${{ parameters.ArtifactsPublishingAdditionalParameters }}

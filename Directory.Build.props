@@ -1,4 +1,12 @@
 <Project>
+
+  <!-- Arcade stuff -->
+  <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+  <Import Project="$(RepositoryEngineeringDir)TargetFrameworkDefaults.props" />
+  <PropertyGroup>
+    <UsingToolXunit>false</UsingToolXunit>
+  </PropertyGroup>
+
   <!-- Set the repository root into a variable -->
   <PropertyGroup>
     <SourceRoot>$(MSBuildThisFileDirectory)</SourceRoot>
@@ -11,7 +19,8 @@
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/orleans</PackageProjectUrl>
-    <PackageIcon>logo_128.png</PackageIcon>
+    <!-- <PackageIcon>logo_128.png</PackageIcon> -->
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)/assets/logo_128.png</PackageIconFullPath>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
     <PublicRepositoryUrl>https://github.com/dotnet/orleans</PublicRepositoryUrl>
@@ -191,4 +200,5 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
+
 </Project>

@@ -1,0 +1,42 @@
+parameters:
+  buildArgs: ''
+  validateBlobFeedUrl: https://dotnetfeed.blob.core.windows.net/dotnet-core-test/index.json
+  buildConfig: Release
+
+jobs:
+- template: /eng/common/templates/job/job.yml
+  parameters:
+    name: ValidateArcadeSDK
+    displayName: Validate Arcade SDK
+    enableMicrobuild: true
+    artifacts:
+      download:
+        path: build_stage_artifacts
+      publish:
+        artifacts:
+          name: Artifacts_ValidateSdk_Windows_NT_Release
+        logs:
+          name: Logs_ValidateSdk_Windows_NT_Release
+    timeoutInMinutes: 90
+    pool:
+      name: NetCore1ESPool-Internal
+      demands: ImageOverride -equals Build.Server.Amd64.VS2019
+    variables:
+    - group: DotNet-Blob-Feed
+    - group: Publish-Build-Assets
+    - _BuildConfig: ${{ parameters.buildConfig }}
+    - _BuildArgs: ${{ parameters.buildArgs }}
+    - _ValidateBlobFeedUrl: ${{ parameters.validateBlobFeedUrl }}
+    preSteps:
+    - checkout: self
+      clean: true
+    steps:
+    - script: eng\update-packagesource.cmd 
+        -gitHubPat $(BotAccount-dotnet-maestro-bot-PAT)
+        -barToken $(MaestroAccessToken)
+        -packagesSource $(Build.SourcesDirectory)/build_stage_artifacts
+      displayName: Update package source
+    - script: eng\common\cibuild.cmd
+        $(_BuildArgs)
+        /p:DotNetPublishBlobFeedUrl=$(_ValidateBlobFeedUrl)
+      displayName: Build / Validate

@@ -1,0 +1,3 @@
+<PoliCheckExclusions>
+  <Exclusion Type="FileName">MICROSOFTDOTNETLIBRARY.TXT</Exclusion>
+</PoliCheckExclusions>

@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <PackageReference Include="NodaTime" Version="$(NodaTimeVersion)" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>

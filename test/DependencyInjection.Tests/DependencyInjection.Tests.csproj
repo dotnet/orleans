@@ -9,7 +9,6 @@
     <PackageReference Include="StructureMap.Microsoft.DependencyInjection" Version="$(StructureMapMicrosoftDependencyInjectionVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>

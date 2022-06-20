@@ -1,0 +1,32 @@
+<Project>
+  <!--
+    These are third party libraries that we use in Arcade. We need to sign them even if they
+    are already signed. However, they must be signed with a 3rd party certificate.
+  -->
+  <ItemGroup>
+    <FileSignInfo Include="AWSSDK.Core.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="AWSSDK.S3.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="CommandLine.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Handlebars.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="SleetLib.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Swashbuckle.AspNetCore.Swagger.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Octokit.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="YamlDotNet.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Mono.Options.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Newtonsoft.Json.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Newtonsoft.Json.Bson.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="SevenZip.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="winterop.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="wix.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="LibGit2Sharp.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="SharpYaml.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="FluentAssertions.dll" CertificateName="3PartySHA2" />
+
+    <!-- Despite being called "Microsoft.*", these are not produced by Microsoft. These assemblies come from the Wix toolset project. -->
+    <FileSignInfo Include="Microsoft.Deployment.Compression.Cab.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Microsoft.Deployment.Compression.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Microsoft.Deployment.Resources.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Microsoft.Deployment.WindowsInstaller.dll" CertificateName="3PartySHA2" />
+    <FileSignInfo Include="Microsoft.Deployment.WindowsInstaller.Package.dll" CertificateName="3PartySHA2" />
+  </ItemGroup>
+</Project>
