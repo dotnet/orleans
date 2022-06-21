@@ -1,9 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.Hosting
 {
     /// <summary>
     /// Extension methods for configuring <see cref="IIncomingGrainCallFilter"/> and <see cref="IOutgoingGrainCallFilter"/> implementations.
     /// </summary>
-    public static class GrainCallFilterExtensions
+    public static class GrainCallFilterSiloBuilderExtensions
     {
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.

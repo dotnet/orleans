@@ -20,6 +20,9 @@ using System.Threading.Tasks;
 namespace Orleans.Serialization
 {
     /// <summary>
+    /// <see cref="IServiceCollection"/> extensions.
+    /// </summary>
+    /// <summary>
     /// Extensions for <see cref="IServiceCollection"/>.
     /// </summary>
     public static class ServiceCollectionExtensions

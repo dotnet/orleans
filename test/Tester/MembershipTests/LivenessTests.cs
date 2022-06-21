@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;

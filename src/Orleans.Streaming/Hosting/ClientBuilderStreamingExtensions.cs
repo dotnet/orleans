@@ -8,7 +8,6 @@ using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Configuration.Internal;
 using System.Linq;
-using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace Orleans.Hosting
 {
@@ -19,28 +18,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The client builder.</returns>
-        public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(AddClientStreaming);
-
-        /// <summary>
-        /// Add support for streaming to this client.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        public static void AddClientStreaming(this IServiceCollection services)
-        {
-            if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
-            {
-                return;
-            }
-
-            services.AddSingleton<ClientStreamingProviderRuntime>();
-            services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
-            services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
-            services.AddSingleton<ImplicitStreamSubscriberTable>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
-        }
+        public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(services => services.AddClientStreaming());
 
         /// <summary>
         /// Adds a new in-memory stream provider to the client.

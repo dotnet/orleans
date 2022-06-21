@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Microsoft.Extensions.Hosting

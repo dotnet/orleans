@@ -3,12 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.GrainDirectory.AzureStorage;
-using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
-    public static class AzureTableGrainDirectoryExtensions
+    public static class AzureTableGrainDirectorySiloBuilderExtensions
     {
         public static ISiloBuilder UseAzureTableGrainDirectoryAsDefault(
             this ISiloBuilder builder,
@@ -38,21 +36,6 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
         {
             return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(name, configureOptions));
-        }
-
-        private static IServiceCollection AddAzureTableGrainDirectory(
-            this IServiceCollection services,
-            string name,
-            Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
-        {
-            configureOptions.Invoke(services.AddOptions<AzureTableGrainDirectoryOptions>(name));
-            services
-                .AddTransient<IConfigurationValidator>(sp => new AzureTableGrainDirectoryOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableGrainDirectoryOptions>>().Get(name)))
-                .ConfigureNamedOptionForLogging<AzureTableGrainDirectoryOptions>(name)
-                .AddSingletonNamedService<IGrainDirectory>(name, (sp, name) => ActivatorUtilities.CreateInstance<AzureTableGrainDirectory>(sp, sp.GetOptionsByName<AzureTableGrainDirectoryOptions>(name)))
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
-
-            return services;
         }
     }
 }
