@@ -29,9 +29,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 #else
         private const string BuildConfiguration = "Release";
 #endif
-        private const string CommonParentDirectory = "test";
+        private const string CommonParentDirectory = "bin";
         private const string BinDirectory = "bin";
-        private const string VersionsProjectDirectory = "Grains";
         private const string GrainsV1ProjectName = "TestVersionGrains";
         private const string GrainsV2ProjectName = "TestVersionGrains2";
         private const string VersionTestBinaryName = "TestVersionGrains.exe";
@@ -69,7 +68,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         private FileInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
         {
-            var projectDirectory = Path.Combine(testDirectory.FullName, VersionsProjectDirectory, directoryName, BinDirectory);
+            var projectDirectory = Path.Combine(testDirectory.FullName, directoryName);
 
             var directories = Directory.GetDirectories(projectDirectory, BuildConfiguration, SearchOption.AllDirectories);
 
@@ -81,7 +80,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             var directory = directories[0];
             var files = Directory.GetFiles(directory, VersionTestBinaryName, SearchOption.AllDirectories)
                 .Where(f => !f.Contains(Path.DirectorySeparatorChar + "ref" + Path.DirectorySeparatorChar))
-                .Where(f => f.Contains("publish"))
                 .Where(f => f.Contains($"net{Environment.Version.Major}.{Environment.Version.Minor}"))
                 .ToArray();
 
