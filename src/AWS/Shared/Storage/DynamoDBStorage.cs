@@ -118,7 +118,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not initialize connection to storage table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not initialize connection to storage table {TableName}", tableName);
                 throw;
             }
         }
@@ -231,7 +231,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not create table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not create table {TableName}", tableName);
                 throw;
             }
         }
@@ -240,7 +240,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!this.updateIfExists)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase, $"The config value 'updateIfExists' is false. The table structure for table '{tableDescription.TableName}' will not be updated.");
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated.", tableDescription.TableName);
                 return;
             }
 
@@ -308,7 +308,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not update table {tableDescription.TableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not update table {TableName}", tableDescription.TableName);
                 throw;
             }
         }
@@ -354,7 +354,7 @@ namespace Orleans.Transactions.DynamoDB
             // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateTimeToLive.html
             if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"TTL is not DISABLED. Cannot update table TTL for table {tableDescription.TableName}. Please update manually.");
+                Logger.LogError((int)ErrorCode.StorageProviderBase, "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually.", tableDescription.TableName);
                 return tableDescription;
             }
 
@@ -378,7 +378,12 @@ namespace Orleans.Transactions.DynamoDB
                 // We need to swallow this exception as there is no API exposed to determine if the below issue will occur before calling UpdateTimeToLive(Async)
                 // "Time to live has been modified multiple times within a fixed interval".
                 // We can arrive at this situation if the TTL feature was recently disabled on the target table.
-                Logger.Error(ErrorCode.StorageProviderBase, $"Exception occured while updating table {tableDescription.TableName} TTL attribute to {ttlAttributeName}. Please update manually.", ddbEx);
+                Logger.LogError(
+                    (int)ErrorCode.StorageProviderBase,
+                    ddbEx,
+                    "Exception occured while updating table {TableName} TTL attribute to {TtlAttributeName}. Please update manually.",
+                    tableDescription.TableName,
+                    ttlAttributeName);
                 return tableDescription;
             }
         }
@@ -442,7 +447,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not delete table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not delete table {TableName}", tableName);
                 throw;
             }
         }
@@ -457,7 +462,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Creating {TableName} table entry: {TableEntry}", tableName, Utils.DictionaryToString(fields));
 
             try
             {
@@ -472,7 +477,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Unable to create item to table '{tableName}'", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Unable to create item to table {TableName}", tableName);
                 throw;
             }
         }

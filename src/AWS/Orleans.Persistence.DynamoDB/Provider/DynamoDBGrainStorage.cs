@@ -189,9 +189,14 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase,
-                    string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
+                    grainType,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -281,7 +286,7 @@ namespace Orleans.Storage
             if (this.logger.IsEnabled(LogLevel.Trace))
             {
                 this.logger.Trace(ErrorCode.StorageProviderBase,
-                    "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}",
+                    "Clearing: GrainType={0} Pk={1} GrainId={2} ETag={3} DeleteStateOnClear={4} from Table={5}",
                     grainType, partitionKey, grainReference, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
             }
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
@@ -307,8 +312,15 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
+                    operation,
+                    grainType,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -359,13 +371,15 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
                 }
+
                 if (dataValue != null)
                 {
-                    sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
+                    sb.AppendFormat("Data Value={DataValue} Type={DataType}", dataValue, dataValue.GetType());
                 }
 
-                this.logger.Error(0, sb.ToString(), exc);
-                throw new AggregateException(sb.ToString(), exc);
+                var message = sb.ToString();
+                this.logger.LogError(exc, "{Message}", message);
+                throw new AggregateException(message, exc);
             }
 
             return dataValue;

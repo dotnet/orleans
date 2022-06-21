@@ -32,11 +32,13 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void GeneratedSerializersRoundTripThroughCodec()
         {
-            var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30 };
+            var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30, OtherObject = MyCustomEnum.Two };
             var result = RoundTripThroughCodec(original);
 
             Assert.Equal(original.IntField, result.IntField);
             Assert.Equal(original.IntProperty, result.IntProperty);
+            var otherObj = Assert.IsType<MyCustomEnum>(result.OtherObject);
+            Assert.Equal(MyCustomEnum.Two, otherObj);
         }
 
         [Fact]

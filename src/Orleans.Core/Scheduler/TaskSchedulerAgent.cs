@@ -89,12 +89,12 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Run completed on agent " + this.Name + " - restarting");
+                            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Run completed on agent {Name} - restarting", Name);
                             this.Start();
                         }
                         catch (Exception exc)
                         {
-                            this.Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                            this.Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, $"Unable to restart {nameof(TaskSchedulerAgent)}");
                             this.State = AgentState.Stopped;
                         }
                     }
@@ -125,13 +125,13 @@ namespace Orleans.Runtime
                 if (Log.IsEnabled(LogLevel.Debug))
                 {
                     // ignore. Just make sure stop does not throw.
-                    Log.Debug("Ignoring error during Stop: {0}", exc);
+                    Log.LogDebug(exc, "Ignoring error during Stop");
                 }
             }
 
             if (Log.IsEnabled(LogLevel.Debug))
             {
-                Log.Debug("Stopped agent");
+                Log.LogDebug("Stopped agent");
             }
         }
 
@@ -190,7 +190,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, $"Unable to restart {nameof(TaskSchedulerAgent)}");
                     State = AgentState.Stopped;
                 }
             }
@@ -200,14 +200,13 @@ namespace Orleans.Runtime
         
         private void LogExecutorError(Exception exc)
         {
-            var logMessagePrefix = $"Asynch agent {Name} encountered unexpected exception";
             switch (OnFault)
             {
                 case FaultBehavior.IgnoreFault:
-                    Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100025, exc, "Asynch agent {Name} encountered unexpected exception. The executor will exit.", Name);
                     break;
                 case FaultBehavior.RestartOnFault:
-                    Log.Error(ErrorCode.Runtime_Error_100026, $"{logMessagePrefix} The Stage will be restarted.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100026, exc, "Asynch agent {Name} encountered unexpected exception. The Stage will be restarted.", Name);
                     break;
                 default:
                     throw new NotImplementedException();

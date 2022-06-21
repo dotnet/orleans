@@ -158,8 +158,12 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
-                    this.options.TableName, clusterId, exc));
+                this.logger.LogError(
+                    (int)ErrorCode.MembershipBase,
+                    exc,
+                    "Unable to delete membership records on table {TableName} for ClusterId {ClusterId}",
+                    this.options.TableName,
+                    clusterId);
                 throw;
             }
         }
@@ -184,13 +188,17 @@ namespace Orleans.Clustering.DynamoDB
                     new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error reading silo entry for key {siloAddress.ToLongString()} from the table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.MembershipBase,
+                    exc,
+                    "Intermediate error reading silo entry for key {SiloAddress} from the table {TableName}",
+                    siloAddress.ToLongString(),
+                    this.options.TableName);
                 throw;
             }
         }
@@ -421,9 +429,11 @@ namespace Orleans.Clustering.DynamoDB
                         }
                         catch (Exception exc)
                         {
-                            this.logger.Error(ErrorCode.MembershipBase,
-                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.",
-                                exc);
+                            this.logger.LogError(
+                                (int)ErrorCode.MembershipBase,
+                                exc,
+                                "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {TableEntry}. Ignoring this entry.",
+                                tableEntry);
                         }
                     }
                 }
@@ -432,8 +442,11 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase,
-                    $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.", exc);
+                this.logger.LogError(
+                    (int)ErrorCode.MembershipBase,
+                    exc,
+                    "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Entries}.",
+                    Utils.EnumerableToString(entries, e => e.ToString()));
                 throw;
             }
         }
@@ -481,7 +494,7 @@ namespace Orleans.Clustering.DynamoDB
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
-                throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
+                throw new OrleansException($"SuspectingSilos.Length of {suspectingSilos.Count} as read from Azure table is not equal to SuspectingTimes.Length of {suspectingTimes.Count}");
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
@@ -568,7 +581,12 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
+                this.logger.LogError(
+                    (int)ErrorCode.MembershipBase,
+                    exc,
+                    "Unable to clean up defunct membership records on table {TableName} for ClusterId {ClusterId}",
+                    this.options.TableName,
+                    this.clusterId);
                 throw;
             }
         }

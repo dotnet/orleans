@@ -209,6 +209,15 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    public enum MyCustomEnum
+    {
+        None,
+        One,
+        Two,
+        Three
+    }
+
+    [GenerateSerializer]
     [WellKnownId(3201)]
     public class SomeClassWithSerializers
     {
@@ -217,8 +226,13 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1)] public int IntField;
 
+        [Id(2)]
+        public object OtherObject { get; set; }
+
+        [NonSerialized]
         public int UnmarkedField;
 
+        [field: NonSerialized]
         public int UnmarkedProperty { get; set; }
 
         public override string ToString() => $"{nameof(IntField)}: {IntField}, {nameof(IntProperty)}: {IntProperty}";
