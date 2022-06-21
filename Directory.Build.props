@@ -73,6 +73,7 @@
     <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
     <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
+    <MicrosoftNetTestSdkVersion>15.0.0</MicrosoftNetTestSdkVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>6.0.1</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationVersion>6.0.0</MicrosoftExtensionsConfigurationVersion>
