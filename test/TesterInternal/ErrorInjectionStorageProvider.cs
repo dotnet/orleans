@@ -101,12 +101,12 @@ namespace UnitTests.StorageTests
         public void SetErrorInjection(ErrorInjectionBehavior errorInject)
         {
             ErrorInjection = errorInject;
-            logger.Info(0, "Set ErrorInjection to {0}", ErrorInjection);
+            logger.LogInformation("Set ErrorInjection to {ErrorInjection}", ErrorInjection);
         }
         
         public async override Task Close()
         {
-            logger.Info(0, "Close ErrorInjection={0}", ErrorInjection);
+            logger.LogInformation("Close ErrorInjection={ErrorInjection}", ErrorInjection);
             try
             {
                 SetErrorInjection(ErrorInjectionBehavior.None);
@@ -121,7 +121,7 @@ namespace UnitTests.StorageTests
 
         public async override Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
-            logger.Info(0, "ReadStateAsync for {0} {1} ErrorInjection={2}", grainType, grainReference, ErrorInjection);
+            logger.LogInformation( "ReadStateAsync for {GrainType} {GrainId} ErrorInjection={ErrorInjection}", grainType, grainReference?.GrainId, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeRead);
@@ -137,7 +137,7 @@ namespace UnitTests.StorageTests
 
         public async override Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
-            logger.Info(0, "WriteStateAsync for {grainType} {grainReference} ErrorInjection={errorInjection}", grainType, grainReference, ErrorInjection);
+            logger.LogInformation("WriteStateAsync for {GrainType} {GrainReference} ErrorInjection={ErrorInjection}", grainType, grainReference, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeWrite);

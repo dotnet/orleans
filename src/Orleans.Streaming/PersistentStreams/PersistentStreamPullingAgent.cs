@@ -151,7 +151,7 @@ namespace Orleans.Streams
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
 
-            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {0} under my responsibility.", QueueId.ToStringWithHashCode());
+            logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {Queue} under my responsibility.", QueueId.ToStringWithHashCode());
         }
 
         public async Task Shutdown()
