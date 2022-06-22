@@ -54,7 +54,7 @@ namespace Orleans.Transactions
             var info = TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartWrite {info}");
+                logger.LogTrace("StartWrite {Info}", info);
 
             if (info.IsReadOnly)
             {
@@ -112,7 +112,11 @@ namespace Orleans.Transactions
                     finally
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
+                            logger.LogTrace(
+                                "EndWrite {Info} {TransactionId} {Timestamp}",
+                                info,
+                                record.TransactionId,
+                                record.Timestamp);
 
                         detectReentrancy = false;
                     }

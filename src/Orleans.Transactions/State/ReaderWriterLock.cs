@@ -130,9 +130,9 @@ namespace Orleans.Transactions.State
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
                     if (group == currentGroup)
-                        logger.Trace($"enter-lock {transactionId} fc={group.FillCount}");
+                        logger.LogTrace("Enter-lock {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
                     else
-                        logger.Trace($"enter-lock-queue {transactionId} fc={group.FillCount}");
+                        logger.LogTrace("Enter-lock-queue {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
                 }
             }
 
@@ -352,7 +352,7 @@ namespace Orleans.Transactions.State
                                     expiredWaiters.Add(kvp.Key);
 
                                     if (logger.IsEnabled(LogLevel.Trace))
-                                        logger.Trace($"expire-lock-waiter {kvp.Key}");
+                                        logger.LogTrace("Expire-lock-waiter {Key}", kvp.Key);
                                 }
                             }
 
@@ -366,9 +366,12 @@ namespace Orleans.Transactions.State
 
                             if (logger.IsEnabled(LogLevel.Trace))
                             {
-                                logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                                logger.LogTrace(
+                                    "Lock group size={Count} deadline={Deadline}",
+                                    currentGroup.Count,
+                                    currentGroup.Deadline is { } deadline ? deadline.ToString("O") : "none");
                                 foreach (var kvp in currentGroup)
-                                    logger.Trace($"enter-lock {kvp.Key}");
+                                    logger.LogTrace("Enter-lock {Key}", kvp.Key);
                             }
 
                             // execute all the read and update tasks

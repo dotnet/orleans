@@ -9,17 +9,6 @@ namespace Orleans.Runtime
     public static class OrleansLoggerExtension
     {
         /// <summary>
-        /// Writes a log entry at the Verbose2 severity level.
-        /// Verbose2 is lower than Verbose.
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="message">The log message.</param>
-        public static void Trace(this ILogger logger, string message)
-        {
-            logger.LogTrace(message);
-        }
-
-        /// <summary>
         /// Writes a log entry at the Information Level
         /// </summary>
         /// <param name="logger">Target logger.</param>

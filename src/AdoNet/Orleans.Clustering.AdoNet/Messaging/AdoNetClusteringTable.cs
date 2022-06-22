@@ -72,7 +72,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<MembershipTableData> ReadAll()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetClusteringTable.ReadAll called.");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.ReadAll called.");
             try
             {
                 return await orleansQueries.MembershipReadAllAsync(this.clusterId);                

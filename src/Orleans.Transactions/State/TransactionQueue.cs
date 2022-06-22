@@ -77,7 +77,7 @@ namespace Orleans.Transactions.State
             try
             {
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.Trace($"start two-phase-commit {record.TransactionId} {record.Timestamp:o}");
+                    logger.LogTrace("Start two-phase-commit {TransactionId} {Timestamp}", record.TransactionId, record.Timestamp.ToString("O"));
 
                 commitQueue.Add(record);
 
@@ -357,7 +357,7 @@ namespace Orleans.Transactions.State
         public async Task NotifyOfConfirm(Guid transactionId, DateTime timeStamp)
         {
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"NotifyOfConfirm: {transactionId} {timeStamp}");
+                logger.LogTrace("NotifyOfConfirm: {TransactionId} {TimeStamp}", transactionId, timeStamp);
 
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
@@ -601,7 +601,7 @@ namespace Orleans.Transactions.State
                         this.stableState = lastCommittedEntry.State;
                         this.stableSequenceNumber = lastCommittedEntry.SequenceNumber;
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"Stable state version: {this.stableSequenceNumber}");
+                            logger.LogTrace("Stable state version: {StableSequenceNumber}", stableSequenceNumber);
 
                         // remove committed entries from commit queue
                         commitQueue.RemoveFromFront(committableEntries);
@@ -810,7 +810,10 @@ namespace Orleans.Transactions.State
             {
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.Trace($"locally committed {entry.TransactionId} {entry.Timestamp:o}");
+                    this.logger.LogTrace(
+                        "Locally committed {TransactionId} {Timestamp}",
+                        entry.TransactionId,
+                        entry.Timestamp.ToString("O"));
                 }
                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
             });
@@ -822,7 +825,10 @@ namespace Orleans.Transactions.State
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace))
                     {
-                        this.logger.Trace($"Adding confirmation to worker for {entry.TransactionId} {entry.Timestamp:o}");
+                        this.logger.LogTrace(
+                            "Adding confirmation to worker for {TransactionId} {Timestamp}",
+                            entry.TransactionId,
+                            entry.Timestamp.ToString("O"));
                     }
                     this.confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
                 });

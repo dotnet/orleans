@@ -47,7 +47,7 @@ namespace Orleans.Transactions
             transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds.ToString("f2")} prepare {transactionInfo}");
+                logger.LogTrace("{ElapsedMilliseconds} prepare {TransactionInfo}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo);
 
             if (transactionInfo.Participants.Count == 0)
             {
@@ -135,13 +135,23 @@ namespace Orleans.Transactions
                 catch (Exception ex)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug("{TotalMilliseconds} failure aborting {TransactionId} CommitReadOnly", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
-                    this.logger.LogWarning(ex, "Failed to abort readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                        logger.LogDebug(
+                            ex,
+                            "{TotalMilliseconds} failure aborting {TransactionId} CommitReadOnly",
+                            stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                            transactionInfo.TransactionId);
+                    this.logger.LogWarning(
+                        ex,
+                        "Failed to abort readonly transaction {TransactionId}",
+                        transactionInfo.TransactionId);
                 }
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds.ToString("f2")} finish (reads only) {transactionInfo.TransactionId}");
+                logger.LogTrace(
+                    "{ElapsedMilliseconds} finish (reads only) {TransactionId}",
+                    transactionInfo.TransactionId,
+                    stopwatch.Elapsed.TotalMilliseconds.ToString("f2"));
 
             return (status, exception);
         }
@@ -221,7 +231,7 @@ namespace Orleans.Transactions
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
+                logger.LogTrace("Abort {TransactionInfo} {Participants}", transactionInfo, string.Join(",", participants.Select(p => p.ToString())));
 
             // send one-way abort messages to release the locks and roll back any updates
             await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
