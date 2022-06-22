@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -294,7 +295,7 @@ namespace UnitTests.General
             Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
             foreach (var pair in statuses)
             {
-                logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                logger.LogInformation("       ######## Silo {SiloAddress}, status: {Status}", pair.Key, pair.Value);
                 Assert.Equal(
                     SiloStatus.Active,
                     pair.Value);

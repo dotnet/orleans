@@ -51,7 +51,7 @@ namespace UnitTests.Grains
             staticCounter++;
             counter++;
             int tmpCounter = counter;
-            Logger().Info("IncrCounter {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("IncrCounter {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             return Task.FromResult(counter);
         }
 
@@ -104,11 +104,11 @@ namespace UnitTests.Grains
             staticCounter++;
             counter++;
             int tmpCounter = counter;
-            Logger().Info("Start TimerCallback {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("Start TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             await Task.Delay(delayPeriod);
-            Logger().Info("After first delay TimerCallback {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("After first delay TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             await Task.Delay(delayPeriod);
-            Logger().Info("After second delay TimerCallback {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("After second delay TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
         }
     }
 
@@ -131,7 +131,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
+                .CreateLogger($"CollectionTestGrain {GrainId} {_grainContext.ActivationId} on {RuntimeIdentity}.");
             logger.LogInformation("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;
@@ -147,9 +147,9 @@ namespace UnitTests.Grains
         {
             staticCounter++;
             int tmpCounter = counter++;
-            Logger().Info("Reentrant:IncrCounter BEFORE Delay {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("Reentrant:IncrCounter BEFORE Delay {Count}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
-            Logger().Info("Reentrant:IncrCounter AFTER Delay {0}, staticCounter {1}.", tmpCounter, staticCounter);
+            Logger().LogInformation("Reentrant:IncrCounter AFTER Delay {Count}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             return counter;
         }
     }

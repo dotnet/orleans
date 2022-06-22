@@ -88,7 +88,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.LogInformation("-----------------------------------------------------------------");
-            logger.Info("Test finished OK. Expected per silo = {0}", expected);
+            logger.LogInformation("Test finished OK. Expected per silo = {Expected}", expected);
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[runtimes[1]], expected, stopLeavy);
 
             logger.LogInformation("-----------------------------------------------------------------");
-            logger.Info("Test finished OK. Expected per silo = {0}", expected);
+            logger.LogInformation("Test finished OK. Expected per silo = {Expected}", expected);
         }
 
         /// <summary>
@@ -225,7 +225,7 @@ namespace UnitTests.General
             string assertMsg)
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            logger.Info("********************** Starting the test {0} ******************************", name);
+            logger.LogInformation("********************** Starting the test {Name} ******************************", name);
             var taintedSilo = this.HostedCluster.StartAdditionalSilo();
 
             const long sampleSize = 10;
@@ -251,7 +251,7 @@ namespace UnitTests.General
             finally
             {
                 // i don't know if this necessary but to be safe, i'll restore the silo's desirability.
-                logger.Info("********************** Finalizing the test {0} ******************************", name);
+                logger.LogInformation("********************** Finalizing the test {Name} ******************************", name);
                 restore(taintedGrain).Wait();
             }
 

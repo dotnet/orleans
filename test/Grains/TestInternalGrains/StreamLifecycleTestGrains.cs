@@ -186,7 +186,7 @@ namespace UnitTests.Grains
                 if (State.ConsumerSubscriptionHandles.Count > 0)
                 {
                     var handles = State.ConsumerSubscriptionHandles.ToArray();
-                    logger.Info("ReconnectConsumerHandles SubscriptionHandles={0} Grain={1}", Utils.EnumerableToString(handles), this.AsReference<IStreamLifecycleConsumerGrain>());
+                    logger.LogInformation("ReconnectConsumerHandles SubscriptionHandles={Handles} Grain={Grain}", Utils.EnumerableToString(handles), this.AsReference<IStreamLifecycleConsumerGrain>());
                     foreach (var handle in handles)
                     {
                         var observer = new MyStreamObserver<int>(this.logger);
@@ -197,7 +197,7 @@ namespace UnitTests.Grains
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not conected to stream yet.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not connected to stream yet.");
             }
         }
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -423,7 +423,7 @@ namespace UnitTests.Grains
         {
             if (logger != null)
             {
-                logger.Info("Receive OnCompletedAsync - Total Items={0} Errors={1}", NumItems, NumErrors);
+                logger.LogInformation("Receive OnCompletedAsync - Total Items={ItemCount} Errors={ErrorCount}", NumItems, NumErrors);
             }
             return Task.CompletedTask;
         }

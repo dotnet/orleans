@@ -132,7 +132,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
+            logger.LogInformation("InitializeMembershipTable {TryInitTableVersion}.", tryInitTableVersion);
             return Task.CompletedTask;
         }
 

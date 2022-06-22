@@ -109,7 +109,7 @@ namespace Orleans.Runtime.ConsistentRing
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.Info("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                log.LogInformation("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
             }
         }
 
@@ -118,7 +118,8 @@ namespace Orleans.Runtime.ConsistentRing
             lock (membershipRingList)
             {
                 if (membershipRingList.Count == 1)
-                    return Utils.EnumerableToString(membershipRingList, silo => String.Format("{0} -> {1}", silo.ToStringWithHashCode(), RangeFactory.CreateFullRange()));
+                    return Utils.EnumerableToString(membershipRingList, silo =>
+                        $"{silo.ToStringWithHashCode()} -> {RangeFactory.CreateFullRange()}");
 
                 var sb = new StringBuilder("[");
                 for (int i = 0; i < membershipRingList.Count; i++)
@@ -168,7 +169,12 @@ namespace Orleans.Runtime.ConsistentRing
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                 }
-                log.Info("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
+
+                log.LogInformation(
+                    "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
+                    silo,
+                    silo.GetConsistentHashCode(),
+                    this.ToString());
             }
         }
 
@@ -193,7 +199,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            log.Info("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
+            log.LogInformation("NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}", old, now, increased);
             IRingRangeListener[] copy;
             lock (statusListeners)
             {

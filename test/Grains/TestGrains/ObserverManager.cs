@@ -269,9 +269,9 @@ namespace UnitTests.Grains
             }
 
             // Remove defunct observers.
-            if (defunct != default(List<TAddress>) && defunct.Count > 0)
+            if (defunct is { Count: > 0 })
             {
-                this.log.Info(this.logPrefix + ": Removing {0} defunct observers entries.", defunct.Count);
+                this.log.LogInformation("{LogPrefix}: Removing {Count} defunct observers entries.", logPrefix, defunct.Count);
                 foreach (var observer in defunct)
                 {
                     this.observers.TryRemove(observer, out _);

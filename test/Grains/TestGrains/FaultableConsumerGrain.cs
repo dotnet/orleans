@@ -97,7 +97,7 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync(int item, StreamSequenceToken token = null)
         {
-            logger.Info("OnNextAsync(item={0}, token={1})", item, token != null ? token.ToString() : "null");
+            logger.LogInformation("OnNextAsync(item={Item}, token={Token})", item, token != null ? token.ToString() : "null");
             if (failPeriodTimer == null)
             {
                 eventsConsumedCount++;
@@ -124,7 +124,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync(Exception ex)
         {
-            logger.Info("OnErrorAsync({0})", ex);
+            logger.LogInformation(ex, "OnErrorAsync()");
             errorsCount++;
             return Task.CompletedTask;
         }

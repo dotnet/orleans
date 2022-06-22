@@ -285,7 +285,7 @@ namespace UnitTests.Grains
 
             if (0 >= count)
                 throw new ArgumentOutOfRangeException("count", "The count must be greater than zero.");
-            _logger.Info("ProducerObserver.ProduceParallelSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProduceParallelSeries: streamId={StreamId}, num items to produce={Count}.", _streamId, count);
             _expectedItemsProduced += count;
             var tasks = new Task<bool>[count];
             for (var i = 1; i <= count; ++i)
@@ -293,7 +293,7 @@ namespace UnitTests.Grains
                 int capture = i;
                 Func<Task<bool>> func = async () =>
                     {
-                        return await ProduceItem(String.Format("parallel#{0}", capture));
+                        return await ProduceItem($"parallel#{capture}");
                     };
                 // Need to call on different threads to force parallel execution.
                 tasks[capture - 1] = Task.Factory.StartNew(func).Unwrap();
@@ -314,7 +314,7 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
-            _logger.Info("ProducerObserver.ProducePeriodicSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProducePeriodicSeries: streamId={StreamId}, num items to produce={Count}.", _streamId, count);
             var timer = TimerState.NewTimer(createTimerFunc, ProduceItem, RemoveTimer, count);
             // we can't pass the TimerState object in as the argument-- it might be prematurely collected, so we root
             // it to this object via the _timers dictionary.
@@ -326,7 +326,7 @@ namespace UnitTests.Grains
 
         private void RemoveTimer(IDisposable handle)
         {
-            _logger.Info("ProducerObserver.RemoveTimer: streamId={0}.", _streamId);
+            _logger.LogInformation("ProducerObserver.RemoveTimer: streamId={StreamId}.", _streamId);
             if (handle == null)
                 throw new ArgumentNullException("handle");
             if (!_timers.Remove(handle))
@@ -398,14 +398,14 @@ namespace UnitTests.Grains
 
         public async Task VerifyFinished()
         {
-            _logger.Info("ProducerObserver.VerifyFinished: waiting for observer disposal; streamId={0}", _streamId);
+            _logger.LogInformation("ProducerObserver.VerifyFinished: waiting for observer disposal; streamId={StreamId}", _streamId);
             while (!_observerDisposedYet)
             {
                 await Task.Delay(1000);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
-            _logger.Info("ProducerObserver.VerifyFinished: observer disposed; streamId={0}", _streamId);
+            _logger.LogInformation("ProducerObserver.VerifyFinished: observer disposed; streamId={StreamId}", _streamId);
         }
 
         private class TimerState : IDisposable
@@ -926,7 +926,7 @@ namespace UnitTests.Grains
         {
             var activationId = RuntimeContext.Current.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ImplicitConsumerGrain1 " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("{0}.OnActivateAsync", GetType().FullName);
+            _logger.LogInformation("{Type}.OnActivateAsync", GetType().FullName);
             _observers = new Dictionary<string, IConsumerObserver>();
             // discuss: Note that we need to know the provider that will be used in advance. I think it would be beneficial if we specified the provider as an argument to ImplicitConsumerActivationAttribute.
 

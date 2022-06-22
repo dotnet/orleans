@@ -33,7 +33,7 @@ namespace UnitTests.Streaming
 
         private void Heading(string testName)
         {
-            logger.Info("\n\n************************ {0}_{1}_{2} ********************************* \n\n", streamProviderName, testNumber, testName);
+            logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
         }
 
         public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
@@ -67,7 +67,7 @@ namespace UnitTests.Streaming
 
             if (stopSiloFunc != null)
             {
-                logger.Info("\n\n\nAbout to stop silo  {0} \n\n", silo.SiloAddress);
+                logger.LogInformation("\n\n\nAbout to stop silo {SiloAddress} \n\n", silo.SiloAddress);
 
                 stopSiloFunc(silo);
 

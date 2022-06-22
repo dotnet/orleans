@@ -64,7 +64,7 @@ namespace UnitTests.Grains
 
             // update after send in case of error
             _numProducedItems++;
-            _logger.Info("Producer.SendEvent - TotalSent: ({0})", _numProducedItems);
+            _logger.LogInformation("Producer.SendEvent - TotalSent: {Count}", _numProducedItems);
         }
     }
 }

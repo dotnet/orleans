@@ -210,7 +210,7 @@ namespace Orleans.Runtime.GrainDirectory
                 catch (Exception exception)
                 {
                     if (this.logger.IsEnabled(LogLevel.Warning))
-                        this.logger.LogWarning($"Exception registering activations in {nameof(AcceptExistingRegistrations)}: {LogFormatter.PrintException(exception)}");
+                        this.logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
                     throw;
                 }
                 finally
@@ -379,13 +379,13 @@ namespace Orleans.Runtime.GrainDirectory
                         if (dequeueCount < MAX_OPERATION_DEQUEUE)
                         {
                             if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning($"{op.Name} failed, will be retried: {LogFormatter.PrintException(exception)}.");
+                                this.logger.LogWarning(exception, "{Operation} failed, will be retried", op.Name);
                             await Task.Delay(RetryDelay);
                         }
                         else
                         {
                             if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning($"{op.Name} failed, will NOT be retried: {LogFormatter.PrintException(exception)}");
+                                this.logger.LogWarning(exception, "{Operation} failed, will NOT be retried", op.Name);
                         }
                     }
                     if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)

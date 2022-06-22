@@ -544,7 +544,12 @@ namespace Orleans.Runtime.GrainDirectory
                 if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)address.GrainId.GetUniformHashCode());
-                    this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                    this.log.LogWarning(
+                        "RegisterAsync - It seems we are not the owner of activation {Address} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                        address,
+                        hash.ToString("X"),
+                        forwardAddress,
+                        hopCount);
                 }
             }
 
@@ -601,17 +606,21 @@ namespace Orleans.Runtime.GrainDirectory
                 InvalidateCacheEntry(address);
 
             // see if the owner is somewhere else (returns null if we are owner)
-            var forwardaddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
+            var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
 
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardaddress != null)
+            if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardaddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
-                this.log.LogWarning($"UnregisterAsync - It seems we are not the owner of activation {address}, trying to forward it to {forwardaddress} (hopCount={hopCount})");
+                forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
+                this.log.LogWarning(
+                    "UnregisterAsync - It seems we are not the owner of activation {Address}, trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                    address,
+                    forwardAddress,
+                    hopCount);
             }
 
-            if (forwardaddress == null)
+            if (forwardAddress == null)
             {
                 // we are the owner
                 UnregistrationsLocal.Increment();
@@ -622,7 +631,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 UnregistrationsRemoteSent.Increment();
                 // otherwise, notify the owner
-                await GetDirectoryReference(forwardaddress).UnregisterAsync(address, cause, hopCount + 1);
+                await GetDirectoryReference(forwardAddress).UnregisterAsync(address, cause, hopCount + 1);
             }
         }
 
@@ -679,7 +688,10 @@ namespace Orleans.Runtime.GrainDirectory
                 forwardlist = forwardlist2;
                 if (forwardlist != null)
                 {
-                    this.log.LogWarning($"RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {forwardlist.Count} silos (hopCount={hopCount})");
+                    this.log.LogWarning(
+                        "RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {Count} silos (hopCount={HopCount})",
+                        forwardlist.Count,
+                        hopCount);
                 }
             }
 
@@ -791,7 +803,12 @@ namespace Orleans.Runtime.GrainDirectory
                 if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)grainId.GetUniformHashCode());
-                    this.log.LogWarning($"LookupAsync - It seems we are not the owner of grain {grainId} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                    this.log.LogWarning(
+                        "LookupAsync - It seems we are not the owner of grain {GrainId} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                        grainId,
+                        hash.ToString("X"),
+                        forwardAddress,
+                        hopCount);
                 }
             }
 
@@ -847,7 +864,11 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
-                this.log.LogWarning($"DeleteGrainAsync - It seems we are not the owner of grain {grainId}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                this.log.LogWarning(
+                    "DeleteGrainAsync - It seems we are not the owner of grain {GrainId}, trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                    grainId,
+                    forwardAddress,
+                    hopCount);
             }
 
             if (forwardAddress == null)

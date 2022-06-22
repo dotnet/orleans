@@ -33,7 +33,7 @@ namespace UnitTests.Grains
 
         public Task SetA(int a)
         {
-            logger.Info("SetA={0}", a);
+            logger.LogInformation("SetA={A}", a);
             A = a;
             return Task.CompletedTask;
         }

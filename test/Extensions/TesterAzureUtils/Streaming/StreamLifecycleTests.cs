@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -305,7 +306,7 @@ namespace UnitTests.StreamingTests
         private async Task WaitForDeactivation()
         {
             var delay = TimeSpan.FromSeconds(1);
-            logger.Info("Waiting for {0} to allow time for grain deactivation to occur", delay);
+            logger.LogInformation("Waiting for {Delay} to allow time for grain deactivation to occur", delay);
             await Task.Delay(delay); // Allow time for Deactivate
             logger.LogInformation("Awake again.");
         }

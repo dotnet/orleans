@@ -68,7 +68,7 @@ namespace UnitTests.Grains
 
         public async Task DelayMethod(int milliseconds)
         {
-            logger.Info("DelayMethod {0}.", counter);
+            logger.LogInformation("DelayMethod {Counter}.", counter);
             counter++;
             await Task.Delay(TimeSpan.FromMilliseconds(milliseconds));
         }

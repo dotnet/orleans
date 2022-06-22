@@ -45,7 +45,7 @@ namespace UnitTests.Grains
         public Task SetLabel(string label)
         {
             this.label = label;
-            logger.Info("SetLabel {0} received", label);
+            logger.LogInformation("SetLabel {Label} received", label);
             return Task.CompletedTask;
         }
 

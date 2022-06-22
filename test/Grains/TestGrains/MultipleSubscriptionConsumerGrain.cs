@@ -158,11 +158,11 @@ namespace UnitTests.Grains
         {
             foreach(SequentialItem<int> item in items)
             {
-                logger.Info("Got next event {0} on handle {1}", item.Item, countCapture);
+                logger.LogInformation("Got next event {Item} on handle {Handle}", item.Item, countCapture);
                 var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
-                if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+                if (!string.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
                 {
-                    throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+                    throw new Exception($"Got the wrong RequestContext value {contextValue}.");
                 }
                 count.Increment();
             }
@@ -171,7 +171,7 @@ namespace UnitTests.Grains
 
         private Task OnError(Exception e, int countCapture, Counter error)
         {
-            logger.Info("Got exception {0} on handle {1}", e.ToString(), countCapture);
+            logger.LogInformation(e, "Got exception on handle {Handle}", countCapture);
             error.Increment();
             return Task.CompletedTask;
         }

@@ -264,7 +264,7 @@ namespace UnitTests.Grains
                 throw new Exception("LocalContentGrain was not correctly initialized during silo startup!");
             }
             object content = await localContentGrain.GetContent();
-            logger.Info("Received content = {0}", content);
+            logger.LogInformation("Received content = {Content}", content);
             return content;
         }
     }

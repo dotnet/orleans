@@ -59,9 +59,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     .GetService<IStreamSubscriptionManagerAdmin>()
                     .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
-            logger.Info(
-                "Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
-                "and PubSubType: {3}", Name, this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData,
+
+            logger.LogInformation(
+                "Initialized SimpleMessageStreamProvider with name {Name} and with property FireAndForgetDelivery: {FireAndForgetDelivery}, OptimizeForImmutableData: {OptimizeForImmutableData} "
+                + "and PubSubType: {PubSubType}",
+                Name,
+                this.options.FireAndForgetDelivery,
+                this.options.OptimizeForImmutableData,
                 this.options.PubSubType);
         }
 

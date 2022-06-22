@@ -76,7 +76,7 @@ namespace UnitTests.TimerTests
             }
             catch (Exception exc)
             {
-                log.Info("Couldn't remove {0}, as expected. Exception received = {1}", r1, exc);
+                log.LogInformation(exc, "Couldn't remove {Reminder}, as expected.", r1);
             }
 
             await grain.StopReminder(r2);
@@ -96,14 +96,14 @@ namespace UnitTests.TimerTests
         public async Task Test_Reminders_Basic_ListOps()
         {
             Guid id = Guid.NewGuid();
-            log.Info("Start Grain Id = {0}", id);
+            log.LogInformation("Start Grain Id = {GrainId}", id);
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(id);
             const int count = 5;
             Task<IGrainReminder>[] startReminderTasks = new Task<IGrainReminder>[count];
             for (int i = 0; i < count; i++)
             {
                 startReminderTasks[i] = grain.StartReminder(DR + "_" + i);
-                log.Info("Started {0}_{1}", DR, i);
+                log.LogInformation("Started {ReminderName}_{ReminderNumber}", DR, i);
             }
 
             await Task.WhenAll(startReminderTasks);
@@ -176,7 +176,7 @@ namespace UnitTests.TimerTests
             // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing 
             // functionality implemented on the LocalReminderService yet
             TimeSpan period = await g.GetReminderPeriod(DR);
-            this.log.Info("PerGrainMultiReminderTestChurn Period={0} Grain={1}", period, g);
+            this.log.LogInformation("PerGrainMultiReminderTestChurn Period={Period} Grain={Grain}", period, g);
 
             // Start Default Reminder
             //g.StartReminder(DR, file + "_" + DR).Wait();
@@ -230,7 +230,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            this.log.Info("PerGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.LogInformation("PerGrainFailureTest Period={Period} Grain={Grain}", period, grain);
 
             await grain.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
@@ -252,7 +252,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await g.GetReminderPeriod(DR);
 
-            this.log.Info("PerGrainMultiReminderTest Period={0} Grain={1}", period, g);
+            this.log.LogInformation("PerGrainMultiReminderTest Period={Period} Grain={Grain}", period, g);
 
             // Each reminder is started 2 periods after the previous reminder
             // once all reminders have been started, stop them every 2 periods
@@ -321,7 +321,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            this.log.Info("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.LogInformation("PerCopyGrainFailureTest Period={Period} Grain={Grain}", period, grain);
 
             await grain.StartReminder(DR);
             await Task.Delay(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
@@ -418,7 +418,7 @@ namespace UnitTests.TimerTests
 
             if (ex is ReminderException)
             {
-                this.log.Info("Retriable operation failed on attempt {0}: {1}", i, ex.ToString());
+                this.log.LogInformation(ex, "Retryable operation failed on attempt {Attempt}", i);
                 await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
                 return true;
             }

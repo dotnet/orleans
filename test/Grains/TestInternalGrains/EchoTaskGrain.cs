@@ -163,10 +163,10 @@ namespace UnitTests.Grains
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
-            logger.Info("Sending Ping to remote silo {0}", siloAddress);
+            logger.LogInformation("Sending Ping to remote silo {SiloAddress}", siloAddress);
 
             await GetSiloControlReference(siloAddress).Ping("PingOtherSilo-" + siloAddress);
-            logger.Info("Ping reply received for {0}", siloAddress);
+            logger.LogInformation("Ping reply received for {SiloAddress}", siloAddress);
         }
 
         public async Task PingClusterMemberAsync()
@@ -178,12 +178,12 @@ namespace UnitTests.Grains
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
-            logger.Info("Sending Ping to remote silo {0}", siloAddress);
+            logger.LogInformation("Sending Ping to remote silo {SiloAddress}", siloAddress);
 
             var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, siloAddress);
 
             await oracle.Ping(1);
-            logger.Info("Ping reply received for {0}", siloAddress);
+            logger.LogInformation("Ping reply received for {SiloAddress}", siloAddress);
         }
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)

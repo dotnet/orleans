@@ -53,14 +53,14 @@ namespace UnitTests.Grains
 
         public async Task DoLongAction(TimeSpan timespan, string str)
         {
-            logger.Info("DoLongAction {0} received", str);
+            logger.LogInformation("DoLongAction {String} received", str);
             await Task.Delay(timespan);
         }
 
         public Task SetLabel(string label)
         {
             this.label = label;
-            logger.Info("SetLabel {0} received", label);
+            logger.LogInformation("SetLabel {Label} received", label);
             return Task.CompletedTask;
         }
 
@@ -86,14 +86,14 @@ namespace UnitTests.Grains
             var task = Task.Factory.StartNew(() =>
             {
                 bar1 = (string) RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar1);
+                logger.LogInformation("bar = {Bar}.", bar1);
             });
 
             string bar2 = null;
             var ac = Task.Factory.StartNew(() =>
             {
                 bar2 = (string) RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar2);
+                logger.LogInformation("bar = {Bar}.", bar2);
             });
 
             await Task.WhenAll(task, ac);

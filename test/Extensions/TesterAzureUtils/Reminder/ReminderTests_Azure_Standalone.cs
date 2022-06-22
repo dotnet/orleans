@@ -120,7 +120,7 @@ namespace Tester.AzureUtils.TimerTests
             }
             catch (Exception exc)
             {
-                this.log.Info("Exception caught {0}", exc);
+                this.log.LogInformation(exc, "Exception caught {0}");
             }
             TimeSpan dur = DateTime.UtcNow - startedAt;
             this.log.LogInformation(

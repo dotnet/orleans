@@ -842,9 +842,9 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.Info("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.Info("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
         }
 
         private void CheckRuntimeEnvironment()
@@ -981,9 +981,9 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.Info("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.Info("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+            logger.LogInformation("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
         }
 
         private void CheckRuntimeEnvironment(string str)
@@ -1073,14 +1073,14 @@ namespace UnitTests.Grains
         public Task<int> GetValue()
         {
             var val = State.Field1;
-            logger.Info("GetValue {0}", val);
+            logger.LogInformation("GetValue {Value}", val);
             return Task.FromResult(val);
         }
 
         public Task SetValue(int val)
         {
             State.Field1 = val;
-            logger.Info("SetValue {0}", val);
+            logger.LogInformation("SetValue {Value}", val);
             return WriteStateAsync();
         }
     }

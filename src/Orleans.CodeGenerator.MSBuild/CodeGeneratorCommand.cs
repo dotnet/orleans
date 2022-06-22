@@ -137,15 +137,20 @@ namespace Orleans.CodeGenerator.MSBuild
                 var generator = new CodeGenerator(compilation, codeGeneratorOptions);
                 stopwatch.Restart();
                 var syntax = generator.GenerateCode(cancellationToken);
-                Log.LogInformation($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
+                Log.LogInformation(
+                    "GenerateCode completed in {ElapsedMilliseconds}ms.",
+                    stopwatch.ElapsedMilliseconds);
                 stopwatch.Restart();
                 
                 var normalized = syntax.NormalizeWhitespace();
-                Log.LogInformation($"NormalizeWhitespace completed in {stopwatch.ElapsedMilliseconds}ms.");
+                Log.LogInformation("NormalizeWhitespace completed in {ElapsedMilliseconds}ms.",
+                    stopwatch.ElapsedMilliseconds);
                 stopwatch.Restart();
 
                 var source = normalized.ToFullString();
-                Log.LogInformation($"Generate source from syntax completed in {stopwatch.ElapsedMilliseconds}ms.");
+                Log.LogInformation(
+                    "Generate source from syntax completed in {ElapsedMilliseconds}ms.",
+                    stopwatch.ElapsedMilliseconds);
                 stopwatch.Restart();
                 using (var sourceWriter = new StreamWriter(CodeGenOutputFile))
                 {
@@ -167,7 +172,10 @@ namespace Orleans.CodeGenerator.MSBuild
 
                     sourceWriter.WriteLine("#endif");
                 }
-                Log.LogInformation($"Write source to disk completed in {stopwatch.ElapsedMilliseconds}ms.");
+
+                Log.LogInformation(
+                    "Write source to disk completed in {ElapsedMilliseconds}ms.",
+                    stopwatch.ElapsedMilliseconds);
 
                 return true;
             }

@@ -63,7 +63,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public Task<int> GetNumberProduced()
         {
-            logger.Info("GetNumberProduced {0}", numProducedItems);
+            logger.LogInformation("GetNumberProduced {Count}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
 
@@ -100,7 +100,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
             numProducedItems++;
             await ProducerOnNextAsync(this.producer);
-            logger.Info("{0} (item={1})", caller, numProducedItems);
+            logger.LogInformation("{Caller} (item={Item})", caller, numProducedItems);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)

@@ -83,7 +83,7 @@ namespace UnitTests.MembershipTests
 
             SiloHandle silo2KillHandle = this.HostedCluster.Silos[silo2Kill];
 
-            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
+            logger.LogInformation("\n\n\n\nAbout to kill {Endpoint}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
                 await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
@@ -164,14 +164,14 @@ namespace UnitTests.MembershipTests
             }
             catch (Exception exc)
             {
-                logger.Info("Exception making grain call: {0}", exc);
+                logger.LogInformation(exc, "Exception making grain call");
                 throw;
             }
         }
 
         private async Task LogGrainIdentity(ILogger logger, ILivenessTestGrain grain)
         {
-            logger.Info("Grain {0}, activation {1} on {2}",
+            logger.LogInformation("Grain {Grain}, activation {Activation} on {Host}",
                 await grain.GetGrainReference(),
                 await grain.GetUniqueId(),
                 await grain.GetRuntimeInstanceId());

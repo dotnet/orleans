@@ -148,7 +148,7 @@ namespace Orleans.Runtime
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
-            logger.Info("DetailedGrainReport for grain id {0}", grainId);
+            logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
             return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
         }
 

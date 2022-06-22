@@ -21,7 +21,7 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            hostingGrain.logger.Info("OnNextAsync(item={0}, token={1})", item, token != null ? token.ToString() : "null");
+            hostingGrain.logger.LogInformation("OnNextAsync(item={Item}, token={Token})", item, token != null ? token.ToString() : "null");
             hostingGrain.numConsumedItems++;
             return Task.CompletedTask;
         }
@@ -34,7 +34,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync(Exception ex)
         {
-            hostingGrain.logger.Info("OnErrorAsync({0})", ex);
+            hostingGrain.logger.LogInformation(ex, "OnErrorAsync()", ex);
             return Task.CompletedTask;
         }
     }
@@ -85,7 +85,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberProduced()
         {
-            logger.Info("GetNumberProduced {0}", numProducedItems);
+            logger.LogInformation("GetNumberProduced {Count}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
 
@@ -110,7 +110,7 @@ namespace UnitTests.Grains
             RequestContext.Set(RequestContextKey, RequestContextValue);
             await producer.OnNextAsync(numProducedItems);
             numProducedItems++;
-            logger.Info("{0} (item={1})", caller, numProducedItems);
+            logger.LogInformation("{Caller} (item count={Count})", caller, numProducedItems);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -218,7 +218,7 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync( int item, StreamSequenceToken token = null )
         {
-            logger.Info( "OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null" );
+            logger.LogInformation( "OnNextAsync({Item}{Token})", item, token != null ? token.ToString() : "null" );
             numConsumedItems++;
             return Task.CompletedTask;
         }
@@ -231,7 +231,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync( Exception ex )
         {
-            logger.Info( "OnErrorAsync({0})", ex );
+            logger.LogInformation(ex,  "OnErrorAsync()", ex );
             return Task.CompletedTask;
         }
 
