@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -525,6 +526,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (runTask is null)
                 {
+                    using var suppressExecutionContext = new ExecutionContextSuppressor();
                     this.runTask = this.RunAsync();
                 }
                 else

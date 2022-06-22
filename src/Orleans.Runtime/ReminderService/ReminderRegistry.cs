@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Services;
 using Orleans.Timers;
 
@@ -96,6 +97,7 @@ namespace Orleans.Runtime.ReminderService
         public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
             this.EnsureReminderServiceRegistered();
+
             var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
             return GetGrainService(callingGrainId).GetReminders(callingGrainReference);
         }

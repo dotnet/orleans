@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime
 {
@@ -19,25 +20,9 @@ namespace Orleans.Runtime
             }
 
             // Don't capture the current ExecutionContext and its AsyncLocals onto the timer
-            bool restoreFlow = false;
-            try
-            {
-                if (!ExecutionContext.IsFlowSuppressed())
-                {
-                    ExecutionContext.SuppressFlow();
-                    restoreFlow = true;
-                }
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
 
-                return new Timer(callback, state, dueTime, period);
-            }
-            finally
-            {
-                // Restore the current ExecutionContext
-                if (restoreFlow)
-                {
-                    ExecutionContext.RestoreFlow();
-                }
-            }
+            return new Timer(callback, state, dueTime, period);
         }
     }
 }
