@@ -419,11 +419,11 @@ namespace Orleans.Messaging
             
             if (msg.Direction != Message.Directions.Request)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {Message}. Reason = {Reason}", msg, reason);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {Message}. Reason = {Reason}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);

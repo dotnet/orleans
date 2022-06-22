@@ -87,7 +87,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
             this.logger = logger;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Creating timer {Name} with dueTime={DueTime} period={period}", GetFullName(), due, period);
 
             timer = NonCapturingTimer.Create(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }

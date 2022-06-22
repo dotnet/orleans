@@ -1445,7 +1445,12 @@ namespace Orleans.Runtime
                 try
                 {
                     // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                        _shared.Logger.LogDebug(
+                            (int)ErrorCode.Catalog_BeforeCallingDeactivate,
+                            "About to call {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                            this,
+                            GrainInstance?.GetType().FullName);
 
                     // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
                     try
@@ -1462,7 +1467,12 @@ namespace Orleans.Runtime
                             await Lifecycle.OnStop(ct).WithCancellation(ct, "Timed out waiting for grain lifecycle to complete deactivation");
                         }
 
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            _shared.Logger.LogDebug(
+                                (int)ErrorCode.Catalog_AfterCallingDeactivate,
+                                "Returned from calling {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                                this,
+                                GrainInstance?.GetType().FullName);
                     }
                     catch (Exception exc)
                     {

@@ -314,13 +314,14 @@ namespace Orleans.Messaging
                 lastRefreshTime = now;
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(ErrorCode.GatewayManager_FoundKnownGateways,
-                            "Refreshed the live gateway list. Found {0} gateways from gateway list provider: {1}. Picked only known live out of them. Now has {2} live gateways: {3}. Previous refresh time was = {4}",
-                            knownGateways.Count,
-                            Utils.EnumerableToString(knownGateways),
-                            cachedLiveGateways.Count,
-                            Utils.EnumerableToString(cachedLiveGateways),
-                            prevRefresh);
+                    logger.LogDebug(
+                        (int)ErrorCode.GatewayManager_FoundKnownGateways,
+                        "Refreshed the live gateway list. Found {KnownGatewayCount} gateways from gateway list provider: {KnownGateways}. Picked only known live out of them. Now has {LiveGatewayCount} live gateways: {LiveGateways}. Previous refresh time was = {PreviousRefreshTime}",
+                        knownGateways.Count,
+                        Utils.EnumerableToString(knownGateways),
+                        cachedLiveGateways.Count,
+                        Utils.EnumerableToString(cachedLiveGateways),
+                        prevRefresh);
                 }
 
                 // Close connections to known dead connections, but keep the "masked" ones.
