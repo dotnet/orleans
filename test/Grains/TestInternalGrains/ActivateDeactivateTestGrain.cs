@@ -265,9 +265,8 @@ namespace UnitTests.Grains
                     }
                     catch (Exception exc)
                     {
-                        var msg = "RecordActivateCall failed with error " + exc;
-                        logger.Error(0, msg);
-                        Assert.True(false, msg);
+                        logger.LogError(exc, "RecordActivateCall failed");
+                        Assert.True(false, "RecordActivateCall failed with error " + exc);
                     }
 
                     Assert.True(doingActivate, "Doing Activate 2");

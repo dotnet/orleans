@@ -165,7 +165,7 @@ namespace Orleans.Transactions.State
             }
             catch (Exception exception)
             {
-                logger.Error(666, $"transaction abort due to internal error in {nameof(EnqueueCommit)}: ", exception);
+                logger.LogError(exception, $"Transaction abort due to internal error in {nameof(EnqueueCommit)}", exception);
                 await NotifyOfAbort(record, TransactionalStatus.UnknownException, exception);
             }
         }
@@ -183,7 +183,7 @@ namespace Orleans.Transactions.State
 
                 if (localEntry.Role != CommitRole.LocalCommit)
                 {
-                    logger.Error(666, $"transaction abort due to internal error in {nameof(NotifyOfPrepared)}: Wrong commit type");
+                    logger.LogError($"Transaction abort due to internal error in {nameof(NotifyOfPrepared)}: Wrong commit type");
                     throw new InvalidOperationException($"Wrong commit type: {localEntry.Role}");
                 }
 
@@ -369,7 +369,7 @@ namespace Orleans.Transactions.State
 
             if (remoteEntry.Role != CommitRole.RemoteCommit)
             {
-                logger.Error(666, $"internal error in {nameof(NotifyOfConfirm)}: wrong commit type");
+                logger.LogError($"Internal error in {nameof(NotifyOfConfirm)}: wrong commit type");
                 throw new InvalidOperationException($"Wrong commit type: {remoteEntry.Role}");
             }
 

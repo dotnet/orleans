@@ -300,7 +300,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task UpdateStatus(SiloStatus status)
         {
-            string errorString = null;
+            bool wasThrownLocally = false;
             int numCalls = 0;
             
             try
@@ -308,7 +308,7 @@ namespace Orleans.Runtime.MembershipService
                 Func<int, Task<bool>> updateMyStatusTask = async counter =>
                 {
                     numCalls++;
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to try to TryUpdateMyStatusGlobalOnce #{0}", counter);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to try to TryUpdateMyStatusGlobalOnce #{Attempt}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
                 };
                 
@@ -332,7 +332,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (ok)
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Silo {0} Successfully updated my Status in the Membership table to {1}", myAddress, status);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Silo {SiloAddress} Successfully updated my Status in the membership table to {Status}", myAddress, status);
 
                     var gossipTask = this.GossipToOthers(this.myAddress, status);
                     gossipTask.Ignore();
@@ -357,21 +357,26 @@ namespace Orleans.Runtime.MembershipService
                 }
                 else
                 {
-                    errorString = $"-Silo {myAddress} failed to update its status to {status} in the Membership table due to write contention on the table after {numCalls} attempts.";
-                    log.Error(ErrorCode.MembershipFailedToWriteConditional, errorString);
-                    throw new OrleansException(errorString);
+                    wasThrownLocally = true;
+                    log.LogError(
+                        (int)ErrorCode.MembershipFailedToWriteConditional,
+                        "Silo {MyAddress} failed to update its status to {Status} in the membership table due to write contention on the table after {NumCalls} attempts.",
+                        myAddress,
+                        status,
+                        numCalls);
+                    throw new OrleansException($"Silo {myAddress} failed to update its status to {status} in the membership table due to write contention on the table after {numCalls} attempts.");
                 }
             }
-            catch (Exception exc) 
+            catch (Exception exc)  when (!wasThrownLocally)
             {
-                if (errorString == null)
-                {
-                    errorString = $"-Silo {this.myAddress} failed to update its status to {status} in the table due to failures (socket failures or table read/write failures) after {numCalls} attempts: {exc.Message}";
-                    log.Error(ErrorCode.MembershipFailedToWrite, errorString);
-                    throw new OrleansException(errorString, exc);
-                }
-
-                throw;
+                log.LogError(
+                    (int)ErrorCode.MembershipFailedToWrite,
+                    exc,
+                    "Silo {MyAddress} failed to update its status to {Status} in the table due to failures (socket failures or table read/write failures) after {NumCalls} attempts",
+                    myAddress,
+                    status,
+                    numCalls);
+                throw new OrleansException($"Silo {myAddress} failed to update its status to {status} in the table due to failures (socket failures or table read/write failures) after {numCalls} attempts", exc);
             }
         }
 
@@ -462,7 +467,7 @@ namespace Orleans.Runtime.MembershipService
         private void ProcessTableUpdate(MembershipTableData table, string caller)
         {
             if (table is null) throw new ArgumentNullException(nameof(table));
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug(nameof(ProcessTableUpdate) + " (called from {Caller}) membership table {Table}", caller, table.ToString());
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table {{Table}}", caller, table.ToString());
 
             // Update the current membership snapshot.
             var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
@@ -474,9 +479,9 @@ namespace Orleans.Runtime.MembershipService
 
                 if (this.log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.Debug(
+                    this.log.LogDebug(
                         (int)ErrorCode.MembershipReadAll_2,
-                        nameof(ProcessTableUpdate) + " (called from {Caller}) membership table: {Table}",
+                        $"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table: {{Table}}",
                         caller,
                         table.WithoutDuplicateDeads().ToString());
                 }
@@ -576,10 +581,9 @@ namespace Orleans.Runtime.MembershipService
 
         private void KillMyselfLocally(string reason)
         {
-            var msg = "I have been told I am dead, so this silo will stop! " + reason;
-            log.Error(ErrorCode.MembershipKillMyselfLocally, msg);
+            log.LogError((int)ErrorCode.MembershipKillMyselfLocally, "I have been told I am dead, so this silo will stop! Reason: {Reason}", reason);
             this.CurrentStatus = SiloStatus.Dead;
-            this.fatalErrorHandler.OnFatalException(this, msg, null);
+            this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
         }
 
         private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)
@@ -670,7 +674,7 @@ namespace Orleans.Runtime.MembershipService
             var table = await membershipTableProvider.ReadAll();
             var now = GetDateTimeUtcNow();
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill: Read Membership table {0}", table.ToString());
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("TryToSuspectOrKill: Read Membership table {Table}", table.ToString());
 
             if (this.IsStopping)
             {
@@ -684,28 +688,34 @@ namespace Orleans.Runtime.MembershipService
             var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
             if (localSiloEntry.Status == SiloStatus.Dead)
             {
-                var msg = string.Format("I should be Dead according to membership table (in TryToSuspectOrKill): entry = {0}.", localSiloEntry.ToFullString(full: true));
-                log.Warn(ErrorCode.MembershipFoundMyselfDead3, msg);
-                KillMyselfLocally(msg);
+                var localSiloEntryDetails = localSiloEntry.ToFullString(full: true);
+                log.LogWarning(
+                    (int)ErrorCode.MembershipFoundMyselfDead3,
+                    "I should be Dead according to membership table (in TryToSuspectOrKill): entry = {Entry}.",
+                    localSiloEntryDetails);
+                KillMyselfLocally($"I should be Dead according to membership table (in TryToSuspectOrKill): entry = {localSiloEntryDetails}.");
                 return true;
             }
 
             if (!table.Contains(silo))
             {
                 // this should not happen ...
-                var str = string.Format("-Could not find silo entry for silo {0} in the table.", silo);
-                log.Error(ErrorCode.MembershipFailedToReadSilo, str);
-                throw new KeyNotFoundException(str);
+                log.LogError((int)ErrorCode.MembershipFailedToReadSilo, "Could not find silo entry for silo {Silo} in the table.", silo);
+                throw new KeyNotFoundException($"Could not find silo entry for silo {silo} in the table.");
             }
 
             var tuple = table.Get(silo);
             var entry = tuple.Item1.Copy();
             string eTag = tuple.Item2;
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
-                entry.SiloAddress, // First
-                entry.SiloAddress, // Second
-                entry.Status, 
-                entry.ToFullString());
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                log.LogDebug(
+                    "TryToSuspectOrKill {SiloAddress}: The current status of {SiloAddress} in the table is {Status}, its entry is {Entry}",
+                    entry.SiloAddress, // First
+                    entry.SiloAddress, // Second
+                    entry.Status,
+                    entry.ToFullString());
+            }
 
             // Check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
@@ -717,14 +727,18 @@ namespace Orleans.Runtime.MembershipService
             // Get all valid (non-expired) votes
             var freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("-Current number of fresh Voters for {0} is {1}", silo, freshVotes.Count.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Current number of fresh voters for {SiloAddress} is {FreshVotes}", silo, freshVotes.Count.ToString());
 
             if (freshVotes.Count >= this.clusterMembershipOptions.NumVotesForDeathDeclaration)
             {
                 // this should not happen ...
-                var str = string.Format("-Silo {0} is suspected by {1} which is more or equal than {2}, but is not marked as dead. This is a bug!!!",
-                    entry.SiloAddress, freshVotes.Count.ToString(), this.clusterMembershipOptions.NumVotesForDeathDeclaration.ToString());
-                log.Error(ErrorCode.Runtime_Error_100053, str);
+                log.LogError(
+                    (int)ErrorCode.Runtime_Error_100053,
+                    "Silo {SiloAddress} is suspected by {SuspectorCount} which is more or equal than {NumVotesForDeathDeclaration}, but is not marked as dead. This is a bug!!!",
+                    entry.SiloAddress,
+                    freshVotes.Count.ToString(),
+                    this.clusterMembershipOptions.NumVotesForDeathDeclaration.ToString());
+
                 KillMyselfLocally("Found a bug! Will stop.");
                 return false;
             }
@@ -743,19 +757,22 @@ namespace Orleans.Runtime.MembershipService
                 int myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
 
                 // Kick this silo off
-                log.Info(ErrorCode.MembershipMarkingAsDead,
-                    "-Going to mark silo {0} as DEAD in the table #1. This silo is the last voter: #FreshVotes={1}, MyVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
-                            entry.SiloAddress,
-                            freshVotes.Count,
-                            myVoteIndex,
-                            this.clusterMembershipOptions.NumVotesForDeathDeclaration,
-                            activeSilos,
-                            PrintSuspectList(entry.SuspectTimes));
+                log.LogInformation(
+                    (int)ErrorCode.MembershipMarkingAsDead,
+                    "Going to mark silo {SiloAddress} as DEAD in the table #1. This silo is the last voter: #FreshVotes={FreshVotes}, MyVoteIndex = {MyVoteIndex}, NumVotesForDeathDeclaration={NumVotesForDeathDeclaration} , #ActiveSilos={ActiveSiloCount}, suspect list={SuspectingSilos}",
+                    entry.SiloAddress,
+                    freshVotes.Count,
+                    myVoteIndex,
+                    this.clusterMembershipOptions.NumVotesForDeathDeclaration,
+                    activeSilos,
+                    PrintSuspectList(entry.SuspectTimes));
+
                 return await DeclareDead(entry, eTag, table.Version, now);
             }
 
-            log.Info(ErrorCode.MembershipVotingForKill,
-                "-Putting my vote to mark silo {0} as DEAD #2. Previous suspect list is {1}, trying to update to {2}, eTag={3}, freshVotes is {4}",
+            log.LogInformation(
+                (int)ErrorCode.MembershipVotingForKill,
+                "Putting my vote to mark silo {SiloAddress} as DEAD #2. Previous suspect list is {PreviousSuspectors}, trying to update to {Suspectors}, ETag={ETag}, FreshVotes is {FreshVotes}",
                 entry.SiloAddress, 
                 PrintSuspectList(prevList), 
                 PrintSuspectList(entry.SuspectTimes),
@@ -791,12 +808,12 @@ namespace Orleans.Runtime.MembershipService
                 // Add the killer (myself) to the suspect list, for easier diagnosis later on.
                 entry.AddSuspector(myAddress, time);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to DeclareDead silo {0} in the table. About to write entry {1}.", entry.SiloAddress, entry.ToFullString());
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to DeclareDead silo {SiloAddress} in the table. About to write entry {Entry}.", entry.SiloAddress, entry.ToFullString());
                 entry.Status = SiloStatus.Dead;
                 bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
                 if (ok)
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Successfully updated {0} status to Dead in the Membership table.", entry.SiloAddress);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Successfully updated {SiloAddress} status to Dead in the membership table.", entry.SiloAddress);
 
                     var table = await membershipTableProvider.ReadAll();
                     this.ProcessTableUpdate(table, "DeclareDead");
@@ -804,11 +821,14 @@ namespace Orleans.Runtime.MembershipService
                     return true;
                 }
                 
-                log.Info(ErrorCode.MembershipMarkDeadWriteFailed, "-Failed to update {0} status to Dead in the Membership table, due to write conflicts. Will retry.", entry.SiloAddress);
+                log.LogInformation(
+                    (int)ErrorCode.MembershipMarkDeadWriteFailed,
+                    "Failed to update {SiloAddress} status to Dead in the membership table, due to write conflicts. Will retry.",
+                    entry.SiloAddress);
                 return false;
             }
             
-            log.Info(ErrorCode.MembershipCantWriteLivenessDisabled, "-Want to mark silo {0} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
+            log.LogInformation((int)ErrorCode.MembershipCantWriteLivenessDisabled, "Want to mark silo {SiloAddress} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
             return true;
         }
 

@@ -1459,13 +1459,21 @@ namespace Orleans.Runtime
                     }
                     catch (Exception exc)
                     {
-                        _shared.Logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                            string.Format("Error calling grain's OnDeactivateAsync(...) method - Grain type = {1} Activation = {0}", this, GrainInstance?.GetType().FullName), exc);
+                        _shared.Logger.LogError(
+                            (int)ErrorCode.Catalog_ErrorCallingDeactivate,
+                            exc,
+                            "Error calling grain's OnDeactivateAsync(...) method - Grain type = {GrainType} Activation = {Activation}",
+                            GrainInstance?.GetType().FullName,
+                            this);
                     }
                 }
                 catch (Exception exc)
                 {
-                    _shared.Logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, string.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", this), exc);
+                    _shared.Logger.LogError(
+                        (int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception,
+                        exc,
+                        "CallGrainDeactivateAndCleanupStreams Activation = {Activation} failed.",
+                        this);
                 }
             }
         }

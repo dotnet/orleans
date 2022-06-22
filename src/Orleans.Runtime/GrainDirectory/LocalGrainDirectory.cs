@@ -268,8 +268,11 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 catch (Exception exc)
                 {
-                    log.Error(ErrorCode.Directory_SiloStatusChangeNotification_Exception,
-                        String.Format("CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {0}.", silo.ToStringWithHashCode()), exc);
+                    log.LogError(
+                        (int)ErrorCode.Directory_SiloStatusChangeNotification_Exception,
+                        exc,
+                        "CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {Silo}.",
+                        silo.ToStringWithHashCode());
                 }
 
                 var existing = this.directoryMembership;
@@ -289,7 +292,7 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalDirectory(silo, dead: true);
                 AdjustLocalCache(silo, dead: true);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} removed silo {1}", MyAddress, silo);
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Silo {LocalSilo} removed silo {OtherSilo}", MyAddress, silo);
             }
         }
 

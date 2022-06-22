@@ -1,4 +1,4 @@
-﻿using Amazon.Runtime;
+using Amazon.Runtime;
 using Amazon.SQS;
 using Orleans.Runtime;
 using System;
@@ -233,11 +233,8 @@ namespace OrleansAWSUtils.Storage
 
         private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
         {
-            var errMsg = String.Format(
-                "Error doing {0} for SQS queue {1} " + Environment.NewLine
-                + "Exception = {2}", operation, QueueName, exc);
-            Logger.Error(errorCode, errMsg, exc);
-            throw new AggregateException(errMsg, exc);
+            Logger.LogError((int)errorCode, exc, "Error doing {Operation} for SQS queue {QueueName}", operation, QueueName);
+            throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
         }
     }
 }

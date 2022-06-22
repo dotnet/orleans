@@ -186,7 +186,10 @@ namespace Orleans.Storage
             }
             catch(Exception ex)
             {
-                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderDeleteError, LogString("Error clearing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.LogError(
+                    (int)RelationalStorageProviderCodes.RelationalProviderDeleteError,
+                    ex,
+                    LogString("Error clearing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
                 throw;
             }
 
@@ -226,7 +229,7 @@ namespace Orleans.Storage
                 if(choice.Deserializer == null)
                 {
                     var errorString = LogString("No deserializer found", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString());
-                    logger.Error((int)RelationalStorageProviderCodes.RelationalProviderNoDeserializer, errorString);
+                    logger.LogError((int)RelationalStorageProviderCodes.RelationalProviderNoDeserializer, errorString);
                     throw new InvalidOperationException(errorString);
                 }
 
@@ -327,7 +330,10 @@ namespace Orleans.Storage
             }
             catch(Exception ex)
             {
-                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderReadError, LogString("Error reading grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.LogError(
+                    (int)RelationalStorageProviderCodes.RelationalProviderReadError,
+                    ex,
+                    LogString("Error reading grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
                 throw;
             }
         }
@@ -373,7 +379,10 @@ namespace Orleans.Storage
             }
             catch(Exception ex)
             {
-                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderWriteError, LogString("Error writing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.LogError(
+                    (int)RelationalStorageProviderCodes.RelationalProviderWriteError,
+                    ex,
+                    LogString("Error writing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
                 throw;
             }
 
@@ -470,12 +479,10 @@ namespace Orleans.Storage
         /// <param name="version">The grain version.</param>
         /// <param name="normalizedGrainType">Grain type without generics information.</param>
         /// <param name="grainId">The grain ID.</param>
-        /// <param name="exceptionMessage">An optional exception message information to log.</param>
         /// <returns>A log string to be printed.</returns>
-        private string LogString(string operationProlog, string serviceId, string providerName, string version, string normalizedGrainType, string grainId, string exceptionMessage = null)
+        private string LogString(string operationProlog, string serviceId, string providerName, string version, string normalizedGrainType, string grainId)
         {
-            const string Exception = " Exception=";
-            return $"{operationProlog}: ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={version}{(exceptionMessage != null ? Exception + exceptionMessage : string.Empty)}.";
+            return $"{operationProlog}: ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={version}.";
         }
 
 

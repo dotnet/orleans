@@ -131,9 +131,12 @@ namespace Orleans.Runtime.MembershipService
             if (myIndex < 0)
             {
                 // this should not happen ...
-                var error = string.Format("This silo {0} status {1} is not in its own local silo list! This is a bug!", self.SiloAddress.ToLongString(), self.Status);
-                log.Error(ErrorCode.Runtime_Error_100305, error);
-                throw new OrleansMissingMembershipEntryException(error);
+                log.LogError(
+                    (int)ErrorCode.Runtime_Error_100305,
+                    "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
+                    self.SiloAddress.ToLongString(),
+                    self.Status);
+                throw new OrleansMissingMembershipEntryException($"This silo {self.SiloAddress.ToLongString()} status {self.Status} is not in its own local silo list! This is a bug!");
             }
 
             // Go over every node excluding me,

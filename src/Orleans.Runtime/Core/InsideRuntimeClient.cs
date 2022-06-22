@@ -424,12 +424,12 @@ namespace Orleans.Runtime
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
-                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
+                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {Message}", message);
                     this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {Message}", message);
                 switch (message.RejectionType)
                 {
                     case Message.RejectionTypes.DuplicateRequest:
@@ -454,8 +454,10 @@ namespace Orleans.Runtime
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
                         return;
                     default:
-                        this.logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
-                            "Missing enum in switch: " + message.RejectionType);
+                        this.logger.LogError(
+                            (int)ErrorCode.Dispatcher_InvalidEnum_RejectionType,
+                            "Unsupported rejection type: {RejectionType}",
+                            message.RejectionType);
                         break;
                 }
             }
@@ -495,8 +497,10 @@ namespace Orleans.Runtime
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
-                    "No callback for response message: " + message);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    this.logger.LogDebug((int)ErrorCode.Dispatcher_NoCallbackForResp, "No callback for response message {Message}", message);
+                }
             }
         }
 
@@ -538,7 +542,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception e)
                     {
-                        this.logger.Warn(ErrorCode.IGC_DisposeError, "Exception while disposing: " + e.Message, e);
+                        this.logger.LogWarning((int)ErrorCode.IGC_DisposeError, e, $"Exception while disposing {nameof(InsideRuntimeClient)}");
                     }
                 }
             }
@@ -555,7 +559,10 @@ namespace Orleans.Runtime
             this.disposables.Add(this.callbackTimer);
 
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            this.logger.LogInformation(
+                (int)ErrorCode.SiloStartPerfMeasure,
+                "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
+                stopWatch.ElapsedMilliseconds);
             return Task.CompletedTask;
         }
 

@@ -80,53 +80,14 @@ namespace Orleans.Runtime
             logger.LogInformation(message);
         }
 
-        /// <summary>
-        /// Writes a log entry at the Debug logLevel
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">Format string of the log message with named parameters
-        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
-        /// </param>
-        /// <param name="args">Any arguments to the format string.</param>
-        public static void Debug(this ILogger logger, int logCode, string format, params object[] args)
-        {
-            logger.LogDebug(logCode, format, args);
-        }
-
         public static void Debug(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogDebug(new EventId((int)logCode), format, args);
         }
 
-        /// <summary>
-        /// Writes a log entry at the Debug logLevel
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="message">The log message.</param>
-        public static void Debug(this ILogger logger, int logCode, string message)
-        {
-            logger.LogDebug(logCode, message);
-        }
-
         public static void Debug(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogDebug(new EventId((int)logCode), message);
-        }
-
-        /// <summary>
-        /// Writes a log entry at the Trace logLevel
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">Format string of the log message with named parameters
-        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
-        /// </param>
-        /// <param name="args">Any arguments to the format string.</param>
-        public static void Trace(this ILogger logger, int logCode, string format, params object[] args)
-        {
-            logger.LogTrace(logCode, format, args);
         }
 
         public static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
@@ -143,11 +104,6 @@ namespace Orleans.Runtime
         public static void Trace(this ILogger logger, int logCode, string message)
         {
             logger.LogTrace(logCode, message);
-        }
-
-        public static void Trace(this ILogger logger, ErrorCode logCode, string message)
-        {
-            logger.LogTrace(new EventId((int)logCode), message);
         }
 
         /// <summary>
@@ -219,23 +175,6 @@ namespace Orleans.Runtime
         public static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
             logger.LogWarning(new EventId((int)logCode), exception, message);
-        }
-
-        /// <summary>
-        /// Writes a log entry at the Error level
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="message">The error message to log.</param>
-        /// <param name="exception">An exception related to the error, if any.</param>
-        public static void Error(this ILogger logger, int logCode, string message, Exception exception = null)
-        {
-            logger.LogError(logCode, exception, message);
-        }
-
-        public static void Error(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
-        {
-            logger.LogError(new EventId((int)logCode), exception, message);
         }
     }
 }

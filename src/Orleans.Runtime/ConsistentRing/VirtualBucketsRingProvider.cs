@@ -113,9 +113,14 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.CRP_Local_Subscriber_Exception,
-                        String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
-                        listener.GetType().FullName, old, now, increased), exc);
+                    logger.LogError(
+                        (int)ErrorCode.CRP_Local_Subscriber_Exception,
+                        exc,
+                        "Local IRangeChangeListener {Name} has thrown an exception when was notified about RangeChangeNotification about old {OldRange} new {NewRange} increased? {IsIncrease}",
+                        listener.GetType().FullName,
+                        old,
+                        now,
+                        increased);
                 }
             }
         }

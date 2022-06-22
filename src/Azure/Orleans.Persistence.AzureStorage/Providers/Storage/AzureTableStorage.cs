@@ -366,7 +366,7 @@ namespace Orleans.Storage
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
-                logger.Error(0, sb.ToString(), exc);
+                logger.LogError(exc, "{Message}", sb.ToString());
                 throw new AggregateException(sb.ToString(), exc);
             }
 

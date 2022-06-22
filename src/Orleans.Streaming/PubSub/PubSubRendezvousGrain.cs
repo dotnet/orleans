@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -114,7 +115,13 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterProducerFailed, $"Failed to register a stream producer.  Stream: {streamId}, Producer: {streamProducer}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_RegisterProducerFailed,
+                    exc,
+                    "Failed to register a stream producer. Stream: {StreamId}, Producer: {StreamProducer}",
+                    streamId,
+                    streamProducer);
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -141,8 +148,13 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_UnegisterProducerFailed,
-                    $"Failed to unregister a stream producer.  Stream: {streamId}, Producer: {streamProducer}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_UnegisterProducerFailed,
+                    exc,
+                    "Failed to unregister a stream producer. Stream: {StreamId}, Producer: {StreamProducer}",
+                    streamId,
+                    streamProducer);
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -180,8 +192,14 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterConsumerFailed,
-                    $"Failed to register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_RegisterConsumerFailed,
+                    exc,
+                    "Failed to register a stream consumer. Stream: {StreamId}, SubscriptionId {SubscriptionId}, Consumer: {StreamConsumer}",
+                    streamId,
+                    subscriptionId,
+                    streamConsumer);
+                
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -225,13 +243,19 @@ namespace Orleans.Streams
 
                 if (exception != null)
                 {
-                    throw exception;
+                    ExceptionDispatchInfo.Capture(exception).Throw();
                 }
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_RegisterConsumerFailed,
-                    $"Failed to update producers while register a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}, Consumer: {streamConsumer}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_RegisterConsumerFailed,
+                    exc,
+                    "Failed to update producers while register a stream consumer. Stream: {StreamId}, SubscriptionId {SubscriptionId}, Consumer: {StreamConsumer}",
+                    streamId,
+                    subscriptionId,
+                    streamConsumer);
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -274,8 +298,13 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_UnregisterConsumerFailed,
-                    $"Failed to unregister a stream consumer.  Stream: {streamId}, SubscriptionId {subscriptionId}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_UnregisterConsumerFailed,
+                    exc,
+                    "Failed to unregister a stream consumer. Stream: {StreamId}, SubscriptionId {SubscriptionId}",
+                    streamId,
+                    subscriptionId);
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -314,7 +343,7 @@ namespace Orleans.Streams
                     numConsumers = State.Consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
-                logger.Info("{0}. Now have total of {1} producers and {2} consumers. All Consumers = {3}, All Producers = {4}",
+                logger.LogDebug("{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
                     when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
             }
         }
@@ -396,8 +425,12 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Stream_SetSubscriptionToFaultedFailed,
-                    $"Failed to set subscription state to faulted.  SubscriptionId {subscriptionId}", exc);
+                logger.LogError(
+                    (int)ErrorCode.Stream_SetSubscriptionToFaultedFailed,
+                    exc,
+                    "Failed to set subscription state to faulted. SubscriptionId {subscriptionId}",
+                    subscriptionId);
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;

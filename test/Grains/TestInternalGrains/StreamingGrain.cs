@@ -74,36 +74,38 @@ namespace UnitTests.Grains
         {
             if (!item.StreamId.Equals(_streamId))
             {
-                string excStr = String.Format("ConsumerObserver.OnNextAsync: received an item from the wrong stream." +
-                        " Got item {0} from stream = {1}, expecting stream = {2}, numConsumed={3}",
-                        item, item.StreamId, _streamId, _itemsConsumed);
-                _logger.Error(0, excStr);
-                throw new ArgumentException(excStr);
+                _logger.LogError(
+                    "ConsumerObserver.OnNextAsync: received an item from the wrong stream. Got item {Item} from stream = {StreamId}, expecting stream = {ExpectedStreamId}, numConsumed={ItemsConsumed}",
+                    item,
+                    item.StreamId,
+                    _streamId,
+                    _itemsConsumed);
+                throw new ArgumentException($"ConsumerObserver.OnNextAsync: received an item from the wrong stream. Got item {item} from stream = {item.StreamId}, expecting stream = {_streamId}, numConsumed={_itemsConsumed}");
             }
             ++_itemsConsumed;
 
-            string str = String.Format("ConsumerObserver.OnNextAsync: streamId={0}, item={1}, numConsumed={2}{3}",
-                _streamId, item.Data, _itemsConsumed, token != null ? ", token = " + token : "");
-            if (ProducerObserver.DEBUG_STREAMING_GRAINS)
-            {
-                _logger.Info(str);
-            }
-            else
-            {
-                _logger.Debug(str);
-            }
+            var logLevel = ProducerObserver.DEBUG_STREAMING_GRAINS ? LogLevel.Information : LogLevel.Debug;
+
+            _logger.Log(
+                logLevel,
+                "ConsumerObserver.OnNextAsync: StreamId: {StreamId}, Item: {Item}, NumConsumed: {ItemsConsumed}, Token: {Token}",
+                _streamId,
+                item.Data,
+                _itemsConsumed,
+                token != null ? ", token = " + token : "");
+
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            _logger.Info("ConsumerObserver.OnCompletedAsync");
+            _logger.LogInformation("ConsumerObserver.OnCompletedAsync");
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            _logger.Info("ConsumerObserver.OnErrorAsync: ex={0}", ex);
+            _logger.LogInformation(ex, "ConsumerObserver.OnErrorAsync");
             return Task.CompletedTask;
         }
 
@@ -111,7 +113,10 @@ namespace UnitTests.Grains
         {
             _logger.Info("BecomeConsumer");
             if (ProviderName != null)
-                throw new InvalidOperationException("redundant call to BecomeConsumer");
+            {
+                throw new InvalidOperationException("Redundant call to BecomeConsumer");
+            }                
+
             _streamId = streamId;
             ProviderName = streamProvider.Name;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
@@ -123,14 +128,14 @@ namespace UnitTests.Grains
         public async Task RenewConsumer(ILogger logger, IStreamProvider streamProvider)
         {
             _logger = logger;
-            _logger.Info("RenewConsumer");
+            _logger.LogInformation("RenewConsumer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
             _subscription = await stream.SubscribeAsync(this);
         }
 
         public async Task StopBeingConsumer(IStreamProvider streamProvider)
         {
-            _logger.Info("StopBeingConsumer");
+            _logger.LogInformation("StopBeingConsumer");
             if (_subscription != null)
             {
                 await _subscription.UnsubscribeAsync();
@@ -210,12 +215,12 @@ namespace UnitTests.Grains
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
+                _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
+                _logger.LogInformation("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
                 observerAsSMSProducer.OnDisposeTestHook +=
                     () =>
                         _observerDisposedYet = true;
@@ -230,7 +235,7 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             _logger = logger;
-            _logger.Info("RenewProducer");
+            _logger.LogInformation("RenewProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
             _observer = stream;
             var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
@@ -257,15 +262,8 @@ namespace UnitTests.Grains
             StreamItem item = new StreamItem(data, _streamId);
             await _observer.OnNextAsync(item);
             _itemsProduced++;
-            string str = String.Format("ProducerObserver.ProduceItem: streamId={0}, data={1}, numProduced so far={2}.", _streamId, data, _itemsProduced);
-            if (DEBUG_STREAMING_GRAINS)
-            {
-                _logger.Info(str);
-            }
-            else
-            {
-                _logger.Debug(str);
-            }
+            var logLevel = DEBUG_STREAMING_GRAINS ? LogLevel.Information : LogLevel.Debug;
+            _logger.Log(logLevel, "ProducerObserver.ProduceItem: StreamId: {StreamId}, Data: {Data}, NumProduced so far: {ItemsProduced}.", _streamId, data, _itemsProduced);
             return true;
         }
 
@@ -276,7 +274,7 @@ namespace UnitTests.Grains
             if (0 >= count)
                 throw new ArgumentOutOfRangeException("count", "The count must be greater than zero.");
             _expectedItemsProduced += count;
-            _logger.Info("ProducerObserver.ProduceSequentialSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProduceSequentialSeries: StreamId={StreamId}, num items to produce={Count}.", _streamId, count);
             for (var i = 1; i <= count; ++i)
                 await ProduceItem(String.Format("sequential#{0}", i));
         }
@@ -389,7 +387,7 @@ namespace UnitTests.Grains
                     }
                     catch (Exception exc)
                     {
-                        _logger.Error(1, "StopBeingProducer: Timer Dispose() has thrown", exc);
+                        _logger.LogError(exc, "StopBeingProducer: Timer Dispose() has thrown");
                     }
                 }
                 _timers = null;
