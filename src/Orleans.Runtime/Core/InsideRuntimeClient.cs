@@ -164,7 +164,11 @@ namespace Orleans.Runtime
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context is null && !oneWay)
             {
-                this.logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
+                this.logger.LogWarning(
+                    (int)ErrorCode.IGC_SendRequest_NullContext,
+                    "Null context {Message}: {StackTrace}",
+                    message,
+                    Utils.GetStackTrace());
             }
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))

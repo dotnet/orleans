@@ -737,8 +737,11 @@ namespace Orleans.Streams
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
             {
-                logger.Warn(ErrorCode.Stream_ConsumerIsDead,
-                    "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
+                logger.LogWarning(
+                    (int)ErrorCode.Stream_ConsumerIsDead,
+                    "Consumer {Consumer} on stream {StreamId} is no longer active - permanently removing Consumer.",
+                    consumerData.StreamConsumer,
+                    consumerData.StreamId);
                 pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId).Ignore();
                 return true;
             }
@@ -847,8 +850,13 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                var message = $"Ignoring exception while trying to evaluate subscription filter '{this.streamFilter.GetType().Name}' with data '{filterData}' on stream {streamId}";
-                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_13, message, exc);
+                logger.LogWarning(
+                    (int)ErrorCode.PersistentStreamPullingAgent_13,
+                    exc,
+                    "Ignoring exception while trying to evaluate subscription filter '{Filter}' with data '{FilterData}' on stream {StreamId}",
+                    this.streamFilter.GetType().Name,
+                    filterData,
+                    streamId);
             }
             return true;
         }

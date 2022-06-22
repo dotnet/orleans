@@ -116,7 +116,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC)
             {
-                logger.Warn((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
+                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
                 logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
             }
 
@@ -124,13 +124,22 @@ namespace Orleans.Runtime
             {
                 var highestLogLevel = logger.IsEnabled(LogLevel.Trace) ? nameof(LogLevel.Trace) : nameof(LogLevel.Debug);
                 logger.LogWarning(
-                    new EventId((int)ErrorCode.SiloGcWarning),
-                    $"A verbose logging level ({highestLogLevel}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.");
+                    (int)ErrorCode.SiloGcWarning,
+                    $"A verbose logging level ({{highestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.",
+                    highestLogLevel);
             }
 
-            logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
-                this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
+            logger.LogInformation(
+                (int)ErrorCode.SiloInitializing,
+                "-------------- Initializing silo on host {HostName} MachineName {MachineNAme} at {LocalEndpoint}, gen {Generation} --------------",
+                this.siloDetails.DnsHostName,
+                Environment.MachineName,
+                localEndpoint,
+                this.siloDetails.SiloAddress.Generation);
+            logger.LogInformation(
+                (int)ErrorCode.SiloInitConfig,
+                "Starting silo {SiloName}",
+                name);
 
             try
             {

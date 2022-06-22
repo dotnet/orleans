@@ -142,22 +142,5 @@ namespace Orleans.Runtime
         {
             logger.LogWarning(logCode, format, args);
         }
-
-        public static void Warn(this ILogger logger, ErrorCode logCode, string format, params object[] args)
-        {
-            logger.LogWarning(new EventId((int)logCode), format, args);
-        }
-
-        /// <summary>
-        /// Writes a log entry at the Warning level
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="message">The warning message to log.</param>
-        /// <param name="exception">An exception related to the warning, if any.</param>
-        public static void Warn(this ILogger logger, int logCode, string message, Exception exception = null)
-        {
-            logger.LogWarning(logCode, exception, message);
-        }
     }
 }

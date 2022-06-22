@@ -41,8 +41,11 @@ namespace Orleans.Runtime.Scheduler
             RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                    task.Id, task.Status);
+                logger.LogWarning(
+                    (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
+                    "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
+                    task.Id,
+                    task.Status);
             
             //  Consider adding ResetExecutionContext() or even better:
             //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
@@ -103,8 +106,11 @@ namespace Orleans.Runtime.Scheduler
             bool done = TryExecuteTask(task);
             if (!done)
             {
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete3, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                    task.Id, task.Status);
+                logger.LogWarning(
+                    (int)ErrorCode.SchedulerTaskExecuteIncomplete3,
+                    "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
+                    task.Id,
+                    task.Status);
             }
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);

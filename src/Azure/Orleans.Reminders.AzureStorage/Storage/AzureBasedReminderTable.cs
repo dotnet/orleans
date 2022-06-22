@@ -82,10 +82,12 @@ namespace Orleans.Runtime.ReminderService
                 string serviceIdStr = this.remTableManager.ServiceId;
                 if (!tableEntry.ServiceId.Equals(serviceIdStr))
                 {
-                    var error =
-                        $"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.";
-                    this.logger.Warn((int)AzureReminderErrorCode.AzureTable_ReadWrongReminder, error);
-                    throw new OrleansException(error);
+                    this.logger.LogWarning(
+                        (int)AzureReminderErrorCode.AzureTable_ReadWrongReminder,
+                        "Read a reminder entry for wrong Service id. Read {TableEntry}, but my service id is {ServiceId}. Going to discard it.",
+                        tableEntry,
+                        serviceIdStr);
+                    throw new OrleansException($"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.");
                 }
             }
         }

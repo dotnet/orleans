@@ -559,8 +559,12 @@ namespace Orleans.Runtime.MembershipService
                 // Temporal paradox - There is an older clone of this silo in the membership table
                 if (siloAddress.Generation < myAddress.Generation)
                 {
-                    log.Warn(ErrorCode.MembershipDetectedOlder, "Detected older version of myself - Marking other older clone as Dead -- Current Me={0} Older Me={1}, Old entry= {2}",
-                        myAddress, siloAddress, entry.ToFullString());
+                    log.LogWarning(
+                        (int)ErrorCode.MembershipDetectedOlder,
+                        "Detected older version of myself - Marking other older clone as Dead -- Current Me={LocalSiloAddress} Older Me={OlderSiloAddress}, Old entry={Entry}",
+                        myAddress,
+                        siloAddress,
+                        entry.ToFullString());
                     // Declare older clone of me as Dead.
                     silosToDeclareDead.Add(tuple);   //return DeclareDead(entry, eTag, tableVersion);
                 }

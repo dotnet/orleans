@@ -190,7 +190,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
+                this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
         }
@@ -206,7 +206,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
+                this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -279,13 +279,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.Warn(1, "OnActivateAsync");
+            this.logger.LogWarning("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.logger.Warn(1, "DoSomething");
+            this.logger.LogWarning("DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
