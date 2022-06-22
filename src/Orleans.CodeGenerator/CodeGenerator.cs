@@ -285,7 +285,7 @@ namespace Orleans.CodeGenerator
                             return false;
                         }
 
-                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute, inherited: true) != null)
+                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute) != null)
                         {
                             return true;
                         }

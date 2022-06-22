@@ -120,19 +120,11 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
-        private class SerializerBuilder : ISerializerBuilderImplementation
+        private class SerializerBuilder : ISerializerBuilder
         {
-            private readonly IServiceCollection _services;
+            public SerializerBuilder(IServiceCollection services) => Services = services;
 
-            public SerializerBuilder(IServiceCollection services) => _services = services;
-
-            public Dictionary<object, object> Properties { get; } = new();
-
-            public ISerializerBuilderImplementation ConfigureServices(Action<IServiceCollection> configureDelegate)
-            {
-                configureDelegate(_services);
-                return this;
-            }
+            public IServiceCollection Services { get; }
         }
 
         private sealed class ActivatorHolder<T> : IActivator<T>, IServiceHolder<IActivator<T>>

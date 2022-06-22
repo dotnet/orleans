@@ -21,6 +21,8 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.TestKit\Orleans.Serialization.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.NewtonsoftJson\Orleans.Serialization.NewtonsoftJson.csproj" />
   </ItemGroup>
 
 </Project>
