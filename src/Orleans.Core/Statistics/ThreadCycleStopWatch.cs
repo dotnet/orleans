@@ -87,8 +87,10 @@ namespace Orleans.Runtime
             else
             {
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.Trace(0,
-                        $"Invalid cycle counts startCycles = {startCycles}, stopCycles = {stopCycles}");
+                    logger.LogTrace(
+                        "Invalid cycle counts startCycles = {StartCycles}, stopCycles = {StopCycles}",
+                        startCycles,
+                        stopCycles);
 
                 // Some threadpool threads seem to be reset, this is normal with .NET threadpool threads as its assumed they are restart out of our control
                 elapsedCycles += stopCycles;
