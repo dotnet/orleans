@@ -173,7 +173,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
         public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");

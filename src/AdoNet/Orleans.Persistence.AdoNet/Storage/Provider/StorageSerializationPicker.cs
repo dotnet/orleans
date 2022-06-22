@@ -51,7 +51,7 @@ namespace Orleans.Storage
 
         /// <summary>
         /// Picks a deserializer using the given parameters.
-        /// <see cref="IStorageSerializationPicker.PickDeserializer"/>
+        /// <see cref="IStorageSerializationPicker.PickDeserializer{T}"/>
         /// </summary>
         public SerializationChoice PickDeserializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {
@@ -63,7 +63,7 @@ namespace Orleans.Storage
 
         /// <summary>
         /// Picks a serializer using the given parameters.
-        /// <see cref="IStorageSerializationPicker.PickSerializer"/>
+        /// <see cref="IStorageSerializationPicker.PickSerializer{T}"/>
         /// </summary>
         public SerializationChoice PickSerializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
         {

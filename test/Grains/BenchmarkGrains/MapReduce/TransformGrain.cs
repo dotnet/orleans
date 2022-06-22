@@ -83,10 +83,6 @@ namespace BenchmarkGrains.MapReduce
                     }
                 });
             }
-            else
-            {
-                throw new NotImplementedException();
-            }
 
             this._processingStarted = true;
         }
