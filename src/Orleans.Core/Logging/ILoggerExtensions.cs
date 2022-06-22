@@ -77,10 +77,5 @@ namespace Orleans.Runtime
         {
             logger.LogDebug(new EventId((int)logCode), message);
         }
-
-        public static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
-        {
-            logger.LogTrace(new EventId((int)logCode), format, args);
-        }
     }
 }

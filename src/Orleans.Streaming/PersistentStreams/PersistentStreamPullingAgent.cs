@@ -476,8 +476,13 @@ namespace Orleans.Streams
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
             numReadMessagesCounter.IncrementBy(multiBatch.Count);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
-                multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace(
+                    (int)ErrorCode.PersistentStreamPullingAgent_11,
+                    "Got {ReceivedCount} messages from queue {Queue}. So far {MessageCount} messages from this queue.",
+                    multiBatch.Count,
+                    myQueueId.ToStringWithHashCode(),
+                    numMessages);
 
             foreach (var group in
                 multiBatch

@@ -214,9 +214,9 @@ namespace Orleans.Messaging
 
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.Trace(
-                        ErrorCode.ProxyClient_QueueRequest,
-                        "Sending message {0} via gateway {1}",
+                    this.logger.LogTrace(
+                        (int)ErrorCode.ProxyClient_QueueRequest,
+                        "Sending message {Message} via gateway {Gateway}",
                         msg,
                         connection.RemoteEndPoint);
                 }
@@ -238,9 +238,9 @@ namespace Orleans.Messaging
 
                         if (this.logger.IsEnabled(LogLevel.Trace))
                         {
-                            this.logger.Trace(
-                                ErrorCode.ProxyClient_QueueRequest,
-                                "Sending message {0} via gateway {1}",
+                            this.logger.LogTrace(
+                                (int)ErrorCode.ProxyClient_QueueRequest,
+                                "Sending message {Message} via gateway {Gateway}",
                                 message,
                                 connection.RemoteEndPoint);
                         }

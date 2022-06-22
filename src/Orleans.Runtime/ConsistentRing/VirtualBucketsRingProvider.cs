@@ -97,7 +97,7 @@ namespace Orleans.Runtime.ConsistentRing
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace(ErrorCode.CRP_Notify, "-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old.ToString(), now.ToString(), increased);
+                logger.LogTrace((int)ErrorCode.CRP_Notify, "NotifyLocalRangeSubscribers about old {Old} new {New} increased? {IsIncrease}", old.ToString(), now.ToString(), increased);
             }
             
             IRingRangeListener[] copy;
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.ConsistentRing
                 var myNewRange = UpdateRange();
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace(ErrorCode.CRP_Added_Silo, "Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                    logger.LogTrace((int)ErrorCode.CRP_Added_Silo, "Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
                 }                
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
@@ -174,7 +174,7 @@ namespace Orleans.Runtime.ConsistentRing
 
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace(ErrorCode.CRP_Removed_Silo, "Removed Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                    logger.LogTrace((int)ErrorCode.CRP_Removed_Silo, "Removed Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
                 }
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);

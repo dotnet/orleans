@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Placement
             message.TargetActivation = activationId;
             message.TargetSilo = targetSilo;
 #if DEBUG
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace((int)ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {Message}", message);
 #endif
         }
 
