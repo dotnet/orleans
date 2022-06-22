@@ -1157,7 +1157,7 @@ namespace Orleans.Runtime
                 _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    _shared.Logger.Debug("InitActivation is done: {0}", Address);
+                    _shared.Logger.LogDebug("InitActivation is done: {Address}", Address);
                 }
             }
             catch (Exception exception)

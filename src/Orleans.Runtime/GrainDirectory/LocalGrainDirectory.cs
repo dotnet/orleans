@@ -253,7 +253,7 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalDirectory(silo, dead: false);
                 AdjustLocalCache(silo, dead: false);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} added silo {1}", MyAddress, silo);
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Silo {SiloAddress} added silo {OtherSiloAddress}", MyAddress, silo);
             }
         }
 
@@ -697,12 +697,19 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo = CalculateGrainDirectoryPartition(grain);
 
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} tries to lookup for {1}-->{2} ({3}-->{4})", MyAddress, grain, silo, grain.GetUniformHashCode(), silo?.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Debug))
+                log.LogDebug(
+                    "Silo {SiloAddress} tries to lookup for {Grain}-->{PartitionOwner} ({GrainHashCode}-->{PartitionOwnerHashCode})",
+                    MyAddress,
+                    grain,
+                    silo,
+                    grain.GetUniformHashCode(),
+                    silo?.GetConsistentHashCode());
 
             //this will only happen if I'm the only silo in the cluster and I'm shutting down
             if (silo == null)
             {
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {Grain}=null", grain);
                 result = new AddressAndTag();
                 return false;
             }

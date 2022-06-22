@@ -29,7 +29,7 @@ namespace Orleans.Runtime.ConsistentRing
             numBucketsPerSilo = numVirtualBuckets;
 
             if (numBucketsPerSilo <= 0)
-                throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + numBucketsPerSilo);
+                throw new IndexOutOfRangeException($"numBucketsPerSilo is out of the range. numBucketsPerSilo = {numBucketsPerSilo}");
 
             logger = loggerFactory.CreateLogger<VirtualBucketsRingProvider>();
 
@@ -39,12 +39,12 @@ namespace Orleans.Runtime.ConsistentRing
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug("Starting {0} on silo {1}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
+                logger.LogDebug("Starting {Name} on silo {SiloAddress}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
             }            
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             IntValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RINGSIZE, () => GetRingSize());
-            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => String.Format("x{0,8:X8}", ((IRingRangeInternal)myRange).RangeSize()));
+            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => $"x{((IRingRangeInternal)myRange).RangeSize(),8:X8}");
             FloatValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGPERCENTAGE, () => (float)((IRingRangeInternal)myRange).RangePercentage());
             FloatValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_AVERAGERINGPERCENTAGE, () =>
             {

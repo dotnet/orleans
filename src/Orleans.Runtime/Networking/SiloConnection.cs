@@ -125,8 +125,8 @@ namespace Orleans.Runtime.Messaging
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
-                    this.Log.Debug(
-                        "Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
+                    this.Log.LogDebug(
+                        "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}.",
                         msg.TargetSilo.ToLongString(),
                         this.LocalSiloAddress.ToLongString(),
                         msg);

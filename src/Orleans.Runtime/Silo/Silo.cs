@@ -261,7 +261,7 @@ namespace Orleans.Runtime
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)
             {
-                logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
+                logger.LogInformation("Creating reminder grain service for type {ReminderTableType}", reminderTable.GetType());
 
                 // Start the reminder service system target
                 var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
@@ -416,7 +416,9 @@ namespace Orleans.Runtime
             grainServices.Add(grainService);
 
             await grainService.QueueTask(() => grainService.Init(Services)).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-            logger.Info($"Grain Service {service.GetType().FullName} registered successfully.");
+            logger.LogInformation(
+                "Grain Service {GrainServiceType} registered successfully.",
+                service.GetType().FullName);
         }
 
         private async Task StartGrainService(IGrainService service)
@@ -424,7 +426,7 @@ namespace Orleans.Runtime
             var grainService = (GrainService)service;
 
             await grainService.QueueTask(grainService.Start).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-            logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
+            logger.LogInformation("Grain Service {GrainServiceType} started successfully.",service.GetType().FullName);
         }
 
         /// <summary>
@@ -658,7 +660,7 @@ namespace Orleans.Runtime
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(
+                    logger.LogDebug(
                         "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
                         grainService.GetType().FullName,
                         grainService.GetPrimaryKeyLong(out string ignored));

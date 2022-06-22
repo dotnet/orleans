@@ -112,7 +112,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task DeleteTopic()
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.Debug("Deleting Google PubSub topic: {0}", TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Deleting Google PubSub topic: {TopicId}", TopicName.TopicId);
             try
             {
                 await _publisher?.DeleteTopicAsync(TopicName);

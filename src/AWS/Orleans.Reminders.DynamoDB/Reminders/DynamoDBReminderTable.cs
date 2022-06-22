@@ -347,7 +347,7 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
 
                 await this.storage.PutEntryAsync(this.options.TableName, fields);
 

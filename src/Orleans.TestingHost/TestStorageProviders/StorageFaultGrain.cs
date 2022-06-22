@@ -34,7 +34,7 @@ namespace Orleans.TestingHost
         public Task AddFaultOnRead(GrainReference grainReference, Exception exception)
         {
             readFaults.Add(grainReference, exception);
-            logger.Info($"Added ReadState fault for {grainReference}.");
+            logger.LogInformation("Added ReadState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 
@@ -42,7 +42,7 @@ namespace Orleans.TestingHost
         public Task AddFaultOnWrite(GrainReference grainReference, Exception exception)
         {
             writeFaults.Add(grainReference, exception);
-            logger.Info($"Added WriteState fault for {grainReference}.");
+            logger.LogInformation("Added WriteState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 
@@ -50,7 +50,7 @@ namespace Orleans.TestingHost
         public Task AddFaultOnClear(GrainReference grainReference, Exception exception)
         {
             clearfaults.Add(grainReference, exception);
-            logger.Info($"Added ClearState fault for {grainReference}.");
+            logger.LogInformation("Added ClearState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 

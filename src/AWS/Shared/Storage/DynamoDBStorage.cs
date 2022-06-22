@@ -702,7 +702,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -751,7 +751,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -861,7 +861,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Put entries {TableName} table", tableName);
 
             if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
 
@@ -925,7 +925,10 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
+                if (Logger.IsEnabled(LogLevel.Debug))
+                    Logger.LogDebug(
+                        "Unable to find table entry for Keys = {Keys}",
+                        Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
                 throw;
             }
         }

@@ -401,7 +401,11 @@ namespace Orleans.Runtime.MembershipService
         {
             var table = await membershipTableProvider.ReadAll();
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryUpdateMyStatusGlobalOnce: Read{0} Membership table {1}", (newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from"), table.ToString());
+            if (log.IsEnabled(LogLevel.Debug))
+                log.LogDebug(
+                    "TryUpdateMyStatusGlobalOnce: Read{Selection} Membership table {Table}",
+                    (newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from"),
+                    table.ToString());
             LogMissedIAmAlives(table);
             var (myEntry, myEtag) = this.GetOrCreateLocalSiloEntry(table, newStatus);
 
@@ -553,8 +557,11 @@ namespace Orleans.Runtime.MembershipService
                     continue;
                 }
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Temporal anomaly detected in membership table -- Me={0} Other me={1}",
-                    myAddress, siloAddress);
+                if (log.IsEnabled(LogLevel.Debug))
+                    log.LogDebug(
+                        "Temporal anomaly detected in membership table -- Me={SiloAddress} Other me={OtherSiloAddress}",
+                        myAddress,
+                        siloAddress);
 
                 // Temporal paradox - There is an older clone of this silo in the membership table
                 if (siloAddress.Generation < myAddress.Generation)
@@ -585,7 +592,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (silosToDeclareDead.Count == 0) return true;
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("CleanupTableEntries: About to DeclareDead {0} outdated silos in the table: {1}", silosToDeclareDead.Count,
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("CleanupTableEntries: About to DeclareDead {Count} outdated silos in the table: {Silos}", silosToDeclareDead.Count,
                 Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1), entry => entry.ToString()));
 
             var result = true;

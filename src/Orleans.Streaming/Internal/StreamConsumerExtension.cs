@@ -62,7 +62,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{Grain} AddObserver for stream {StreamId}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
@@ -74,7 +74,7 @@ namespace Orleans.Streams
                 logger.LogError(
                     (int)ErrorCode.StreamProvider_AddObserverException,
                     exc,
-                    "{CurrentActivation} StreamConsumerExtension.AddObserver({StreamId}) caught exception.", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                    "{Grain} StreamConsumerExtension.AddObserver({StreamId}) caught exception.", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
                 throw;
             }
         }
@@ -119,7 +119,7 @@ namespace Orleans.Streams
 
             logger.LogWarning(
                 (int)ErrorCode.StreamProvider_NoStreamForItem,
-                "{CurrentActivation} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -154,7 +154,7 @@ namespace Orleans.Streams
 
             logger.LogWarning(
                 (int)ErrorCode.StreamProvider_NoStreamForBatch,
-                "{CurrentActivation} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -173,7 +173,7 @@ namespace Orleans.Streams
 
             logger.LogWarning(
                 (int)ErrorCode.StreamProvider_NoStreamForItem,
-                "{CurrentActivation} got a Complete for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                "{Grain} got a Complete for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -193,7 +193,7 @@ namespace Orleans.Streams
             logger.LogWarning(
                 (int)ErrorCode.StreamProvider_NoStreamForItem,
                 exc,
-                "{CurrentActivation} got an error for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                "{Grain} got an error for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 

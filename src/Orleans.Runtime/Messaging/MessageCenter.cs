@@ -380,7 +380,7 @@ namespace Orleans.Runtime.Messaging
 
         private void ResendMessageImpl(Message message, GrainAddress forwardingAddress = null)
         {
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Resend {0}", message);
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
 
             if (message.TargetGrain.IsSystemTarget())
             {
@@ -575,7 +575,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
             }
             else
             {

@@ -146,12 +146,12 @@ namespace Orleans.Runtime.ConsistentRing
                 int myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
-                    throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, this.ToString()));
+                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {this.ToString()}.");
 
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, this.ToString());
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left

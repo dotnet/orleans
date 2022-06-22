@@ -361,7 +361,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.Reset(): client Id {ClientId}", clientId);
                 }
             }, this.logger);
 
@@ -393,7 +393,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id {ClientId}", clientId);
                 }
             });
             

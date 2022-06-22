@@ -187,7 +187,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateIAmAlive entry = {0}", entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {Entry}", entry.ToFullString());
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }

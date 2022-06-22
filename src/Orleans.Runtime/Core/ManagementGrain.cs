@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Management
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics on {SiloAddresses}", Utils.EnumerableToString(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
             foreach (SiloAddress siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
@@ -307,7 +307,7 @@ namespace Orleans.Runtime.Management
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+                logger.LogDebug("Executing {Action} against {SiloAddresses}", actionToLog, Utils.EnumerableToString(silos.Keys));
             }
 
             var actionPromises = new List<Task<object>>();
