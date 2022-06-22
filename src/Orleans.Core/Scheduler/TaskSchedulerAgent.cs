@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
             Task.Run(() => this.StartAsync()).Ignore();
 
-            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Started asynch agent {Name}", this.Name);
         }
 
         private async Task StartAsync()
@@ -131,7 +131,7 @@ namespace Orleans.Runtime
 
             if (Log.IsEnabled(LogLevel.Debug))
             {
-                Log.LogDebug("Stopped agent");
+                LoggerExtensions.LogDebug(Log, "Stopped agent");
             }
         }
 

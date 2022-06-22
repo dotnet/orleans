@@ -47,13 +47,13 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (this.log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.LogDebug($"Membership table cleanup is disabled due to {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloCleanupPeriod)} not being specified");
+                    LoggerExtensions.LogDebug(this.log, $"Membership table cleanup is disabled due to {nameof(Orleans.Configuration.ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloCleanupPeriod)} not being specified");
                 }
 
                 return;
             }
 
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting membership table cleanup agent");
+            if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting membership table cleanup agent");
             try
             {
                 var period = this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
@@ -86,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped membership table cleanup agent");
+                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopped membership table cleanup agent");
             }
         }
 

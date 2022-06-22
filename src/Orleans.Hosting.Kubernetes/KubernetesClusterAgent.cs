@@ -257,7 +257,7 @@ namespace Orleans.Hosting.Kubernetes
                     {
                         if (_logger.IsEnabled(LogLevel.Debug))
                         {
-                            _logger.LogDebug("Unexpected end of stream from Kubernetes API. Will try again.");
+                            LoggerExtensions.LogDebug(_logger, "Unexpected end of stream from Kubernetes API. Will try again.");
                         }
 
                         await Task.Delay(5000);

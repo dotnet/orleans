@@ -176,7 +176,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Client table updated, publishing to successor");
+                    LoggerExtensions.LogDebug(_logger, "Client table updated, publishing to successor");
                 }
 
                 _schedulePublishUpdate();
@@ -185,7 +185,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Client table not updated");
+                    LoggerExtensions.LogDebug(_logger, "Client table not updated");
                 }
             }
 
@@ -448,7 +448,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Skipping publishing of routes because target silo already has them");
+                    LoggerExtensions.LogDebug(_logger, "Skipping publishing of routes because target silo already has them");
                 }
 
                 return;

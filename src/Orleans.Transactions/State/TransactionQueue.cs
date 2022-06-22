@@ -439,7 +439,13 @@ namespace Orleans.Transactions.State
             this.stableSequenceNumber = loadresponse.CommittedSequenceId;
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.Debug($"Load v{this.stableSequenceNumber} {loadresponse.PendingStates.Count}p {storageBatch.MetaData.CommitRecords.Count}c");
+            {
+                logger.LogDebug(
+                    "Load v{StableSequenceNumber} {PendingStatesCount}p {CommitRecordsCount}c",
+                    this.stableSequenceNumber,
+                    loadresponse.PendingStates.Count,
+                    storageBatch.MetaData.CommitRecords.Count);
+            }
 
             // ensure clock is consistent with loaded state
             this.Clock.Merge(storageBatch.MetaData.TimeStamp);
@@ -450,7 +456,7 @@ namespace Orleans.Transactions.State
                 if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager.Reference != null)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"recover two-phase-commit {pr.TransactionId}");
+                        logger.LogDebug("Recover two-phase-commit {TransactionId}", pr.TransactionId);
 
                     ParticipantId tm = pr.TransactionManager;
 
@@ -475,7 +481,9 @@ namespace Orleans.Transactions.State
             foreach (var kvp in storageBatch.MetaData.CommitRecords)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"recover commit confirmation {kvp.Key}");
+                    logger.LogDebug(
+                        "Recover commit confirmation {Key}",
+                        kvp.Key);
                 this.confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
             }
 
@@ -535,8 +543,12 @@ namespace Orleans.Transactions.State
 
                         if (logger.IsEnabled(LogLevel.Debug))
                         {
-                            var r = commitQueue.Count > committableEntries ? commitQueue[committableEntries].ToString() : "";
-                            logger.Debug($"batchcommit={committableEntries} leave={commitQueue.Count - committableEntries} {r}");
+                            var recordString = commitQueue.Count > committableEntries ? commitQueue[committableEntries].ToString() : "";
+                            logger.LogDebug(
+                                "BatchCommit: {CommittableEntries} Leave: {UncommittableEntries}, Record: {Record}",
+                                committableEntries,
+                                commitQueue.Count - committableEntries,
+                                recordString);
                         }
                     }
                     else
@@ -633,7 +645,7 @@ namespace Orleans.Transactions.State
             await Task.WhenAll(pending);
             if (++failCounter >= 10 || force)
             {
-                logger.Debug("StorageWorker triggering grain Deactivation");
+                logger.LogDebug("StorageWorker triggering grain Deactivation");
                 this.deactivate();
             }
             await this.Restore();

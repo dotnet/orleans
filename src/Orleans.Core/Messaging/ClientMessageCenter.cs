@@ -92,7 +92,7 @@ namespace Orleans.Messaging
             numMessages = 0;
             this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
                 () =>
@@ -116,7 +116,7 @@ namespace Orleans.Messaging
             }
 
             Running = true;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client started");
         }
 
         private async Task EstablishInitialConnection(CancellationToken cancellationToken)

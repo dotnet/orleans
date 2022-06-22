@@ -303,7 +303,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (partitionData.ContainsKey(pair.Key))
                     {
-                        if (log.IsEnabled(LogLevel.Debug)) log.Debug("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
+                        if (log.IsEnabled(LogLevel.Debug))
+                        {
+                            log.LogDebug("While merging two disjoint partitions, same grain {GrainId} was found in both partitions", pair.Key);
+                        }
+
                         var activationToDrop = partitionData[pair.Key].Merge(pair.Value);
                         if (activationToDrop == null) continue;
 

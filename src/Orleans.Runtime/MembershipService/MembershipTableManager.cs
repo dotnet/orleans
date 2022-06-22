@@ -235,7 +235,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task PeriodicallyRefreshMembershipTable()
         {
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership table refreshes");
+            if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting periodic membership table refreshes");
             try
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
@@ -270,7 +270,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping periodic membership table refreshes");
+                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopping periodic membership table refreshes");
             }
         }
 
@@ -550,11 +550,14 @@ namespace Orleans.Runtime.MembershipService
                 else if (siloAddress.Generation > myAddress.Generation)
                 {
                     // I am the older clone - Newer version of me should survive - I need to kill myself
-                    var msg = string.Format("Detected newer version of myself - I am the older clone so I will stop -- Current Me={0} Newer Me={1}, Current entry= {2}",
-                        myAddress, siloAddress, entry.ToFullString());
-                    log.Warn(ErrorCode.MembershipDetectedNewer, msg);
+                    log.LogWarning(
+                        (int)ErrorCode.MembershipDetectedNewer,
+                        "Detected newer version of myself - I am the older clone so I will stop -- Current Me={LocalSiloAddress} Newer Me={NewerSiloAddress}, Current entry={Entry}",
+                        myAddress,
+                        siloAddress,
+                        entry.ToFullString());
                     await this.UpdateStatus(SiloStatus.Dead);
-                    KillMyselfLocally(msg);
+                    KillMyselfLocally($"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry.ToFullString()}");
                     return true; // No point continuing!
                 }
             }

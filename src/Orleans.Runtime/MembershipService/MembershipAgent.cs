@@ -56,7 +56,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task UpdateIAmAlive()
         {
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership liveness timestamp updates");
+            if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting periodic membership liveness timestamp updates");
             try
             {
                 TimeSpan? onceOffDelay = default;
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping periodic membership liveness timestamp updates");
+                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopping periodic membership liveness timestamp updates");
             }
         }
 

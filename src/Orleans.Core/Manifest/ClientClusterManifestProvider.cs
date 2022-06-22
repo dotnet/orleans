@@ -99,7 +99,7 @@ namespace Orleans.Runtime
 
                         if (_logger.IsEnabled(LogLevel.Debug))
                         {
-                            _logger.LogDebug("Refreshed cluster manifest");
+                            LoggerExtensions.LogDebug(_logger, "Refreshed cluster manifest");
                         }
 
                         await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
@@ -117,7 +117,7 @@ namespace Orleans.Runtime
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Stopped refreshing cluster manifest");
+                    LoggerExtensions.LogDebug(_logger, "Stopped refreshing cluster manifest");
                 }
             }
         }

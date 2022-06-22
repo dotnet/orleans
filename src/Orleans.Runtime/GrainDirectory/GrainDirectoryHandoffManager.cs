@@ -47,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo remove event for " + removedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Processing silo remove event for {RemovedSilo}", removedSilo);
 
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
@@ -61,7 +61,7 @@ namespace Orleans.Runtime.GrainDirectory
                 Dictionary<SiloAddress, List<GrainAddress>> duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Merging my partition with the copy of silo {RemovedSilo}", removedSilo);
                     // now I am responsible for this directory part
                     duplicates = localDirectory.DirectoryPartition.Merge(partition);
                     // no need to send our new partition to all others, as they
@@ -69,12 +69,12 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 else
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Merging partition of {Predecessor} with the copy of silo {RemovedSilo}", predecessor, removedSilo);
                     // adjust copy for the predecessor of the failed silo
                     duplicates = directoryPartitionsMap[predecessor].Merge(partition);
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removed copied partition of silo {RemovedSilo}", removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
                 DestroyDuplicateActivations(duplicates);
             }
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo add event for " + addedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Processing silo add event for {AddedSilo}", addedSilo);
 
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.GrainDirectory
                 List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
                 if (!successors.Contains(addedSilo))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not one of my successors.", addedSilo);
                     return;
                 }
 
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (successors[0].Equals(addedSilo))
                 {
                     // split my local directory and send to my new immediate successor his share
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Splitting my partition between me and " + addedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting my partition between me and {AddedSilo}", addedSilo);
                     GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
                         grain =>
                         {
@@ -127,7 +127,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     else
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting partition of {Predecessor} and creating a copy for {AddedSilo}", predecessorOfNewSilo, addedSilo);
                         GrainDirectoryPartition splitPart = predecessorPartition.Split(
                             grain =>
                             {
@@ -143,7 +143,14 @@ namespace Orleans.Runtime.GrainDirectory
                 SiloAddress oldSuccessor = directoryPartitionsMap.FirstOrDefault(pair => !successors.Contains(pair.Key)).Key;
                 if (oldSuccessor == null) return;
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug(
+                        "Removing copy of the directory partition of silo {OldSuccessor} (holding copy of {AddedSilo} instead)",
+                        oldSuccessor,
+                        addedSilo);
+                }
+
                 directoryPartitionsMap.Remove(oldSuccessor);
             }
         }
@@ -156,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (splitPartListSingle.Count > 0)
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Sending {Count} single activation entries to {AddedSilo}", splitPartListSingle.Count, addedSilo);
                 }
 
                 await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
@@ -169,7 +176,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (splitPartListSingle.Count > 0)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing " + splitPartListSingle.Count + " single activation after partition split");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removing {Count} single activation after partition split", splitPartListSingle.Count);
 
                 splitPartListSingle.ForEach(
                     activationAddress =>
@@ -190,8 +197,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug(
-                    $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations");
+                LoggerExtensions.LogDebug(
+this.logger, $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations");
             }
 
             if (singleActivations != null && singleActivations.Count > 0)
@@ -243,7 +250,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Got request to register {CopyType}, directory partition with {Count} elements from {Source}", isFullCopy ? "FULL" : "DELTA", partition.Count, source);
 
                 if (!directoryPartitionsMap.TryGetValue(source, out var sourcePartition))
                 {
@@ -273,7 +280,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to unregister directory partition copy from " + source);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Got request to unregister directory partition copy from {Source}", source);
                 directoryPartitionsMap.Remove(source);
             }
         }
@@ -289,7 +296,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void RemoveOldFollower(SiloAddress silo)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing my copy from silo " + silo);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removing my copy from silo {Silo}", silo);
             // release this old copy, as we have got a new one
             silosHoldingMyPartition.Remove(silo);
             localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(
@@ -315,8 +322,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))
                     {
-                        this.logger.LogDebug(
-                            $"{nameof(DestroyDuplicateActivations)} will destroy {duplicates.Count} duplicate activations on silo {pair.Key}: {string.Join("\n * ", pair.Value.Select(_ => _))}");
+                        LoggerExtensions.LogDebug(
+this.logger, $"{nameof(DestroyDuplicateActivations)} will destroy {duplicates.Count} duplicate activations on silo {pair.Key}: {string.Join("\n * ", pair.Value.Select(_ => _))}");
                     }
 
                     var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);

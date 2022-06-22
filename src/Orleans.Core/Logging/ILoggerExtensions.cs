@@ -22,18 +22,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Writes a log entry at the Verbose severity level.
-        /// Verbose is suitable for debugging information that should usually not be logged in production.
-        /// Verbose is lower than Info.
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="message">The log message.</param>
-        public static void Debug(this ILogger logger, string message)
-        {
-            logger.LogDebug(message);
-        }
-
-        /// <summary>
         /// Writes a log entry at the Trace logLevel.
         /// </summary>
         /// <param name="logger">The logger</param>

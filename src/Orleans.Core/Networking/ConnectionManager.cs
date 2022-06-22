@@ -272,7 +272,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.trace.IsEnabled(LogLevel.Debug))
                 {
-                    this.trace.LogDebug("Shutting down connections");
+                    LoggerExtensions.LogDebug(this.trace, "Shutting down connections");
                 }
 
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);

@@ -313,7 +313,7 @@ namespace Orleans.Runtime
             {
                 StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
                 StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
-                logger.Debug("Silo statistics manager started successfully.");
+                logger.LogDebug("Silo statistics manager started successfully.");
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
@@ -322,14 +322,14 @@ namespace Orleans.Runtime
                     var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
                     await deploymentLoadPublisher.WorkItemGroup.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
                         .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
-                    logger.Debug("Silo deployment load publisher started successfully.");
+                    logger.LogDebug("Silo deployment load publisher started successfully.");
                 }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
                 this.platformWatchdog.Start();
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
+                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo platform watchdog started successfully."); }
             }
             catch (Exception exc)
             {
@@ -366,7 +366,7 @@ namespace Orleans.Runtime
                     this.reminderServiceContext = (this.reminderService as IGrainContext) ?? this.fallbackScheduler;
                     await this.reminderServiceContext.QueueTask(this.reminderService.Start)
                         .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
-                    this.logger.Debug("Reminder service started successfully.");
+                    this.logger.LogDebug("Reminder service started successfully.");
                 }
             }
             foreach (var grainService in grainServices)

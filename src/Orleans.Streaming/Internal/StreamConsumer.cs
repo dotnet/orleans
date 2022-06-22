@@ -200,7 +200,7 @@ namespace Orleans.Streams
         {
             _ = RequestContextExtensions.SuppressCurrentCallChainFlow();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
             if (myExtension == null)
                 return;
 
@@ -217,8 +217,10 @@ namespace Orleans.Streams
 
             } catch (Exception exc)
             {
-                logger.Warn(ErrorCode.StreamProvider_ConsumerFailedToUnregister,
-                    "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
+                logger.LogWarning(
+                    (int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+                    exc,
+                    "Ignoring unhandled exception during PubSub.UnregisterConsumer");
             }
             myExtension = null;
         }

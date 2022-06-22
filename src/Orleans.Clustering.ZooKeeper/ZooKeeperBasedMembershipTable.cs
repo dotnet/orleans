@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Membership
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.Debug("Deployment path already exists: " + this.clusterPath);
+                    this.logger.LogDebug("Deployment path already exists: {DeploymentPath}", this.clusterPath);
                 }
             });
         }
@@ -355,7 +355,7 @@ namespace Orleans.Runtime.Membership
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug(@event.ToString());
+                logger.LogDebug(@event.ToString());
             }
             return Task.CompletedTask;
         }

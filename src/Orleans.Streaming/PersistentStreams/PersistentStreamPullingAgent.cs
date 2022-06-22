@@ -216,8 +216,10 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.PersistentStreamPullingAgent_08,
-                    "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.", exc);
+                logger.LogWarning(
+                    (int)ErrorCode.PersistentStreamPullingAgent_08,
+                    exc,
+                    "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.");
             }
             pubSubCache.Clear();
             IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));
@@ -440,8 +442,11 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
-                            $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
+                        logger.LogWarning(
+                            (int)ErrorCode.PersistentStreamPullingAgent_27,
+                            exc,
+                            "Exception calling MessagesDeliveredAsync on queue {MyQueueId}. Ignoring.",
+                            myQueueId);
                     }
                 }
             }
@@ -483,7 +488,7 @@ namespace Orleans.Streams
                     else
                     {
                         if(this.logger.IsEnabled(LogLevel.Debug))
-                            this.logger.LogDebug($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                            LoggerExtensions.LogDebug(this.logger, $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                                    $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
 

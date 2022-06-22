@@ -30,13 +30,13 @@ namespace Orleans.Streams
             var streamId = InternalStreamId.Parse(grain.GetGrainId().Key.ToString());
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug($"Trying to find storage provider {streamId.ProviderName}");
+                LoggerExtensions.LogDebug(logger, $"Trying to find storage provider {streamId.ProviderName}");
 
             var storage = _serviceProvider.GetServiceByName<IGrainStorage>(streamId.ProviderName);
             if (storage == null)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug($"Fallback to storage provider {ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME}");
+                    LoggerExtensions.LogDebug(logger, $"Fallback to storage provider {ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME}");
 
                 storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }

@@ -950,9 +950,9 @@ namespace Orleans.Transactions.DynamoDB
 
                 return ddbClient.TransactWriteItemsAsync(request);
             }
-            catch (Exception)
+            catch (Exception exc)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to write tx");
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug(exc, "Unable to write");
                 throw;
             }
         }

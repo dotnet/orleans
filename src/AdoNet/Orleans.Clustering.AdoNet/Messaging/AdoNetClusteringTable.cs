@@ -95,12 +95,12 @@ namespace Orleans.Runtime.MembershipService
             //Likewise, no update can be done without membership entry.
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.InsertRow aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             if (tableVersion == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.InsertRow aborted due to null check. TableVersion is null ");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. TableVersion is null ");
                 throw new ArgumentNullException("tableVersion");
             }
 
@@ -127,12 +127,12 @@ namespace Orleans.Runtime.MembershipService
             //Likewise, no update can be done without membership entry or an etag.
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateRow aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             if (tableVersion == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateRow aborted due to null check. TableVersion is null ");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. TableVersion is null ");
                 throw new ArgumentNullException("tableVersion");
             }
 
@@ -153,7 +153,7 @@ namespace Orleans.Runtime.MembershipService
             if(logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.UpdateIAmAlive called with entry {0}.", entry));
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateIAmAlive aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateIAmAlive aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             try

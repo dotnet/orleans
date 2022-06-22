@@ -81,7 +81,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
+                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting to process membership updates");
                 await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
                 {
                     this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
+                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopping membership update processor");
             }
         }
 

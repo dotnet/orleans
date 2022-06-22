@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (log.IsEnabled(LogLevel.Debug))
             {
-                log.LogDebug("BlockApplicationMessages");
+                LoggerExtensions.LogDebug(log, "BlockApplicationMessages");
             }
 
             IsBlockingApplicationMessages = true;
@@ -101,7 +101,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (log.IsEnabled(LogLevel.Debug))
             {
-                log.LogDebug("StopClientMessages");
+                LoggerExtensions.LogDebug(log, "StopClientMessages");
             }
 
             try
