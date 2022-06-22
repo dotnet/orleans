@@ -503,7 +503,7 @@ namespace Orleans.Runtime
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
+                    logger.LogDebug((int)ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
                 }
                 var pause = TimeSpan.FromSeconds(1);                
 
@@ -511,7 +511,7 @@ namespace Orleans.Runtime
                 {                    
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        logger.Debug(ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
+                        logger.LogDebug((int)ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
                     }
                     await Task.Delay(pause).ConfigureAwait(false);
                 }

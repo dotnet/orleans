@@ -72,10 +72,5 @@ namespace Orleans.Runtime
         {
             logger.LogDebug(new EventId((int)logCode), format, args);
         }
-
-        public static void Debug(this ILogger logger, ErrorCode logCode, string message)
-        {
-            logger.LogDebug(new EventId((int)logCode), message);
-        }
     }
 }

@@ -90,7 +90,7 @@ namespace Orleans.Runtime
                 // Flush remaining data
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                    logger.LogDebug((int)ErrorCode.PerfCounterDumpAll, "{Message}", logMsgBuilder.ToString());
                 }
                 logMsgBuilder.Clear();
                 return;
@@ -105,7 +105,7 @@ namespace Orleans.Runtime
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                    logger.LogDebug((int)ErrorCode.PerfCounterDumpAll, "{Message}", logMsgBuilder.ToString());
                 }
                 logMsgBuilder.Clear();
             }
