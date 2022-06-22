@@ -69,7 +69,7 @@ namespace Orleans.Reminders.DynamoDB
                 this.options.CreateIfNotExists,
                 this.options.UpdateIfExists);
 
-            this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
+            this.logger.LogInformation((int)ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {

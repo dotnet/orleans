@@ -105,7 +105,10 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!this.createIfNotExists && !this.updateIfExists)
             {
-                Logger.Info(ErrorCode.StorageProviderBase, $"The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{tableName}' will not be created or updated.");
+                Logger.LogInformation(
+                    (int)ErrorCode.StorageProviderBase,
+                    "The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{TableName}' will not be created or updated.",
+                    tableName);
                 return;
             }
 

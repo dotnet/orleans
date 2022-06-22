@@ -180,8 +180,11 @@ namespace Orleans.Runtime.MembershipService
             var result = newProbedSilos.ToImmutable();
             if (!AreTheSame(monitoredSilos, result))
             {
-                log.Info(ErrorCode.MembershipWatchList, "Will watch (actively ping) {0} silos: {1}",
-                    newProbedSilos.Count, Utils.EnumerableToString(newProbedSilos.Keys, silo => silo.ToLongString()));
+                log.LogInformation(
+                    (int)ErrorCode.MembershipWatchList,
+                    "Will watch (actively ping) {ProbedSiloCount} silos: {ProbedSilos}",
+                    newProbedSilos.Count,
+                    Utils.EnumerableToString(newProbedSilos.Keys, silo => silo.ToLongString()));
             }
 
             return result;

@@ -113,7 +113,11 @@ namespace Orleans.Runtime
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
-            logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
+            logger.LogInformation(
+                (int)ErrorCode.SiloGcSetting,
+                "Silo starting with GC settings: ServerGC={ServerGC} GCLatencyMode={GCLatencyMode}",
+                GCSettings.IsServerGC,
+                Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC)
             {
                 logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
@@ -197,7 +201,11 @@ namespace Orleans.Runtime
             // add self to lifecycle
             this.Participate(this.siloLifecycle);
 
-            logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
+            logger.LogInformation(
+                (int)ErrorCode.SiloInitializingFinished,
+                "-------------- Started silo {SiloAddress}, ConsistentHashCode {HashCode} --------------",
+                SiloAddress.ToLongString(),
+                SiloAddress.GetConsistentHashCode().ToString("X"));
         }
 
         /// <summary>
@@ -276,7 +284,7 @@ namespace Orleans.Runtime
                 this.SystemStatus = SystemStatus.Starting;
             }
 
-            logger.Info(ErrorCode.SiloStarting, "Silo Start()");
+            logger.LogInformation((int)ErrorCode.SiloStarting, "Silo Start()");
             return Task.CompletedTask;
         }
 
@@ -285,7 +293,11 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             task.Invoke();
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
+            this.logger.LogInformation(
+                (int)ErrorCode.SiloStartPerfMeasure,
+                "{TaskName} took {ElapsedMilliseconds} milliseconds to finish",
+                taskName,
+                stopWatch.ElapsedMilliseconds);
         }
 
         private async Task StartAsyncTaskWithPerfAnalysis(string taskName, Func<Task> task, Stopwatch stopWatch)
@@ -293,7 +305,11 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             await task.Invoke();
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
+            this.logger.LogInformation(
+                (int)ErrorCode.SiloStartPerfMeasure,
+                "{TaskName} took {ElapsedMilliseconds} milliseconds to finish",
+                taskName,
+                stopWatch.ElapsedMilliseconds);
         }
 
         private Task OnRuntimeServicesStart(CancellationToken ct)

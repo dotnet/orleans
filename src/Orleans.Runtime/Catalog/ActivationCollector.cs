@@ -514,7 +514,7 @@ namespace Orleans.Runtime
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
             Action<Task> signalCompletion = task => mtcs.SetOneResult();

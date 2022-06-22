@@ -52,7 +52,7 @@ namespace Orleans.Clustering.DynamoDB
                 this.options.CreateIfNotExists,
                 this.options.UpdateIfExists);
 
-            logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
+            logger.LogInformation((int)ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {

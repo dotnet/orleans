@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -38,7 +38,7 @@ namespace UnitTests.Streaming
 
         public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
         {
-            Heading(String.Format("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains"));
+            Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
             List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)

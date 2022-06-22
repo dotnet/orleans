@@ -107,26 +107,5 @@ namespace Orleans.Runtime
         {
             logger.LogInformation(logCode, format, args);
         }
-
-        public static void Info(this ILogger logger, ErrorCode logCode, string format, params object[] args)
-        {
-            logger.LogInformation(new EventId((int)logCode), format, args);
-        }
-
-        /// <summary>
-        /// Writes a log entry at the Information logLevel
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="message">The log message.</param>
-        public static void Info(this ILogger logger, int logCode, string message)
-        {
-            logger.LogInformation(logCode, message);
-        }
-
-        public static void Info(this ILogger logger, ErrorCode logCode, string message)
-        {
-            logger.LogInformation(new EventId((int)logCode), message);
-        }
     }
 }

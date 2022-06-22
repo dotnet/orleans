@@ -267,7 +267,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.LogInformation((int)ErrorCode.MembershipJoining, "Joining");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);

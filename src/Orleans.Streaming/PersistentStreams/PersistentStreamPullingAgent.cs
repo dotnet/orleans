@@ -69,9 +69,14 @@ namespace Orleans.Streams
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
-            logger.Info(ErrorCode.PersistentStreamPullingAgent_01,
-                "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
-                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
+            logger.LogInformation(
+                (int)ErrorCode.PersistentStreamPullingAgent_01,
+                "Created {Name} {Id} for Stream Provider {StreamProvider} on silo {Silo} for Queue {Queue}.",
+                GetType().Name,
+                ((ISystemTargetBase)this).GrainId.ToString(),
+                streamProviderName,
+                Silo,
+                QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
         }
@@ -94,8 +99,13 @@ namespace Orleans.Streams
 
         private void InitializeInternal()
         {
-            logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), Silo, QueueId.ToStringWithHashCode());
+            logger.LogInformation(
+                (int)ErrorCode.PersistentStreamPullingAgent_02,
+                "Init of {Name} {Id} on silo {Silo} for queue {Queue}.",
+                GetType().Name,
+                ((ISystemTargetBase)this).GrainId.ToString(),
+                Silo,
+                QueueId.ToStringWithHashCode());
 
             lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
@@ -147,7 +157,7 @@ namespace Orleans.Streams
         public async Task Shutdown()
         {
             // Stop pulling from queues that are not in my range anymore.
-            logger.Info(ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
+            logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {Name} responsible for queue: {Queue}", GetType().Name, QueueId.ToStringWithHashCode());
 
             if (timer != null)
             {
@@ -206,7 +216,7 @@ namespace Orleans.Streams
             {
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
-                logger.Info(ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
+                logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {StreamId}.", streamId);
                 unregisterTasks.Add(pubSub.UnregisterProducer(streamId, meAsStreamProducer));
             }
 
@@ -454,7 +464,7 @@ namespace Orleans.Streams
             if (queueCache != null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
-                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
+                logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
                 return false;
             }
 
