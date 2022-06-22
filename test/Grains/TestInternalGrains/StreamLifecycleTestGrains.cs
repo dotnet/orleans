@@ -434,7 +434,7 @@ namespace UnitTests.Grains
 
             if (logger != null)
             {
-                logger.Warn(1, "Received OnErrorAsync - Exception={0} - Total Items={1} Errors={2}", ex, NumItems, NumErrors);
+                logger.LogWarning(ex, "Received OnErrorAsync - Total Items={ItemCount} Errors={ErrorCount}", NumItems, NumErrors);
             }
 
             return Task.CompletedTask;

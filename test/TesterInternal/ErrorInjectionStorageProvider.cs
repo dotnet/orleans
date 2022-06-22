@@ -130,7 +130,7 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                logger.Warn(0, "Injected error during ReadStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.LogWarning(exc, "Injected error during ReadStateAsync for {GrainType} {GrainId}", grainType, grainReference?.GrainId);
                 throw;
             }
         }
@@ -146,7 +146,7 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                logger.Warn(0, "Injected error during WriteStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.LogWarning(exc, "Injected error during WriteStateAsync for {GrainType} {GrainId}", grainType, grainReference?.GrainId);
                 throw;
             }
         }

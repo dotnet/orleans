@@ -25,6 +25,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester.AzureUtils;
 using Orleans.Serialization.TypeSystem;
+using Microsoft.Extensions.Logging;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -984,18 +985,22 @@ namespace UnitTests.Streaming.Reliability
             SiloAddress oldSilo = silo.SiloAddress;
             bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
             string siloType = isPrimary ? "Primary" : "Secondary";
-            string action;
-            if (restart)    action = kill ? "Kill+Restart" : "Stop+Restart";
-            else            action = kill ? "Kill" : "Stop";
+            var action = (restart, kill) switch
+            {
+                (true, true) => "Kill and restart",
+                (true, false) => "Stop and restart",
+                (false, true) => "Kill",
+                (false, false) => "Stop",
+            };
 
-            logger.Warn(2, "{0} {1} silo {2}", action, siloType, oldSilo);
+            logger.LogWarning("{Action} {SiloType} silo {OldSilo}", action, siloType, oldSilo);
 
             if (restart)
             {
                 //RestartRuntime(silo, kill);
                 SiloHandle newSilo = await this.HostedCluster.RestartSiloAsync(silo);
 
-                logger.Info("Restarted new {0} silo {1}", siloType, newSilo.SiloAddress);
+                logger.LogInformation("Restarted new {SiloType} silo {SiloAddress}", siloType, newSilo.SiloAddress);
 
                 Assert.NotEqual(oldSilo, newSilo.SiloAddress); //"Should be different silo address after Restart"
             }

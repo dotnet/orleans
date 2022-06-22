@@ -128,19 +128,5 @@ namespace Orleans.Runtime
         {
             logger.LogInformation(new EventId((int)logCode), message);
         }
-
-        /// <summary>
-        /// Writes a log entry at the Warning level
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">Format string of the log message with named parameters
-        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
-        /// </param>
-        /// <param name="args">Any arguments to the format string.</param>
-        public static void Warn(this ILogger logger, int logCode, string format, params object[] args)
-        {
-            logger.LogWarning(logCode, format, args);
-        }
     }
 }

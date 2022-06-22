@@ -136,8 +136,12 @@ namespace Orleans.Runtime.MembershipService
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
-                    logger.Warn((int)TableStorageErrorCode.AzureTable_24,
-                        "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}", entry.ToFullString(), etag, tableVersion);
+                    logger.LogWarning(
+                        (int)TableStorageErrorCode.AzureTable_24,
+                        "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}",
+                        entry.ToFullString(),
+                        etag,
+                        tableVersion);
                 return result;
             }
             catch (Exception exc)
