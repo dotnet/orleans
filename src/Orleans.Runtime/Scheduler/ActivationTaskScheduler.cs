@@ -56,7 +56,7 @@ namespace Orleans.Runtime.Scheduler
         protected override void QueueTask(Task task)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " QueueTask Task Id={0}", task.Id);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} QueueTask Task Id={TaskId}", myId, task.Id);
 #endif
             workerGroup.EnqueueTask(task);
         }
@@ -77,8 +77,14 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace(myId + " --> TryExecuteTaskInline Task Id={0} Status={1} PreviouslyQueued={2} CanExecute={3} Queued={4}",
-                    task.Id, task.Status, taskWasPreviouslyQueued, canExecuteInline, workerGroup.ExternalWorkItemCount);
+                logger.LogTrace(
+                    "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}",
+                    myId,
+                    task.Id,
+                    task.Status,
+                    taskWasPreviouslyQueued,
+                    canExecuteInline,
+                    workerGroup.ExternalWorkItemCount);
             }
 #endif
             if (!canExecuteInline) return false;
@@ -91,7 +97,7 @@ namespace Orleans.Runtime.Scheduler
             if (!canExecuteInline)
             {
 #if DEBUG
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-X TryExecuteTaskInline Task Id={0} Status={1} Execute=No", task.Id, task.Status);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Status={Status} Execute=No", myId, task.Id, task.Status);
 #endif
                 return false;
             }
@@ -100,7 +106,12 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " TryExecuteTaskInline Task Id={0} Thread={1} Execute=Yes", task.Id, Thread.CurrentThread.ManagedThreadId);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace(
+                    "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Yes",
+                    myId,
+                    task.Id,
+                    Thread.CurrentThread.ManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
@@ -113,14 +124,17 @@ namespace Orleans.Runtime.Scheduler
                     task.Status);
             }
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace(
+                    "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}",
+                    myId,
+                    task.Id,
+                    Thread.CurrentThread.ManagedThreadId,
+                    done);
 #endif
             return done;
         }
 
-        public override string ToString()
-        {
-            return string.Format("{0}-{1}:Queued={2}", GetType().Name, myId, workerGroup.ExternalWorkItemCount);
-        }
+        public override string ToString() => $"{GetType().Name}-{myId}:Queued={workerGroup.ExternalWorkItemCount}";
     }
 }

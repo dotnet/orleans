@@ -204,7 +204,11 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace))
+                        Logger.LogTrace(
+                            "DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}",
+                            httpStatusCode,
+                            restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;

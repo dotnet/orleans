@@ -129,7 +129,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Publishing {0} message to topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Publishing {Count} messages to topic {TopicId}", count, TopicName.TopicId);
 
             try
             {
@@ -143,13 +143,13 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task<IEnumerable<ReceivedMessage>> GetMessages(int count = 1)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Getting {Count} message(s) from Google PubSub topic {TopicId}", count, TopicName.TopicId);
 
             PullResponse response = null;
             try
             {
                 //According to Google, no more than 1000 messages can be published/received
-                response = await _subscriber?.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
+                response = await _subscriber.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
             }
             catch (Exception exc)
             {
@@ -158,12 +158,15 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.Trace("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
+                _logger.LogTrace("Received {Count} message(s) from Google PubSub topic {TopicId}", response.ReceivedMessages.Count, TopicName.TopicId);
 
                 foreach (var received in response.ReceivedMessages)
                 {
-                    _logger.Trace("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
-                            received.Message.PublishTime.ToDateTime(), TopicName.TopicId);
+                    _logger.LogTrace(
+                        "Received message {MessageId} published {PublishedTime} from Google PubSub topic {TopicId}",
+                        received.Message.MessageId,
+                        received.Message.PublishTime.ToDateTime(),
+                        TopicName.TopicId);
                 }
             }
 
@@ -175,7 +178,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {Count} message(s) from Google PubSub topic {TopicId}", count, TopicName.TopicId);
 
             try
             {

@@ -406,8 +406,12 @@ namespace Orleans.Storage
                 entity.BinaryState = null;
                 dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
-                    dataSize, entity.GrainReference, entity.GrainType);
+                if (this.logger.IsEnabled(LogLevel.Trace))
+                    this.logger.LogTrace(
+                        "Writing JSON data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
+                        dataSize,
+                        entity.GrainReference,
+                        entity.GrainType);
             }
             else
             {
@@ -416,7 +420,7 @@ namespace Orleans.Storage
                 entity.StringState = null;
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
 
@@ -426,7 +430,7 @@ namespace Orleans.Storage
 
             if ((pkSize + rkSize + versionSize + dataSize) > MAX_DATA_SIZE)
             {
-                var msg = string.Format("Data too large to write to DynamoDB table. Size={0} MaxSize={1}", dataSize, MAX_DATA_SIZE);
+                var msg = $"Data too large to write to DynamoDB table. Size={dataSize} MaxSize={MAX_DATA_SIZE}";
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }

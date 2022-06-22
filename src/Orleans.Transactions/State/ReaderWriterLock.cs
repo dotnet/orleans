@@ -113,7 +113,7 @@ namespace Orleans.Transactions.State
                     group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.Trace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
+                        logger.LogTrace("Set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
                 }
 
                 // create a new record for this transaction
@@ -229,7 +229,7 @@ namespace Orleans.Transactions.State
         private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
         {
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace("Break-lock for transaction {TransactionId}", transactionId);
+                logger.LogTrace("Break-lock for transaction {TransactionId}", transactionId);
 
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
@@ -317,7 +317,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+                                    logger.LogTrace("Recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
 
                                 // check again when the group expires
                                 lockWorker.Notify(currentGroup.Deadline.Value);

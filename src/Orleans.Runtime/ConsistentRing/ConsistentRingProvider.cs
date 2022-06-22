@@ -293,7 +293,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {SiloAddress} calculated ring partition owner silo {OwnerAddress} for key {Key}: {Key} --> {OwnerHash}", MyAddress, siloAddress, hash, hash, siloAddress?.GetConsistentHashCode());
             return siloAddress;
         }
 

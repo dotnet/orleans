@@ -130,7 +130,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("DeliverBatch {Batch} for subscription {Subscription}", batch.Value, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -165,7 +165,7 @@ namespace Orleans.Streams
 
         public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("CompleteStream for subscription {0}", subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("CompleteStream for subscription {SubscriptionId}", subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))

@@ -436,7 +436,7 @@ namespace Orleans.Runtime.GrainDirectory
             // give a special treatment for special grains
             if (grainId.IsSystemTarget())
             {
-                if (Constants.SystemMembershipTableType.Equals(grainId))
+                if (Constants.SystemMembershipTableType.Equals(grainId.Type))
                 {
                     if (Seed == null)
                     {
@@ -449,7 +449,8 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a system target {1}, returned {2}", MyAddress, grainId, MyAddress);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {SiloAddress} looked for a system target {GrainId}, returned {TargetSilo}", MyAddress, grainId, MyAddress);
+
                 // every silo owns its system targets
                 return MyAddress;
             }
@@ -492,7 +493,14 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress?.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace))
+                log.LogTrace(
+                    "Silo {SiloAddress} calculated directory partition owner silo {OwnerAddress} for grain {GrainId}: {GrainIdHash} --> {OwnerAddressHash}",
+                    MyAddress,
+                    siloAddress,
+                    grainId,
+                    hash,
+                    siloAddress?.GetConsistentHashCode());
             return siloAddress;
         }
 
@@ -570,7 +578,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task UnregisterAfterNonexistingActivation(GrainAddress addr, SiloAddress origin)
         {
-            log.Trace("UnregisterAfterNonexistingActivation addr={0} origin={1}", addr, origin);
+            log.LogTrace("UnregisterAfterNonexistingActivation addr={Address} origin={Origin}", addr, origin);
 
             if (origin == null || this.directoryMembership.MembershipCache.Contains(origin))
             {
@@ -709,7 +717,7 @@ namespace Orleans.Runtime.GrainDirectory
             //this will only happen if I'm the only silo in the cluster and I'm shutting down
             if (silo == null)
             {
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {Grain}=null", grain);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}=null", grain);
                 result = new AddressAndTag();
                 return false;
             }
@@ -724,7 +732,7 @@ namespace Orleans.Runtime.GrainDirectory
                     Address = address,
                 };
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Address);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup cache {GrainId}={TargetAddress}", grain, result.Address);
                 cacheSuccesses.Increment();
                 localSuccesses.Increment();
                 return true;
@@ -739,16 +747,16 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
-                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
+                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}=null", grain);
                     return false;
                 }
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}={1}", grain, result.Address);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}={Address}", grain, result.Address);
                 LocalDirectorySuccesses.Increment();
                 localSuccesses.Increment();
                 return true;
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("TryFullLookup else {0}=null", grain);
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("TryFullLookup else {GrainId}=null", grain);
             result = default;
             return false;
         }
@@ -796,13 +804,13 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
-                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}=none", grainId);
+                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}=none", grainId);
                     localResult.Address = default;
                     localResult.VersionTag = GrainInfo.NO_ETAG;
                     return localResult;
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}={1}", grainId, localResult.Address);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}={Address}", grainId, localResult.Address);
                 LocalDirectorySuccesses.Increment();
                 return localResult;
             }
@@ -823,7 +831,7 @@ namespace Orleans.Runtime.GrainDirectory
                     DirectoryCache.AddOrUpdate(address, result.VersionTag);
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup remote {0}={1}", grainId, result.Address);
+                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup remote {GrainId}={Address}", grainId, result.Address);
 
                 return result;
             }

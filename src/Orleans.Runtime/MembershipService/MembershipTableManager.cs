@@ -553,7 +553,7 @@ namespace Orleans.Runtime.MembershipService
                 
                 if (entry.Status == SiloStatus.Dead)
                 {
-                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("Skipping my previous old Dead entry in membership table: {0}", entry.ToFullString(full: true));
+                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Skipping my previous old Dead entry in membership table: {Entry}", entry.ToFullString(full: true));
                     continue;
                 }
 

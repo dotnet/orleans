@@ -312,7 +312,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "UpdateTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
 
             try
             {
@@ -356,7 +356,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{Operation} entry {Data} table {TableName}", operation, data, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} table {TableName}", operation, data, TableName);
 
             try
             {
@@ -647,7 +647,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "UpdateTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
 
             try
             {

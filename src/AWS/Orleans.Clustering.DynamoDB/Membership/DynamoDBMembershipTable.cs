@@ -231,7 +231,7 @@ namespace Orleans.Clustering.DynamoDB
                 }
 
                 MembershipTableData data = Convert(records);
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("ReadAll Table {Table}", data.ToString());
 
                 return data;
             }
