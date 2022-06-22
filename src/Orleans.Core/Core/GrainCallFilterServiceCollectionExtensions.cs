@@ -4,7 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
 {
-    public static class GrainCallFilterExtensions
+    /// <summary>
+    /// <see cref="IServiceCollection"/> extensions.
+    /// </summary>
+    public static class GrainCallFilterServiceCollectionExtensions
     {
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.

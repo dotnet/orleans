@@ -12,7 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Orleans
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Extension methods for <see cref="IClientBuilder"/>.

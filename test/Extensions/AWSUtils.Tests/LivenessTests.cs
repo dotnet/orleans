@@ -1,15 +1,7 @@
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnitTests.MembershipTests;
 using Xunit;

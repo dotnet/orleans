@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Builder for configuring an Orleans client.
