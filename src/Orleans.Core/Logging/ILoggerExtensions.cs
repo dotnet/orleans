@@ -159,10 +159,5 @@ namespace Orleans.Runtime
         {
             logger.LogWarning(logCode, exception, message);
         }
-
-        public static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
-        {
-            logger.LogWarning(new EventId((int)logCode), exception, message);
-        }
     }
 }

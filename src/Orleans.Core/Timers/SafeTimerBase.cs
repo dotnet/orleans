@@ -117,14 +117,17 @@ namespace Orleans.Runtime
                 {
                     var t = timer;
                     timer = null;
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerDisposing, "Disposing timer {Name}", GetFullName());
                     t.Dispose();
 
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.TimerDisposeError,
-                        string.Format("Ignored error disposing timer {0}", GetFullName()), exc);
+                    logger.LogWarning(
+                        (int)ErrorCode.TimerDisposeError,
+                        exc,
+                        "Ignored error disposing timer {Name}",
+                        GetFullName());
                 }
             }
         }

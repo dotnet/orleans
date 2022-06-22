@@ -245,7 +245,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.IGC_SniffIncomingMessage_Exc, "SniffIncomingMessage has thrown exception. Ignoring.", exc);
+                this.logger.LogWarning((int)ErrorCode.IGC_SniffIncomingMessage_Exc, exc, "SniffIncomingMessage has thrown exception. Ignoring.");
             }
         }
 
@@ -295,15 +295,16 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    if (message.Direction == Message.Directions.OneWay)
+                    var isDebugLog = invokeExceptionLogger.IsEnabled(LogLevel.Debug);
+                    if (message.Direction == Message.Directions.OneWay || isDebugLog)
                     {
-                        this.invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(invocationException), invocationException);
-                    }
-                    else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(invocationException), invocationException);
+                        var logLevel = isDebugLog ? LogLevel.Debug : LogLevel.Warning;
+                        this.invokeExceptionLogger.Log(
+                            logLevel,
+                            (int)ErrorCode.GrainInvokeException,
+                            invocationException,
+                            "Exception during Grain method call of message {Message}: ",
+                            message);
                     }
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
@@ -313,8 +314,7 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        var msg = $"Deactivating {target} due to inconsistent state.";
-                        this.invokeExceptionLogger.Info(msg);
+                        this.invokeExceptionLogger.LogInformation("Deactivating {Target} due to inconsistent state.", target);
                         target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
                     }
                 }
@@ -328,7 +328,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc2)
             {
-                this.logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
+                this.logger.LogWarning((int)ErrorCode.Runtime_Error_100329, exc2, "Exception during Invoke of message {Message}", message);
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
@@ -349,8 +349,10 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.IGC_SendResponseFailed,
-                    "Exception trying to send a response: " + exc.Message, exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.IGC_SendResponseFailed,
+                    exc,
+                    "Exception trying to send a response");
                 SendResponse(message, Response.FromException(exc));
             }
         }
@@ -404,14 +406,18 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    this.logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
-                        "Exception trying to send an exception response: " + exc1.Message, exc1);
+                    this.logger.LogWarning(
+                        (int)ErrorCode.IGC_SendExceptionResponseFailed,
+                        exc1,
+                        "Exception trying to send an exception response");
                     SendResponse(message, Response.FromException(exc1));
                 }
                 catch (Exception exc2)
                 {
-                    this.logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
-                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: " + exc2.Message, exc2);
+                    this.logger.LogWarning(
+                        (int)ErrorCode.IGC_UnhandledExceptionInInvoke,
+                        exc2,
+                        "Exception trying to send an exception. Ignoring and not trying to send again.");
                 }
             }
         }

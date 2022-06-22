@@ -362,7 +362,10 @@ namespace Orleans.Runtime.GrainDirectory
             int index = existing.MembershipRingList.FindIndex(elem => elem.Equals(silo));
             if (index == -1)
             {
-                log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members");
+                log.LogWarning(
+                    (int)ErrorCode.Runtime_Error_100201,
+                    "Got request to find predecessors of silo {SiloAddress}, which is not in the list of members",
+                    silo);
                 return null;
             }
 
@@ -382,7 +385,10 @@ namespace Orleans.Runtime.GrainDirectory
             int index = existing.MembershipRingList.FindIndex(elem => elem.Equals(silo));
             if (index == -1)
             {
-                log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members");
+                log.LogWarning(
+                    (int)ErrorCode.Runtime_Error_100203,
+                    "Got request to find successors of silo {SiloAddress}, which is not in the list of members",
+                    silo);
                 return null;
             }
 

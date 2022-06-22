@@ -189,7 +189,10 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!createIfNotExists)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase, $"The config value 'createIfNotExists' is false. The table '{tableName}' does not exist and it will not get created.");
+                Logger.LogWarning(
+                    (int)ErrorCode.StorageProviderBase,
+                    "The config value 'createIfNotExists' is false. The table '{TableName}' does not exist and it will not get created.",
+                    tableName);
                 return;
             }
 
@@ -531,8 +534,11 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error upserting to the table {tableName}", exc);
+                Logger.LogWarning(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Intermediate error upserting to the table {TableName}",
+                    tableName);
                 throw;
             }
         }
@@ -610,8 +616,11 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entry from the table {tableName}.", exc);
+                Logger.LogWarning(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Intermediate error deleting entry from the table {TableName}.",
+                    tableName);
                 throw;
             }
         }
@@ -649,8 +658,11 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entries from the table {tableName}.", exc);
+                Logger.LogWarning(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Intermediate error deleting entries from the table {TableName}.",
+                    tableName);
                 throw;
             }
         }
@@ -833,9 +845,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                var errorMsg = $"Failed to read table {tableName}: {exc.Message}";
-                Logger.Warn(ErrorCode.StorageProviderBase, errorMsg, exc);
-                throw new Orleans.Runtime.OrleansException(errorMsg, exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, "Failed to read table {TableName}", tableName);
+                throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
             }
         }
 
@@ -872,8 +883,11 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error bulk inserting entries to table {tableName}.", exc);
+                Logger.LogWarning(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Intermediate error bulk inserting entries to table {TableName}.",
+                    tableName);
                 throw;
             }
         }

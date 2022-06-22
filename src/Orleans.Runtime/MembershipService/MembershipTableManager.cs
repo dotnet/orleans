@@ -113,9 +113,11 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (localSiloEntry.Status == SiloStatus.Dead && this.CurrentStatus != SiloStatus.Dead)
                 {
-                    var msg = $"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.";
-                    this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
-                    this.KillMyselfLocally(msg);
+                    this.log.LogWarning(
+                        (int)ErrorCode.MembershipFoundMyselfDead1,
+                        "I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {Entry}.",
+                        localSiloEntry.ToFullString(full: true));
+                    this.KillMyselfLocally($"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.");
                 }
 
                 snapshot = MembershipTableSnapshot.Create(localSiloEntry.WithStatus(this.CurrentStatus), snapshot);
@@ -220,15 +222,24 @@ namespace Orleans.Runtime.MembershipService
                 bool physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
                 if (physicalHostChanged)
                 {
-                    string error = string.Format("Silo {0} migrated from host {1} silo address {2} to host {3} silo address {4}.",
-                        mySiloName, myHostname, myAddress, mostRecentPreviousEntry.HostName, mostRecentPreviousEntry.SiloAddress);
-                    log.Warn(ErrorCode.MembershipNodeMigrated, error);
+                    log.LogWarning(
+                        (int)ErrorCode.MembershipNodeMigrated,
+                        "Silo {SiloName} migrated to host {HostName} silo address {SiloAddress} from host {PreviousHostName} silo address {PreviousSiloAddress}.",
+                        mySiloName,
+                        myHostname,
+                        myAddress,
+                        mostRecentPreviousEntry.HostName,
+                        mostRecentPreviousEntry.SiloAddress);
                 }
                 else
                 {
-                    string error = string.Format("Silo {0} restarted on same host {1} New silo address = {2} Previous silo address = {3}",
-                        mySiloName, myHostname, myAddress, mostRecentPreviousEntry.SiloAddress);
-                    log.Warn(ErrorCode.MembershipNodeRestarted, error);
+                    log.LogWarning(
+                        (int)ErrorCode.MembershipNodeRestarted,
+                        "Silo {SiloName} restarted on same host {HostName} with silo address = {SiloAddress} Previous silo address = {PreviousSiloAddress}",
+                        mySiloName,
+                        myHostname,
+                        myAddress,
+                        mostRecentPreviousEntry.SiloAddress);
                 }
             }
         }
@@ -396,9 +407,11 @@ namespace Orleans.Runtime.MembershipService
 
             if (myEntry.Status == SiloStatus.Dead && myEntry.Status != newStatus)
             {
-                var msg = string.Format("I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): myEntry = {0}.", myEntry.ToFullString(full: true));
-                this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
-                this.KillMyselfLocally(msg);
+                this.log.LogWarning(
+                    (int)ErrorCode.MembershipFoundMyselfDead1,
+                    "I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {Entry}.",
+                    myEntry.ToFullString(full: true));
+                this.KillMyselfLocally($"I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {(myEntry.ToFullString(full: true))}.");
                 return true;
             }
 
@@ -500,10 +513,15 @@ namespace Orleans.Runtime.MembershipService
                 var missedSince = entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now);
                 if (missedSince != null)
                 {
-                    log.Warn(
-                    ErrorCode.MembershipMissedIAmAliveTableUpdate,
-                    $"Noticed that silo {entry.SiloAddress} has not updated it's IAmAliveTime table column recently."
-                    + $" Last update was at {missedSince}, now is {now}, no update for {now - missedSince}, which is more than {this.clusterMembershipOptions.AllowedIAmAliveMissPeriod}.");
+                    log.LogWarning(
+                        (int)ErrorCode.MembershipMissedIAmAliveTableUpdate,
+                        "Noticed that silo {SiloAddress} has not updated it's IAmAliveTime table column recently."
+                        + " Last update was at {LastUpdateTime}, now is {CurrentTime}, no update for {SinceUpdate}, which is more than {AllowedIAmAliveMissPeriod}.",
+                        entry.SiloAddress,
+                        missedSince,
+                        now,
+                        now - missedSince,
+                        clusterMembershipOptions.AllowedIAmAliveMissPeriod);
                 }
             }
         }
@@ -523,9 +541,8 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (entry.Status == SiloStatus.Dead)
                     {
-                        var msg = string.Format("I should be Dead according to membership table (in CleanupTableEntries): entry = {0}.", entry.ToFullString(full: true));
-                        log.Warn(ErrorCode.MembershipFoundMyselfDead2, msg);
-                        KillMyselfLocally(msg);
+                        log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead2, "I should be Dead according to membership table (in CleanupTableEntries): entry = {Entry}.", entry.ToFullString(full: true));
+                        KillMyselfLocally($"I should be Dead according to membership table (in CleanupTableEntries): entry = {(entry.ToFullString(full: true))}.");
                     }
                     continue;
                 }

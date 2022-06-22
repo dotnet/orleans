@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Placement
                 var result = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
                 if (result.Length > 0) return result;
 
-                _logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
+                _logger.Warn((int)ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
                 return new SiloAddress[] { LocalSilo };
             }
         }
