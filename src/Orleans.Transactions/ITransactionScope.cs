@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using System;
 
-namespace Orleans.Transactions;
+namespace Orleans;
 
 public interface ITransactionScope
 {
