@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 using OrleansAWSUtils.Streams;
 using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 

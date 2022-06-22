@@ -14,6 +14,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.StreamingTests
 {

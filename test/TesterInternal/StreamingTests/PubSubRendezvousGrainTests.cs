@@ -1,6 +1,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;

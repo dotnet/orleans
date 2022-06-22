@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Orleans;
 using Orleans.Runtime;

@@ -7,6 +7,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
 using Orleans.Internal;
