@@ -197,8 +197,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
-                LoggerExtensions.LogDebug(
-this.logger, $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations");
+                this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations?.Count ?? 0);
             }
 
             if (singleActivations != null && singleActivations.Count > 0)
@@ -324,8 +323,11 @@ this.logger, $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivatio
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))
                     {
-                        LoggerExtensions.LogDebug(
-this.logger, $"{nameof(DestroyDuplicateActivations)} will destroy {duplicates.Count} duplicate activations on silo {pair.Key}: {string.Join("\n * ", pair.Value.Select(_ => _))}");
+                        this.logger.LogDebug(
+                            $"{nameof(DestroyDuplicateActivations)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}",
+                            duplicates.Count,
+                            pair.Key,
+                            string.Join("\n * ", pair.Value.Select(_ => _)));
                     }
 
                     var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);

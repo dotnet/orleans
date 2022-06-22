@@ -133,9 +133,8 @@ namespace UnitTests.Grains
 
         public void Dispose()
         {
-            logger?.Info($"Disposed instance {this.instanceValue}");
+            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
         }
-
     }
 
     public interface IInjectedScopedService
@@ -155,7 +154,7 @@ namespace UnitTests.Grains
 
         public void Dispose()
         {
-            logger.Info($"Disposed instance {this.instanceValue}");
+            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
         }
 
         public string GetInstanceValue() =>  this.instanceValue;

@@ -131,7 +131,7 @@ namespace Orleans.Runtime
 
             if (Log.IsEnabled(LogLevel.Debug))
             {
-                LoggerExtensions.LogDebug(Log, "Stopped agent");
+                Log.LogDebug("Stopped agent");
             }
         }
 

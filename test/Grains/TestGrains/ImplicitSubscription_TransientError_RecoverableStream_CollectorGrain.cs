@@ -82,7 +82,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             Faults.onActivateFault.TryFire(InjectFault);
             await ReadStateAsync();

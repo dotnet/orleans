@@ -22,21 +22,21 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _logger.Info("Producer.OnActivateAsync");
+            _logger.LogInformation("Producer.OnActivateAsync");
             _numProducedItems = 0;
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("Producer.OnDeactivateAsync");
+            _logger.LogInformation("Producer.OnDeactivateAsync");
             _numProducedItems = 0;
             await base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public Task BecomeProducer(Guid streamId, string providerToUse)
         {
-            _logger.Info("Producer.BecomeProducer");
+            _logger.LogInformation("Producer.BecomeProducer");
             if (String.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException("providerToUse");
@@ -54,7 +54,7 @@ namespace UnitTests.Grains
 
         public async Task SendEvent()
         {
-            _logger.Info("Producer.SendEvent called");
+            _logger.LogInformation("Producer.SendEvent called");
             if (_producer == null)
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");

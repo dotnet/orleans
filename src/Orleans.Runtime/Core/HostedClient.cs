@@ -202,7 +202,7 @@ namespace Orleans.Runtime
                     {
                         if (this.logger.IsEnabled(LogLevel.Debug))
                         {
-                            LoggerExtensions.LogDebug(this.logger, $"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
+                            this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
                         }
                         break;
                     }

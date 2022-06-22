@@ -20,15 +20,5 @@ namespace Orleans.Runtime
         {
             logger.LogInformation(format, args);
         }
-
-        /// <summary>
-        /// Writes a log entry at the Info logLevel
-        /// </summary>
-        /// <param name="logger">Target logger.</param>
-        /// <param name="message">The log message.</param>
-        public static void Info(this ILogger logger, string message)
-        {
-            logger.LogInformation(message);
-        }
     }
 }

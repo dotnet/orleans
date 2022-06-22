@@ -169,7 +169,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Func<Task> busyWorker =
                 async () =>
                 {
-                    logger.Info("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
+                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
                     List<Task> tasks1 = new List<Task>();
                     while (!quit[0])
                     {
@@ -229,7 +229,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Func<Task> busyWorker =
                 async () =>
                 {
-                    logger.Info("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
+                    logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
                     List<Task> tasks1 = new List<Task>();
                     while (!quit[0])
                     {
@@ -328,7 +328,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Func<Task> busyWorker =
                 async () =>
                 {
-                    logger.Info("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
+                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
                     List<Task> tasks1 = new List<Task>();
                     while (!quit[0])
                     {
@@ -413,7 +413,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 async () =>
                 {
                     // (part of) 4. periodically send a message to each grain...
-                    logger.Info("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
+                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
 
                     List<Task> tasks1 = new List<Task>();
                     while (!quit[0])

@@ -54,7 +54,7 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task SampleStreamingTests_4()
         {
-            logger.Info("************************ SampleStreamingTests_4 *********************************");
+            logger.LogInformation("************************ SampleStreamingTests_4 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
@@ -62,7 +62,7 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task SampleStreamingTests_5()
         {
-            logger.Info("************************ SampleStreamingTests_5 *********************************");
+            logger.LogInformation("************************ SampleStreamingTests_5 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
             await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }

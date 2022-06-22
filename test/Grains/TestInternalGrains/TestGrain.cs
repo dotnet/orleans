@@ -30,14 +30,14 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKeyLong().ToString();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("!!! OnDeactivateAsync");
+            logger.LogInformation("!!! OnDeactivateAsync");
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
@@ -66,7 +66,7 @@ namespace UnitTests.Grains
 
         public Task StartTimer()
         {
-            logger.Info("StartTimer.");
+            logger.LogInformation("StartTimer.");
             timer = base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
 
             return Task.CompletedTask;
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
 
         private Task TimerTick(object data)
         {
-            logger.Info("TimerTick.");
+            logger.LogInformation("TimerTick.");
             return Task.CompletedTask;
         }
 
@@ -176,7 +176,7 @@ namespace UnitTests.Grains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             return Task.CompletedTask;
         }

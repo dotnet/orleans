@@ -508,8 +508,9 @@ namespace Orleans.Streams
                     else
                     {
                         if(this.logger.IsEnabled(LogLevel.Debug))
-                            LoggerExtensions.LogDebug(this.logger, $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
-                                                   $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
+                            this.logger.LogDebug(
+                                $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                                                              $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
 
                 }

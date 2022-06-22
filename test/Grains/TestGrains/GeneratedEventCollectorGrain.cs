@@ -30,7 +30,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);

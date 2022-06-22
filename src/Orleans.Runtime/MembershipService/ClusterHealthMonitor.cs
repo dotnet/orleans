@@ -75,7 +75,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting to process membership updates");
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
                 await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
                     var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, DateTime.UtcNow);
@@ -99,7 +99,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopped processing membership updates");
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped processing membership updates");
             }
         }
 

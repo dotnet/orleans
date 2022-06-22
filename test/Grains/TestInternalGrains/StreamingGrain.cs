@@ -111,7 +111,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
         {
-            _logger.Info("BecomeConsumer");
+            _logger.LogInformation("BecomeConsumer");
             if (ProviderName != null)
             {
                 throw new InvalidOperationException("Redundant call to BecomeConsumer");
@@ -208,7 +208,7 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
-            _logger.Info("BecomeProducer");
+            _logger.LogInformation("BecomeProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
             _observer = stream;
             var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
@@ -373,7 +373,7 @@ namespace UnitTests.Grains
 
         public Task StopBeingProducer()
         {
-            _logger.Info("StopBeingProducer");
+            _logger.LogInformation("StopBeingProducer");
             if (!_cleanedUpFlag.TrySet())
                 return Task.CompletedTask;
 
@@ -496,7 +496,7 @@ namespace UnitTests.Grains
         {
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
              _producers = new List<IProducerObserver>();
             _cleanedUpFlag = new InterlockedFlag();
             return Task.CompletedTask;
@@ -504,7 +504,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -593,7 +593,7 @@ namespace UnitTests.Grains
 
         public virtual Task DeactivateProducerOnIdle()
         {
-            _logger.Info("DeactivateProducerOnIdle");
+            _logger.LogInformation("DeactivateProducerOnIdle");
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -613,7 +613,7 @@ namespace UnitTests.Grains
             await base.OnActivateAsync(cancellationToken);
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             if (State.Producers == null)
             {
                 State.Producers = new List<IProducerObserver>();
@@ -631,7 +631,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
@@ -687,14 +687,14 @@ namespace UnitTests.Grains
         {
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             _observers = new List<IConsumerObserver>();
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -729,9 +729,9 @@ namespace UnitTests.Grains
 
         public virtual Task DeactivateConsumerOnIdle()
         {
-            _logger.Info("DeactivateConsumerOnIdle");
+            _logger.LogInformation("DeactivateConsumerOnIdle");
 
-            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
+            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.LogInformation("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -751,7 +751,7 @@ namespace UnitTests.Grains
             await base.OnActivateAsync(cancellationToken);
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
 
             if (State.Consumers == null)
             {
@@ -770,7 +770,7 @@ namespace UnitTests.Grains
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             await base.OnDeactivateAsync(reason, cancellationToken);
         }
 
@@ -799,7 +799,7 @@ namespace UnitTests.Grains
         {
             var activationId = RuntimeContext.Current.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId) ;
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             await base.OnActivateAsync(cancellationToken);
         }
     }
@@ -815,12 +815,12 @@ namespace UnitTests.Grains
         {
             var activationId = RuntimeContext.Current.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -911,7 +911,7 @@ namespace UnitTests.Grains
 
         public Task DeactivateProducerOnIdle()
         {
-            _logger.Info("DeactivateProducerOnIdle");
+            _logger.LogInformation("DeactivateProducerOnIdle");
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -939,7 +939,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -994,9 +994,9 @@ namespace UnitTests.Grains
 
         public Task DeactivateConsumerOnIdle()
         {
-            _logger.Info("DeactivateConsumerOnIdle");
+            _logger.LogInformation("DeactivateConsumerOnIdle");
 
-            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
+            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.LogInformation("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
             return Task.CompletedTask;
         }

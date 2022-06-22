@@ -206,7 +206,7 @@ namespace DefaultCluster.Tests
             CreateGR(n + 3, 1);
             CreateGR(n + 4, 1);
 
-            Logger.Info("================");
+            Logger.LogInformation("================");
 
             CreateGR(n, 2);
             CreateGR(n + 1, 2);
@@ -214,7 +214,7 @@ namespace DefaultCluster.Tests
             CreateGR(n + 3, 2);
             CreateGR(n + 4, 2);
 
-            Logger.Info("DONE.");
+            Logger.LogInformation("DONE.");
         }
 
         private void CreateGR(int n, int type)

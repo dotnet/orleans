@@ -27,14 +27,14 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
         }
 
         public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("BecomeProducer");
+            logger.LogInformation("BecomeProducer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             producer = streamProvider.GetStream<T>(streamId, streamNamespace);
             return Task.CompletedTask;
@@ -42,7 +42,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public Task StartPeriodicProducing(TimeSpan? firePeriod = null)
         {
-            logger.Info("StartPeriodicProducing");
+            logger.LogInformation("StartPeriodicProducing");
             var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
             producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, period.Value);
             return Task.CompletedTask;
@@ -50,7 +50,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public Task StopPeriodicProducing()
         {
-            logger.Info("StopPeriodicProducing");
+            logger.LogInformation("StopPeriodicProducing");
             producerTimer.Dispose();
             producerTimer = null;
             if (producerExceptions is { Count: > 0 } exceptions)
@@ -105,7 +105,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
     }

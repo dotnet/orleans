@@ -1879,7 +1879,7 @@ namespace Orleans.Serialization.UnitTests
                 _ = hashSet.Add(rand.Next().ToString());
             }
 
-            return ImmutableHashSet.ToImmutableHashSet(hashSet);
+            return hashSet.ToImmutableHashSet();
         }
 
         protected override ImmutableHashSet<string>[] TestValues => new[] { null, ImmutableHashSet.Create<string>(), CreateValue(), CreateValue(), CreateValue() };
@@ -1898,7 +1898,7 @@ namespace Orleans.Serialization.UnitTests
                 _ = hashSet.Add(rand.Next().ToString());
             }
 
-            return ImmutableHashSet.ToImmutableHashSet(hashSet);
+            return hashSet.ToImmutableHashSet();
         }
 
         protected override ImmutableHashSet<string>[] TestValues => new[] { null, ImmutableHashSet.Create<string>(), CreateValue(), CreateValue(), CreateValue() };

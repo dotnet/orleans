@@ -89,21 +89,21 @@ namespace Orleans.Runtime
 
         public Task Ping(string message)
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.Info("ForceGarbageCollection");
+            logger.LogInformation("ForceGarbageCollection");
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.Info("ForceActivationCollection");
+            logger.LogInformation("ForceActivationCollection");
             return _activationCollector.CollectActivations(ageLimit);
         }
 
@@ -129,19 +129,19 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.Info("GetGrainStatistics");
+            logger.LogInformation("GetGrainStatistics");
             return Task.FromResult(this.catalog.GetGrainStatistics());
         }
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "GetDetailedGrainStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
-            logger.Info("GetSimpleGrainStatistics");
+            logger.LogInformation("GetSimpleGrainStatistics");
             return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }

@@ -27,7 +27,7 @@ namespace Orleans.TestingHost
             readFaults = new Dictionary<GrainReference, Exception>();
             writeFaults = new Dictionary<GrainReference, Exception>();
             clearfaults = new Dictionary<GrainReference, Exception>();
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
         }
 
         /// <inheritdoc />

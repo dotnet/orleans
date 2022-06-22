@@ -26,7 +26,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 

@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Metadata
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    LoggerExtensions.LogDebug(_logger, "Starting to process membership updates");
+                    _logger.LogDebug("Starting to process membership updates");
                 }
 
                 var cancellation = _cancellation.Token;
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Metadata
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    LoggerExtensions.LogDebug(_logger, "Stopped processing membership updates");
+                    _logger.LogDebug("Stopped processing membership updates");
                 }
             }
         }

@@ -62,14 +62,14 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateControllableGeneratedStreamsTest()
         {
-            this.fixture.Logger.Info("************************ ValidateControllableGeneratedStreamsTest *********************************");
+            this.fixture.Logger.LogInformation("************************ ValidateControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Validate2ControllableGeneratedStreamsTest()
         {
-            this.fixture.Logger.Info("************************ Validate2ControllableGeneratedStreamsTest *********************************");
+            this.fixture.Logger.LogInformation("************************ Validate2ControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
             await ValidateControllableGeneratedStreams();
         }

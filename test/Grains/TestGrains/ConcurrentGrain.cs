@@ -25,7 +25,7 @@ namespace UnitTests.Grains
         public async Task Initialize(int ind)
         {
             this.index = ind;
-            logger.Info("Initialize(" + index + ")");
+            logger.LogInformation("Initialize({Index})", index);
             if (index == 0)
             {
                 children = new List<IConcurrentGrain>();
@@ -42,24 +42,24 @@ namespace UnitTests.Grains
         {
             callNumber++;
             int call = callNumber;
-            logger.Info("A() start callNumber " + call);
+            logger.LogInformation("A() start callNumber {Call}", call);
             int i = 1;
             foreach (IConcurrentGrain child in children)
             {
-                logger.Info("Calling B(" + i + "," + call + ")");
+                logger.LogInformation("Calling B({Index}, {Call})", i, call);
                 int ret = await child.B(call);
-                logger.Info("Resolved the calling B(" + i + "," + call + ")");
+                logger.LogInformation("Resolved the call to B({Index}, {Call})", i, call);
                 i++;
             }
-            logger.Info("A() END callNumber " + call);
+            logger.LogInformation("A() END callNumber {Call}", call);
             return 1;
         }
 
         public Task<int> B(int number)
         {
-            logger.Info("B(" + index + ") call " + number);
+            logger.LogInformation("B({Index}) call {Number}", index, number);
             Thread.Sleep(100);
-            logger.Info("B(" + index + ") call " + number + " after sleep");
+            logger.LogInformation("B({Index}) call {Number} after sleep", index, number);
             return Task.FromResult(1);
         }
 
@@ -86,14 +86,14 @@ namespace UnitTests.Grains
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger.Info("Initialize(" + index + ")");
+            logger.LogInformation("Initialize({Index})", index);
             return Task.CompletedTask;
         }
 
         // start a long tail call on the 1st grain by calling into the 2nd grain 
         public async Task<int> TailCall_Caller(IConcurrentReentrantGrain another, bool doCW)
         {
-            logger.Info("TailCall_Caller");
+            logger.LogInformation("TailCall_Caller");
             if (doCW)
             {
                 int i = await another.TailCall_Called();
@@ -107,7 +107,7 @@ namespace UnitTests.Grains
         // if tail call optimization is working, this call should go in (the grain should be considered not executing request).
         public Task<int> TailCall_Resolver(IConcurrentReentrantGrain another)
         {
-            logger.Info("TailCall_Resolver");
+            logger.LogInformation("TailCall_Resolver");
             return another.TailCall_Resolve();
         }
     }
@@ -127,20 +127,20 @@ namespace UnitTests.Grains
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger.Info("Initialize(" + index + ")");
+            logger.LogInformation("Initialize({Index})", index);
             return Task.CompletedTask;
         }
 
         public Task<int> TailCall_Called()
         {
-            logger.Info("TailCall_Called");
+            logger.LogInformation("TailCall_Called");
             resolver = new TaskCompletionSource<int>();
             return resolver.Task;
         }
 
         public Task<int> TailCall_Resolve()
         {
-            logger.Info("TailCall_Resolve");
+            logger.LogInformation("TailCall_Resolve");
             resolver.SetResult(7);
             return Task.FromResult(8);
         }

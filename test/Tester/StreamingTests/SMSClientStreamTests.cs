@@ -59,14 +59,14 @@ namespace Tester.StreamingTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSStreamProducerOnDroppedClientTest()
         {
-            logger.Info("************************ SMSStreamProducerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ SMSStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace);
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSStreamConsumerOnDroppedClientTest()
         {
-            logger.Info("************************ SMSStreamConsumerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ SMSStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace, output);
         }
     }

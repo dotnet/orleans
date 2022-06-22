@@ -28,7 +28,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             Reset();
             return Task.CompletedTask;
         }
@@ -44,13 +44,13 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("BecomeConsumer");
+            logger.LogInformation("BecomeConsumer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             consumerHandle = await consumer.SubscribeAsync(
@@ -72,7 +72,7 @@ namespace UnitTests.Grains
 
         public async Task StopConsuming()
         {
-            logger.Info("StopConsuming");
+            logger.LogInformation("StopConsuming");
             if (consumerHandle != null)
             {
                 await consumerHandle.UnsubscribeAsync();
@@ -118,7 +118,7 @@ namespace UnitTests.Grains
 
         public Task OnCompletedAsync()
         {
-            logger.Info("OnCompletedAsync()");
+            logger.LogInformation("OnCompletedAsync()");
             return Task.CompletedTask;
         }
 

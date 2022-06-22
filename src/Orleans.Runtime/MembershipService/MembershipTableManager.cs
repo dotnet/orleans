@@ -246,7 +246,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task PeriodicallyRefreshMembershipTable()
         {
-            if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Starting periodic membership table refreshes");
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership table refreshes");
             try
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
@@ -281,7 +281,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(this.log, "Stopping periodic membership table refreshes");
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping periodic membership table refreshes");
             }
         }
 

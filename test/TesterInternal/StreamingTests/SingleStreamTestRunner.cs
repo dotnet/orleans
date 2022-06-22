@@ -281,7 +281,7 @@ namespace UnitTests.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(null, consumer, false), _timeout);
             await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(producer, null, false), _timeout);
 
-            logger.Info("\n\n\n*******************************************************************\n\n\n");
+            logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);

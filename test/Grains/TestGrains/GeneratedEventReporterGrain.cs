@@ -22,7 +22,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
             return base.OnActivateAsync(cancellationToken);

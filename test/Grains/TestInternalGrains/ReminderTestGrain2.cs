@@ -51,14 +51,14 @@ namespace UnitTests.Grains
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
             this.period = GetDefaultPeriod(this.logger);
-            this.logger.Info("OnActivateAsync.");
+            this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "g" + this.GrainId.ToString().Replace('/', '_') + "_";
             return GetMissingReminders();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            this.logger.Info("OnDeactivateAsync");
+            this.logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -249,14 +249,14 @@ namespace UnitTests.Grains
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
-            this.logger.Info("OnActivateAsync.");
+            this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "gc" + this.GrainId.Key + "_";
             await GetMissingReminders();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            this.logger.Info("OnDeactivateAsync.");
+            this.logger.LogInformation("OnDeactivateAsync.");
             return Task.CompletedTask;
         }
 
@@ -404,7 +404,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.Info("OnActivateAsync.");
+            this.logger.LogInformation("OnActivateAsync.");
             return Task.CompletedTask;
         }
 

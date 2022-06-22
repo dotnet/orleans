@@ -307,7 +307,7 @@ namespace UnitTests.StreamingTests
             var delay = TimeSpan.FromSeconds(1);
             logger.Info("Waiting for {0} to allow time for grain deactivation to occur", delay);
             await Task.Delay(delay); // Allow time for Deactivate
-            logger.Info("Awake again.");
+            logger.LogInformation("Awake again.");
         }
     }
 }

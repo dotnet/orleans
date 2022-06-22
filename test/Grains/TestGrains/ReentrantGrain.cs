@@ -48,24 +48,24 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 
         public Task<string> One()
         {
-            logger.Info("Entering One");
+            logger.LogInformation("Entering One");
             string result = "one";
-            logger.Info("Exiting One");
+            logger.LogInformation("Exiting One");
             return Task.FromResult(result);
         }
 
         public async Task<string> Two()
         {
-            logger.Info("Entering Two");
+            logger.LogInformation("Entering Two");
             string result = await Self.One();
             result = result + " two";
-            logger.Info("Exiting Two");
+            logger.LogInformation("Exiting Two");
             return result;
         }
 
@@ -141,7 +141,7 @@ namespace UnitTests.Grains
 
             await stream.SubscribeAsync((item, _) =>
             {
-                logger.Info("Received stream item:" + item);
+                logger.LogInformation("Received stream item: {Item}", item);
                 return Task.CompletedTask;
             });
         }
@@ -224,7 +224,7 @@ namespace UnitTests.Grains
             logger.Info("Before GetCounter - OtherId={0}", destination);
             IReentrantSelfManagedGrain otherGrain = GrainFactory.GetGrain<IReentrantSelfManagedGrain>(destination);
             var ctr = otherGrain.GetCounter();
-            logger.Info("After GetCounter() - returning promise");
+            logger.LogInformation("After GetCounter() - returning promise");
             return ctr;
         }
     }
@@ -271,7 +271,7 @@ namespace UnitTests.Grains
             logger.Info("Before GetCounter - OtherId={0}", destination);
             INonReentrantSelfManagedGrain otherGrain = GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(destination);
             var ctr = otherGrain.GetCounter();
-            logger.Info("After GetCounter() - returning promise");
+            logger.LogInformation("After GetCounter() - returning promise");
             return ctr;
         }
     }

@@ -86,7 +86,7 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact, TestCategory("AWS")]
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
-            logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(SQSStreamProviderName, StreamNamespace);
         }
     }

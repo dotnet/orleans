@@ -84,8 +84,10 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
-                State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
+            logger.LogInformation(
+                "OnActivateAsync IsProducer = {IsProducer}, IsConsumer = {IsConsumer}.",
+                State.IsProducer,
+                State.ConsumerSubscriptionHandles is { Count: > 0 });
 
             if (Observers == null)
 #if USE_GENERICS
@@ -114,13 +116,13 @@ namespace UnitTests.Grains
             }
             else
             {
-                logger.Info("No stream yet.");
+                logger.LogInformation("No stream yet.");
             }
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
@@ -145,7 +147,7 @@ namespace UnitTests.Grains
 
         public Task Ping()
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
@@ -217,7 +219,7 @@ namespace UnitTests.Grains
 
         public async Task ClearGrain()
         {
-            logger.Info("ClearGrain.");
+            logger.LogInformation("ClearGrain.");
             State.ConsumerSubscriptionHandles.Clear();
             State.IsProducer = false;
             Observers.Clear();
@@ -366,7 +368,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
+            logger.LogInformation(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
             return Task.CompletedTask;
         }

@@ -80,7 +80,7 @@ namespace UnitTests.TimerTests
             }
 
             await grain.StopReminder(r2);
-            log.Info("Removed reminder2 successfully");
+            log.LogInformation("Removed reminder2 successfully");
 
             // trying to see if readreminder works
             _ = await grain.StartReminder(DR);
@@ -90,7 +90,7 @@ namespace UnitTests.TimerTests
 
             IGrainReminder r = await grain.GetReminderObject(DR);
             await grain.StopReminder(r);
-            log.Info("Removed got reminder successfully");
+            log.LogInformation("Removed got reminder successfully");
         }
 
         public async Task Test_Reminders_Basic_ListOps()
@@ -110,7 +110,7 @@ namespace UnitTests.TimerTests
             // do comparison on strings
             List<string> registered = (from reminder in startReminderTasks select reminder.Result.ReminderName).ToList();
 
-            log.Info("Waited");
+            log.LogInformation("Waited");
 
             List<IGrainReminder> remindersList = await grain.GetRemindersList();
             List<string> fetched = (from reminder in remindersList select reminder.ReminderName).ToList();
@@ -124,7 +124,7 @@ namespace UnitTests.TimerTests
             Assert.True(fetched.Count == 0, $"More than registered reminders. Extra: {Utils.EnumerableToString(fetched)}");
 
             // do some time tests as well
-            log.Info("Time tests");
+            log.LogInformation("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
             await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
             for (int i = 0; i < count; i++)
@@ -155,7 +155,7 @@ namespace UnitTests.TimerTests
 
             await Task.Delay(period.Multiply(5));
             // start another silo ... although it will take it a while before it stabilizes
-            log.Info("Starting another silo");
+            log.LogInformation("Starting another silo");
             await this.HostedCluster.StartAdditionalSilosAsync(1, true);
 
             //Block until all tasks complete.
@@ -349,7 +349,7 @@ namespace UnitTests.TimerTests
             sb.AppendFormat(
                 " -- Expecting value in the range between {0} and {1}, and got value {2}.",
                 lowerLimit, upperLimit, val);
-            this.log.Info(sb.ToString());
+            this.log.LogInformation("{Message}", sb.ToString());
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 

@@ -39,7 +39,7 @@ namespace UnitTests.Grains
         public async Task DoBadDeactivateNoClose()
         {
             if (logger.IsEnabled(LogLevel.Debug))
-                LoggerExtensions.LogDebug(logger, "DoBadDeactivateNoClose");
+                logger.LogDebug("DoBadDeactivateNoClose");
 
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.LogDebug("Suppressing Cleanup when Deactivate for stream {0}", State.Stream);
@@ -51,7 +51,7 @@ namespace UnitTests.Grains
             await WriteStateAsync();
 #endif
 
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "Calling DeactivateOnIdle");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Calling DeactivateOnIdle");
             base.DeactivateOnIdle();
         }
     }

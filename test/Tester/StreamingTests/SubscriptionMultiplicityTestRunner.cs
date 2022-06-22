@@ -355,7 +355,7 @@ namespace UnitTests.StreamingTests
             {
                 if (numProduced <= 0)
                 {
-                    logger.Info("numProduced <= 0: Events were not produced");
+                    logger.LogInformation("numProduced <= 0: Events were not produced");
                 }
                 if (consumerCount != numConsumed.Count)
                 {
@@ -392,7 +392,7 @@ namespace UnitTests.StreamingTests
             {
                 if (numProduced <= 0)
                 {
-                    logger.Info("numProduced <= 0: Events were not produced");
+                    logger.LogInformation("numProduced <= 0: Events were not produced");
                 }
                 if (numProduced != numConsumed)
                 {

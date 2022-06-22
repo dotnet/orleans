@@ -39,7 +39,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             await ReadStateAsync();
 

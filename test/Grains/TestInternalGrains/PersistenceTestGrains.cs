@@ -738,14 +738,14 @@ namespace UnitTests.Grains
 
         public Task Setup(IReentrentGrainWithState other)
         {
-            logger.Info("Setup");
+            logger.LogInformation("Setup");
             _other = other;
             return Task.CompletedTask;
         }
 
         public async Task SetOne(int val)
         {
-            logger.Info("SetOne Start");
+            logger.LogInformation("SetOne Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.One = val;
@@ -758,7 +758,7 @@ namespace UnitTests.Grains
 
         public async Task SetTwo(int val)
         {
-            logger.Info("SetTwo Start");
+            logger.LogInformation("SetTwo Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.Two = val;
@@ -771,7 +771,7 @@ namespace UnitTests.Grains
 
         public async Task Test1()
         {
-            logger.Info(" ==================================== Test1 Started");
+            logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
             for (var i = 1*Multiple; i < 2*Multiple; i++)
             {
@@ -792,12 +792,12 @@ namespace UnitTests.Grains
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
-            logger.Info(" ==================================== Test1 Done");
+            logger.LogInformation(" ==================================== Test1 Done");
         }
 
         public async Task Test2()
         {
-            logger.Info("==================================== Test2 Started");
+            logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
             for (var i = 2*Multiple; i < 3*Multiple; i++)
             {
@@ -818,18 +818,18 @@ namespace UnitTests.Grains
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
-            logger.Info(" ==================================== Test2 Done");
+            logger.LogInformation(" ==================================== Test2 Done");
         }
 
         public async Task Task_Delay(bool doStart)
         {
             var wrapper = new Task<Task>(async () =>
             {
-                logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(1);
-                logger.Info("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(2);
-                logger.Info("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
             });
 
             if (doStart)
@@ -964,11 +964,11 @@ namespace UnitTests.Grains
         {
             var wrapper = new Task<Task>(async () =>
             {
-                logger.Info("Before Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(1);
-                logger.Info("After Task.Delay #1 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(2);
-                logger.Info("After Task.Delay #2 TaskScheduler.Current=" + TaskScheduler.Current);
+                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
             });
 
             if (doStart)
@@ -1032,7 +1032,7 @@ namespace UnitTests.Grains
 
         public Task SetOne(int val)
         {
-            logger.Info("SetOne");
+            logger.LogInformation("SetOne");
             State.One = val;
             return Task.CompletedTask;
         }
@@ -1066,7 +1066,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 

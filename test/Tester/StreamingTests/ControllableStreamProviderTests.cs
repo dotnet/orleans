@@ -52,7 +52,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ControllableAdapterEchoTest()
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterEchoTest *********************************");
+            this.fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             const string echoArg = "blarg";
             await this.ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterEcho, echoArg);
         }
@@ -60,14 +60,14 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ControllableAdapterFactoryEchoTest()
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterFactoryEchoTest *********************************");
+            this.fixture.Logger.LogInformation("************************ ControllableAdapterFactoryEchoTest *********************************");
             const string echoArg = "blarg";
             await this.ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterFactoryEcho, echoArg);
         }
 
         private async Task ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands command, object echoArg)
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterEchoTest *********************************");
+            this.fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);

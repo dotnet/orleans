@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             var streamProvider = this.GetStreamProvider("SMSProvider");
             redStream = streamProvider.GetStream<int>(this.GetPrimaryKey(), "red");

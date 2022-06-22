@@ -34,7 +34,7 @@ namespace UnitTests.Grains
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
-            logger.Info("OnActivateAsync.");
+            logger.LogInformation("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
             return Task.CompletedTask;
@@ -42,7 +42,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            Logger().Info("OnDeactivateAsync.");
+            Logger().LogInformation("OnDeactivateAsync.");
             return Task.CompletedTask;
         }
 
@@ -57,39 +57,39 @@ namespace UnitTests.Grains
 
         public Task<TimeSpan> GetAge()
         {
-            Logger().Info("GetAge.");
+            Logger().LogInformation("GetAge.");
             return Task.FromResult(DateTime.UtcNow.Subtract(activated));
         }
 
         public virtual Task DeactivateSelf()
         {
-            Logger().Info("DeactivateSelf.");
+            Logger().LogInformation("DeactivateSelf.");
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
         public Task SetOther(ICollectionTestGrain other)
         {
-            Logger().Info("SetOther.");
+            Logger().LogInformation("SetOther.");
             this.other = other;
             return Task.CompletedTask;
         }
 
         public Task<TimeSpan> GetOtherAge()
         {
-            Logger().Info("GetOtherAge.");
+            Logger().LogInformation("GetOtherAge.");
             return other.GetAge();
         }
 
         public Task<string> GetRuntimeInstanceId()
         {
-            Logger().Info("GetRuntimeInstanceId.");
+            Logger().LogInformation("GetRuntimeInstanceId.");
             return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<ICollectionTestGrain> GetGrainReference()
         {
-            Logger().Info("GetGrainReference.");
+            Logger().LogInformation("GetGrainReference.");
             return Task.FromResult(this.AsReference<ICollectionTestGrain>());
         }
         public Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
@@ -132,14 +132,14 @@ namespace UnitTests.Grains
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
-            logger.Info("OnActivateAsync.");
+            logger.LogInformation("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            Logger().Info("OnDeactivateAsync.");
+            Logger().LogInformation("OnDeactivateAsync.");
             return Task.CompletedTask;
         }
 

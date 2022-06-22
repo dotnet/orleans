@@ -80,56 +80,56 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task AQMultipleParallelSubscriptionTest()
         {
-            logger.Info("************************ AQMultipleParallelSubscriptionTest *********************************");
+            logger.LogInformation("************************ AQMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQMultipleLinearSubscriptionTest()
         {
-            logger.Info("************************ AQMultipleLinearSubscriptionTest *********************************");
+            logger.LogInformation("************************ AQMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQMultipleSubscriptionTest_AddRemove()
         {
-            logger.Info("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
+            logger.LogInformation("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQResubscriptionTest()
         {
-            logger.Info("************************ AQResubscriptionTest *********************************");
+            logger.LogInformation("************************ AQResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQResubscriptionAfterDeactivationTest()
         {
-            logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
+            logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQActiveSubscriptionTest()
         {
-            logger.Info("************************ AQActiveSubscriptionTest *********************************");
+            logger.LogInformation("************************ AQActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQTwoIntermitentStreamTest()
         {
-            logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
+            logger.LogInformation("************************ AQTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQSubscribeFromClientTest()
         {
-            logger.Info("************************ AQSubscribeFromClientTest *********************************");
+            logger.LogInformation("************************ AQSubscribeFromClientTest *********************************");
             await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
         }
     }

@@ -172,7 +172,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "OnActivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
             await RecordActivate();
 
@@ -197,12 +197,12 @@ namespace UnitTests.Grains
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "Not conected to stream yet.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not conected to stream yet.");
             }
         }
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "OnDeactivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();
         }
 
@@ -221,7 +221,7 @@ namespace UnitTests.Grains
 
         public Task Ping()
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
@@ -266,7 +266,7 @@ namespace UnitTests.Grains
 
         public async Task ClearGrain()
         {
-            logger.Info("ClearGrain");
+            logger.LogInformation("ClearGrain");
             var subsHandles = State.ConsumerSubscriptionHandles.ToArray();
             foreach (var handle in subsHandles)
             {
@@ -289,7 +289,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "OnActivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
             await RecordActivate();
 
@@ -299,13 +299,13 @@ namespace UnitTests.Grains
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "Not connected to stream yet.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not connected to stream yet.");
             }
         }
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "OnDeactivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();
         }
 
@@ -325,7 +325,7 @@ namespace UnitTests.Grains
 
         public Task Ping()
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
@@ -338,7 +338,7 @@ namespace UnitTests.Grains
             {
                 await State.Stream.OnNextAsync(item);
 
-                if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "Successful SendItem " + item);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Successful SendItem " + item);
                 State.NumMessagesSent++;
             }
             catch (Exception exc)
@@ -371,7 +371,7 @@ namespace UnitTests.Grains
 
         public async Task ClearGrain()
         {
-            logger.Info("ClearGrain");
+            logger.LogInformation("ClearGrain");
             State.IsProducer = false;
             State.Stream = null;
             await ClearStateAsync();
@@ -379,13 +379,13 @@ namespace UnitTests.Grains
 
         public async Task DoDeactivateNoClose()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "DoDeactivateNoClose");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DoDeactivateNoClose");
 
             State.IsProducer = false;
             State.Stream = null;
             await WriteStateAsync();
 
-            if (logger.IsEnabled(LogLevel.Debug)) LoggerExtensions.LogDebug(logger, "Calling DeactivateOnIdle");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Calling DeactivateOnIdle");
             DeactivateOnIdle();
         }
     }

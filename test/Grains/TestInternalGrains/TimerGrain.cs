@@ -47,7 +47,11 @@ namespace UnitTestGrains
         private Task Tick(object data)
         {
             counter++;
-            logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
+            logger.LogInformation(
+                "{Data} Tick # {Counter} RuntimeContext = {RuntimeContext}",
+                data,
+                counter,
+                RuntimeContext.Current);
 
             // make sure we run in the right activation context.
             if(!Equals(context, RuntimeContext.Current))
