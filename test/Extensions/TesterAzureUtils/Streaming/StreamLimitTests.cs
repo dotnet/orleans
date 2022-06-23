@@ -82,7 +82,7 @@ namespace UnitTests.StreamingTests
                     .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
             }
 
-            public void Configure(IConfiguration configuration, Orleans.IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
 
         public StreamLimitTests(ITestOutputHelper output)

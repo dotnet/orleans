@@ -1,6 +1,6 @@
 using System;
 
-namespace Orleans.Serialization.TypeSystem
+namespace Orleans.Serialization
 {
     /// <summary>
     /// Converts between <see cref="Type"/> and <see cref="string"/> representations.
@@ -21,7 +21,7 @@ namespace Orleans.Serialization.TypeSystem
     /// <summary>
     /// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
     /// </summary>
-    public interface ITypeFilter
+    public interface ITypeNameFilter
     {
         /// <summary>
         /// Determines whether the specified type name corresponds to a type which is allowed to be loaded, serialized, deserialized, etcetera.
@@ -30,5 +30,18 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="assemblyName">Name of the assembly.</param>
         /// <returns><see langword="true" /> if the specified type is allowed; otherwise, <see langword="false" />.</returns>
         bool? IsTypeNameAllowed(string typeName, string assemblyName);
+    }
+
+    /// <summary>
+    /// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+    /// </summary>
+    public interface ITypeFilter
+    {
+        /// <summary>
+        /// Determines whether the specified type is allowed to be serialized, deserialized, etcetera.
+        /// </summary>
+        /// <param name="type">The type</param>
+        /// <returns><see langword="true" /> if the specified type is allowed; otherwise, <see langword="false" />.</returns>
+        bool? IsTypeAllowed(Type type);
     }
 }

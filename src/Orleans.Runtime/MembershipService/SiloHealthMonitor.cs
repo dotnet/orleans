@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace Orleans.Runtime.MembershipService
@@ -95,6 +96,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         public void Start()
         {
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             lock (_lockObj)
             {
                 if (_stoppingCancellation.IsCancellationRequested)
@@ -102,7 +104,7 @@ namespace Orleans.Runtime.MembershipService
                     throw new InvalidOperationException("This instance has already been stopped and cannot be started again");
                 }
 
-                if (_runTask is Task)
+                if (_runTask is not null)
                 {
                     throw new InvalidOperationException("This instance has already been started");
                 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -70,7 +71,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT")]
         public async Task SampleStreamingTests_1()
         {
-            this.logger.Info("************************ SampleStreamingTests_1 *********************************");
+            this.logger.LogInformation("************************ SampleStreamingTests_1 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
@@ -78,7 +79,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_2()
         {
-            this.logger.Info("************************ SampleStreamingTests_2 *********************************");
+            this.logger.LogInformation("************************ SampleStreamingTests_2 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
@@ -86,7 +87,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_3()
         {
-            this.logger.Info("************************ SampleStreamingTests_3 *********************************");
+            this.logger.LogInformation("************************ SampleStreamingTests_3 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_InlineConsumer(Guid.NewGuid());
         }
@@ -94,7 +95,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task MultipleImplicitSubscriptionTest()
         {
-            this.logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
+            this.logger.LogInformation("************************ MultipleImplicitSubscriptionTest *********************************");
             var streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
@@ -117,7 +118,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task FilteredImplicitSubscriptionGrainTest()
         {
-            this.logger.Info($"************************ {nameof(FilteredImplicitSubscriptionGrainTest)} *********************************");
+            this.logger.LogInformation($"************************ {nameof(FilteredImplicitSubscriptionGrainTest)} *********************************");
 
             var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
             var events = new[] { 3, 5, 2, 4 };
@@ -148,7 +149,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task FilteredImplicitSubscriptionWithExtensionGrainTest()
         {
-            logger.Info($"************************ {nameof(FilteredImplicitSubscriptionWithExtensionGrainTest)} *********************************");
+            logger.LogInformation($"************************ {nameof(FilteredImplicitSubscriptionWithExtensionGrainTest)} *********************************");
 
             var redEvents = new[] { 3, 5, 2, 4 };
             var blueEvents = new[] { 7, 3, 6 };
@@ -268,7 +269,7 @@ namespace UnitTests.StreamingTests
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            this.logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            this.logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);

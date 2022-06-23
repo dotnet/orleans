@@ -62,7 +62,7 @@ namespace Orleans
         public Type Task1Invoker { get; init; }
 
         /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns <see cref="void"/>.
+        /// Gets or sets the base type for the method call representation which is generated for any method which returns <see langword="void"/>.
         /// </summary>
         public Type VoidInvoker { get; init; }
     }
@@ -391,6 +391,14 @@ namespace Orleans
     }
 
     /// <summary>
+    /// When applied to a type, indicates that the type is a converter and that it should be automatically registered.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    public sealed class RegisterConverterAttribute : Attribute
+    {
+    }
+
+    /// <summary>
     /// When applied to a type, indicates that the type should be activated using a registered activator rather than via its constructor or another mechanism.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
@@ -510,5 +518,38 @@ namespace Orleans
         /// </summary>
         /// <value>The type.</value>
         public Type Type { get; }
+    }
+
+    /// <summary>
+    /// Functionality for converting between two types.
+    /// </summary>
+    public interface IConverter<TValue, TSurrogate> where TSurrogate : struct
+    {
+        /// <summary>
+        /// Converts a surrogate value to the value type.
+        /// </summary>
+        /// <param name="surrogate">The surrogate.</param>
+        /// <returns>The value.</returns>
+        TValue ConvertFromSurrogate(in TSurrogate surrogate);
+
+        /// <summary>
+        /// Converts a value to the valuetype.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The surrogate.</returns>
+        TSurrogate ConvertToSurrogate(in TValue value); 
+    }
+
+    /// <summary>
+    /// Functionality for populating one type from another.
+    /// </summary>
+    public interface IPopulator<TValue, TSurrogate> where TSurrogate : struct where TValue : class
+    {
+        /// <summary>
+        /// Populates <paramref name="value"/> with values from <paramref name="surrogate"/>.
+        /// </summary>
+        /// <param name="surrogate">The surrogate.</param>
+        /// <param name="value">The value.</param>
+        void Populate(in TSurrogate surrogate, TValue value);
     }
 }

@@ -126,15 +126,20 @@ namespace Orleans.Storage
         public Task Close(CancellationToken ct) => Task.CompletedTask;
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
         public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainReference);
-            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.StorageProviderBase,
-                "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}",
-                grainType, partitionKey, grainReference, this.options.TableName);
+            if (this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.LogTrace(
+                    (int)ErrorCode.StorageProviderBase,
+                    "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}",
+                    grainType,
+                    partitionKey,
+                    grainReference?.GrainId,
+                    this.options.TableName);
 
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
@@ -168,7 +173,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
         public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -189,9 +194,14 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase,
-                    string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
+                    grainType,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -272,7 +282,7 @@ namespace Orleans.Storage
         /// for this grain will be deleted / removed, otherwise the table row will be
         /// cleared by overwriting with default / null values.
         /// </remarks>
-        /// <see cref="IGrainStorage.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
         public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -280,9 +290,15 @@ namespace Orleans.Storage
             string partitionKey = GetKeyString(grainReference);
             if (this.logger.IsEnabled(LogLevel.Trace))
             {
-                this.logger.Trace(ErrorCode.StorageProviderBase,
-                    "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}",
-                    grainType, partitionKey, grainReference, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
+                this.logger.LogTrace(
+                    (int)ErrorCode.StorageProviderBase,
+                    "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
+                    grainType,
+                    partitionKey,
+                    grainReference?.GrainId,
+                    grainState.ETag,
+                    this.options.DeleteStateOnClear,
+                    this.options.TableName);
             }
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
             var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
@@ -307,8 +323,15 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError(
+                    (int)ErrorCode.StorageProviderBase,
+                    exc,
+                    "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
+                    operation,
+                    grainType,
+                    grainReference,
+                    grainState.ETag,
+                    this.options.TableName);
                 throw;
             }
         }
@@ -359,13 +382,15 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
                 }
+
                 if (dataValue != null)
                 {
-                    sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
+                    sb.AppendFormat("Data Value={DataValue} Type={DataType}", dataValue, dataValue.GetType());
                 }
 
-                this.logger.Error(0, sb.ToString(), exc);
-                throw new AggregateException(sb.ToString(), exc);
+                var message = sb.ToString();
+                this.logger.LogError(exc, "{Message}", message);
+                throw new AggregateException(message, exc);
             }
 
             return dataValue;
@@ -381,8 +406,12 @@ namespace Orleans.Storage
                 entity.BinaryState = null;
                 dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
-                    dataSize, entity.GrainReference, entity.GrainType);
+                if (this.logger.IsEnabled(LogLevel.Trace))
+                    this.logger.LogTrace(
+                        "Writing JSON data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
+                        dataSize,
+                        entity.GrainReference,
+                        entity.GrainType);
             }
             else
             {
@@ -391,7 +420,7 @@ namespace Orleans.Storage
                 entity.StringState = null;
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
 
@@ -401,7 +430,7 @@ namespace Orleans.Storage
 
             if ((pkSize + rkSize + versionSize + dataSize) > MAX_DATA_SIZE)
             {
-                var msg = string.Format("Data too large to write to DynamoDB table. Size={0} MaxSize={1}", dataSize, MAX_DATA_SIZE);
+                var msg = $"Data too large to write to DynamoDB table. Size={dataSize} MaxSize={MAX_DATA_SIZE}";
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }

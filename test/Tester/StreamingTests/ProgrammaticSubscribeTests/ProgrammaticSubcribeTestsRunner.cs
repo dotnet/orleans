@@ -282,7 +282,7 @@ namespace Tester.StreamingTests
                 numProduced += await p.GetNumberProduced();
             }
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);

@@ -19,14 +19,6 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 2.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '2.1.x'
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Build
@@ -49,14 +41,6 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -84,14 +68,6 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -115,14 +91,6 @@ jobs:
           MARIADB_ROOT_PASSWORD: "mariadb"
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -148,14 +116,6 @@ jobs:
           SA_PASSWORD: "yourWeak(!)Password"
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -181,14 +141,6 @@ jobs:
           - 10002:10002
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -211,14 +163,6 @@ jobs:
           - 8600:8600/udp
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -241,14 +185,6 @@ jobs:
           ALLOW_ANONYMOUS_LOGIN: "yes"
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
@@ -274,14 +210,6 @@ jobs:
           AWS_REGION: us-east-1
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1.x'
-    - name: Setup .NET 5.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test

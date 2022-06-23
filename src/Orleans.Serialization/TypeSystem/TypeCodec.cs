@@ -1,8 +1,11 @@
 using Orleans.Serialization.Buffers;
 using System;
 using System.Buffers;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -108,7 +111,7 @@ namespace Orleans.Serialization.TypeSystem
             }
 
             _ = _typeConverter.TryParse(typeNameString, out type);
-            if (type is object)
+            if (type is not null)
             {
                 var key = new TypeKey(hashCode, typeName.ToArray());
                 while (!_typeKeyCache.TryAdd(candidateHashCode++, (key, type)))
@@ -177,14 +180,12 @@ namespace Orleans.Serialization.TypeSystem
             _ = _typeConverter.TryParse(typeNameString, out type);
             var key = new TypeKey(hashCode, typeName.ToArray());
             typeString = key.ToString();
-            return type is object; 
+            return type is not null; 
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedVersion(byte version)
-        {
-            throw new NotSupportedException($"Type encoding version {version} is not supported");
-        }
+        [DoesNotReturn]
+        private static void ThrowUnsupportedVersion(byte version) => throw new NotSupportedException($"Type encoding version {version} is not supported");
 
         /// <summary>
         /// Represents a named type for the purposes of serialization.

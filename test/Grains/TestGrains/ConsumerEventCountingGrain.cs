@@ -49,7 +49,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _logger.Info("Consumer.OnActivateAsync");
+            _logger.LogInformation("Consumer.OnActivateAsync");
             _numConsumedItems = 0;
             _subscriptionHandle = null;
             return base.OnActivateAsync(cancellationToken);
@@ -57,7 +57,7 @@ namespace UnitTests.Grains
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("Consumer.OnDeactivateAsync");
+            _logger.LogInformation("Consumer.OnDeactivateAsync");
             await StopConsuming();
             _numConsumedItems = 0;
             await base.OnDeactivateAsync(reason, cancellationToken);
@@ -65,11 +65,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
-            _logger.Info("Consumer.BecomeConsumer");
-            if (streamId == null)
-            {
-                throw new ArgumentNullException("streamId");
-            }
+            _logger.LogInformation("Consumer.BecomeConsumer");
             if (String.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException("providerToUse");
@@ -83,13 +79,13 @@ namespace UnitTests.Grains
         private Task EventArrived(int evt)
         {
             _numConsumedItems++;
-            _logger.Info("Consumer.EventArrived. NumConsumed so far: " + _numConsumedItems);
+            _logger.LogInformation("Consumer.EventArrived. NumConsumed so far: {Count}", _numConsumedItems);
             return Task.CompletedTask;
         }
 
         public async Task StopConsuming()
         {
-            _logger.Info("Consumer.StopConsuming");
+            _logger.LogInformation("Consumer.StopConsuming");
             if (_subscriptionHandle != null && _consumer != null)
             {
                 await _subscriptionHandle.UnsubscribeAsync();

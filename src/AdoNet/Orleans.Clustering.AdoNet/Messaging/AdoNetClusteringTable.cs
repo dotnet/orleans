@@ -30,7 +30,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetClusteringTable.InitializeMembershipTable called.");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.InitializeMembershipTable called.");
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
@@ -48,7 +48,7 @@ namespace Orleans.Runtime.MembershipService
                 var wasCreated = await InitTableAsync();
                 if(wasCreated)
                 {
-                    logger.Info("Created new table version row.");
+                    logger.LogInformation("Created new table version row.");
                 }
             }
         }
@@ -56,14 +56,15 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("AdoNetClusteringTable.ReadRow called with key: {0}.", key));
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace("AdoNetClusteringTable.ReadRow called with key: {Key}.", key);
             try
             {
                 return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);                
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.ReadRow failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.ReadRow failed");
                 throw;
             }
         }
@@ -71,14 +72,14 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<MembershipTableData> ReadAll()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetClusteringTable.ReadAll called.");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.ReadAll called.");
             try
             {
                 return await orleansQueries.MembershipReadAllAsync(this.clusterId);                
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.ReadAll failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.ReadAll failed");
                 throw;
             }
         }
@@ -86,7 +87,11 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace($"AdoNetClusteringTable.InsertRow called with entry {entry} and tableVersion {tableVersion}.");
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace(
+                    "AdoNetClusteringTable.InsertRow called with entry {Entry} and tableVersion {TableVersion}.",
+                    entry,
+                    tableVersion);
 
             //The "tableVersion" parameter should always exist when inserting a row as Init should
             //have been called and membership version created and read. This is an optimization to
@@ -95,12 +100,12 @@ namespace Orleans.Runtime.MembershipService
             //Likewise, no update can be done without membership entry.
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.InsertRow aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             if (tableVersion == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.InsertRow aborted due to null check. TableVersion is null ");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. TableVersion is null ");
                 throw new ArgumentNullException("tableVersion");
             }
 
@@ -110,7 +115,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.InsertRow failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.InsertRow failed");
                 throw;
             }            
         }
@@ -118,7 +123,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.UpdateRow called with entry {0}, etag {1} and tableVersion {2}.", entry, etag, tableVersion));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("IMembershipTable.UpdateRow called with entry {Entry}, etag {ETag} and tableVersion {TableVersion}.", entry, etag, tableVersion);
 
             //The "tableVersion" parameter should always exist when updating a row as Init should
             //have been called and membership version created and read. This is an optimization to
@@ -127,12 +132,12 @@ namespace Orleans.Runtime.MembershipService
             //Likewise, no update can be done without membership entry or an etag.
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateRow aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             if (tableVersion == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateRow aborted due to null check. TableVersion is null ");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. TableVersion is null");
                 throw new ArgumentNullException("tableVersion");
             }
 
@@ -142,7 +147,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateRow failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.UpdateRow failed");
                 throw;
             }
         }
@@ -150,10 +155,11 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if(logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.UpdateIAmAlive called with entry {0}.", entry));
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace("IMembershipTable.UpdateIAmAlive called with entry {Entry}.", entry);
             if (entry == null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateIAmAlive aborted due to null check. MembershipEntry is null.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateIAmAlive aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
             try
@@ -162,7 +168,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.UpdateIAmAlive failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug(ex, "AdoNetClusteringTable.UpdateIAmAlive failed");
                 throw;
             }
         }
@@ -170,14 +177,16 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.DeleteMembershipTableEntries called with clusterId {0}.", clusterId));
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace("IMembershipTable.DeleteMembershipTableEntries called with clusterId {ClusterId}.", clusterId);
             try
             {
                 await orleansQueries.DeleteMembershipTableEntriesAsync(clusterId);
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.DeleteMembershipTableEntries failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug(ex, "AdoNetClusteringTable.DeleteMembershipTableEntries failed");
                 throw;
             }
         }
@@ -191,7 +200,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch(Exception ex)
             {
-                if(logger.IsEnabled(LogLevel.Trace)) logger.Trace("Insert silo membership version failed: {0}", ex.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(ex, "Insert silo membership version failed");
                 throw;
             }
         }

@@ -113,7 +113,7 @@ namespace Orleans
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 
             services.AddSerializer();
-            services.AddSingleton<ITypeFilter, AllowOrleansTypes>();
+            services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
@@ -147,9 +147,9 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A <see cref="ITypeFilter"/> which allows any type from an assembly containing "Orleans" in its name to be allowed for the purposes of serialization and deserialization.
+        /// A <see cref="ITypeNameFilter"/> which allows any type from an assembly containing "Orleans" in its name to be allowed for the purposes of serialization and deserialization.
         /// </summary>
-        private class AllowOrleansTypes : ITypeFilter
+        private class AllowOrleansTypes : ITypeNameFilter
         {
             /// <inheritdoc />
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)

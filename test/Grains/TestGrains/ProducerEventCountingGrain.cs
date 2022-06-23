@@ -22,25 +22,21 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _logger.Info("Producer.OnActivateAsync");
+            _logger.LogInformation("Producer.OnActivateAsync");
             _numProducedItems = 0;
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _logger.Info("Producer.OnDeactivateAsync");
+            _logger.LogInformation("Producer.OnDeactivateAsync");
             _numProducedItems = 0;
             await base.OnDeactivateAsync(reason, cancellationToken);
         }
 
         public Task BecomeProducer(Guid streamId, string providerToUse)
         {
-            _logger.Info("Producer.BecomeProducer");
-            if (streamId == null)
-            {
-                throw new ArgumentNullException("streamId");
-            }
+            _logger.LogInformation("Producer.BecomeProducer");
             if (String.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException("providerToUse");
@@ -58,7 +54,7 @@ namespace UnitTests.Grains
 
         public async Task SendEvent()
         {
-            _logger.Info("Producer.SendEvent called");
+            _logger.LogInformation("Producer.SendEvent called");
             if (_producer == null)
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");
@@ -68,7 +64,7 @@ namespace UnitTests.Grains
 
             // update after send in case of error
             _numProducedItems++;
-            _logger.Info("Producer.SendEvent - TotalSent: ({0})", _numProducedItems);
+            _logger.LogInformation("Producer.SendEvent - TotalSent: {Count}", _numProducedItems);
         }
     }
 }

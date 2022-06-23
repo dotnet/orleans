@@ -27,13 +27,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 
         public Task SetA(int a)
         {
-            logger.Info("SetA={0}", a);
+            logger.LogInformation("SetA={A}", a);
             A = a;
             return Task.CompletedTask;
         }
@@ -67,7 +67,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync.");
+            logger.LogInformation("OnDeactivateAsync.");
             return Task.CompletedTask;
         }
     }

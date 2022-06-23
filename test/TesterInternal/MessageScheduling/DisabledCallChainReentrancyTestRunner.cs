@@ -49,7 +49,7 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
-            this.logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
+            this.logger.LogInformation("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
         public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse(bool performDeadlockDetection)
@@ -82,7 +82,7 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout on stream item delivery to itself when CanInterleave predicate returns false");
             }
-            this.logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
+            this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
@@ -115,7 +115,7 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
-            this.logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
+            this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         public void UnorderedNonReentrantGrain(bool performDeadlockDetection)
@@ -149,7 +149,7 @@ namespace UnitTests
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
 
-            this.logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
+            this.logger.LogInformation("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
     }
 }

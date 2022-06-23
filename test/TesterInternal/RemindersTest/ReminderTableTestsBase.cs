@@ -39,7 +39,7 @@ namespace UnitTests.RemindersTest
             var serviceId = Guid.NewGuid().ToString() + "/foo";
             var clusterId = "test-" + serviceId + "/foo2";
 
-            logger.Info("ClusterId={0}", clusterId);
+            logger.LogInformation("ClusterId={ClusterId}", clusterId);
             this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
 
             this.remindersTable = this.CreateRemindersTable();

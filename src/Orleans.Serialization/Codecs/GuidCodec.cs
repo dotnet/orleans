@@ -88,6 +88,39 @@ namespace Orleans.Serialization.Codecs
 #endif
         }
 
+        public static void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, Guid value) where TBufferWriter : IBufferWriter<byte>
+        {
+#if NETCOREAPP3_1_OR_GREATER
+            writer.EnsureContiguous(Width);
+            if (value.TryWriteBytes(writer.WritableSpan))
+            {
+                writer.AdvanceSpan(Width);
+                return;
+            }
+#endif
+            writer.Write(value.ToByteArray());
+        }
+
+        public static Guid ReadRaw<TInput>(ref Reader<TInput> reader)
+        {
+#if NETCOREAPP3_1_OR_GREATER
+            if (reader.TryReadBytes(Width, out var readOnly))
+            {
+                return new Guid(readOnly);
+            }
+
+            Span<byte> bytes = stackalloc byte[Width];
+            for (var i = 0; i < Width; i++)
+            {
+                bytes[i] = reader.ReadByte();
+            }
+
+            return new Guid(bytes);
+#else
+            return new Guid(reader.ReadBytes(Width));
+#endif
+        }
+
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for {nameof(Guid)} fields. {field}");
     }

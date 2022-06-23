@@ -1,6 +1,4 @@
-using Orleans.Hosting;
-
-namespace Orleans
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Extensions for configuring grain call filters.

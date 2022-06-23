@@ -199,7 +199,10 @@ namespace Orleans.Providers.Streams.Common
                 return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
             }
 
-            logger.Warn(0, $"Got command {(PersistentStreamProviderCommand)command} with arg {arg}, but PullingAgentManager is not initialized yet. Ignoring the command.");
+            logger.LogWarning(
+                "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command.",
+                (PersistentStreamProviderCommand)command,
+                arg);
             throw new ArgumentException("PullingAgentManager is not initialized yet.");
         }
 

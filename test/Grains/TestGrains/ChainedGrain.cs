@@ -77,9 +77,8 @@ namespace UnitTests.Grains
                 return Task.CompletedTask;
             }
 
-            string msg = String.Format("ChainGrain Id={0} is in an invalid state. Next={1}", State.Id, State.Next);
-            logger.Warn(0, msg);
-            throw new OrleansException(msg);
+            logger.LogWarning("ChainGrain Id={Id} is in an invalid state. Next={Next}", State.Id, State.Next);
+            throw new OrleansException($"ChainGrain Id={State.Id} is in an invalid state. Next={State.Next}");
         }
 
         public Task PassThis(IChainedGrain next)

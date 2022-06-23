@@ -203,7 +203,7 @@ namespace UnitTests.StreamingTests
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainCount", "The grain count must be at least one");
-            logger.Info("ConsumerProxy.NewConsumerGrainsAsync: multiplexing {0} consumer grains for stream {1}.", grainCount, streamId);
+            logger.LogInformation("ConsumerProxy.NewConsumerGrainsAsync: multiplexing {GrainCount} consumer grains for stream {StreamId}.", grainCount, streamId);
             var grains = new IStreaming_ConsumerGrain[grainCount];
             var dedup = new Dictionary<Guid, IStreaming_ConsumerGrain>();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
@@ -234,7 +234,7 @@ namespace UnitTests.StreamingTests
             int grainCount = grainIds.Length;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainIds", "The grain count must be at least one");
-            logger.Info("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {0} consumer grains for stream {1}.", grainCount, streamId);
+            logger.LogInformation("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {GrainCount} consumer grains for stream {StreamId}.", grainCount, streamId);
             var grains = new IStreaming_ConsumerGrain[grainCount];
             var dedup = new Dictionary<int, IStreaming_ConsumerGrain>();
             for (var i = 0; i < grainCount; ++i)
@@ -263,7 +263,7 @@ namespace UnitTests.StreamingTests
         {
             if (consumerCount < 1)
                 throw new ArgumentOutOfRangeException("consumerCount", "argument must be 1 or greater");
-            logger.Info("ConsumerProxy.NewConsumerClientObjectsAsync: multiplexing {0} consumer client objects for stream {1}.", consumerCount, streamId);
+            logger.LogInformation("ConsumerProxy.NewConsumerClientObjectsAsync: multiplexing {ConsumerCount} consumer client objects for stream {StreamId}.", consumerCount, streamId);
             var objs = new IStreaming_ConsumerGrain[consumerCount];
             for (var i = 0; i < consumerCount; ++i)
                 objs[i] = Streaming_ConsumerClientObject.NewObserver(logger, client);
@@ -399,7 +399,7 @@ namespace UnitTests.StreamingTests
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainCount", "The grain count must be at least one");
-            logger.Info("ProducerProxy.NewProducerGrainsAsync: multiplexing {0} producer grains for stream {1}.", grainCount, streamId);
+            logger.LogInformation("ProducerProxy.NewProducerGrainsAsync: multiplexing {GrainCount} producer grains for stream {StreamId}.", grainCount, streamId);
             var grains = new IStreaming_ProducerGrain[grainCount];
             var dedup = new Dictionary<Guid, IStreaming_ProducerGrain>();
             var producerGrainFullName = typeof(Streaming_ProducerGrain).FullName;
@@ -430,7 +430,7 @@ namespace UnitTests.StreamingTests
             int grainCount = grainIds.Length;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainIds", "The grain count must be at least one");
-            logger.Info("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {0} producer grains for stream {1}.", grainCount, streamId);
+            logger.LogInformation("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {GrainCount} producer grains for stream {StreamId}.", grainCount, streamId);
             var grains = new IStreaming_ProducerGrain[grainCount];
             var dedup = new Dictionary<int, IStreaming_ProducerGrain>();
             for (var i = 0; i < grainCount; ++i)
@@ -462,7 +462,7 @@ namespace UnitTests.StreamingTests
             var producers = new IStreaming_ProducerGrain[producersCount];
             for (var i = 0; i < producersCount; ++i)
                 producers[i] = Streaming_ProducerClientObject.NewObserver(logger, client);
-            logger.Info("ProducerProxy.NewProducerClientObjectsAsync: multiplexing {0} producer client objects for stream {1}.", producersCount, streamId);
+            logger.LogInformation("ProducerProxy.NewProducerClientObjectsAsync: multiplexing {ProducerCount} producer client objects for stream {StreamId}.", producersCount, streamId);
             return NewProducerProxy(producers, streamId, streamProvider, streamNamespace, logger);
         }
 

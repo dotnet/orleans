@@ -100,7 +100,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.LogTrace("Forwarding message {Message} from {SendingSilo} to silo {TargetSilo}", msg.Id, msg.SendingSilo, msg.TargetSilo);
                 messageCenter.SendMessage(msg);
                 return;
             }
@@ -125,8 +125,8 @@ namespace Orleans.Runtime.Messaging
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
-                    this.Log.Debug(
-                        "Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
+                    this.Log.LogDebug(
+                        "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}.",
                         msg.TargetSilo.ToLongString(),
                         this.LocalSiloAddress.ToLongString(),
                         msg);
@@ -221,7 +221,7 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{LocalClusterId}""");
                 }
 
-                if (preamble.SiloAddress is object)
+                if (preamble.SiloAddress is not null)
                 {
                     this.RemoteSiloAddress = preamble.SiloAddress;
                     this.connectionManager.OnConnected(preamble.SiloAddress, this);
@@ -252,7 +252,7 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogDebug("Sending ping message {Message}", msg);
             }
 
-            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
+            if (this.RemoteSiloAddress is not null && msg.TargetSilo is not null && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
             {
                 this.Log.LogWarning(
                     "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",

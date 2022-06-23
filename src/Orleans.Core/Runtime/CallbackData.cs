@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -61,10 +62,16 @@ namespace Orleans.Runtime
 
             string messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}Target History is: {messageHistory}.";
-            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
+            this.shared.Logger.LogWarning(
+                (int)ErrorCode.Runtime_Error_100157,
+                "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage} Target History is: {MessageHistory}. About to break its promise.",
+                timeout,
+                msg,
+                statusMessage,
+                messageHistory);
 
-            var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
+            var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage} Target History is: {messageHistory}.");
+            var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
             //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
@@ -88,10 +95,15 @@ namespace Orleans.Runtime
             var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            var errorMsg =
-                $"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
-            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
-            var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
+            this.shared.Logger.LogWarning(
+                (int)ErrorCode.Runtime_Error_100157,
+                "The target silo became unavailable for message: {Message}. {StatusMessage}Target History is: {MessageHistory}. See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise.",
+                msg,
+                statusMessage,
+                messageHistory,
+                Constants.TroubleshootingHelpLink);
+            var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
+            var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
             //(this.Message.BodyObject as IDisposable)?.Dispose();
         }

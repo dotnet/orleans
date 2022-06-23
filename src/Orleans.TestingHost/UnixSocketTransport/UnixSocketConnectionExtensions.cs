@@ -1,18 +1,13 @@
 using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
-using Orleans.Networking.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
-public  static class UnixSocketConnectionExtensions
+public static class UnixSocketConnectionExtensions
 {
     public static ISiloBuilder UseUnixSocketConnection(this ISiloBuilder siloBuilder)
     {

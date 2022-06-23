@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace Orleans.Serialization.TypeSystem
@@ -48,7 +47,7 @@ namespace Orleans.Serialization.TypeSystem
 
         private bool TryPerformUncachedTypeResolution(string name, out Type type)
         {
-            IEnumerable<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             if (!TryPerformUncachedTypeResolution(name, out type, assemblies))
             {
                 return false;
@@ -81,7 +80,7 @@ namespace Orleans.Serialization.TypeSystem
             }
         }
 
-        private bool TryPerformUncachedTypeResolution(string fullName, out Type type, IEnumerable<Assembly> assemblies)
+        private bool TryPerformUncachedTypeResolution(string fullName, out Type type, Assembly[] assemblies)
         {
             if (null == assemblies)
             {

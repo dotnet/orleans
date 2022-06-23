@@ -267,14 +267,17 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.LogInformation((int)ErrorCode.MembershipJoining, "Joining");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToJoin, "Error updating status to Joining", exc);
+                this.log.LogError(
+                    (int)ErrorCode.MembershipFailedToJoin,
+                    exc,
+                    "Error updating status to Joining");
                 throw;
             }
         }
@@ -283,7 +286,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                this.log.Debug(ErrorCode.MembershipShutDown, "-Shutdown");
+                this.log.LogDebug((int)ErrorCode.MembershipShutDown, "-Shutdown");
             }
             
             try
@@ -292,7 +295,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error updating status to ShuttingDown", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToShutdown, exc, "Error updating status to ShuttingDown");
                 throw;
             }
         }
@@ -301,7 +304,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                log.Debug(ErrorCode.MembershipStop, "-Stop");
+                log.LogDebug((int)ErrorCode.MembershipStop, "-Stop");
             }
 
             try
@@ -310,7 +313,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.MembershipFailedToStop, "Error updating status to Stopping", exc);
+                log.LogError((int)ErrorCode.MembershipFailedToStop, exc, "Error updating status to Stopping");
                 throw;
             }
         }
@@ -332,8 +335,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogError(
                     (int)ErrorCode.MembershipFailedToKillMyself,
-                    "Failure updating status to " + nameof(SiloStatus.Dead) + ": {Exception}",
-                    exception);
+                    exception,
+                    "Failure updating status to " + nameof(SiloStatus.Dead));
                 throw;
             }
         }

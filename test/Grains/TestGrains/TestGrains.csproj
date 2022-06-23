@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests.Grains</RootNamespace>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <NoWarn>$(NoWarn);1591;1591;618</NoWarn>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
@@ -11,5 +11,6 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharpGrainInterfaces\TestFSharpGrainInterfaces.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
   </ItemGroup>
 </Project>

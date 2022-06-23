@@ -38,7 +38,7 @@ namespace Orleans.Transactions.TestKit
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            this.logger.LogInformation($"GrainId : {this.GetPrimaryKey()}.");
+            this.logger.LogInformation("GrainId {GrainId}", this.GetPrimaryKey());
 
             return base.OnActivateAsync(cancellationToken);
         }
@@ -47,7 +47,7 @@ namespace Orleans.Transactions.TestKit
         {
             return this.data.PerformUpdate(d =>
             {
-                this.logger.LogInformation($"Setting value {newValue}.");
+                this.logger.LogInformation("Setting value {NewValue}.", newValue);
                 d.Value = newValue;
             });
         }
@@ -66,7 +66,7 @@ namespace Orleans.Transactions.TestKit
            
             return this.data.PerformUpdate(d =>
             {
-                this.logger.LogInformation($"Adding {numberToAdd} to value {d.Value}.");
+                this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, d.Value);
                 d.Value += numberToAdd;
             });
         }

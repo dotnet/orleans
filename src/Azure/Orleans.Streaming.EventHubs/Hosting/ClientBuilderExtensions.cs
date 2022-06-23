@@ -5,7 +5,6 @@ namespace Orleans.Hosting
 {
     public static class ClientBuilderExtensions
     {
-
         /// <summary>
         /// Configure cluster client to use event hub persistent streams.
         /// </summary>

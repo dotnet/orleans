@@ -23,40 +23,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
-
-        /// <summary>
-        /// Add support for streaming to this silo.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        public static void AddSiloStreaming(this IServiceCollection services)
-        {
-            if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))
-            {
-                return;
-            }
-
-            services.AddSingleton<PubSubGrainStateStorageFactory>();
-            services.AddSingleton<SiloStreamProviderRuntime>();
-            services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
-            services.AddSingleton<ImplicitStreamSubscriberTable>();
-            services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
-            {
-                var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
-                var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
-                return new StreamConsumerExtension(runtime, grainContextAccessor.GrainContext?.GrainInstance as IStreamSubscriptionObserver);
-            });
-            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
-                new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
-            services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
-
-            // One stream directory per activation
-            services.AddScoped<StreamDirectory>();
-        }
+        public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(services => services.AddSiloStreaming());
 
         /// <summary>
         /// Configures the silo to use persistent streams.
@@ -149,18 +116,6 @@ namespace Orleans.Hosting
         public static IClientBuilder AddStreamFilter<T>(this IClientBuilder builder, string name) where T : class, IStreamFilter
         {
             return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
-        }
-
-        /// <summary>
-        /// Adds a stream filter. 
-        /// </summary>
-        /// <typeparam name="T">The stream filter type.</typeparam>
-        /// <param name="services">The service collection.</param>
-        /// <param name="name">The stream filter name.</param>
-        /// <returns>The service collection.</returns>
-        public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
-        {
-            return services.AddSingletonNamedService<IStreamFilter, T>(name);
         }
     }
 }

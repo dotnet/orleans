@@ -14,6 +14,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -84,7 +85,7 @@ namespace ServiceBus.Tests.StreamingTests
                               "left from previous tests")]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
-            this.fixture.Logger.Info("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
 
             int streamCount = 100;
             int eventsInStream = 10;

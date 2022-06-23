@@ -20,6 +20,9 @@ using System.Threading.Tasks;
 namespace Orleans.Serialization
 {
     /// <summary>
+    /// <see cref="IServiceCollection"/> extensions.
+    /// </summary>
+    /// <summary>
     /// Extensions for <see cref="IServiceCollection"/>.
     /// </summary>
     public static class ServiceCollectionExtensions
@@ -37,7 +40,7 @@ namespace Orleans.Serialization
             if (context is null)
             {
                 context = new ConfigurationContext(services);
-                foreach (var asm in ReferencedAssemblyHelper.GetRelevantAssemblies(services))
+                foreach (var asm in services.GetRelevantAssemblies())
                 {
                     context.Builder.AddAssembly(asm);
                 }
@@ -67,7 +70,7 @@ namespace Orleans.Serialization
                 services.TryAddSingleton(typeof(IBaseCopier<>), typeof(BaseCopierHolder<>));
 
                 // Type filtering
-                services.AddSingleton<ITypeFilter, DefaultTypeFilter>();
+                services.AddSingleton<ITypeNameFilter, DefaultTypeFilter>();
 
                 // Session
                 services.TryAddSingleton<SerializerSessionPool>();
@@ -117,19 +120,11 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
-        private class SerializerBuilder : ISerializerBuilderImplementation
+        private class SerializerBuilder : ISerializerBuilder
         {
-            private readonly IServiceCollection _services;
+            public SerializerBuilder(IServiceCollection services) => Services = services;
 
-            public SerializerBuilder(IServiceCollection services) => _services = services;
-
-            public Dictionary<object, object> Properties { get; } = new();
-
-            public ISerializerBuilderImplementation ConfigureServices(Action<IServiceCollection> configureDelegate)
-            {
-                configureDelegate(_services);
-                return this;
-            }
+            public IServiceCollection Services { get; }
         }
 
         private sealed class ActivatorHolder<T> : IActivator<T>, IServiceHolder<IActivator<T>>

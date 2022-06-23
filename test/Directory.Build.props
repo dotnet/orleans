@@ -14,10 +14,12 @@
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;net6.0;netcoreapp3.1</TestTargetFrameworks>
+    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net6.0</TestTargetFrameworks>
+    <MinTestTargetFramework Condition="'$(MinTestTargetFramework)' == ''">net6.0</MinTestTargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="*.xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
 </Project>

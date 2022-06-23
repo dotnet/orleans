@@ -22,6 +22,13 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
+            var (requestContextData, runningRequest) = RequestContextExtensions.ExportInternal(this.deepCopier);
+            var callChainId = runningRequest switch
+            {
+                Message msg when msg.CallChainId != Guid.Empty => msg.CallChainId,
+                _ => Guid.NewGuid(),
+            };
+
             var message = new Message
             {
                 Category = Message.Categories.Application,
@@ -31,7 +38,8 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
-                RequestContextData = RequestContextExtensions.Export(this.deepCopier)
+                RequestContextData = requestContextData,
+                CallChainId = callChainId,
             };
 
             messagingTrace.OnCreateMessage(message);
@@ -48,6 +56,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
+                CallChainId = request.CallChainId,
             };
 
             if (!request.SendingGrain.IsDefault)
@@ -93,7 +102,13 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            if (this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug(
+                    ex,
+                    "Creating {RejectionType} rejection with info '{Info}' at:" + Environment.NewLine + "{StackTrace}",
+                    type,
+                    info,
+                    Utils.GetStackTrace());
             return response;
         }
 

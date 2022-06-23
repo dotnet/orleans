@@ -29,11 +29,11 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            logger.Info("Starting Silo Watchdog.");
+            logger.LogInformation("Starting Silo Watchdog.");
             var now = DateTime.UtcNow;
             lastHeartbeat = now;
             lastWatchdogCheck = now;
-            if (thread is object) throw new InvalidOperationException("Watchdog.Start may not be called more than once");
+            if (thread is not null) throw new InvalidOperationException("Watchdog.Start may not be called more than once");
             this.thread = new Thread(this.Run)
             {
                 IsBackground = true,

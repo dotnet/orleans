@@ -37,7 +37,7 @@ namespace Orleans.Transactions
             DateTime ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
+                logger.LogTrace("{TotalMilliseconds} start transaction {TransactionId} at {TimeStamp}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), guid, ts.ToString("o"));
             this.statistics.TrackTransactionStarted();
             return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
@@ -47,7 +47,7 @@ namespace Orleans.Transactions
             transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
+                logger.LogTrace("{ElapsedMilliseconds} prepare {TransactionInfo}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo);
 
             if (transactionInfo.Participants.Count == 0)
             {
@@ -102,7 +102,7 @@ namespace Orleans.Transactions
                     {
                         status = s;
                         if (logger.IsEnabled(LogLevel.Debug))
-                            logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
+                            logger.LogDebug("{TotalMilliseconds} fail {TransactionId} prepare response status={status}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId, status);
                         break;
                     }
                 }
@@ -112,14 +112,14 @@ namespace Orleans.Transactions
             catch (TimeoutException ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadOnly");
+                    logger.LogDebug("{TotalMilliseconds} timeout {TransactionId} on CommitReadOnly", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
                 status = TransactionalStatus.ParticipantResponseTimeout;
                 exception = ex;
             }
             catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadOnly");
+                    logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadOnly", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
                 this.logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
                 exception = ex;
@@ -135,13 +135,23 @@ namespace Orleans.Transactions
                 catch (Exception ex)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadOnly");
-                    this.logger.LogWarning(ex, "Failed to abort readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                        logger.LogDebug(
+                            ex,
+                            "{TotalMilliseconds} failure aborting {TransactionId} CommitReadOnly",
+                            stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                            transactionInfo.TransactionId);
+                    this.logger.LogWarning(
+                        ex,
+                        "Failed to abort readonly transaction {TransactionId}",
+                        transactionInfo.TransactionId);
                 }
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
+                logger.LogTrace(
+                    "{ElapsedMilliseconds} finish (reads only) {TransactionId}",
+                    transactionInfo.TransactionId,
+                    stopwatch.Elapsed.TotalMilliseconds.ToString("f2"));
 
             return (status, exception);
         }
@@ -171,14 +181,14 @@ namespace Orleans.Transactions
             catch (TimeoutException ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadWriteTransaction");
+                    logger.LogDebug("{TotalMilliseconds} timeout {TransactionId} on CommitReadWriteTransaction", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
                 status = TransactionalStatus.TMResponseTimeout;
                 exception = ex;
             }
             catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadWriteTransaction");
+                    logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadWriteTransaction", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
                 this.logger.LogWarning(ex, "Unknown error while committing transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
                 exception = ex;
@@ -189,7 +199,7 @@ namespace Orleans.Transactions
                 try
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failed {transactionInfo.TransactionId} with status={status}");
+                        logger.LogDebug("{TotalMilliseconds} failed {TransactionId} with status={Status}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId, status);
 
                     // notify participants
                     if (status.DefinitelyAborted())
@@ -203,13 +213,13 @@ namespace Orleans.Transactions
                 catch (Exception ex)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadWriteTransaction");
+                        logger.LogDebug("{TotalMilliseconds} failure aborting {TransactionId} CommitReadWriteTransaction", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
                     this.logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
                 }
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
+                logger.LogTrace("{TotalMilliseconds} finish {TransactionId}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
 
             return (status, exception);
         }
@@ -221,7 +231,7 @@ namespace Orleans.Transactions
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
+                logger.LogTrace("Abort {TransactionInfo} {Participants}", transactionInfo, string.Join(",", participants.Select(p => p.ToString())));
 
             // send one-way abort messages to release the locks and roll back any updates
             await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()

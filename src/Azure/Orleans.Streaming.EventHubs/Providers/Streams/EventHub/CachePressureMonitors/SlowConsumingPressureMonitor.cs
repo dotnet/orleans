@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using System;
 using Microsoft.Extensions.Logging;
@@ -107,7 +107,10 @@ namespace Orleans.ServiceBus.Providers
                 this.nextCheckedTime = utcNow + this.PressureWindowSize;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
                 if(logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                    logger.LogDebug(
+                        "Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}",
+                        biggestPressureInCurrentWindow,
+                        FlowControlThreshold);
                 this.biggestPressureInCurrentWindow = 0;
             }
 
@@ -121,7 +124,10 @@ namespace Orleans.ServiceBus.Providers
                 {
                     this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                        logger.LogDebug(
+                            "Message ingestion is healthy. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}",
+                            biggestPressureInCurrentWindow,
+                            FlowControlThreshold);
                 }
                 this.wasUnderPressure = underPressure;
             }

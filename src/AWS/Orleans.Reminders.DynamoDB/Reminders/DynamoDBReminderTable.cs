@@ -69,7 +69,7 @@ namespace Orleans.Reminders.DynamoDB
                 this.options.CreateIfNotExists,
                 this.options.UpdateIfExists);
 
-            this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
+            this.logger.LogInformation((int)ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
@@ -132,8 +132,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.ReminderServiceBase,
+                    exc,
+                    "Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.",
+                    Utils.DictionaryToString(keys),
+                    this.options.TableName);
                 throw;
             }
         }
@@ -160,8 +164,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.ReminderServiceBase,
+                    exc,
+                    "Intermediate error reading reminder entry {Entries} from table {TableName}.",
+                    Utils.DictionaryToString(expressionValues),
+                    this.options.TableName);
                 throw;
             }
         }
@@ -216,8 +224,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.ReminderServiceBase,
+                    exc,
+                    "Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.",
+                    Utils.DictionaryToString(expressionValues),
+                    this.options.TableName);
                 throw;
             }
         }
@@ -302,8 +314,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error removing reminder entries {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.ReminderServiceBase,
+                    exc,
+                    "Intermediate error removing reminder entries {Entries} from table {TableName}.",
+                    Utils.DictionaryToString(expressionValues),
+                    this.options.TableName);
                 throw;
             }
         }
@@ -331,7 +347,7 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
 
                 await this.storage.PutEntryAsync(this.options.TableName, fields);
 
@@ -340,8 +356,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error updating entry {entry.ToString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.ReminderServiceBase,
+                    exc,
+                    "Intermediate error updating entry {Entry} to the table {TableName}.",
+                    entry.ToString(),
+                    options.TableName);
                 throw;
             }
         }

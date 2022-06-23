@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Counters
         /// </summary>
         public void Start()
         {
-            logger.Info(ErrorCode.PerfCounterStarting, "Starting Windows perf counter stats collection with frequency={0}", PerfCountersWriteInterval);
+            logger.LogInformation((int)ErrorCode.PerfCounterStarting, "Starting Windows perf counter stats collection with write interval {Interval}", PerfCountersWriteInterval);
 
             // Start the timer
             timer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), TimerTick, null, PerfCountersWriteInterval, PerfCountersWriteInterval);
@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Counters
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug(ErrorCode.PerfCounterStopping, "Stopping  Windows perf counter stats collection");
+                logger.LogDebug((int)ErrorCode.PerfCounterStopping, "Stopping Windows perf counter stats collection");
             }
             if (timer != null)
                 timer.Dispose(); // Stop timer
@@ -75,25 +75,22 @@ namespace Orleans.Runtime.Counters
 
                 if (numErrors > 0)
                 {
-                    logger.Warn(ErrorCode.PerfCounterWriteErrors,
-                                "Completed writing Windows perf counters with {0} errors", numErrors);
+                    logger.LogWarning((int)ErrorCode.PerfCounterWriteErrors, "Completed writing Windows perf counters with {ErrorCount} errors", numErrors);
                 }
                 else if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace(ErrorCode.PerfCounterWriteSuccess,
-                                    "Completed writing Windows perf counters successfully");
+                    logger.LogTrace((int)ErrorCode.PerfCounterWriteSuccess, "Completed writing Windows perf counters successfully");
                 }
 
                 if (numErrors > ERROR_THRESHOLD)
                 {
-                    logger.Error(ErrorCode.PerfCounterWriteTooManyErrors,
-                                "Too many errors writing Windows perf counters -- disconnecting counters");
+                    logger.LogError((int)ErrorCode.PerfCounterWriteTooManyErrors, "Too many errors writing Windows perf counters -- disconnecting counters");
                     shouldWritePerfCounters = false;
                 }
             }
             else if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace("Skipping - Writing Windows perf counters is disabled");
+                logger.LogTrace("Skipping - Writing Windows perf counters is disabled");
             }
         }
     }

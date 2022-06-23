@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -29,94 +30,34 @@ namespace Orleans.Runtime.Scheduler
 
         public static void QueueAction(this TaskScheduler taskScheduler, Action action)
         {
-            bool restoreFlow = false;
-            try
-            {
-                if (!ExecutionContext.IsFlowSuppressed())
-                {
-                    ExecutionContext.SuppressFlow();
-                    restoreFlow = true;
-                }
+            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
-                var task = new Task(action);
-                task.Start(taskScheduler);
-            }
-            finally
-            {
-                if (restoreFlow)
-                {
-                    ExecutionContext.RestoreFlow();
-                }
-            }
+            var task = new Task(action);
+            task.Start(taskScheduler);
         }
 
         public static void QueueAction(this TaskScheduler taskScheduler, Action<object> action, object state)
         {
-            bool restoreFlow = false;
-            try
-            {
-                if (!ExecutionContext.IsFlowSuppressed())
-                {
-                    ExecutionContext.SuppressFlow();
-                    restoreFlow = true;
-                }
+            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
-                var task = new Task(action, state);
-                task.Start(taskScheduler);
-            }
-            finally
-            {
-                if (restoreFlow)
-                {
-                    ExecutionContext.RestoreFlow();
-                }
-            }
+            var task = new Task(action, state);
+            task.Start(taskScheduler);
         }
 
         public static void QueueWorkItem(this TaskScheduler taskScheduler, IWorkItem todo)
         {
-            bool restoreFlow = false;
-            try
-            {
-                if (!ExecutionContext.IsFlowSuppressed())
-                {
-                    ExecutionContext.SuppressFlow();
-                    restoreFlow = true;
-                }
+            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
-                var workItemTask = new Task(TaskFunc, todo);
-                workItemTask.Start(taskScheduler);
-            }
-            finally
-            {
-                if (restoreFlow)
-                {
-                    ExecutionContext.RestoreFlow();
-                }
-            }
+            var workItemTask = new Task(TaskFunc, todo);
+            workItemTask.Start(taskScheduler);
         }
 
         public static void QueueThreadPoolWorkItem(this TaskScheduler taskScheduler, IThreadPoolWorkItem workItem)
         {
-            bool restoreFlow = false;
-            try
-            {
-                if (!ExecutionContext.IsFlowSuppressed())
-                {
-                    ExecutionContext.SuppressFlow();
-                    restoreFlow = true;
-                }
+            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
-                var workItemTask = new Task(ThreadPoolWorkItemTaskFunc , workItem);
-                workItemTask.Start(taskScheduler);
-            }
-            finally
-            {
-                if (restoreFlow)
-                {
-                    ExecutionContext.RestoreFlow();
-                }
-            }
+            var workItemTask = new Task(ThreadPoolWorkItemTaskFunc , workItem);
+            workItemTask.Start(taskScheduler);
         }
     }
 }

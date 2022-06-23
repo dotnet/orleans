@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost;

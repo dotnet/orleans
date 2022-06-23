@@ -28,7 +28,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             public void Enter(object caller)
             {
                 ++_depth;
-                if (caller is object)
+                if (caller is not null)
                 {
                     Callers.Add(caller);
                 }

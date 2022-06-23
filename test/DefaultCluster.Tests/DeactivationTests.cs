@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -29,7 +30,7 @@ namespace DefaultCluster.Tests.General
             sw.Stop();
 
             Assert.True(sw.ElapsedMilliseconds < 1000);
-            this.Logger.Info("Took {0}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
+            this.Logger.LogInformation("Took {ElapsedMilliseconds}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
 
             var a = await grain.GetA();
             Assert.Equal(99, a); // value of A survive deactivation and reactivation of the grain

@@ -167,7 +167,7 @@ namespace Orleans
             {
                 var manifest = _clusterManifestProvider.Current;
                 cache = _cache;
-                if (cache is object && cache.Version == manifest.Version)
+                if (cache is not null && cache.Version == manifest.Version)
                 {
                     return cache;
                 }
@@ -187,18 +187,6 @@ namespace Orleans
 
             foreach (var manifest in clusterManifest.AllGrainManifests)
             {
-                GrainType knownPrimary = default;
-                foreach (var grainInterface in manifest.Interfaces)
-                {
-                    var id = grainInterface.Key;
-
-                    if (grainInterface.Value.Properties.TryGetValue(WellKnownGrainInterfaceProperties.DefaultGrainType, out var defaultTypeString))
-                    {
-                        knownPrimary = GrainType.Create(defaultTypeString);
-                        continue;
-                    }
-                }
-
                 foreach (var grainType in manifest.Grains)
                 {
                     var id = grainType.Key;
@@ -220,26 +208,29 @@ namespace Orleans
 
                         // Try to work out the best primary implementation
                         result.TryGetValue(implemented, out var entry);
+
+                        var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
+                        if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
+
                         GrainType primaryImplementation;
-                        if (!knownPrimary.IsDefault)
-                        {
-                            primaryImplementation = knownPrimary;
-                        }
-                        else if (!entry.PrimaryImplementation.IsDefault)
+                        if (!entry.PrimaryImplementation.IsDefault)
                         {
                             primaryImplementation = entry.PrimaryImplementation;
                         }
+                        else if (interfaceProperties?.Properties is { } props && props.TryGetValue(WellKnownGrainInterfaceProperties.DefaultGrainType, out var defaultTypeString))
+                        {
+                            // A specified default grain type trumps others.
+                            primaryImplementation = GrainType.Create(defaultTypeString);
+                        }
                         else if (string.Equals(interfaceTypeName?.Substring(1), typeName, StringComparison.Ordinal))
                         {
+                            // Otherwise, a substring match on the interface name, dropping the 'I', is used.
                             primaryImplementation = id;
                         }
                         else
                         {
                             primaryImplementation = default;
                         }
-
-                        var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
-                        if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
                         result[implemented] = new CacheEntry(primaryImplementation, implementations);
                     }
                 }

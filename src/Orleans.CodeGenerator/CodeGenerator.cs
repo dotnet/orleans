@@ -258,6 +258,11 @@ namespace Orleans.CodeGenerator
                             metadataModel.DetectedCopiers.Add(symbol);
                         }
 
+                        if (symbol.HasAttribute(LibraryTypes.RegisterConverterAttribute))
+                        {
+                            metadataModel.DetectedConverters.Add(symbol);
+                        }
+
                         // Find all implementations of invokable interfaces
                         foreach (var iface in symbol.AllInterfaces)
                         {
@@ -280,7 +285,7 @@ namespace Orleans.CodeGenerator
                             return false;
                         }
 
-                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute, inherited: true) != null)
+                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute) != null)
                         {
                             return true;
                         }

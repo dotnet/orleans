@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.EnsureInitialized(sizeHint);
 
-            if (this.privateWriter != null || sizeHint > this.realMemory.Length - this.advanced)
+            if (this.privateWriter != null || sizeHint >= this.realMemory.Length - this.advanced)
             {
                 if (this.privateWriter == null)
                 {

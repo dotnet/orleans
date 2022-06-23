@@ -113,7 +113,7 @@ namespace Tester.AzureUtils.Streaming
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
             // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
             var numAgents = results.Select(Convert.ToInt32).ToArray();
-            logger.Info($"Got back NumberRunningAgents: {Utils.EnumerableToString(numAgents)}");
+            logger.LogInformation("Got back RunningAgentCounts: {RunningAgentCounts}", Utils.EnumerableToString(numAgents));
             int i = 0;
             foreach (var agents in numAgents)
             {

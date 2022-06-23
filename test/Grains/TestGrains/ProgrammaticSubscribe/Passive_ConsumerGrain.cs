@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             onAddCalledCount = 0;
             consumerObservers = new List<ICounterObserver>();
             consumerHandles = new List<StreamSubscriptionHandle<IFruit>>();
@@ -45,13 +45,13 @@ namespace UnitTests.Grains
                 sum += observer.NumConsumed;
             }
 
-            logger.Info($"GetNumberConsumed {sum}");
+            logger.LogInformation("GetNumberConsumed {Sum}", sum);
             return Task.FromResult(sum);
         }
 
         public async Task StopConsuming()
         {
-            logger.Info("StopConsuming");
+            logger.LogInformation("StopConsuming");
             foreach (var handle in consumerHandles)
             {
                 await handle.UnsubscribeAsync();
@@ -62,13 +62,13 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
-            logger.Info("OnAdd");
+            logger.LogInformation("OnAdd");
             this.onAddCalledCount++;
             var observer = new CounterObserver<IFruit>(this.logger);
             var newhandle = handleFactory.Create<IFruit>();
@@ -88,7 +88,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
@@ -118,19 +118,19 @@ namespace UnitTests.Grains
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
             this.NumConsumed++;
-            this.logger.Info($"Consumer {this.GetHashCode()} OnNextAsync() with NumConsumed {this.NumConsumed}");
+            this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            this.logger.Info($"Consumer {this.GetHashCode()} OnCompletedAsync()");
+            this.logger.LogInformation("Consumer {HashCode} OnCompletedAsync()", this.GetHashCode());
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            this.logger.Info($"Consumer {this.GetHashCode()} OnErrorAsync({ex})");
+            this.logger.LogInformation(ex, "Consumer {HashCode} OnErrorAsync()", this.GetHashCode());
             return Task.CompletedTask;
         }
     }
