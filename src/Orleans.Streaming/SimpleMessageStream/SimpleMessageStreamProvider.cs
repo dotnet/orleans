@@ -8,6 +8,7 @@ using Orleans.Streams.Core;
 using Orleans.Configuration;
 using Orleans.Streams.Filtering;
 using Orleans.Serialization;
+using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
