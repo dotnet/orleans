@@ -31,6 +31,7 @@ namespace Orleans.Transactions
         public TransactionInfo(TransactionInfo other) : this()
         {
             this.TransactionId = other.TransactionId;
+            this.TryToCommit = other.TryToCommit;
             this.IsReadOnly = other.IsReadOnly;
             this.TimeStamp = other.TimeStamp;
             this.Priority = other.Priority;
@@ -57,6 +58,9 @@ namespace Orleans.Transactions
         // zero means the resource was only read
         [Id(5)]
         public Dictionary<ParticipantId, AccessCounter> Participants { get; }
+
+        [Id(6)]
+        public bool TryToCommit { get; internal set; } = true;
 
         [NonSerialized]
         public int PendingCalls;
@@ -139,6 +143,10 @@ namespace Orleans.Transactions
             // take max of timestamp
             if (TimeStamp < other.TimeStamp)
                 TimeStamp = other.TimeStamp;
+
+            // take commit pending flag
+            if (TryToCommit)
+                TryToCommit = other.TryToCommit;
         }
 
         public void RecordRead(ParticipantId id, DateTime minTime)
@@ -177,6 +185,7 @@ namespace Orleans.Transactions
             return string.Join("",
                 $"{TransactionId} {TimeStamp:o}",
                 (IsReadOnly ? " RO" : ""),
+                (TryToCommit ? " Committing" : ""),
                 (OriginalException != null ? " Aborting" : ""),
                 $" {{{string.Join(" ", this.Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}"
             );

@@ -33,7 +33,7 @@ namespace Orleans.Hosting
         {
             services.TryAddSingleton<IClock, Clock>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
-            services.AddSingleton<ITransactionScope, TransactionScope>();
+            services.AddSingleton<ITransactionClient, TransactionClient>();
             services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
             services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
             return services;

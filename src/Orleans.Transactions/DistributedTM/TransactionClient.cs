@@ -6,22 +6,33 @@ using Orleans.Serialization;
 
 namespace Orleans.Transactions;
 
-internal class TransactionScope : ITransactionScope
+internal class TransactionClient : ITransactionClient
 {
     private readonly ITransactionAgent _transactionAgent;
     private readonly Serializer<OrleansTransactionAbortedException> _serializer;
 
-    public TransactionScope(ITransactionAgent transactionAgent, Serializer<OrleansTransactionAbortedException> serializer)
+    public TransactionClient(ITransactionAgent transactionAgent, Serializer<OrleansTransactionAbortedException> serializer)
     {
         _transactionAgent = transactionAgent;
         _serializer = serializer;
     }
 
-    public async Task RunScope(TransactionOption transactionOption, Func<Task> transactionScope)
+    public Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
     {
-        if (transactionScope is null)
+        return transactionDelegate is null
+            ? throw new ArgumentNullException(nameof(transactionDelegate))
+            : RunTransaction(transactionOption, async () =>
+            {
+                await transactionDelegate.Invoke();
+                return true;
+            });
+    }
+
+    public async Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate)
+    {
+        if (transactionDelegate is null)
         {
-            throw new ArgumentNullException(nameof(transactionScope));
+            throw new ArgumentNullException(nameof(transactionDelegate));
         }
 
         // Pick up ambient transaction context
@@ -29,12 +40,12 @@ internal class TransactionScope : ITransactionScope
 
         if (ambientTransactionInfo is not null && transactionOption == TransactionOption.Suppress)
         {
-            throw new NotSupportedException("Scope cannot be executed within a transaction.");
+            throw new NotSupportedException("Delegate cannot be executed within a transaction.");
         }
 
         if (ambientTransactionInfo is null && transactionOption == TransactionOption.Join)
         {
-            throw new NotSupportedException("Scope cannot be executed outside of a transaction.");
+            throw new NotSupportedException("Delegate cannot be executed outside of a transaction.");
         }
 
         try
@@ -42,59 +53,72 @@ internal class TransactionScope : ITransactionScope
             switch (transactionOption)
             {
                 case TransactionOption.Create:
-                    await RunScopeWithTransaction(null, transactionScope);
+                    await RunDelegateWithTransaction(null, transactionDelegate);
                     break;
                 case TransactionOption.Join:
-                    await RunScopeWithTransaction(ambientTransactionInfo, transactionScope);
+                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.CreateOrJoin:
-                    await RunScopeWithTransaction(ambientTransactionInfo, transactionScope);
+                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.Suppress:
-                    await RunScopeWithSupressedTransaction(transactionScope);
+                    await RunDelegateWithSupressedTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.Supported:
-                    await RunScopedWithSupportedTransaction(transactionScope);
+                    await RunDelegateWithSupportedTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.NotAllowed:
-                    await RunScopeWithDisallowedTransaction(ambientTransactionInfo, transactionScope);
+                    await RunDelegateWithDisallowedTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(transactionOption), $"{transactionOption} is not supported");
             }
         }
         finally
-        {
-            // Restore ambient transaction context, if any
+        {   // Restore ambient transaction context, if any
             TransactionContext.SetTransactionInfo(ambientTransactionInfo);
         }
     }
 
-    private static async Task RunScopeWithDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task> transactionScope)
+    private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is not null)
-        {   // No transaction is allowed within scope
-            throw new NotSupportedException("Scope cannot be executed within a transaction.");
+        {   // No transaction is allowed within delegate
+            throw new NotSupportedException("Delegate cannot be executed within a transaction.");
         }
 
-        // Run scope
-        await transactionScope.Invoke();
+        // Run delegate
+        ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
     }
 
-    private static async Task RunScopedWithSupportedTransaction(Func<Task> transactionScope) =>
-        // Run scope
-        await transactionScope.Invoke();
+    private static async Task RunDelegateWithSupportedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    {
+        if (ambientTransactionInfo is null)
+        {   // Run delegate
+            _ = await transactionDelegate.Invoke();
+        }
+        else
+        {   // Run delegate
+            ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        }
+    }
 
-    private static async Task RunScopeWithSupressedTransaction(Func<Task> transactionScope)
+    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         // Clear transaction context
         TransactionContext.Clear();
 
-        // Run scope
-        await transactionScope.Invoke();
+        if (ambientTransactionInfo is null)
+        {   // Run delegate
+            _ = await transactionDelegate.Invoke();
+        }
+        else
+        {   // Run delegate
+            ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        }
     }
 
-    private async Task RunScopeWithTransaction(TransactionInfo ambientTransactionInfo, Func<Task> transactionScope)
+    private async Task RunDelegateWithTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         TransactionInfo transactionInfo;
 
@@ -115,8 +139,8 @@ internal class TransactionScope : ITransactionScope
         TransactionContext.SetTransactionInfo(transactionInfo);
 
         try
-        {   // Run scope
-            await transactionScope.Invoke();
+        {   // Run delegate
+            transactionInfo.TryToCommit = await transactionDelegate.Invoke();
         }
         catch (Exception exception)
         {   // Record exception with transaction
@@ -131,8 +155,7 @@ internal class TransactionScope : ITransactionScope
             await FinalizeTransaction(transactionInfo);
         }
         else
-        {
-            // Join transaction into ambient transaction
+        {   // Join transaction with ambient transaction
             ambientTransactionInfo.Join(transactionInfo);
         }
     }
@@ -145,7 +168,7 @@ internal class TransactionScope : ITransactionScope
         // Check if transaction is pending for abort
         transactionException = transactionInfo.MustAbort(_serializer);
 
-        if (transactionException is not null)
+        if (transactionException is not null || transactionInfo.TryToCommit is false)
         {   // Transaction is pending for abort
             await _transactionAgent.Abort(transactionInfo);
         }
