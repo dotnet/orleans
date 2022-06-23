@@ -40,7 +40,7 @@ namespace Orleans.Serialization
             if (context is null)
             {
                 context = new ConfigurationContext(services);
-                foreach (var asm in ReferencedAssemblyHelper.GetRelevantAssemblies(services))
+                foreach (var asm in services.GetRelevantAssemblies())
                 {
                     context.Builder.AddAssembly(asm);
                 }

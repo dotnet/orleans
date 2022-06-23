@@ -56,7 +56,7 @@ namespace UnitTests.Grains
         public Task<string> TraceIdEcho()
         {
             string traceId = RequestContext.Get("TraceId") as string;
-            logger.Info(0, "{0}: TraceId={1}", "TraceIdEcho", traceId);
+            logger.LogInformation("{Method}: TraceId={TraceId}", "TraceIdEcho", traceId);
             return Task.FromResult(traceId);
         }
 
@@ -69,14 +69,14 @@ namespace UnitTests.Grains
         public Task<string> TraceIdDelayedEcho1()
         {
             string method = "TraceIdDelayedEcho1";
-            logger.Info(0, "{0}: Entered", method);
+            logger.LogInformation("{Method}: Entered", method);
             string traceIdOutside = RequestContext.Get("TraceId") as string;
-            logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
+            logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.Factory.StartNew(() =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
-                logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);
+                logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
         }
@@ -84,14 +84,14 @@ namespace UnitTests.Grains
         public Task<string> TraceIdDelayedEcho2()
         {
             string method = "TraceIdDelayedEcho2";
-            logger.Info(0, "{0}: Entered", method);
+            logger.LogInformation("{Method}: Entered", method);
             string traceIdOutside = RequestContext.Get("TraceId") as string;
-            logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
+            logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.CompletedTask.ContinueWith(task =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
-                logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);
+                logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
         }
@@ -99,31 +99,31 @@ namespace UnitTests.Grains
         public async Task<string> TraceIdDelayedEchoAwait()
         {
             string method = "TraceIdDelayedEchoAwait";
-            logger.Info(0, "{0}: Entered", method);
+            logger.LogInformation("{Method}: Entered", method);
             string traceIdOutside = RequestContext.Get("TraceId") as string;
-            logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
+            logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             string traceId = await Task.CompletedTask.ContinueWith(task =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
-                logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);
+                logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
-            logger.Info(0, "{0}: After await TraceId={1}", "TraceIdDelayedEchoAwait", traceId);
+            logger.LogInformation("{Method}: After await TraceId={TraceId}", "TraceIdDelayedEchoAwait", traceId);
             return traceId;
         }
 
         public Task<string> TraceIdDelayedEchoTaskRun()
         {
             string method = "TraceIdDelayedEchoTaskRun";
-            logger.Info(0, "{0}: Entered", method);
+            logger.LogInformation("{Method}: Entered", method);
             string traceIdOutside = RequestContext.Get("TraceId") as string;
-            logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
+            logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.Run(() =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
-                logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);
+                logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
         }
@@ -141,14 +141,14 @@ namespace UnitTests.Grains
             Task task = Task.Factory.StartNew(() =>
             {
                 bar1 = (string)RequestContext.Get("jarjar");
-                logger.Info("jarjar inside Task.Factory.StartNew = {0}.", bar1);
+                logger.LogInformation("jarjar inside Task.Factory.StartNew = {Bar}.", bar1);
             });
 
             string bar2 = null;
             Task ac = Task.Factory.StartNew(() =>
             {
                 bar2 = (string)RequestContext.Get("jarjar");
-                logger.Info("jarjar inside Task.StartNew  = {0}.", bar2);
+                logger.LogInformation("jarjar inside Task.StartNew  = {Bar}.", bar2);
             });
 
             await Task.WhenAll(task, ac);

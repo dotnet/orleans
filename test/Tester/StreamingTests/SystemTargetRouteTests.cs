@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
@@ -62,7 +63,7 @@ namespace Tester.StreamingTests
         {
             const int streamCount = 100;
 
-            this.fixture.Logger.Info("************************ PersistentStreamingOverSingleGatewayTest *********************************");
+            this.fixture.Logger.LogInformation("************************ PersistentStreamingOverSingleGatewayTest *********************************");
 
             // generate stream Id's
             List<Guid> streamIds = Enumerable.Range(0, streamCount)

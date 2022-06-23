@@ -1085,9 +1085,11 @@ namespace Orleans.Runtime
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    _shared.Logger.Debug(
-                        ErrorCode.Catalog_RerouteAllQueuedMessages,
-                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, this));
+                    _shared.Logger.LogDebug(
+                        (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
+                        "RejectAllQueuedMessages: {Count} messages from invalid activation {Activation}.",
+                        msgs.Count,
+                        this);
                 _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
@@ -1155,7 +1157,7 @@ namespace Orleans.Runtime
                 _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    _shared.Logger.Debug("InitActivation is done: {0}", Address);
+                    _shared.Logger.LogDebug("InitActivation is done: {Address}", Address);
                 }
             }
             catch (Exception exception)
@@ -1294,12 +1296,17 @@ namespace Orleans.Runtime
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
                             var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(ForwardingAddress.GrainId);
-                            var logMsg =
-                                $"Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. " +
-                                $"GrainInstance Type is {GrainInstance?.GetType()}. " +
-                                $"{(primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty)}" +
-                                $"Full activation address is {Address.ToFullString()}. We have {WaitingCount} messages to forward.";
-                            _shared.Logger.Debug(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                            _shared.Logger.LogDebug(
+                                (int)ErrorCode.Catalog_DuplicateActivation,
+                                "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
+                                + "GrainInstance Type is {GrainInstanceType}. {PrimaryMessage}"
+                                + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
+                                Address,
+                                ForwardingAddress,
+                                GrainInstance?.GetType(),
+                                primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty,
+                                Address.ToFullString(),
+                                WaitingCount);
                         }
                     }
 
@@ -1438,7 +1445,12 @@ namespace Orleans.Runtime
                 try
                 {
                     // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                        _shared.Logger.LogDebug(
+                            (int)ErrorCode.Catalog_BeforeCallingDeactivate,
+                            "About to call {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                            this,
+                            GrainInstance?.GetType().FullName);
 
                     // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
                     try
@@ -1455,17 +1467,30 @@ namespace Orleans.Runtime
                             await Lifecycle.OnStop(ct).WithCancellation(ct, "Timed out waiting for grain lifecycle to complete deactivation");
                         }
 
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync(...) method {0}", this, GrainInstance?.GetType().FullName);
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            _shared.Logger.LogDebug(
+                                (int)ErrorCode.Catalog_AfterCallingDeactivate,
+                                "Returned from calling {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                                this,
+                                GrainInstance?.GetType().FullName);
                     }
                     catch (Exception exc)
                     {
-                        _shared.Logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                            string.Format("Error calling grain's OnDeactivateAsync(...) method - Grain type = {1} Activation = {0}", this, GrainInstance?.GetType().FullName), exc);
+                        _shared.Logger.LogError(
+                            (int)ErrorCode.Catalog_ErrorCallingDeactivate,
+                            exc,
+                            "Error calling grain's OnDeactivateAsync(...) method - Grain type = {GrainType} Activation = {Activation}",
+                            GrainInstance?.GetType().FullName,
+                            this);
                     }
                 }
                 catch (Exception exc)
                 {
-                    _shared.Logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, string.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", this), exc);
+                    _shared.Logger.LogError(
+                        (int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception,
+                        exc,
+                        "CallGrainDeactivateAndCleanupStreams Activation = {Activation} failed.",
+                        this);
                 }
             }
         }

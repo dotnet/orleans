@@ -380,12 +380,12 @@ namespace Orleans.Runtime.Messaging
 
                     if (!TrySend(msg))
                     {
-                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
+                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
                         _pendingToSend.Enqueue(msg);
                     }
                     else
                     {
-                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
+                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent message {Message} to client {TargetGrain}", msg, msg.TargetGrain);
                     }
                 }
             }
@@ -421,7 +421,7 @@ namespace Orleans.Runtime.Messaging
                         var message = _pendingToSend.Peek();
                         if (TrySend(message))
                         {
-                            if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.Trace("Sent queued message {0} to client {1}", message, Id);
+                            if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent queued message {Message} to client {ClientId}", message, Id);
                             _pendingToSend.Dequeue();
                         }
                         else

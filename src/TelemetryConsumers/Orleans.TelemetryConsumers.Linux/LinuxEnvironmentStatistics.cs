@@ -121,7 +121,7 @@ namespace Orleans.Statistics
             // Format: "MemTotal:       16426476 kB"
             if (!long.TryParse(new string(memTotalLine.Where(char.IsDigit).ToArray()), out var totalMemInKb))
             {
-                _logger.LogWarning($"Couldn't parse meminfo output");
+                _logger.LogWarning("Couldn't parse meminfo output");
                 return;
             }
 
@@ -146,7 +146,7 @@ namespace Orleans.Statistics
 
             if (cpuNumberStrings.Any(n => !long.TryParse(n, out _)))
             {
-                _logger.LogWarning($"Failed to parse '{CPUSTAT_FILEPATH}' output correctly. Line: {cpuUsageLine}");
+                _logger.LogWarning($"Failed to parse '{CPUSTAT_FILEPATH}' output correctly. Line: {{CpuUsageLine}}", cpuUsageLine);
                 return;
             }
 
@@ -186,14 +186,14 @@ namespace Orleans.Statistics
                 memAvailableLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemFree");
                 if (string.IsNullOrWhiteSpace(memAvailableLine))
                 {
-                    _logger.LogWarning($"Couldn't read 'MemAvailable' or 'MemFree' line from '{MEMINFO_FILEPATH}'");
+                    _logger.LogWarning($"Failed to read 'MemAvailable' or 'MemFree' line from '{MEMINFO_FILEPATH}'");
                     return;
                 }
             }
 
             if (!long.TryParse(new string(memAvailableLine.Where(char.IsDigit).ToArray()), out var availableMemInKb))
             {
-                _logger.LogWarning($"Couldn't parse meminfo output: '{memAvailableLine}'");
+                _logger.LogWarning("Failed to parse meminfo output: '{MemAvailableLine}'", memAvailableLine);
                 return;
             }
 

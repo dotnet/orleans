@@ -151,7 +151,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public async Task Cleanup()
         {
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
+            if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
 
             myExtension?.RemoveStream(stream.InternalStreamId);
 
@@ -166,8 +166,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn((int) ErrorCode.StreamProvider_ProducerFailedToUnregister,
-                        "Ignoring unhandled exception during PubSub.UnregisterProducer", exc);
+                    logger.LogWarning(
+                        (int)ErrorCode.StreamProvider_ProducerFailedToUnregister,
+                        exc,
+                        "Ignoring unhandled exception during PubSub.UnregisterProducer");
                 }
             }
             isDisposed = true;

@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
@@ -64,9 +64,10 @@ namespace Orleans.ServiceBus.Providers
             {
                 this.isUnderPressure = underPressure;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.isUnderPressure, null, null, null);
-                logger.Info(this.isUnderPressure
-                    ? $"Ingesting messages too fast. Throttling message reading."
-                    : $"Message ingestion is healthy.");
+                logger.LogInformation(
+                    this.isUnderPressure
+                    ? "Ingesting messages too fast. Throttling message reading."
+                    : "Message ingestion is healthy.");
             }
             return underPressure;
         }

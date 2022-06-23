@@ -26,14 +26,14 @@ namespace UnitTests.Grains
 
             uniqueId = Guid.NewGuid();
             label = this.GetPrimaryKeyLong().ToString();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("!!! OnDeactivateAsync");
+            logger.LogInformation("!!! OnDeactivateAsync");
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
@@ -45,13 +45,13 @@ namespace UnitTests.Grains
         public Task SetLabel(string label)
         {
             this.label = label;
-            logger.Info("SetLabel {0} received", label);
+            logger.LogInformation("SetLabel {Label} received", label);
             return Task.CompletedTask;
         }
 
         public Task StartTimer()
         {
-            logger.Info("StartTimer.");
+            logger.LogInformation("StartTimer.");
             base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
             
             return Task.CompletedTask;
@@ -59,7 +59,7 @@ namespace UnitTests.Grains
 
         private Task TimerTick(object data)
         {
-            logger.Info("TimerTick.");
+            logger.LogInformation("TimerTick.");
             return Task.CompletedTask;
         }
 

@@ -47,11 +47,15 @@ namespace UnitTestGrains
         private Task Tick(object data)
         {
             counter++;
-            logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
+            logger.LogInformation(
+                "{Data} Tick # {Counter} RuntimeContext = {RuntimeContext}",
+                data,
+                counter,
+                RuntimeContext.Current);
 
             // make sure we run in the right activation context.
             if(!Equals(context, RuntimeContext.Current))
-                logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
+                logger.LogError((int)ErrorCode.Runtime_Error_100146, "Grain not running in the right activation context");
 
             string name = (string)data;
             IDisposable timer;
@@ -64,7 +68,7 @@ namespace UnitTestGrains
                 timer = allTimers[(string)data];
             }
             if(timer == null)
-                logger.Error((int)ErrorCode.Runtime_Error_100146, "Timer is null");
+                logger.LogError((int)ErrorCode.Runtime_Error_100146, "Timer is null");
             if (timer != null && counter > 10000)
             {
                 // do not let orphan timers ticking for long periods
@@ -157,7 +161,7 @@ namespace UnitTestGrains
 
         public Task StartTimer(string name, TimeSpan delay)
         {
-            logger.Info("StartTimer Name={0} Delay={1}", name, delay);
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
             this.timerName = name;
             this.timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
             return Task.CompletedTask;
@@ -165,10 +169,10 @@ namespace UnitTestGrains
 
         public Task StopTimer(string name)
         {
-            logger.Info("StopTimer Name={0}", name);
+            logger.LogInformation("StopTimer Name={Name}", name);
             if (name != this.timerName)
             {
-                throw new ArgumentException(string.Format("Wrong timer name: Expected={0} Actual={1}", this.timerName, name));
+                throw new ArgumentException($"Wrong timer name: Expected={this.timerName} Actual={name}");
             }
             timer.Dispose();
             return Task.CompletedTask;
@@ -252,9 +256,14 @@ namespace UnitTestGrains
 
         private void LogStatus(string what)
         {
-            logger.Info("{0} Tick # {1} - {2} - RuntimeContext.Current={3} TaskScheduler.Current={4} CurrentWorkerThread={5}",
-                        timerName, tickCount, what, RuntimeContext.Current, TaskScheduler.Current,
-                        Thread.CurrentThread.Name);
+            logger.LogInformation(
+                "{TimerName} Tick # {TickCount} - {Step} - RuntimeContext.Current={RuntimeContext} TaskScheduler.Current={TaskScheduler} CurrentWorkerThread={Thread}",
+                timerName,
+                tickCount,
+                what,
+                RuntimeContext.Current,
+                TaskScheduler.Current,
+                Thread.CurrentThread.Name);
         }
     }
 

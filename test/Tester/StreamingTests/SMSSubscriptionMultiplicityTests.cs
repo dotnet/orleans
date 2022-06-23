@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -38,55 +39,55 @@ namespace UnitTests.StreamingTests
         }
 
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
-        private readonly SubscriptionMultiplicityTestRunner runner;
-        private readonly Fixture fixture;
+        private readonly SubscriptionMultiplicityTestRunner _runner;
+        private readonly Fixture _fixture;
 
         public SMSSubscriptionMultiplicityTests(Fixture fixture)
         {
-            this.fixture = fixture;
-            runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, fixture.HostedCluster);
+            _fixture = fixture;
+            _runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, fixture.HostedCluster);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
-            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ SMSMultipleSubscriptionTest *********************************");
+            await _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
-            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ SMSAddAndRemoveSubscriptionTest *********************************");
+            await _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSResubscriptionTest *********************************");
-            await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ SMSResubscriptionTest *********************************");
+            await _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionAfterDeactivationTest()
         {
-            this.fixture.Logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
-            await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
+            await _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSActiveSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSActiveSubscriptionTest *********************************");
-            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ SMSActiveSubscriptionTest *********************************");
+            await _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSSubscribeFromClientTest()
         {
-            this.fixture.Logger.Info("************************ SMSSubscribeFromClientTest *********************************");
-            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+            _fixture.Logger.LogInformation("************************ SMSSubscribeFromClientTest *********************************");
+            await _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
         }
     }
 }

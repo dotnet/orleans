@@ -21,7 +21,7 @@ namespace Orleans.Connections.Security
         /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if LocalCertificateSelector is set.
         /// </para>
         /// <para>
-        /// To omit client authentication set to <c>null</c> on client and set <see cref="RemoteCertificateMode"/> to <see cref="RemoteCertificateMode.AllowCertificate"/> or <see cref="RemoteCertificateMode.NoCertificate"/> on server.
+        /// To omit client authentication set to <c>null</c> on client and set <see cref="RemoteCertificateMode"/> to <see cref="Orleans.Connections.Security.RemoteCertificateMode.AllowCertificate"/> or <see cref="Orleans.Connections.Security.RemoteCertificateMode.NoCertificate"/> on server.
         /// </para>
         /// <para>
         /// If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1) for server and Client Authentication (OID 1.3.6.1.5.5.7.3.2) for client.
@@ -51,12 +51,12 @@ namespace Orleans.Connections.Security
         public Func<object, string, X509CertificateCollection, X509Certificate, string[], X509Certificate2> LocalClientCertificateSelector { get; set; }
 
         /// <summary>
-        /// Specifies the remote endpoint certificate requirements for a TLS connection. Defaults to <see cref="RemoteCertificateMode.RequireCertificate"/>.
+        /// Specifies the remote endpoint certificate requirements for a TLS connection. Defaults to <see cref="Orleans.Connections.Security.RemoteCertificateMode.RequireCertificate"/>.
         /// </summary>
         public RemoteCertificateMode RemoteCertificateMode { get; set; } = RemoteCertificateMode.RequireCertificate;
 
         /// <summary>
-        /// Specifies the client authentication certificate requirements for a TLS connection to Silo. Defaults to <see cref="RemoteCertificateMode.AllowCertificate"/>.
+        /// Specifies the client authentication certificate requirements for a TLS connection to Silo. Defaults to <see cref="Orleans.Connections.Security.RemoteCertificateMode.AllowCertificate"/>.
         /// </summary>
         public RemoteCertificateMode ClientCertificateMode { get; set; } = RemoteCertificateMode.AllowCertificate;
 
@@ -67,7 +67,7 @@ namespace Orleans.Connections.Security
         public RemoteCertificateValidator RemoteCertificateValidation { get; set; }
 
         /// <summary>
-        /// Specifies allowable SSL protocols. Defaults to <see cref="SslProtocols.Tls12" /> and <see cref="SslProtocols.Tls11"/>.
+        /// Specifies allowable SSL protocols. Defaults to <see cref="System.Security.Authentication.SslProtocols.Tls12" /> and <see cref="System.Security.Authentication.SslProtocols.Tls11"/>.
         /// </summary>
         public SslProtocols SslProtocols { get; set; } = SslProtocols.Tls12 | SslProtocols.Tls11;
 

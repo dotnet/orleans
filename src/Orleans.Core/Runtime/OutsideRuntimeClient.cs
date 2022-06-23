@@ -147,7 +147,7 @@ namespace Orleans
             }
             catch (Exception exc)
             {
-                if (logger != null) logger.Error(ErrorCode.Runtime_Error_100319, "OutsideRuntimeClient constructor failed.", exc);
+                if (logger != null) logger.LogError((int)ErrorCode.Runtime_Error_100319, exc, "OutsideRuntimeClient constructor failed.");
                 ConstructorReset();
                 throw;
             }
@@ -234,7 +234,7 @@ namespace Orleans
                         break;
                     }
                 default:
-                    logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
+                    logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}.", message);
                     break;
             }
         }
@@ -291,7 +291,7 @@ namespace Orleans
                 context?.Complete();
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Send {Message}", message);
             MessageCenter.SendMessage(message);
         }
 
@@ -299,7 +299,7 @@ namespace Orleans
         {
             OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
 
             // ignore duplicate requests
             if (response.Result == Message.ResponseTypes.Rejection
@@ -346,7 +346,7 @@ namespace Orleans
             }
             else
             {
-                logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message {ResponseMessage}", response);
             }
         }
 
@@ -361,7 +361,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.Reset(): client Id {ClientId}", clientId);
                 }
             }, this.logger);
 
@@ -393,7 +393,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.ConstructorReset(): client Id {ClientId}", clientId);
                 }
             });
             
@@ -492,7 +492,7 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
             }
         }
 
@@ -505,7 +505,7 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending gateway count changed notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
             }
         }
 

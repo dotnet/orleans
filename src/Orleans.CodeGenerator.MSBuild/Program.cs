@@ -106,7 +106,9 @@ namespace Orleans.CodeGenerator.MSBuild
                 cmd.Log = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Orleans.CodeGenerator");
                 var stopwatch = Stopwatch.StartNew();
                 var ok = cmd.Execute(CancellationToken.None).GetAwaiter().GetResult();
-                cmd.Log.LogInformation($"Code generation completed in {stopwatch.ElapsedMilliseconds}ms.");
+                cmd.Log.LogInformation(
+                    "Code generation completed in {ElapsedMilliseconds}ms.",
+                    stopwatch.ElapsedMilliseconds);
                 if (ok)
                 {
                     return 0;

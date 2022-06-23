@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection);
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
+                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug("Rejecting a request due to overloading: {Message}", msg.ToString());
                 loadSheddingCounter.Increment();
                 return;
             }
@@ -156,14 +156,28 @@ namespace Orleans.Runtime.Messaging
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                if (this.Log.IsEnabled(LogLevel.Debug))
+                    this.Log.LogDebug(
+                        (int)ErrorCode.MessagingSendingRejection,
+                        "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}",
+                        this.myAddress,
+                        msg,
+                        reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", this.myAddress, msg, reason));
+                this.messageCenter.SendRejection(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                this.Log.LogInformation(
+                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}",
+                    this.myAddress,
+                    msg,
+                    reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }

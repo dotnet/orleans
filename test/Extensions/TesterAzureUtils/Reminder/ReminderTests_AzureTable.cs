@@ -7,6 +7,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
 using Orleans.Internal;
@@ -148,7 +149,7 @@ namespace Tester.AzureUtils.TimerTests
             await Task.Delay(period.Multiply(5));
 
             // start two extra silos ... although it will take it a while before they stabilize
-            log.Info("Starting 2 extra silos");
+            log.LogInformation("Starting 2 extra silos");
 
             await this.HostedCluster.StartAdditionalSilosAsync(2, true);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -190,7 +191,7 @@ namespace Tester.AzureUtils.TimerTests
 
             Thread.Sleep(period.Multiply(failAfter));
             // stop the secondary silo
-            log.Info("Stopping secondary silo");
+            log.LogInformation("Stopping secondary silo");
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
 
             await test; // Block until test completes.
@@ -221,7 +222,7 @@ namespace Tester.AzureUtils.TimerTests
             Thread.Sleep(period.Multiply(failAfter));
 
             // stop a couple of silos
-            log.Info("Stopping 2 silos");
+            log.LogInformation("Stopping 2 silos");
             int i = random.Next(silos.Count);
             await this.HostedCluster.StopSiloAsync(silos[i]);
             silos.RemoveAt(i);
@@ -257,7 +258,7 @@ namespace Tester.AzureUtils.TimerTests
 
             var siloToKill = silos[random.Next(silos.Count)];
             // stop a silo and join a new one in parallel
-            log.Info("Stopping a silo and joining a silo");
+            log.LogInformation("Stopping a silo and joining a silo");
             Task t1 = Task.Factory.StartNew(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
             Task t2 = this.HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
             {
@@ -266,7 +267,7 @@ namespace Tester.AzureUtils.TimerTests
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
-            log.Info("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
+            log.LogInformation("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -331,7 +332,7 @@ namespace Tester.AzureUtils.TimerTests
 
             var siloToKill = silos[random.Next(silos.Count)];
             // stop a silo and join a new one in parallel
-            log.Info("Stopping a silo and joining a silo");
+            log.LogInformation("Stopping a silo and joining a silo");
             Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
             Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);

@@ -215,7 +215,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             DelayDeactivation(TimeSpan.MaxValue);   // make sure this activation is not collected.
             cachedContent = RuntimeIdentity;        // store your silo identity as a local cached content in this grain.
             InstanceIdForThisSilo = this.AsReference<ILocalContentGrain>();
@@ -224,7 +224,7 @@ namespace UnitTests.Grains
 
         public Task Init()
         {
-            logger.Info("Init LocalContentGrain on silo " + RuntimeIdentity);
+            logger.LogInformation("Init LocalContentGrain on silo {RuntimeIdentity}", RuntimeIdentity);
             return Task.FromResult(0);
         }
 
@@ -245,26 +245,26 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 
         public Task<string> GetRuntimeInstanceId()
         {
-            logger.Info("GetRuntimeInstanceId");
+            logger.LogInformation("GetRuntimeInstanceId");
             return Task.FromResult(RuntimeIdentity);
         }
 
         public async Task<object> FetchContentFromLocalGrain()
         {
-            logger.Info("FetchContentFromLocalGrain");
+            logger.LogInformation("FetchContentFromLocalGrain");
             var localContentGrain = LocalContentGrain.InstanceIdForThisSilo;
             if (localContentGrain == null)
             {
                 throw new Exception("LocalContentGrain was not correctly initialized during silo startup!");
             }
             object content = await localContentGrain.GetContent();
-            logger.Info("Received content = {0}", content);
+            logger.LogInformation("Received content = {Content}", content);
             return content;
         }
     }

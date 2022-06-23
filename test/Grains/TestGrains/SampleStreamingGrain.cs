@@ -21,20 +21,20 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            hostingGrain.logger.Info("OnNextAsync(item={0}, token={1})", item, token != null ? token.ToString() : "null");
+            hostingGrain.logger.LogInformation("OnNextAsync(item={Item}, token={Token})", item, token != null ? token.ToString() : "null");
             hostingGrain.numConsumedItems++;
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            hostingGrain.logger.Info("OnCompletedAsync()");
+            hostingGrain.logger.LogInformation("OnCompletedAsync()");
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            hostingGrain.logger.Info("OnErrorAsync({0})", ex);
+            hostingGrain.logger.LogInformation(ex, "OnErrorAsync()", ex);
             return Task.CompletedTask;
         }
     }
@@ -55,14 +55,14 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
         }
 
         public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("BecomeProducer");
+            logger.LogInformation("BecomeProducer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             producer = streamProvider.GetStream<int>(streamId, streamNamespace);
             return Task.CompletedTask;
@@ -70,14 +70,14 @@ namespace UnitTests.Grains
 
         public Task StartPeriodicProducing()
         {
-            logger.Info("StartPeriodicProducing");
+            logger.LogInformation("StartPeriodicProducing");
             producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
             return Task.CompletedTask;
         }
 
         public Task StopPeriodicProducing()
         {
-            logger.Info("StopPeriodicProducing");
+            logger.LogInformation("StopPeriodicProducing");
             producerTimer.Dispose();
             producerTimer = null;
             return Task.CompletedTask;
@@ -85,7 +85,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberProduced()
         {
-            logger.Info("GetNumberProduced {0}", numProducedItems);
+            logger.LogInformation("GetNumberProduced {Count}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
 
@@ -110,12 +110,12 @@ namespace UnitTests.Grains
             RequestContext.Set(RequestContextKey, RequestContextValue);
             await producer.OnNextAsync(numProducedItems);
             numProducedItems++;
-            logger.Info("{0} (item={1})", caller, numProducedItems);
+            logger.LogInformation("{Caller} (item count={Count})", caller, numProducedItems);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
     }
@@ -135,7 +135,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             numConsumedItems = 0;
             consumerHandle = null;
             return Task.CompletedTask;
@@ -143,7 +143,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("BecomeConsumer");
+            logger.LogInformation("BecomeConsumer");
             consumerObserver = new SampleConsumerObserver<int>(this);
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
@@ -152,7 +152,7 @@ namespace UnitTests.Grains
 
         public async Task StopConsuming()
         {
-            logger.Info("StopConsuming");
+            logger.LogInformation("StopConsuming");
             if (consumerHandle != null)
             {
                 await consumerHandle.UnsubscribeAsync();
@@ -167,7 +167,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
     }
@@ -186,7 +186,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info( "OnActivateAsync" );
+            logger.LogInformation( "OnActivateAsync" );
             numConsumedItems = 0;
             consumerHandle = null;
             return Task.CompletedTask;
@@ -194,7 +194,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info( "BecomeConsumer" );
+            logger.LogInformation( "BecomeConsumer" );
             IStreamProvider streamProvider = this.GetStreamProvider( providerToUse );
             consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             consumerHandle = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
@@ -202,7 +202,7 @@ namespace UnitTests.Grains
 
         public async Task StopConsuming()
         {
-            logger.Info( "StopConsuming" );
+            logger.LogInformation( "StopConsuming" );
             if ( consumerHandle != null )
             {
                 await consumerHandle.UnsubscribeAsync();
@@ -218,26 +218,26 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync( int item, StreamSequenceToken token = null )
         {
-            logger.Info( "OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null" );
+            logger.LogInformation( "OnNextAsync({Item}{Token})", item, token != null ? token.ToString() : "null" );
             numConsumedItems++;
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            logger.Info( "OnCompletedAsync()" );
+            logger.LogInformation( "OnCompletedAsync()" );
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync( Exception ex )
         {
-            logger.Info( "OnErrorAsync({0})", ex );
+            logger.LogInformation(ex,  "OnErrorAsync()", ex );
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
     }

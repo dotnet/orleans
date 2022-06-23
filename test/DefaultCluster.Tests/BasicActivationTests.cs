@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -206,11 +207,11 @@ namespace DefaultCluster.Tests.General
             ITestGrain simple = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
 
             simple.GetMultipleGrainInterfaces_List().Wait();
-            this.Logger.Info("GetMultipleGrainInterfaces_List() worked");
+            this.Logger.LogInformation("GetMultipleGrainInterfaces_List() worked");
 
             simple.GetMultipleGrainInterfaces_Array().Wait();
 
-            this.Logger.Info("GetMultipleGrainInterfaces_Array() worked");
+            this.Logger.LogInformation("GetMultipleGrainInterfaces_Array() worked");
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"),
@@ -240,7 +241,7 @@ namespace DefaultCluster.Tests.General
                 }
                 catch (Exception)
                 {
-                    this.Logger.Info("Done with stress iteration.");
+                    this.Logger.LogInformation("Done with stress iteration.");
                 }
 
                 // wait a bit to make sure expired msgs in the silo is trigered.
@@ -249,9 +250,9 @@ namespace DefaultCluster.Tests.General
                 // set the regular response time back, expect msgs ot succeed.
                 this.SetResponseTimeout(prevTimeout);
                 
-                this.Logger.Info("About to send a next legit request that should succeed.");
+                this.Logger.LogInformation("About to send a next legit request that should succeed.");
                 grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
-                this.Logger.Info("The request succeeded.");
+                this.Logger.LogInformation("The request succeeded.");
             }
             finally
             {
@@ -265,10 +266,10 @@ namespace DefaultCluster.Tests.General
         {
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             Task<Tuple<string, string>> promise1 = g1.TestRequestContext();
-            Tuple<string, string> requstContext = promise1.Result;
-            this.Logger.Info("Request Context is: " + requstContext);
-            Assert.NotNull(requstContext.Item2);
-            Assert.NotNull(requstContext.Item1);
+            Tuple<string, string> requestContext = promise1.Result;
+            this.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
+            Assert.NotNull(requestContext.Item2);
+            Assert.NotNull(requestContext.Item1);
         }
     }
 }

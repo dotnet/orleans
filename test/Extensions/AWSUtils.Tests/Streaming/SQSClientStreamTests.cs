@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 using OrleansAWSUtils.Streams;
 using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 
@@ -86,7 +87,7 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact, TestCategory("AWS")]
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
-            logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(SQSStreamProviderName, StreamNamespace);
         }
     }

@@ -97,14 +97,19 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                     catch (OverflowException exc)
                     {
-                        log.Error(ErrorCode.ConsistentRingProviderBase + 5,
-                            String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
-                            hash, (uint)hash, myKey, (uint)myKey), exc);
+                        log.LogError(
+                            (int)ErrorCode.ConsistentRingProviderBase + 5,
+                            exc,
+                            "OverflowException: hash as int: x{Hash}, hash as uint: x{HashUInt}, myKey as int: x{MyKey}, myKey as uint: x{MyKeyUInt}.",
+                            hash.ToString("X8"),
+                            ((uint)hash).ToString("X8"),
+                            myKey.ToString("X8"),
+                            ((uint)myKey).ToString("X8"));
                     }
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.Info("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                log.LogInformation("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
             }
         }
 
@@ -113,7 +118,8 @@ namespace Orleans.Runtime.ConsistentRing
             lock (membershipRingList)
             {
                 if (membershipRingList.Count == 1)
-                    return Utils.EnumerableToString(membershipRingList, silo => String.Format("{0} -> {1}", silo.ToStringWithHashCode(), RangeFactory.CreateFullRange()));
+                    return Utils.EnumerableToString(membershipRingList, silo =>
+                        $"{silo.ToStringWithHashCode()} -> {RangeFactory.CreateFullRange()}");
 
                 var sb = new StringBuilder("[");
                 for (int i = 0; i < membershipRingList.Count; i++)
@@ -141,12 +147,12 @@ namespace Orleans.Runtime.ConsistentRing
                 int myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
-                    throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, this.ToString()));
+                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {this.ToString()}.");
 
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, this.ToString());
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
@@ -163,7 +169,12 @@ namespace Orleans.Runtime.ConsistentRing
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                 }
-                log.Info("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
+
+                log.LogInformation(
+                    "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
+                    silo,
+                    silo.GetConsistentHashCode(),
+                    this.ToString());
             }
         }
 
@@ -188,7 +199,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            log.Info("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
+            log.LogInformation("NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}", old, now, increased);
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
@@ -202,9 +213,14 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    log.Error(ErrorCode.CRP_Local_Subscriber_Exception,
-                        String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
-                        listener.GetType().FullName, old, now, increased), exc);
+                    log.LogError(
+                        (int)ErrorCode.CRP_Local_Subscriber_Exception,
+                        exc,
+                        "Local IRangeChangeListener {Name} has thrown an exception when was notified about RangeChangeNotification about old {OldRange} new {NewRange} increased? {IsIncrease}",
+                        listener.GetType().FullName,
+                        old,
+                        now,
+                        increased);
                 }
             }
         }
@@ -283,7 +299,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {SiloAddress} calculated ring partition owner silo {OwnerAddress} for key {Key}: {Key} --> {OwnerHash}", MyAddress, siloAddress, hash, hash, siloAddress?.GetConsistentHashCode());
             return siloAddress;
         }
 

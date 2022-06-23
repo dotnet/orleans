@@ -95,7 +95,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         }
 
         /// <summary>
-        /// Returns a new <see cref="ReadOnlySequence{T}"/> which must be used and returned before resetting this instance via the <see cref="ReturnReadOnlySequence(in ReadOnlySequence{byte})"/> method.
+        /// Returns a new <see cref="ReadOnlySequence{T}"/> which must be used and returned before resetting this instance via the <see cref="ReturnReadOnlySequence"/> method.
         /// </summary>
         public ReadOnlySequence<byte> RentReadOnlySequence()
         {

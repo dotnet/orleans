@@ -52,12 +52,12 @@ namespace Orleans.Transactions.Azure.Tests
                 var tableItem = await tableRef.CreateIfNotExistsAsync();
                 var didCreate = tableItem is not null;
 
-                logger.Info($"{(didCreate ? "Created" : "Attached to")} Azure storage table {tableName}", (didCreate ? "Created" : "Attached to"));
+                logger.LogInformation("{Verb} Azure storage table {TableName}", didCreate ? "Created" : "Attached to", tableName);
                 return tableRef;
             }
             catch (Exception exc)
             {
-                logger.LogError($"Could not initialize connection to storage table {tableName}", exc);
+                logger.LogError(exc, "Could not initialize connection to storage table {TableName}", tableName);
                 throw;
             }
         }

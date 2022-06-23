@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 using System;
@@ -76,15 +76,19 @@ namespace Orleans.Transactions.TestKit.Consistency
                 switch (whethertoreadorwrite.Next(4))
                 {
                     case 0:
-                        logger.LogTrace($"g{MyNumber} {TransactionContext.CurrentTransactionId} {stack} Write");
+                        logger.LogTrace("g{MyNumber} {CurrentTransactionId} {Stack} Write", MyNumber, TransactionContext.CurrentTransactionId, stack);
                         return await Write();
                     default:
-                        logger.LogTrace($"g{MyNumber} {TransactionContext.CurrentTransactionId} {stack} Read");
+                        logger.LogTrace(
+                            "g{MyNumber} {CurrentTransactionId} {stack} Read",
+                            MyNumber,
+                            TransactionContext.CurrentTransactionId,
+                            stack);
                         return await Read();
                 }
             } catch(Exception e)
             {
-                logger.LogTrace($"g{MyNumber} {TransactionContext.CurrentTransactionId} {stack} --> {e.GetType().Name}");
+                logger.LogTrace("g{MyNumber} {CurrentTransactionId} {Stack} --> {ExceptionType}", MyNumber, TransactionContext.CurrentTransactionId, stack, e.GetType().Name);
                 throw;
             }
         }
@@ -134,7 +138,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         private async Task<Observation[]> Recurse(ConsistencyTestOptions options, int depth, string stack, Random random, int count, bool parallel, int maxgrain, DateTime stopAfter)
         {
-            logger.LogTrace($"g{MyNumber} {TransactionContext.CurrentTransactionId} {stack} Recurse {count} {(parallel ? "par" : "seq")}");
+            logger.LogTrace("g{MyNumber} {CurrentTransactionId} {Stack} Recurse {Count} {ParallelOrSequential}", MyNumber, TransactionContext.CurrentTransactionId, stack, count, (parallel ? "par" : "seq"));
             try
             {
                 int min = options.AvoidDeadlocks ? MyNumber : 0;
@@ -167,7 +171,12 @@ namespace Orleans.Transactions.TestKit.Consistency
             }
             catch (Exception e)
             {
-                logger.LogTrace($"g{MyNumber} {TransactionContext.CurrentTransactionId} {stack} --> {e.GetType().Name}");
+                logger.LogTrace(
+                    "g{MyNumber} {CurrentTransactionId} {Stack} --> {ExceptionType}",
+                    MyNumber,
+                    TransactionContext.CurrentTransactionId,
+                    stack,
+                    e.GetType().Name);
                 throw;
             }
         }

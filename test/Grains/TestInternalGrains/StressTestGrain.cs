@@ -30,7 +30,7 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
 
             return Task.CompletedTask;
         }
@@ -124,7 +124,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
@@ -281,7 +281,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 

@@ -22,19 +22,19 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 
         public Task LogMessage(string msg)
         {
-           logger.Info(msg);
+            logger.LogInformation("{Message}", msg);
            return Task.CompletedTask;
         }
 
         public Task SetAError(int a)
         {
-            logger.Info("SetAError={0}", a);
+            logger.LogInformation("SetAError={A}", a);
             A = a;
             throw new Exception("SetAError-Exception");
         }
@@ -68,20 +68,20 @@ namespace UnitTests.Grains
 
         public async Task DelayMethod(int milliseconds)
         {
-            logger.Info("DelayMethod {0}.", counter);
+            logger.LogInformation("DelayMethod {Counter}.", counter);
             counter++;
             await Task.Delay(TimeSpan.FromMilliseconds(milliseconds));
         }
 
         public Task Dispose()
         {
-            logger.Info("Dispose()");
+            logger.LogInformation("Dispose()");
             return Task.CompletedTask;
         }
 
         public Task<int> UnobservedErrorImmediate()
         {
-            logger.Info("UnobservedErrorImmediate()");
+            logger.LogInformation("UnobservedErrorImmediate()");
 
             bool doThrow = true;
             // the grain method returns OK, but leaves some unobserved promise
@@ -89,7 +89,7 @@ namespace UnitTests.Grains
             {
                 if (!doThrow)
                     return 0;
-                logger.Info("About to throw 1.");
+                logger.LogInformation("About to throw 1.");
                 throw new ArgumentException("ErrorGrain left Immediate Unobserved Error 1.");
             });
             promise = null;
@@ -102,7 +102,7 @@ namespace UnitTests.Grains
 
         public Task<int> UnobservedErrorDelayed()
         {
-            logger.Info("UnobservedErrorDelayed()");
+            logger.LogInformation("UnobservedErrorDelayed()");
             bool doThrow = true;
             // the grain method rturns OK, but leaves some unobserved promise
             Task<long> promise = Task<long>.Factory.StartNew(() =>
@@ -110,7 +110,7 @@ namespace UnitTests.Grains
                 if (!doThrow)
                     return 0;
                 Thread.Sleep(100);
-                logger.Info("About to throw 1.5.");
+                logger.LogInformation("About to throw 1.5.");
                 throw new ArgumentException("ErrorGrain left Delayed Unobserved Error 1.5.");
             });
             promise = null;
@@ -123,12 +123,12 @@ namespace UnitTests.Grains
 
         public Task<int> UnobservedErrorContinuation2()
         {
-            logger.Info("UnobservedErrorContinuation2()");
+            logger.LogInformation("UnobservedErrorContinuation2()");
             // the grain method returns OK, but leaves some unobserved promise
             Task<long> promise = Task.FromResult((long)25);
             Task cont = promise.ContinueWith(_ =>
                 {
-                    logger.Info("About to throw 2.");
+                    logger.LogInformation("About to throw 2.");
                     throw new ArgumentException("ErrorGrain left ContinueWith Unobserved Error 2.");
                 });
             promise = null;
@@ -142,16 +142,16 @@ namespace UnitTests.Grains
 
         public Task<int> UnobservedErrorContinuation3()
         {
-            logger.Info("UnobservedErrorContinuation3() from Task " + Task.CurrentId);
+            logger.LogInformation("UnobservedErrorContinuation3() from Task {TaskId}", Task.CurrentId);
             // the grain method returns OK, but leaves some unobserved promise
             Task<long> promise = Task<long>.Factory.StartNew(() =>
             {
-                logger.Info("First promise from Task " + Task.CurrentId);
+                logger.LogInformation("First promise from Task {TaskId}", Task.CurrentId);
                 return 26;
             });
             Task cont = promise.ContinueWith(_ =>
             {
-                logger.Info("About to throw 3 from Task " + Task.CurrentId);
+                logger.LogInformation("About to throw 3 from Task {TaskId}", Task.CurrentId);
                 throw new ArgumentException("ErrorGrain left ContinueWith Unobserved Error 3.");
             });
             //logger.Info("cont.number=" + cont.task.number + " cont.m_Task.number=" + cont.task.m_Task.Id);
@@ -166,7 +166,7 @@ namespace UnitTests.Grains
 
         public Task<int> UnobservedIgnoredError()
         {
-            logger.Info("UnobservedIgnoredError()");
+            logger.LogInformation("UnobservedIgnoredError()");
             bool doThrow = true;
             // the grain method rturns OK, but leaves some unobserved promise
             Task<long> promise = Task<long>.Factory.StartNew(() =>

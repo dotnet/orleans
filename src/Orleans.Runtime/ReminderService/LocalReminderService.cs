@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
@@ -90,22 +91,21 @@ namespace Orleans.Runtime.ReminderService
                 Period = period,
             };
 
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_RegisterOrUpdate, "RegisterOrUpdateReminder: {0}", entry.ToString());
+            if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_RegisterOrUpdate, "RegisterOrUpdateReminder: {Entry}", entry.ToString());
             await DoResponsibilitySanityCheck(grainRef, "RegisterReminder");
             var newEtag = await reminderTable.UpsertRow(entry);
 
             if (newEtag != null)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Registered reminder {0} in table, assigned localSequence {1}", entry, localTableSequence);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Registered reminder {Entry} in table, assigned localSequence {LocalSequence}", entry, localTableSequence);
                 entry.ETag = newEtag;
                 StartAndAddTimer(entry);
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
                 return new ReminderData(grainRef, reminderName, newEtag) as IGrainReminder;
             }
 
-            var msg = string.Format("Could not register reminder {0} to reminder table due to a race. Please try again later.", entry);
-            logger.Error(ErrorCode.RS_Register_TableError, msg);
-            throw new ReminderException(msg);
+            logger.LogError((int)ErrorCode.RS_Register_TableError, "Could not register reminder {Entry} to reminder table due to a race. Please try again later.", entry);
+            throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace Orleans.Runtime.ReminderService
         public async Task UnregisterReminder(IGrainReminder reminder)
         {
             var remData = (ReminderData)reminder;
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_Unregister, "UnregisterReminder: {0}, LocalTableSequence: {1}", remData, localTableSequence);
+            if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_Unregister, "UnregisterReminder: {Entry}, LocalTableSequence: {LocalTableSequence}", remData, localTableSequence);
 
             GrainReference grainRef = remData.GrainRef;
             string reminderName = remData.ReminderName;
@@ -134,33 +134,32 @@ namespace Orleans.Runtime.ReminderService
                 bool removed = TryStopPreviousTimer(grainRef, reminderName);
                 if (removed)
                 {
-                    if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_Stop, "Stopped reminder {0}", reminder);
-                    if (logger.IsEnabled(LogLevel.Trace)) PrintReminders(string.Format("After removing {0}.", reminder));
+                    if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_Stop, "Stopped reminder {Entry}", reminder);
+                    if (logger.IsEnabled(LogLevel.Trace)) PrintReminders($"After removing {reminder}.");
                 }
                 else
                 {
                     // no-op
-                    if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_RemoveFromTable, "Removed reminder from table which I didn't have locally: {0}.", reminder);
+                    if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_RemoveFromTable, "Removed reminder from table which I didn't have locally: {Entry}.", reminder);
                 }
             }
             else
             {
-                var msg = string.Format("Could not unregister reminder {0} from the reminder table, due to tag mismatch. You can retry.", reminder);
-                logger.Error(ErrorCode.RS_Unregister_TableError, msg);
-                throw new ReminderException(msg);
+                logger.LogError((int)ErrorCode.RS_Unregister_TableError, "Could not unregister reminder {Reminder} from the reminder table, due to tag mismatch. You can retry.", reminder);
+                throw new ReminderException($"Could not unregister reminder {reminder} from the reminder table, due to tag mismatch. You can retry.");
             }
         }
 
         public async Task<IGrainReminder> GetReminder(GrainReference grainRef, string reminderName)
         {
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminder,"GetReminder: GrainReference={0} ReminderName={1}", grainRef.ToString(), reminderName);
+            if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_GetReminder, "GetReminder: GrainId={GrainId} ReminderName={ReminderName}", grainRef.GrainId.ToString(), reminderName);
             var entry = await reminderTable.ReadRow(grainRef, reminderName);
             return entry == null ? null : entry.ToIGrainReminder();
         }
 
         public async Task<List<IGrainReminder>> GetReminders(GrainReference grainRef)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminders, "GetReminders: GrainReference={0}", grainRef.ToString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_GetReminders, "GetReminders: GrainId={GrainId}", grainRef.GrainId.ToString());
             var tableData = await reminderTable.ReadRows(grainRef);
             return tableData.Reminders.Select(entry => entry.ToIGrainReminder()).ToList();
         }
@@ -176,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
 
             // try to retrieve reminders from all my subranges
             var rangeSerialNumberCopy = RangeSerialNumber;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace($"My range= {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {localReminders.Count}");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("My range {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {LocalRemindersCount}", RingRange, RangeSerialNumber, localReminders.Count);
             var acks = new List<Task>();
             foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
@@ -194,13 +193,16 @@ namespace Orleans.Runtime.ReminderService
             foreach (var reminder in remindersOutOfRange)
             {
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.Trace("Not in my range anymore, so removing. {0}", reminder);
+                    logger.LogTrace("Not in my range anymore, so removing. {Reminder}", reminder);
                 // remove locally
                 reminder.StopReminder();
                 localReminders.Remove(reminder.Identity);
             }
 
-            if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0) logger.Info($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
+            if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0)
+            {
+                logger.LogInformation("Removed {RemovedCount} local reminders that are now out of my range.", remindersOutOfRange.Length);
+            }
         }
 
         public override Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
@@ -208,7 +210,7 @@ namespace Orleans.Runtime.ReminderService
             _ = base.OnRangeChange(oldRange, newRange, increased);
             if (Status == GrainServiceStatus.Started)
                 return ReadAndUpdateReminders();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Ignoring range change until ReminderService is Started -- Current status = {0}", Status);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Ignoring range change until ReminderService is Started -- Current status = {Status}", Status);
             return Task.CompletedTask;
         }
 
@@ -235,7 +237,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogWarning(exception, "Exception while reading reminders: {Exception}", exception);
+                    this.logger.LogWarning(exception, "Exception while reading reminders");
                     overrideDelay = ThreadSafeRandom.NextTimeSpan(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
                 }
             }
@@ -264,24 +266,26 @@ namespace Orleans.Runtime.ReminderService
 
                 if (initialReadCallCount <= InitialReadRetryCountBeforeFastFailForUpdates)
                 {
-                    logger.Warn(
-                        ErrorCode.RS_ServiceInitialLoadFailing,
-                        string.Format("ReminderService failed initial load of reminders and will retry. Attempt #{0}", this.initialReadCallCount),
-                        ex);
+                    logger.LogWarning(
+                        (int)ErrorCode.RS_ServiceInitialLoadFailing,
+                        ex,
+                        "ReminderService failed initial load of reminders and will retry. Attempt #{AttemptNumber}",
+                        this.initialReadCallCount);
                 }
                 else
                 {
-                    const string baseErrorMsg = "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.";
-                    var logErrorMessage = string.Format(baseErrorMsg + " Attempt #{0}", this.initialReadCallCount);
-                    logger.Error(ErrorCode.RS_ServiceInitialLoadFailed, logErrorMessage, ex);
-                    startedTask.TrySetException(new OrleansException(baseErrorMsg, ex));
+                    logger.LogError(
+                        (int)ErrorCode.RS_ServiceInitialLoadFailed,
+                        ex,
+                        "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Attempt #{AttemptNumber}", this.initialReadCallCount);
+                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.", ex));
                 }
             }
         }
 
         private async Task ReadTableAndStartTimers(IRingRange range, int rangeSerialNumberCopy)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Reading rows from {0}", range.ToString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Reading rows from {Range}", range.ToString());
             localTableSequence++;
             long cachedSequence = localTableSequence;
 
@@ -295,7 +299,14 @@ namespace Orleans.Runtime.ReminderService
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {rangeSerialNumberCopy}.");
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug(
+                        "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {rangeSerialNumberCopy}.",
+                        RangeSerialNumber,
+                        rangeSerialNumberCopy);
+                    }
+
                     return;
                 }
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
@@ -304,7 +315,15 @@ namespace Orleans.Runtime.ReminderService
                 if (null == table && reminderTable is MockReminderTable) return;
 
                 var remindersNotInTable = localReminders.Where(r => range.InRange(r.Key.GrainRef)).ToDictionary(r => r.Key, r => r.Value); // shallow copy
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("For range {0}, I read in {1} reminders from table. LocalTableSequence {2}, CachedSequence {3}", range.ToString(), table.Reminders.Count, localTableSequence, cachedSequence);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug(
+                        "For range {Range}, I read in {ReminderCount} reminders from table. LocalTableSequence {LocalTableSequence}, CachedSequence {CachedSequence}",
+                        range.ToString(),
+                        table.Reminders.Count,
+                        localTableSequence,
+                        cachedSequence);
+                }
 
                 foreach (ReminderEntry entry in table.Reminders)
                 {
@@ -316,13 +335,13 @@ namespace Orleans.Runtime.ReminderService
                         {
                             if (localRem.IsRunning) // if ticking
                             {
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Old, & Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Old, & Ticking {LocalReminder}", localRem);
                                 // it might happen that our local reminder is different than the one in the table, i.e., eTag is different
                                 // if so, stop the local timer for the old reminder, and start again with new info
                                 if (!localRem.ETag.Equals(entry.ETag))
                                 // this reminder needs a restart
                                 {
-                                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("{0} Needs a restart", localRem);
+                                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{LocalReminder} Needs a restart", localRem);
                                     localRem.StopReminder();
                                     localReminders.Remove(localRem.Identity);
                                     StartAndAddTimer(entry);
@@ -331,7 +350,7 @@ namespace Orleans.Runtime.ReminderService
                             else // if not ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Old, & Not Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Old, & Not Ticking {LocalReminder}", localRem);
                             }
                         }
                         else // cachedSequence < localRem.LocalSequenceNumber ... // info read from table is older than local info
@@ -339,18 +358,18 @@ namespace Orleans.Runtime.ReminderService
                             if (localRem.IsRunning) // if ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Newer, & Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Newer, & Ticking {LocalReminder}", localRem);
                             }
                             else // if not ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Newer, & Not Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Newer, & Not Ticking {LocalReminder}", localRem);
                             }
                         }
                     }
                     else // exists in table, but not locally
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, Not in local, {0}", entry);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, Not in local, {Reminder}", entry);
                         // create and start the reminder
                         StartAndAddTimer(entry);
                     }
@@ -366,21 +385,21 @@ namespace Orleans.Runtime.ReminderService
                     if (cachedSequence < reminder.LocalSequenceNumber)
                     {
                         // no-op
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Not in table, In local, Newer, {0}", reminder);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Not in table, In local, Newer, {Reminder}", reminder);
                     }
                     else // cachedSequence > reminder.LocalSequenceNumber
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Not in table, In local, Old, so removing. {0}", reminder);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Not in table, In local, Old, so removing. {Reminder}", reminder);
                         // remove locally
                         reminder.StopReminder();
                         localReminders.Remove(reminder.Identity);
                     }
                 }
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"Removed {localReminders.Count - remindersCountBeforeRemove} reminders from local table");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removed {RemovedCount} reminders from local table", localReminders.Count - remindersCountBeforeRemove);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.RS_FailedToReadTableAndStartTimer, "Failed to read rows from table.", exc);
+                logger.LogError((int)ErrorCode.RS_FailedToReadTableAndStartTimer, exc, "Failed to read rows from table.");
                 throw;
             }
         }
@@ -394,7 +413,15 @@ namespace Orleans.Runtime.ReminderService
             LocalReminderData prevReminder;
             if (localReminders.TryGetValue(key, out prevReminder)) // if found locally
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_LocalStop, "Locally stopping reminder {0} as it is different than newly registered reminder {1}", prevReminder, entry);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug(
+                    (int)ErrorCode.RS_LocalStop,
+                    "Locally stopping reminder {PreviousReminder} as it is different than newly registered reminder {Reminder}",
+                    prevReminder,
+                    entry);
+                }
+
                 prevReminder.StopReminder();
                 localReminders.Remove(prevReminder.Identity);
             }
@@ -404,7 +431,7 @@ namespace Orleans.Runtime.ReminderService
             newReminder.LocalSequenceNumber = localTableSequence;
             localReminders.Add(newReminder.Identity, newReminder);
             newReminder.StartTimer();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_Started, "Started reminder {0}.", entry.ToString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_Started, "Started reminder {Reminder}.", entry.ToString());
         }
 
         // stop without removing it. will remove later.
@@ -467,8 +494,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (!RingRange.InRange(grainRef))
                 {
-                    logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
-                        debugInfo, grainRef.ToString(), RingRange);
+                    logger.LogWarning((int)ErrorCode.RS_NotResponsible, "I shouldn't have received request '{Request}' for {GrainId}. It is not in my responsibility range: {Range}",
+                        debugInfo, grainRef.GrainId.ToString(), RingRange);
                     // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
                     // otherwise, we can either reject the request, or re-route the request
                 }
@@ -480,9 +507,8 @@ namespace Orleans.Runtime.ReminderService
         {
             if (!logger.IsEnabled(LogLevel.Trace)) return;
 
-            var str = String.Format("{0}{1}{2}", (msg ?? "Current list of reminders:"), Environment.NewLine,
-                Utils.EnumerableToString(localReminders, null, Environment.NewLine));
-            logger.Trace(str);
+            var str = $"{(msg ?? "Current list of reminders:")}{Environment.NewLine}{Utils.EnumerableToString(localReminders, null, Environment.NewLine)}";
+            logger.LogTrace("{Message}", str);
         }
 
         private class LocalReminderData
@@ -597,7 +623,7 @@ namespace Orleans.Runtime.ReminderService
                 var logger = this.reminderService.logger;
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace("Triggering tick for {0}, status {1}, now {2}", this.ToString(), status, before);
+                    logger.LogTrace("Triggering tick for {Instance}, status {Status}, now {CurrentTime}", this.ToString(), status, before);
                 }
 
                 try
@@ -616,20 +642,25 @@ namespace Orleans.Runtime.ReminderService
                     var after = DateTime.UtcNow;
                     if (logger.IsEnabled(LogLevel.Trace))
                     {
-                        logger.Trace("Tick triggered for {0}, dt {1} sec, next@~ {2}", this.ToString(), (after - before).TotalSeconds,
-                              // the next tick isn't actually scheduled until we return control to
-                              // AsyncSafeTimer but we can approximate it by adding the period of the reminder
-                              // to the after time.
-                              after + this.period);
+                        // the next tick isn't actually scheduled until we return control to
+                        // AsyncSafeTimer but we can approximate it by adding the period of the reminder
+                        // to the after time.
+                        logger.LogTrace(
+                            "Tick triggered for {Instance}, dt {DueTime} sec, next@~ {NextDueTime}",
+                            this.ToString(),
+                            (after - before).TotalSeconds,
+                            after + this.period);
                     }
                 }
                 catch (Exception exc)
                 {
                     var after = DateTime.UtcNow;
-                    logger.Error(
-                        ErrorCode.RS_Tick_Delivery_Error,
-                        string.Format("Could not deliver reminder tick for {0}, next {1}.",  this.ToString(), after + this.period),
-                            exc);
+                    logger.LogError(
+                        (int)ErrorCode.RS_Tick_Delivery_Error,
+                        exc,
+                        "Could not deliver reminder tick for {Instance}, next {NextDueTime}.",
+                        this.ToString(),
+                        after + this.period);
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }
             }

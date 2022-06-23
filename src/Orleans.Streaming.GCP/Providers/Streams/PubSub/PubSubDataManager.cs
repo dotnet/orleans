@@ -1,4 +1,4 @@
-﻿using Google.Api.Gax.Grpc;
+using Google.Api.Gax.Grpc;
 using Google.Cloud.PubSub.V1;
 using Grpc.Core;
 using Orleans.Runtime;
@@ -83,7 +83,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 _topic = await _publisher.GetTopicAsync(TopicName);
             }
 
-            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
+            _logger.LogInformation((int)GoogleErrorCode.Initializing, "{Verb} Google PubSub Topic {TopicId}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
 
             didCreate = false;
 
@@ -101,16 +101,22 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
                 _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
             }
-            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
+
+            _logger.LogInformation(
+                (int)GoogleErrorCode.Initializing,
+                "{Verb} Google PubSub Subscription {SubscriptionId} to Topic {TopicId}",
+                (didCreate ? "Created" : "Attached to"),
+                SubscriptionName.SubscriptionId,
+                TopicName.TopicId);
         }
 
         public async Task DeleteTopic()
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.Debug("Deleting Google PubSub topic: {0}", TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Deleting Google PubSub topic: {TopicId}", TopicName.TopicId);
             try
             {
                 await _publisher?.DeleteTopicAsync(TopicName);
-                _logger.Info((int)GoogleErrorCode.Initializing, "Deleted Google PubSub topic {0}", TopicName.TopicId);
+                _logger.LogInformation((int)GoogleErrorCode.Initializing, "Deleted Google PubSub topic {TopicId}", TopicName.TopicId);
             }
             catch (Exception exc)
             {
@@ -123,7 +129,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Publishing {0} message to topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Publishing {Count} messages to topic {TopicId}", count, TopicName.TopicId);
 
             try
             {
@@ -137,13 +143,13 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task<IEnumerable<ReceivedMessage>> GetMessages(int count = 1)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Getting {Count} message(s) from Google PubSub topic {TopicId}", count, TopicName.TopicId);
 
             PullResponse response = null;
             try
             {
                 //According to Google, no more than 1000 messages can be published/received
-                response = await _subscriber?.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
+                response = await _subscriber.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
             }
             catch (Exception exc)
             {
@@ -152,12 +158,15 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.Trace("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
+                _logger.LogTrace("Received {Count} message(s) from Google PubSub topic {TopicId}", response.ReceivedMessages.Count, TopicName.TopicId);
 
                 foreach (var received in response.ReceivedMessages)
                 {
-                    _logger.Trace("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
-                            received.Message.PublishTime.ToDateTime(), TopicName.TopicId);
+                    _logger.LogTrace(
+                        "Received message {MessageId} published {PublishedTime} from Google PubSub topic {TopicId}",
+                        received.Message.MessageId,
+                        received.Message.PublishTime.ToDateTime(),
+                        TopicName.TopicId);
                 }
             }
 
@@ -169,7 +178,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {Count} message(s) from Google PubSub topic {TopicId}", count, TopicName.TopicId);
 
             try
             {
@@ -183,11 +192,16 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         private void ReportErrorAndRethrow(Exception exc, string operation, GoogleErrorCode errorCode)
         {
-            var errMsg = String.Format(
-                "Error doing {0} for Google Project {1} at PubSub Topic {2} " + Environment.NewLine
-                + "Exception = {3}", operation, TopicName.ProjectId, TopicName.TopicId, exc);
-            _logger.Error((int)errorCode, errMsg, exc);
-            throw new AggregateException(errMsg, exc);
+            _logger.LogError(
+                (int)errorCode,
+                exc,
+                "Error doing {Operation} for Google Project {ProjectId} at PubSub Topic {TopicId} ",
+                operation,
+                TopicName.ProjectId,
+                TopicName.TopicId);
+            throw new AggregateException(
+                $"Error doing {operation} for Google Project {TopicName.ProjectId} at PubSub Topic {TopicName.TopicId} {Environment.NewLine}Exception = {exc}",
+                exc);
         }
     }
 }

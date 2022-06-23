@@ -488,7 +488,7 @@ namespace Orleans.Runtime
             if (list != null && list.Count > 0)
             {
                 count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
             
@@ -514,7 +514,7 @@ namespace Orleans.Runtime
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
             Action<Task> signalCompletion = task => mtcs.SetOneResult();

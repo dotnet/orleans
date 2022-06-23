@@ -57,13 +57,13 @@ namespace Orleans.Transactions
         {
             if (detectReentrancy)
             {
-                throw new LockRecursionException("cannot perform a read operation from within another operation");
+                throw new LockRecursionException("Cannot perform a read operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartRead {info}");
+                logger.LogTrace("StartRead {Info}", info);
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
@@ -86,7 +86,7 @@ namespace Orleans.Transactions
                      }
 
                      if (logger.IsEnabled(LogLevel.Debug))
-                         logger.Debug($"update-lock read v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+                         logger.LogDebug("Update-lock read v{SequenceNumber} {TransactionId} {Timestamp}", record.SequenceNumber, record.TransactionId, record.Timestamp.ToString("o"));
 
                      // record this read in the transaction info data structure
                      info.RecordRead(this.participantId, record.Timestamp);
@@ -102,7 +102,7 @@ namespace Orleans.Transactions
                      finally
                      {
                          if (logger.IsEnabled(LogLevel.Trace))
-                             logger.Trace($"EndRead {info} {result} {record.State}");
+                             logger.LogTrace("EndRead {Info} {Result} {State}", info, result, record.State);
 
                          detectReentrancy = false;
                      }
@@ -117,13 +117,13 @@ namespace Orleans.Transactions
             if (updateAction == null) throw new ArgumentNullException(nameof(updateAction));
             if (detectReentrancy)
             {
-                throw new LockRecursionException("cannot perform an update operation from within another operation");
+                throw new LockRecursionException("Cannot perform an update operation from within another operation");
             }
 
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartWrite {info}");
+                logger.LogTrace("StartWrite {Info}", info);
 
             if (info.IsReadOnly)
             {
@@ -159,7 +159,13 @@ namespace Orleans.Transactions
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+                    {
+                        logger.LogDebug(
+                            "Update-lock write v{SequenceNumber} {TransactionId} {Timestamp}",
+                            record.SequenceNumber,
+                            record.TransactionId,
+                            record.Timestamp.ToString("o"));
+                    }
 
                     // record this write in the transaction info data structure
                     info.RecordWrite(this.participantId, record.Timestamp);
@@ -174,7 +180,7 @@ namespace Orleans.Transactions
                     finally
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
+                            logger.LogTrace("EndWrite {Info} {TransactionId} {Timestamp}", info, record.TransactionId, record.Timestamp);
 
                         detectReentrancy = false;
                     }

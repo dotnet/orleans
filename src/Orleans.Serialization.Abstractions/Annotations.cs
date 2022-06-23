@@ -62,7 +62,7 @@ namespace Orleans
         public Type Task1Invoker { get; init; }
 
         /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns <see cref="void"/>.
+        /// Gets or sets the base type for the method call representation which is generated for any method which returns <see langword="void"/>.
         /// </summary>
         public Type VoidInvoker { get; init; }
     }

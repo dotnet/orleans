@@ -83,7 +83,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_SimpleNotification_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
 
             if (a == 3 && b == 0)
                 callbacksReceived[0] = true;
@@ -130,7 +130,7 @@ namespace DefaultCluster.Tests.General
             catch (Exception exc)
             {
                 Exception baseException = exc.GetBaseException();
-                this.Logger.Info("Received exception: {0}", baseException);
+                this.Logger.LogInformation(baseException, "Received exception");
                 Assert.IsAssignableFrom<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
@@ -140,7 +140,7 @@ namespace DefaultCluster.Tests.General
 
             await grain.SetA(2); // Use grain
 
-            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetA(2)", timeout));
+            Assert.False(await result.WaitForFinished(timeout), $"Should timeout waiting {timeout} for SetA(2)");
 
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -148,7 +148,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {CallbackCounter} time with a={A} and b={B}", this.callbackCounter, a, b);
             Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected " + callbackCounter);
             if (callbackCounter == 2)
             {
@@ -167,12 +167,12 @@ namespace DefaultCluster.Tests.General
             ISimpleGrainObserver reference = this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.True(await result.WaitForContinue(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
+            Assert.True(await result.WaitForContinue(timeout), $"Should not timeout waiting {timeout} for SetA");
 
             await grain.Unsubscribe(reference);
             await grain.SetB(3);
 
-            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));
+            Assert.False(await result.WaitForFinished(timeout), $"Should timeout waiting {timeout} for SetB");
 
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -180,7 +180,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);
@@ -230,7 +230,7 @@ namespace DefaultCluster.Tests.General
             await grain.Subscribe(reference2);
             grain.SetA(6).Ignore();
 
-            Assert.True(await result.WaitForFinished(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
+            Assert.True(await result.WaitForFinished(timeout), $"Should not timeout waiting {timeout} for SetA");
 
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
@@ -239,7 +239,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 3, "Callback has been called more times than was expected.");
 
             Assert.Equal(6, a);
@@ -260,17 +260,17 @@ namespace DefaultCluster.Tests.General
             ISimpleGrainObserver reference = this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.True(await result.WaitForContinue(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
+            Assert.True(await result.WaitForContinue(timeout), $"Should not timeout waiting {timeout} for SetA");
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             await grain.SetB(3);
 
-            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));
+            Assert.False(await result.WaitForFinished(timeout), $"Should timeout waiting {timeout} for SetB");
         }
 
         void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DeleteObject_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);
@@ -336,7 +336,7 @@ namespace DefaultCluster.Tests.General
 
             public void StateChanged(int a, int b)
             {
-                this.logger.Debug("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                this.logger.LogDebug("SimpleGrainObserver.StateChanged a={A} b={B}", a, b);
                 action?.Invoke(a, b, result);
             }
         }
