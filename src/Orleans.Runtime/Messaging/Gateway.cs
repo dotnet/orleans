@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -240,13 +241,7 @@ namespace Orleans.Runtime.Messaging
                             if (clients.TryRemove(kv.Key, out _))
                             {
                                 // Reject all pending messages from the client.
-                                var droppedMessages = client.Drop();
-                                ClientNotAvailableException exception = null;
-                                foreach (var message in droppedMessages)
-                                {
-                                    exception ??= new ClientNotAvailableException(client.Id.GrainId);
-                                    messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
-                                }
+                                client.Drop();
                             }
 
                             clientsCollectionVersion++;
@@ -299,44 +294,67 @@ namespace Orleans.Runtime.Messaging
         private class ClientState
         {
             private readonly Gateway _gateway;
-            private readonly Queue<Message> _pendingToSend = new();
-            private bool _dropped;
+            private readonly Task _messageLoop;
+            private readonly ConcurrentQueue<Message> _pendingToSend = new();
+            private readonly SingleWaiterAutoResetEvent _signal = new()
+            {
+               RunContinuationsAsynchronously = true
+            };
+
+            private GatewayInboundConnection _connection;
+            private int _dropped;
             private CoarseStopwatch _disconnectedSince;
 
             internal ClientState(Gateway gateway, ClientGrainId id)
             {
+                // Ensure that the client does not capture any AsyncLocal state, etc
+                using var suppressExecutionContext = new ExecutionContextSuppressor();
+
                 _gateway = gateway;
                 Id = id;
                 _disconnectedSince.Restart();
+                _messageLoop = Task.Run(RunMessageLoop);
             }
 
             public bool IsConnected => Connection != null;
 
-            internal GatewayInboundConnection Connection { get; private set; }
+            private bool IsDropped => Volatile.Read(ref _dropped) == 1;
 
-            internal TimeSpan DisconnectedSince => _disconnectedSince.Elapsed;
+            public GatewayInboundConnection Connection => _connection;
 
-            internal ClientGrainId Id { get; }
+            public TimeSpan DisconnectedSince => _disconnectedSince.Elapsed;
 
-            internal void RecordDisconnection()
+            public ClientGrainId Id { get; }
+
+            public void RecordDisconnection()
             {
-                if (Connection is null)
+                var connection = Interlocked.Exchange(ref _connection, null);
+                if (connection is null)
                 {
                     return;
                 }
 
                 _disconnectedSince.Restart();
-                Connection = null;
+                _signal.Signal();
             }
 
-            internal void RecordConnection(GatewayInboundConnection connection)
+            public void RecordConnection(GatewayInboundConnection connection)
             {
-                Connection = connection;
+                var existing = Interlocked.Exchange(ref _connection, connection);
+                if (existing is not null)
+                {
+                    _gateway.logger.LogWarning(
+                        "Client {ClientId} received new connection ({NewConnection}) before the previous connection ({PreviousConnection}) had been removed",
+                        Id.GrainId,
+                        connection,
+                        existing);
+                }
+
                 _disconnectedSince.Reset();
-                Drain();
+                _signal.Signal();
             }
 
-            internal bool ReadyToDrop()
+            public bool ReadyToDrop()
             {
                 if (IsConnected) return false;
                 if (_disconnectedSince.Elapsed < _gateway.clientDropTimeout)
@@ -347,52 +365,78 @@ namespace Orleans.Runtime.Messaging
                 return true;
             }
 
-            internal List<Message> Drop()
+            public void Drop()
             {
-                lock (_pendingToSend)
-                {
-                    _dropped = true;
-                    var result = new List<Message>(_pendingToSend.Count);
-                    while (_pendingToSend.TryDequeue(out var message))
-                    {
-                        result.Add(message);
-                    }
+                Interlocked.Exchange(ref _dropped, 1);
+                RejectDroppedClientMessages();
+                _signal.Signal();
+            }
 
-                    return result;
+            public void Send(Message msg)
+            {
+                _pendingToSend.Enqueue(msg);
+                _signal.Signal();
+#if DEBUG
+                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
+#endif
+            }
+
+            private async Task RunMessageLoop()
+            {
+                while (true)
+                {
+                    try
+                    {
+                        await _signal.WaitAsync();
+
+                        if (IsDropped)
+                        {
+                            RejectDroppedClientMessages();
+                            continue;
+                        }
+
+                        var connection = Volatile.Read(ref _connection);
+                        if (connection is null)
+                        {
+                            continue;
+                        }
+
+                        // Send all pending messages.
+                        while (_pendingToSend.TryDequeue(out var message))
+                        {
+                            if (TrySend(connection, message))
+                            {
+#if DEBUG
+                                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent queued message {Message} to client {ClientId}", message, Id);
+#endif
+                            }
+                            else
+                            {
+                                // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
+                                _pendingToSend.Enqueue(message);
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        _gateway.logger.LogWarning(exception, "Exception in message loop for client {ClientId}", Id);
+                    }
                 }
             }
 
-            internal void Send(Message msg)
+            private void RejectDroppedClientMessages()
             {
-                lock (_pendingToSend)
+                ClientNotAvailableException exception = null;
+                while (_pendingToSend.TryDequeue(out var message))
                 {
-                    if (_dropped)
-                    {
-                        ThrowClientNotAvailable(this);
-                    }
-
-                    // If the queue is non empty, try draining the queue first.
-                    if (IsConnected && _pendingToSend.Count > 0)
-                    {
-                        // For now, drain in-line, although in the future this should happen in yet another async agent.
-                        Drain();
-                    }
-
-                    if (!TrySend(msg))
-                    {
-                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
-                        _pendingToSend.Enqueue(msg);
-                    }
-                    else
-                    {
-                        if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent message {Message} to client {TargetGrain}", msg, msg.TargetGrain);
-                    }
+                    exception ??= new ClientNotAvailableException(Id.GrainId);
+                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
                 }
             }
 
-            private bool TrySend(Message message)
+            private bool TrySend(GatewayInboundConnection connection, Message message)
             {
-                var connection = Connection;
                 if (connection is null)
                 {
                     return false;
@@ -411,30 +455,6 @@ namespace Orleans.Runtime.Messaging
                     return false;
                 }
             }
-
-            private void Drain()
-            {
-                lock (_pendingToSend)
-                {
-                    while (_pendingToSend.Count > 0)
-                    {
-                        var message = _pendingToSend.Peek();
-                        if (TrySend(message))
-                        {
-                            if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent queued message {Message} to client {ClientId}", message, Id);
-                            _pendingToSend.Dequeue();
-                        }
-                        else
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-
-            [DoesNotReturn]
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            private static void ThrowClientNotAvailable(ClientState clientState) => throw new ClientNotAvailableException(clientState.Id.GrainId);
         }
 
         // this cache is used to record the addresses of Gateways from which clients connected to.
