@@ -24,6 +24,6 @@ namespace Orleans.Networking.Shared
         /// <summary>
         /// Gets or sets the memory pool factory.
         /// </summary>
-        internal Func<MemoryPool<byte>> MemoryPoolFactory { get; set; } = () => KestrelMemoryPool.Create();
+        internal Func<MemoryPool<byte>> MemoryPoolFactory { get; set; } = () => SharedMemoryPool.Pool;
     }
 }

@@ -117,8 +117,13 @@ namespace Orleans.Networking.Shared
         public ValueTask DisposeAsync()
         {
             _listenSocket?.Dispose();
+
             // Dispose the memory pool
-            _memoryPool.Dispose();
+            if (!ReferenceEquals(_memoryPool, SharedMemoryPool.Pool))
+            {
+                _memoryPool.Dispose();
+            }
+
             return default;
         }
     }

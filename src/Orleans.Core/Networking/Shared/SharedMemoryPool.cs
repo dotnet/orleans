@@ -2,8 +2,8 @@ using System.Buffers;
 
 namespace Orleans.Networking.Shared
 {
-    internal sealed class SharedMemoryPool
+    internal static class SharedMemoryPool
     {
-        public MemoryPool<byte> Pool { get; } = KestrelMemoryPool.Create();
+        public static MemoryPool<byte> Pool { get; } = PinnedBlockMemoryPoolFactory.Create();
     }
 }

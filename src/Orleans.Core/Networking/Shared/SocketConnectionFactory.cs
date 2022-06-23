@@ -17,12 +17,12 @@ namespace Orleans.Networking.Shared
         private readonly SocketSchedulers schedulers;
         private readonly MemoryPool<byte> memoryPool;
 
-        public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers, SharedMemoryPool memoryPool)
+        public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers)
         {
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");
             this.trace = new SocketsTrace(logger);
             this.schedulers = schedulers;
-            this.memoryPool = memoryPool.Pool;
+            this.memoryPool = SharedMemoryPool.Pool;
         }
 
         public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)

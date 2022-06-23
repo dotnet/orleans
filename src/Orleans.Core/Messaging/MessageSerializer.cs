@@ -38,7 +38,6 @@ namespace Orleans.Runtime.Messaging
         public MessageSerializer(
             Serializer<object> bodySerializer,
             SerializerSessionPool sessionPool,
-            SharedMemoryPool memoryPool,
             IServiceProvider services,
             Serializer<GrainAddress> activationAddressSerializer,
             ICodecProvider codecProvider,
@@ -49,7 +48,7 @@ namespace Orleans.Runtime.Messaging
             _activationAddressCodec = activationAddressSerializer;
             _serializationSession = sessionPool.GetSession();
             _deserializationSession = sessionPool.GetSession();
-            _memoryPool = memoryPool.Pool;
+            _memoryPool = SharedMemoryPool.Pool;
             _bodySerializer = bodySerializer;
             _maxHeaderLength = maxHeaderSize;
             _maxBodyLength = maxBodySize;

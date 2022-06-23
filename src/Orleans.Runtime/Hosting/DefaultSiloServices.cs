@@ -384,7 +384,6 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
             services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

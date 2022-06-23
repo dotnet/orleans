@@ -24,14 +24,13 @@ internal class UnixSocketConnectionFactory : IConnectionFactory
     public UnixSocketConnectionFactory(
         ILoggerFactory loggerFactory,
         IOptions<UnixSocketConnectionOptions> options,
-        SocketSchedulers schedulers,
-        SharedMemoryPool memoryPool)
+        SocketSchedulers schedulers)
     {
         var logger = loggerFactory.CreateLogger("Orleans.UnixSocket");
         this.trace = new SocketsTrace(logger);
         this.socketConnectionOptions = options.Value;
         this.schedulers = schedulers;
-        this.memoryPool = memoryPool.Pool;
+        this.memoryPool = SharedMemoryPool.Pool;
     }
 
     public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken = default)

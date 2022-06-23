@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -45,7 +46,7 @@ internal static class InMemoryTransportExtensions
         return (IServiceProvider sp, object key) =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
+            var sharedMemoryPool = SharedMemoryPool.Pool;
             return new InMemoryTransportConnectionFactory(hub, loggerFactory, sharedMemoryPool);
         };
     }
@@ -55,7 +56,7 @@ internal static class InMemoryTransportExtensions
         return (IServiceProvider sp, object key) =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
+            var sharedMemoryPool = SharedMemoryPool.Pool;
             return new InMemoryTransportListener(hub, loggerFactory, sharedMemoryPool);
         };
     }
@@ -66,10 +67,10 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
     private readonly Channel<(InMemoryTransportConnection Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryTransportConnection, TaskCompletionSource<bool>)>();
     private readonly InMemoryTransportConnectionHub _hub;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly SharedMemoryPool _memoryPool;
+    private readonly MemoryPool<byte> _memoryPool;
     private readonly CancellationTokenSource _disposedCts = new();
 
-    public InMemoryTransportListener(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, SharedMemoryPool memoryPool)
+    public InMemoryTransportListener(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, MemoryPool<byte> memoryPool)
     {
         _hub = hub;
         _loggerFactory = loggerFactory;
@@ -103,7 +104,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
             {
                 var remoteConnectionContext = item.Connection;
                 var localConnectionContext = InMemoryTransportConnection.Create(
-                    _memoryPool.Pool,
+                    _memoryPool,
                     _loggerFactory.CreateLogger<InMemoryTransportConnection>(),
                     other: remoteConnectionContext,
                     localEndPoint: EndPoint);
@@ -170,10 +171,10 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
 {
     private readonly InMemoryTransportConnectionHub _hub;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly SharedMemoryPool _memoryPool;
+    private readonly MemoryPool<byte> _memoryPool;
     private readonly IPEndPoint _localEndpoint;
 
-    public InMemoryTransportConnectionFactory(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, SharedMemoryPool memoryPool)
+    public InMemoryTransportConnectionFactory(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, MemoryPool<byte> memoryPool)
     {
         _hub = hub;
         _loggerFactory = loggerFactory;
@@ -190,7 +191,7 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
         }
 
         var connectionContext = InMemoryTransportConnection.Create(
-            _memoryPool.Pool,
+            _memoryPool,
             _loggerFactory.CreateLogger<InMemoryTransportConnection>(),
             _localEndpoint,
             endpoint);

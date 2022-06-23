@@ -100,7 +100,6 @@ namespace Orleans
 
             // TODO: abstract or move into some options.
             services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
 
             // Networking
             services.TryAddSingleton<ConnectionCommon>();
