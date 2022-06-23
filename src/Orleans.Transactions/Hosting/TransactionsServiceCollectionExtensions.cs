@@ -28,5 +28,15 @@ namespace Orleans.Hosting
                 services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
             return services;
         }
+
+        internal static IServiceCollection UseTransactions(this IServiceCollection services)
+        {
+            services.TryAddSingleton<IClock, Clock>();
+            services.AddSingleton<ITransactionAgent, TransactionAgent>();
+            services.AddSingleton<ITransactionScope, TransactionScope>();
+            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
+            services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
+            return services;
+        }
     }
 }
