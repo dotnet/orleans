@@ -254,12 +254,10 @@ namespace Orleans.Runtime
         /// Concurrently start creating and initializing the real activation and replace it when it is ready.
         /// </summary>
         /// <param name="grainId">The grain identity</param>
-        /// <param name="activationId">The activation identity</param>
         /// <param name="requestContextData">Request context data.</param>
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
-            in ActivationId activationId,
             Dictionary<string, object> requestContextData)
         {
             if (TryGetGrainContext(grainId, out var result))
@@ -277,7 +275,7 @@ namespace Orleans.Runtime
 
                 if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
-                    var address = GrainAddress.GetAddress(Silo, grainId, activationId);
+                    var address = GrainAddress.GetAddress(Silo, grainId, new ActivationId(Guid.NewGuid()));
                     result = this.grainActivator.CreateInstance(address);
                     RegisterMessageTarget(result);
                 }
@@ -285,23 +283,22 @@ namespace Orleans.Runtime
 
             if (result is null)
             {
-                var address = GrainAddress.GetAddress(Silo, grainId, activationId);
-
                 // Did not find and did not start placing new
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation {Activation}", address.ToFullString());
+                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation for grain {GrainId}", grainId);
                 }
 
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
 
-                this.directory.InvalidateCacheEntry(address);
+                this.directory.InvalidateCacheEntry(grainId);
 
                 // Unregister the target activation so we don't keep getting spurious messages.
                 // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
                 // this request snuck ahead of another request, with new placement requested, for the same activation.
                 // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
                 // we want to make sure that we don't unregister the activation we just created.
+                var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
                 _ = this.UnregisterNonExistentActivation(address);
                 return null;
             }

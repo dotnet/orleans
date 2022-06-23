@@ -73,14 +73,11 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = default;
-                msg.ClearTargetAddress();
 
                 if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
-                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
@@ -94,7 +91,6 @@ namespace Orleans.Runtime.Messaging
                 if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
-                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 this.messageCenter.SendMessage(msg);

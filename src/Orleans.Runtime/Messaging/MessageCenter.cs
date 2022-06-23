@@ -389,14 +389,12 @@ namespace Orleans.Runtime.Messaging
             }
             else if (forwardingAddress != null)
             {
-                message.TargetAddress = forwardingAddress;
+                message.TargetSilo = forwardingAddress.SiloAddress;
                 SendMessage(message);
             }
             else
             {
-                message.TargetActivation = default;
                 message.TargetSilo = null;
-                message.ClearTargetAddress();
                 _ = AddressAndSendMessage(message);
             }
         }
@@ -479,11 +477,6 @@ namespace Orleans.Runtime.Messaging
             {
                 message.TargetSilo = _siloAddress;
             }
-
-            if (message.TargetActivation.IsDefault)
-            {
-                message.TargetActivation = ActivationId.GetDeterministic(message.TargetGrain);
-            }
         }
 
         public void ReceiveMessage(Message msg)
@@ -493,14 +486,15 @@ namespace Orleans.Runtime.Messaging
             // Find the activation it targets; first check for a system activation, then an app activation
             if (msg.TargetGrain.IsSystemTarget())
             {
-                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
+                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetGrain);
                 if (target == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     this.log.LogWarning(
                         (int) ErrorCode.MessagingMessageFromUnknownActivation,
                         "Received a message {Message} for an unknown SystemTarget: {Target}",
-                         msg, msg.TargetAddress);
+                         msg,
+                         msg.TargetGrain);
 
                     // Send a rejection only on a request
                     if (msg.Direction == Message.Directions.Request)
@@ -533,7 +527,6 @@ namespace Orleans.Runtime.Messaging
                     {
                         var targetActivation = catalog.GetOrCreateActivation(
                             msg.TargetGrain,
-                            msg.TargetActivation,
                             msg.RequestContextData);
 
                         if (targetActivation is null)
@@ -544,7 +537,7 @@ namespace Orleans.Runtime.Messaging
                                 "Intermediate NonExistentActivation for message {Message}",
                                 msg);
 
-                            var nonExistentActivation = msg.TargetAddress;
+                            var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
                             ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
                             return;
                         }

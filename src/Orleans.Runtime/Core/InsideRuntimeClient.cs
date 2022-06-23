@@ -136,11 +136,9 @@ namespace Orleans.Runtime
             {
                 var clientAddress = this.HostedClient.Address;
                 message.SendingGrain = clientAddress.GrainId;
-                message.SendingActivation = clientAddress.ActivationId;
             }
             else
             {
-                message.SendingActivation = sendingActivation.ActivationId;
                 message.SendingGrain = sendingActivation.GrainId;
             }
 
@@ -151,7 +149,6 @@ namespace Orleans.Runtime
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
                 message.Category = targetGrainId.Type.Equals(Constants.MembershipServiceType) ?
                     Message.Categories.Ping : Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
@@ -456,7 +453,7 @@ namespace Orleans.Runtime
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
-                            this.GrainLocator.InvalidateCache(message.SendingAddress);
+                            this.GrainLocator.InvalidateCache(message.SendingGrain);
                         }
                         break;
 
