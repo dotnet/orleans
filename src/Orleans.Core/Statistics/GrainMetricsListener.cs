@@ -6,6 +6,7 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
+// TODO: Make metrics listeners injectable and optionally enabled/disabled.
 internal static class GrainMetricsListener
 {
     internal static readonly ConcurrentDictionary<string, int> GrainCounts = new();
@@ -28,10 +29,20 @@ internal static class GrainMetricsListener
     }
 
     // TODO: not sure if it's thread-safe... need check
+    // Alternatives:
+    // 1. Use existing *Statistics counters
+    // 2. Copy source code from System.Diagnostics.Metrics.AggregationManager
     private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object>> tags, object state)
     {
         var typeTag = tags[0];
         var grainType = (string)typeTag.Value;
-        GrainCounts.AddOrUpdate(grainType, 1, (k, v) => Interlocked.Increment(ref v));
+        if (measurement == 1)
+        {
+            GrainCounts.AddOrUpdate(grainType, 1, (k, v) => Interlocked.Increment(ref v));
+        }
+        else if (measurement == -1)
+        {
+            GrainCounts.AddOrUpdate(grainType, -1, (k, v) => Interlocked.Decrement(ref v));
+        }
     }
 }
