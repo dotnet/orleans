@@ -16,6 +16,10 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Utilities;
+using Orleans.Serialization.WireProtocol;
+using Orleans.Runtime.Serialization;
+using Orleans.Utilities;
+using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -25,6 +29,8 @@ namespace Orleans.Runtime.Messaging
         private const int MessageSizeHint = 4096;
         private readonly Serializer<object> _bodySerializer;
         private readonly Serializer<GrainAddress> _activationAddressCodec;
+        private readonly CachingSiloAddressCodec _readerSiloAddressCachingCodec;
+        private readonly CachingSiloAddressCodec _writerSiloAddressCachingCodec;
         private readonly Serializer _serializer;
         private readonly SerializerSession _serializationSession;
         private readonly SerializerSession _deserializationSession;
@@ -45,6 +51,8 @@ namespace Orleans.Runtime.Messaging
             int maxHeaderSize,
             int maxBodySize)
         {
+            _readerSiloAddressCachingCodec = new CachingSiloAddressCodec();
+            _writerSiloAddressCachingCodec = new CachingSiloAddressCodec();
             _serializer = ActivatorUtilities.CreateInstance<Serializer>(services);
             _activationAddressCodec = activationAddressSerializer;
             _serializationSession = sessionPool.GetSession();
@@ -245,7 +253,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
-                WriteSiloAddress(ref writer, value.SendingSilo);
+                _writerSiloAddressCachingCodec.WriteRaw(ref writer, value.SendingSilo);
             }
 
             if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
@@ -265,7 +273,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)
             {
-                WriteSiloAddress(ref writer, value.TargetSilo);
+                _writerSiloAddressCachingCodec.WriteRaw(ref writer, value.TargetSilo);
             }
 
             if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
@@ -339,7 +347,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
-                result.SendingSilo = ReadSiloAddress(ref reader);
+                result.SendingSilo = _readerSiloAddressCachingCodec.ReadRaw(ref reader);
             }
 
             if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
@@ -359,7 +367,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)
             {
-                result.TargetSilo = ReadSiloAddress(ref reader);
+                result.TargetSilo = _readerSiloAddressCachingCodec.ReadRaw(ref reader);
             }
 
             if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
@@ -493,77 +501,6 @@ namespace Orleans.Runtime.Messaging
             return result;
         }
 
-        public static SiloAddress ReadSiloAddress<TInput>(ref Reader<TInput> reader)
-        {
-            IPAddress ip;
-            var length = reader.ReadVarInt32();
-            if (length < 0)
-            {
-                return null;
-            }
-#if NET5_0_OR_GREATER
-            if (reader.TryReadBytes(length, out var bytes))
-            {
-                ip = new IPAddress(bytes);
-            }
-            else
-            {
-#endif
-                var addressBytes = reader.ReadBytes((uint)length);
-                ip = new IPAddress(addressBytes);
-#if NET5_0_OR_GREATER
-            }
-#endif
-            var port = (int)reader.ReadVarUInt32();
-            var generation = reader.ReadInt32();
-            
-            return SiloAddress.New(new IPEndPoint(ip, port), generation);
-        }
-
-        public static void WriteSiloAddress<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
-        {
-            if (value is null)
-            {
-                writer.WriteVarInt32(-1);
-                return;
-            }
-
-            var ep = value.Endpoint;
-#if NET5_0_OR_GREATER
-            Span<byte> buffer = stackalloc byte[64];
-            if (ep.Address.TryWriteBytes(buffer, out var length))
-            {
-                var writable = writer.WritableSpan;
-                if (writable.Length > length)
-                {
-                    // IP
-                    writer.WriteVarInt32(length);
-                    buffer.Slice(0, length).CopyTo(writable[1..]);
-                    writer.AdvanceSpan(length);
-
-                    // Port
-                    writer.WriteVarUInt32((uint)ep.Port);
-
-                    // Generation
-                    writer.WriteInt32(value.Generation);
-
-                    return;
-                }
-            }
-#endif
-
-            // IP
-            var bytes = ep.Address.GetAddressBytes();
-            writer.WriteVarInt32(bytes.Length);
-            writer.Write(bytes);
-
-            // Port
-            writer.WriteVarUInt32((uint)ep.Port);
-
-            // Generation
-            writer.WriteInt32(value.Generation);
-        }
-
         private static GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
         {
             var grainType = IdSpanCodec.ReadRaw(ref reader);
@@ -615,6 +552,229 @@ namespace Orleans.Runtime.Messaging
             }
 
             writer.Write(value.Key.ToByteArray());
+        }
+    }
+
+    /// <summary>
+    /// A serializer for <see cref="SiloAddress"/> which caches values and avoids re-encoding and unnecessary allocations.
+    /// </summary>
+    internal sealed class CachingSiloAddressCodec
+    {
+        // Refresh each entry's timer upon access after 1 minute
+        private const long RefreshAfterMilliseconds = 60 * 1000;
+
+        // Purge entries which have not been accessed in over 2 minutes. 
+        private const long PurgeAfterMilliseconds = 2 * 60 * 1000 + RefreshAfterMilliseconds;
+
+        // Scan for entries which are expired every minute
+        private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
+
+        private readonly Dictionary<int, CacheEntry> _cache = new();
+        private long _lastGarbageCollectionTimestamp;
+
+        public CachingSiloAddressCodec()
+        {
+            _lastGarbageCollectionTimestamp = Environment.TickCount64;
+        }
+
+        public SiloAddress ReadRaw<TInput>(ref Reader<TInput> reader)
+        {
+            var currentTimestamp = Environment.TickCount64;
+
+            SiloAddress result = null;
+            byte[] payloadArray = default;
+            var length = reader.ReadVarInt32();
+            if (length == -1)
+            {
+                return null;
+            }
+
+            var hashCode = reader.ReadInt32();
+            length -= sizeof(int);
+            if (!reader.TryReadBytes(length, out var payloadSpan))
+            {
+                payloadSpan = payloadArray = reader.ReadBytes((uint)length);
+            }
+
+            if (_cache.TryGetValue(hashCode, out var current) && new ReadOnlySpan<byte>(current.Encoded).SequenceEqual(payloadSpan))
+            {
+                result = current.Value;
+
+                // Refresh the inteval periodically.
+                if (currentTimestamp - current.SloppyLastSeen > RefreshAfterMilliseconds)
+                {
+                    var updatedEntry = current;
+                    updatedEntry.SloppyLastSeen = currentTimestamp;
+                    _cache[hashCode] = updatedEntry;
+                }
+            }
+
+            if (result is null)
+            {
+                if (payloadArray is null)
+                {
+                    payloadArray = new byte[length];
+                    payloadSpan.CopyTo(payloadArray);
+                }
+
+                var innerReader = Reader.Create(payloadSpan, null);
+                result = ReadSiloAddressInner(ref innerReader);
+                result.InternalSetConsistentHashCode(hashCode);
+
+                var cacheEntry = new CacheEntry { Encoded = payloadArray, Value = result, SloppyLastSeen = currentTimestamp };
+
+                // If there is a hash collision, then the last seen entry will always win.
+                _cache.TryAdd(hashCode, cacheEntry);
+            }
+
+            // Perform periodic maintenance to prevent unbounded memory leaks.
+            if (currentTimestamp - _lastGarbageCollectionTimestamp > GarbageCollectionIntervalMilliseconds)
+            {
+                PurgeStaleEntries();
+                _lastGarbageCollectionTimestamp = currentTimestamp;
+            }
+
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void PurgeStaleEntries()
+        {
+            var currentTimestamp = Environment.TickCount64;
+            List<int> purgeKeys = default;
+            foreach (var entry in _cache)
+            {
+                if (currentTimestamp - entry.Value.SloppyLastSeen > PurgeAfterMilliseconds)
+                {
+                    purgeKeys ??= new();
+                    purgeKeys.Add(entry.Key);
+                }
+            }
+
+            if (purgeKeys is not null)
+            {
+                foreach (var key in purgeKeys)
+                {
+                    _cache.Remove(key);
+                }
+            }
+        }
+
+        private static SiloAddress ReadSiloAddressInner<TInput>(ref Reader<TInput> reader)
+        {
+            IPAddress ip;
+            var length = reader.ReadVarInt32();
+#if NET5_0_OR_GREATER
+            if (reader.TryReadBytes(length, out var bytes))
+            {
+                ip = new IPAddress(bytes);
+            }
+            else
+            {
+#endif
+                var addressBytes = reader.ReadBytes((uint)length);
+                ip = new IPAddress(addressBytes);
+#if NET5_0_OR_GREATER
+            }
+#endif
+            var port = (int)reader.ReadVarUInt32();
+            var generation = reader.ReadInt32();
+            
+            return SiloAddress.New(new IPEndPoint(ip, port), generation);
+        }
+
+        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        {
+            var currentTimestamp = Environment.TickCount64;
+            if (value is null)
+            {
+                writer.WriteVarInt32(-1);
+                return;
+            }
+
+            var hashCode = value.GetConsistentHashCode();
+            if (_cache.TryGetValue(hashCode, out var cacheEntry) && value.Equals(cacheEntry.Value))
+            {
+                writer.WriteVarInt32(cacheEntry.Encoded.Length);
+                writer.Write(cacheEntry.Encoded);
+
+                // Refresh the inteval periodically.
+                if (currentTimestamp - cacheEntry.SloppyLastSeen > RefreshAfterMilliseconds)
+                {
+                    var updatedEntry = cacheEntry;
+                    updatedEntry.SloppyLastSeen = currentTimestamp;
+                    _cache[hashCode] = updatedEntry;
+                }
+
+                // Perform periodic maintenance to prevent unbounded memory leaks.
+                if (currentTimestamp - _lastGarbageCollectionTimestamp > GarbageCollectionIntervalMilliseconds)
+                {
+                    PurgeStaleEntries();
+                    _lastGarbageCollectionTimestamp = currentTimestamp;
+                }
+
+                return;
+            }
+
+            var innerWriter = Writer.Create(new PooledArrayBufferWriter(), null);
+            innerWriter.WriteInt32(value.GetConsistentHashCode());
+            WriteSiloAddressInner(ref innerWriter, value);
+            innerWriter.Commit();
+
+            writer.WriteVarInt32((int)innerWriter.Output.Length);
+            innerWriter.Output.CopyTo(ref writer);
+            var payloadArray = innerWriter.Output.ToArray();
+            innerWriter.Dispose();
+
+            cacheEntry = new CacheEntry { Encoded = payloadArray, Value = value, SloppyLastSeen = currentTimestamp };
+
+            // If there is a hash collision, then the last seen entry will always win.
+            _cache.TryAdd(hashCode, cacheEntry);
+        }
+
+        private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        {
+#if NET5_0_OR_GREATER
+            var ep = value.Endpoint;
+            Span<byte> buffer = stackalloc byte[64];
+            if (ep.Address.TryWriteBytes(buffer, out var length))
+            {
+                var writable = writer.WritableSpan;
+                if (writable.Length > length)
+                {
+                    // IP
+                    writer.WriteVarInt32(length);
+                    buffer.Slice(0, length).CopyTo(writable[1..]);
+                    writer.AdvanceSpan(length);
+
+                    // Port
+                    writer.WriteVarUInt32((uint)ep.Port);
+
+                    // Generation
+                    writer.WriteInt32(value.Generation);
+
+                    return;
+                }
+            }
+#endif
+
+            // IP
+            var bytes = ep.Address.GetAddressBytes();
+            writer.WriteVarInt32(bytes.Length);
+            writer.Write(bytes);
+
+            // Port
+            writer.WriteVarUInt32((uint)ep.Port);
+
+            // Generation
+            writer.WriteInt32(value.Generation);
+        }
+
+        private struct CacheEntry
+        {
+            public byte[] Encoded { get; set; }
+            public SiloAddress Value { get; set; }
+            public long SloppyLastSeen { get; set; }
         }
     }
 }
