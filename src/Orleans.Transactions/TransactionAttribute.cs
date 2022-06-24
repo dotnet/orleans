@@ -203,7 +203,7 @@ namespace Orleans
                 // or if it must abort, tell participants that it aborted
                 if (startedNewTransaction)
                 {
-                    if (transactionException is not null)
+                    if (transactionException is not null || transactionInfo.TryToCommit is false)
                     {
                         await TransactionAgent.Abort(transactionInfo);
                     }
