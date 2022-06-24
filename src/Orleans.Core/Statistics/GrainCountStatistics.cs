@@ -10,7 +10,7 @@ internal class GrainCountStatistics
 {
     public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
     {
-        return GrainCountStatisticsListener
+        return GrainMetricsListener
             .GrainCounts
             .Select(s => new KeyValuePair<string, long>(s.Key, s.Value))
             .Where(p => p.Value > 0);

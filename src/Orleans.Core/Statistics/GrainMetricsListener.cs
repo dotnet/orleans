@@ -6,11 +6,11 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-internal static class GrainCountStatisticsListener
+internal static class GrainMetricsListener
 {
     internal static readonly ConcurrentDictionary<string, int> GrainCounts = new();
     private static readonly MeterListener MeterListener = new();
-    static GrainCountStatisticsListener()
+    static GrainMetricsListener()
     {
         MeterListener.InstrumentPublished = (instrument, listener) =>
         {
@@ -20,6 +20,10 @@ internal static class GrainCountStatisticsListener
             }
         };
         MeterListener.SetMeasurementEventCallback<int>(OnMeasurementRecorded);
+    }
+
+    internal static void Start()
+    {
         MeterListener.Start();
     }
 

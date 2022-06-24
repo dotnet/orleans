@@ -8,7 +8,7 @@ using System.Threading;
 namespace Orleans.Runtime;
 
 // Can not use MetricsEventSource because it only supports single listener.
-public static class SiloRuntimeStatisticsListener
+public static class SiloRuntimeMetricsListener
 {
     private static readonly MeterListener MeterListener = new();
 
@@ -27,7 +27,7 @@ public static class SiloRuntimeStatisticsListener
         InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE,
     };
 
-    static SiloRuntimeStatisticsListener()
+    static SiloRuntimeMetricsListener()
     {
         MeterListener.InstrumentPublished = (instrument, listener) =>
         {
@@ -42,6 +42,10 @@ public static class SiloRuntimeStatisticsListener
             }
         };
         MeterListener.SetMeasurementEventCallback<int>(OnMeasurementRecorded);
+    }
+
+    internal static void Start()
+    {
         MeterListener.Start();
     }
 

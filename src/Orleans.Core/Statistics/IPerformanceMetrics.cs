@@ -92,10 +92,10 @@ namespace Orleans.Runtime
             AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
             MemoryUsage = appEnvironmentStatistics.MemoryUsage;
             IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
-            ClientCount = SiloRuntimeStatisticsListener.ConnectedClientCount;
+            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
             TotalPhysicalMemory = hostEnvironmentStatistics.TotalPhysicalMemory;
-            ReceivedMessages = SiloRuntimeStatisticsListener.MessageReceivedTotal;
-            SentMessages = SiloRuntimeStatisticsListener.MessageSentTotal;
+            ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
+            SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
         }
 

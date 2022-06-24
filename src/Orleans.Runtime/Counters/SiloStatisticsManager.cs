@@ -21,6 +21,8 @@ namespace Orleans.Runtime.Counters
 
         internal void Start(StatisticsOptions options)
         {
+            GrainMetricsListener.Start();
+            SiloRuntimeMetricsListener.Start();
             countersPublisher.Start();
             logStatistics.Start();
         }
