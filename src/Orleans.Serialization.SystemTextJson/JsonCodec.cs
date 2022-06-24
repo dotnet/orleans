@@ -71,15 +71,21 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         // Note that the Utf8JsonWriter and PooledArrayBufferWriter could be pooled as long as they're correctly
         // reset at the end of each use.
         var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
-        using var jsonWriter = new Utf8JsonWriter(bufferWriter);
-        JsonSerializer.Serialize(jsonWriter, value, _options.SerializerOptions);
-        jsonWriter.Flush();
+        try
+        {
+            using var jsonWriter = new Utf8JsonWriter(bufferWriter);
+            JsonSerializer.Serialize(jsonWriter, value, _options.SerializerOptions);
+            jsonWriter.Flush();
 
-        ReferenceCodec.MarkValueField(writer.Session);
-        writer.WriteFieldHeader(1, typeof(byte[]), typeof(byte[]), WireType.LengthPrefixed);
-        writer.WriteVarUInt32((uint)bufferWriter.Value.Length);
-        bufferWriter.Value.CopyTo(ref writer);
-        bufferWriter.Value.Reset();
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(1, typeof(byte[]), typeof(byte[]), WireType.LengthPrefixed);
+            writer.WriteVarUInt32((uint)bufferWriter.Value.Length);
+            bufferWriter.Value.CopyTo(ref writer);
+        }
+        finally
+        {
+            bufferWriter.Value.Dispose();
+        }
 
         writer.WriteEndObject();
     }
@@ -126,19 +132,17 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                     var length = reader.ReadVarUInt32();
 
                     // To possibly improve efficiency, this could be converted to read a ReadOnlySequence<byte> instead of a byte array.
-                    ReadOnlySequence<byte> sequence = default;
                     var tempBuffer = new PooledArrayBufferWriter();
                     try
                     {
                         reader.ReadBytes(ref tempBuffer, (int)length);
-                        sequence = tempBuffer.RentReadOnlySequence();
+                        var sequence = tempBuffer.AsReadOnlySequence();
                         var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
                         result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
                     }
                     finally
                     {
-                        tempBuffer.ReturnReadOnlySequence(sequence);
-                        tempBuffer.Reset();
+                        tempBuffer.Dispose();
                     }
 
                     break;
@@ -184,7 +188,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
         using var jsonWriter = new Utf8JsonWriter(bufferWriter);
         JsonSerializer.Serialize(jsonWriter, input, _options.SerializerOptions);
-        var sequence = bufferWriter.Value.RentReadOnlySequence();
+        var sequence = bufferWriter.Value.AsReadOnlySequence();
         try
         {
             var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
@@ -194,7 +198,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         }
         finally
         {
-            bufferWriter.Value.ReturnReadOnlySequence(sequence);
+            bufferWriter.Value.Dispose();
         }
     }
 

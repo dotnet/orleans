@@ -60,7 +60,7 @@ namespace Benchmarks
         public int Serialize()
         {
             Session.FullReset();
-            var writer = new PooledArrayBufferWriter(4096).CreateWriter(Session);
+            var writer = Writer.CreatePooled(Session);
             Serializer.Serialize(Value, ref writer);
             writer.Output.Dispose();
             return writer.Position;
