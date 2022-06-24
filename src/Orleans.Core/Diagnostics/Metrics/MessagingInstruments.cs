@@ -7,23 +7,23 @@ namespace Orleans.Runtime
 {
     internal static class MessagingInstruments
     {
-        internal static readonly Counter<int> HeaderBytesSentCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_SENT_BYTES_HEADER);
-        internal static readonly Counter<int> HeaderBytesReceivedCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_RECEIVED_BYTES_HEADER);
-        internal static readonly Counter<int> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_SENT_LOCALMESSAGES);
-        internal static readonly Counter<int> FailedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_SENT_FAILED);
-        internal static readonly Counter<int> DroppedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_SENT_DROPPED);
-        internal static readonly Counter<int> RejectedMessagesCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_REJECTED);
-        internal static readonly Counter<int> ReroutedMessagesCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_REROUTED);
-        internal static readonly Counter<int> ExpiredMessagesCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_EXPIRED);
+        internal static readonly Counter<int> HeaderBytesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, "bytes");
+        internal static readonly Counter<int> HeaderBytesReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, "bytes");
+        internal static readonly Counter<int> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES);
+        internal static readonly Counter<int> FailedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_FAILED);
+        internal static readonly Counter<int> DroppedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_DROPPED);
+        internal static readonly Counter<int> RejectedMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_REJECTED);
+        internal static readonly Counter<int> ReroutedMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_REROUTED);
+        internal static readonly Counter<int> ExpiredMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_EXPIRED);
 
         // ! UpDownCounter
-        internal static readonly Counter<int> ConnectedClient = Instruments.Meter.CreateCounter<int>(StatisticNames.GATEWAY_CONNECTED_CLIENTS);
-        internal static readonly Counter<int> PingSendCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_PINGS_SENT);
-        internal static readonly Counter<int> PingReceivedCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_PINGS_RECEIVED);
-        internal static readonly Counter<int> PingReplyReceivedCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_PINGS_REPLYRECEIVED);
-        internal static readonly Counter<int> PingReplyMissedCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.MESSAGING_PINGS_REPLYMISSED);
-        internal static readonly Histogram<int> MessageSentSizeHistogram = Instruments.Meter.CreateHistogram<int>(StatisticNames.MESSAGING_SENT_MESSAGES_SIZE, "bytes");
-        internal static readonly Histogram<int> MessageReceivedSizeHistogram = Instruments.Meter.CreateHistogram<int>(StatisticNames.MESSAGING_RECEIVED_MESSAGES_SIZE, "bytes");
+        internal static readonly Counter<int> ConnectedClient = Instruments.Meter.CreateCounter<int>(InstrumentNames.GATEWAY_CONNECTED_CLIENTS);
+        internal static readonly Counter<int> PingSendCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_SENT);
+        internal static readonly Counter<int> PingReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_RECEIVED);
+        internal static readonly Counter<int> PingReplyReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_REPLYRECEIVED);
+        internal static readonly Counter<int> PingReplyMissedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_REPLYMISSED);
+        internal static readonly Histogram<int> MessageSentSizeHistogram = Instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_SENT_MESSAGES_SIZE, "bytes");
+        internal static readonly Histogram<int> MessageReceivedSizeHistogram = Instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE, "bytes");
 
 
         internal enum Phase

@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-internal class GrainCountStatisticsListener
+internal static class GrainCountStatisticsListener
 {
     internal static readonly ConcurrentDictionary<string, int> GrainCounts = new();
     private static readonly MeterListener MeterListener = new();
@@ -14,12 +14,13 @@ internal class GrainCountStatisticsListener
     {
         MeterListener.InstrumentPublished = (instrument, listener) =>
         {
-            if (instrument == MiscInstruments.GrainCounts)
+            if (instrument.Name == InstrumentNames.GRAIN_COUNTS)
             {
                 listener.EnableMeasurementEvents(instrument);
             }
         };
         MeterListener.SetMeasurementEventCallback<int>(OnMeasurementRecorded);
+        MeterListener.Start();
     }
 
     // TODO: not sure if it's thread-safe... need check

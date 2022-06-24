@@ -6,11 +6,11 @@ namespace Orleans.Runtime;
 
 internal static class MessagingProcessingInstruments
 {
-    private static readonly Counter<long> dispatcherMessagesProcessedCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.MESSAGING_DISPATCHER_PROCESSED);
-    private static readonly Counter<long> dispatcherMessagesReceivedCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.MESSAGING_DISPATCHER_RECEIVED);
-    private static readonly Counter<long> dispatcherMessagesForwardedCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.MESSAGING_DISPATCHER_FORWARDED);
-    private static readonly Counter<long> imaReceivedCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.MESSAGING_IMA_RECEIVED);
-    private static readonly Counter<long> imaEnqueuedCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.MESSAGING_IMA_ENQUEUED);
+    private static readonly Counter<long> dispatcherMessagesProcessedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_PROCESSED);
+    private static readonly Counter<long> dispatcherMessagesReceivedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED);
+    private static readonly Counter<long> dispatcherMessagesForwardedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED);
+    private static readonly Counter<long> imaReceivedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED);
+    private static readonly Counter<long> imaEnqueuedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED);
 
     internal static void OnDispatcherMessageReceive(Message msg)
     {
@@ -60,6 +60,6 @@ internal static class MessagingProcessingInstruments
     internal static ObservableGauge<long> ActivationDataAll;
     internal static void RegisterActivationDataAllObserve(Func<long> observeValue)
     {
-        ActivationDataAll = Instruments.Meter.CreateObservableGauge(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
+        ActivationDataAll = Instruments.Meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
     }
 }

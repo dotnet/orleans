@@ -6,8 +6,8 @@ namespace Orleans.Runtime;
 
 internal static class NetworkingInstruments
 {
-    internal static Counter<int> ClosedSocketsCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.NETWORKING_SOCKETS_CLOSED);
-    internal static Counter<int> OpenedSocketsCounter = Instruments.Meter.CreateCounter<int>(StatisticNames.NETWORKING_SOCKETS_OPENED);
+    internal static Counter<int> ClosedSocketsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_CLOSED);
+    internal static Counter<int> OpenedSocketsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_OPENED);
 
     internal static void OnOpenedSocket(ConnectionDirection direction)
     {

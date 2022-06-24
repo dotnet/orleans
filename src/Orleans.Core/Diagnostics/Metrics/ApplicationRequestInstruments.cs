@@ -5,8 +5,8 @@ namespace Orleans.Runtime;
 
 internal static class ApplicationRequestInstruments
 {
-    internal static Histogram<double> AppRequestsLatencyHistogram = Instruments.Meter.CreateHistogram<double>(StatisticNames.APP_REQUESTS_LATENCY_HISTOGRAM, "ms");
-    internal static Counter<long> TimedOutRequestsCounter = Instruments.Meter.CreateCounter<long>(StatisticNames.APP_REQUESTS_TIMED_OUT);
+    internal static Histogram<double> AppRequestsLatencyHistogram = Instruments.Meter.CreateHistogram<double>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM, "ms");
+    internal static Counter<long> TimedOutRequestsCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_TIMED_OUT);
 
     internal static void OnAppRequestsEnd(TimeSpan timeSpan)
     {

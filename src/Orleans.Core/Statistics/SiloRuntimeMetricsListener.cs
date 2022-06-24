@@ -7,7 +7,6 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-// TODO: use a singleton to injecting options
 // Can not use MetricsEventSource because it only supports single listener.
 public static class SiloRuntimeStatisticsListener
 {
@@ -24,8 +23,8 @@ public static class SiloRuntimeStatisticsListener
     private static readonly string[] MetricNames =
     {
         // orleans
-        StatisticNames.GATEWAY_CONNECTED_CLIENTS,
-        StatisticNames.MESSAGING_RECEIVED_MESSAGES_SIZE,
+        InstrumentNames.GATEWAY_CONNECTED_CLIENTS,
+        InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE,
     };
 
     static SiloRuntimeStatisticsListener()

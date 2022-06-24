@@ -8,6 +8,6 @@ public static class ClientInstruments
     internal static ObservableGauge<int> ConnectedGatewayCount;
     internal static void RegisterConnectedGatewayCountObserve(Func<int> observeValue)
     {
-        ConnectedGatewayCount = Instruments.Meter.CreateObservableGauge(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, observeValue);
+        ConnectedGatewayCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CLIENT_CONNECTED_GATEWAY_COUNT, observeValue);
     }
 }
