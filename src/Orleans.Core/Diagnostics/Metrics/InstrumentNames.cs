@@ -11,16 +11,16 @@ internal static class InstrumentNames
     // Messaging
     public const string MESSAGING_SENT_MESSAGES_SIZE = "orleans-messaging-sent-messages-size";
     public const string MESSAGING_RECEIVED_MESSAGES_SIZE = "orleans-messaging-received-messages-size";
-    public const string MESSAGING_SENT_BYTES_HEADER = "orleans-messaging-sent-bytes-header-size";
+    public const string MESSAGING_SENT_BYTES_HEADER = "orleans-messaging-sent-header-size";
     public const string MESSAGING_SENT_FAILED = "orleans-messaging-sent-failed";
     public const string MESSAGING_SENT_DROPPED = "orleans-messaging-sent-dropped";
     public const string MESSAGING_RECEIVED_BYTES_HEADER = "orleans-messaging-received-header-size";
 
     public const string MESSAGING_DISPATCHER_RECEIVED = "orleans-messaging-processing-dispatcher-received";
     public const string MESSAGING_DISPATCHER_PROCESSED = "orleans-messaging-processing-dispatcher-processed";
+    public const string MESSAGING_DISPATCHER_FORWARDED = "orleans-messaging-processing-dispatcher-forwarded";
     public const string MESSAGING_IMA_RECEIVED = "orleans-messaging-processing-ima-received";
     public const string MESSAGING_IMA_ENQUEUED = "orleans-messaging-processing-ima-enqueued";
-    public const string MESSAGING_DISPATCHER_FORWARDED = "orleans-messaging-processing-dispatcher-forwarded";
     public const string MESSAGING_PROCESSING_ACTIVATION_DATA_ALL = "orleans-messaging-processing-activation-data";
     public const string MESSAGING_PINGS_SENT = "orleans-messaging-pings-sent";
     public const string MESSAGING_PINGS_RECEIVED = "orleans-messaging-pings-received";
@@ -29,7 +29,7 @@ internal static class InstrumentNames
     public const string MESSAGING_EXPIRED = "orleans-messaging-expired";
     public const string MESSAGING_REJECTED = "orleans-messaging-rejected";
     public const string MESSAGING_REROUTED = "orleans-messaging-rerouted";
-    public const string MESSAGING_SENT_LOCALMESSAGES = "orleans-messaging-sent-local-messages";
+    public const string MESSAGING_SENT_LOCALMESSAGES = "orleans-messaging-sent-local";
 
     // Gateway
     public const string GATEWAY_CONNECTED_CLIENTS = "orleans-gateway-connected-clients";
@@ -38,7 +38,6 @@ internal static class InstrumentNames
     public const string GATEWAY_LOAD_SHEDDING = "orleans-gateway-load-shedding";
 
     // Runtime
-    // not used
     public const string SCHEDULER_NUM_LONG_RUNNING_TURNS = "orleans-scheduler-long-running-turns";
 
     // Catalog
@@ -52,17 +51,19 @@ internal static class InstrumentNames
     public const string CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS = "orleans-catalog-activation-concurrent-registration-attempts";
 
     // Directory
+    // not used...
     public const string DIRECTORY_LOOKUPS_LOCAL_ISSUED = "orleans-directory-lookups-local-issued";
+    // not used...
     public const string DIRECTORY_LOOKUPS_LOCAL_SUCCESSES = "orleans-directory-lookups-local-successes";
     public const string DIRECTORY_LOOKUPS_FULL_ISSUED = "orleans-directory-lookups-full-issued";
     public const string DIRECTORY_LOOKUPS_REMOTE_SENT = "orleans-directory-lookups-remote-sent";
     public const string DIRECTORY_LOOKUPS_REMOTE_RECEIVED = "orleans-directory-lookups-remote-received";
     public const string DIRECTORY_LOOKUPS_LOCALDIRECTORY_ISSUED = "orleans-directory-lookups-local-directory-issued";
     public const string DIRECTORY_LOOKUPS_LOCALDIRECTORY_SUCCESSES = "orleans-directory-lookups-local-directory-successes";
+    // not used
     public const string DIRECTORY_LOOKUPS_CACHE_ISSUED = "orleans-directory-lookups-cache-issued";
+    // not used
     public const string DIRECTORY_LOOKUPS_CACHE_SUCCESSES = "orleans-directory-lookups-cache-successes";
-    // TODO: provide query for this
-    public const string DIRECTORY_LOOKUPS_CACHE_HITRATIO = "orleans-directory-lookups-cache-hit-ratio";
     public const string DIRECTORY_VALIDATIONS_CACHE_SENT = "orleans-directory-validations-cache-sent";
     public const string DIRECTORY_VALIDATIONS_CACHE_RECEIVED = "orleans-directory-validations-cache-received";
     public const string DIRECTORY_PARTITION_SIZE = "orleans-directory-partition-size";

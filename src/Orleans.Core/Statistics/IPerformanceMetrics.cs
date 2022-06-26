@@ -77,7 +77,6 @@ namespace Orleans.Runtime
 
         internal SiloRuntimeStatistics() { }
 
-        // TODO: maybe users should be guided to use dotnet counters to collect statistics
         internal SiloRuntimeStatistics(
             int activationCount,
             int recentlyUsedActivationCount,

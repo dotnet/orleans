@@ -6,8 +6,6 @@ namespace Orleans.Runtime;
 internal static class DirectoryInstruments
 {
     internal static Counter<int> LookupsLocalIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
-
-    // TODO: use multi-demensional counter for this
     internal static Counter<int> LookupsLocalSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
 
     internal static Counter<int> LookupsFullIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_FULL_ISSUED);

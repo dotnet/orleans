@@ -11,11 +11,11 @@ internal static class NetworkingInstruments
 
     internal static void OnOpenedSocket(ConnectionDirection direction)
     {
-        OpenedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction));
+        OpenedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
     }
 
     internal static void OnClosedSocket(ConnectionDirection direction)
     {
-        ClosedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction));
+        ClosedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
     }
 }

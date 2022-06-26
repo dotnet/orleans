@@ -13,7 +13,6 @@ public static class SiloRuntimeMetricsListener
     private static readonly MeterListener MeterListener = new();
 
     private static long _connectedClientCount;
-    // ? is volatile read needed?
     public static long ConnectedClientCount => _connectedClientCount;
     private static long _messageReceivedTotal;
     public static long MessageReceivedTotal => _messageReceivedTotal;

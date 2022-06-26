@@ -7,11 +7,9 @@ internal static class StreamInstruments
 {
     public static Counter<int> PubSubProducersAdded = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_PRODUCERS_ADDED);
     public static Counter<int> PubSubProducersRemoved = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_PRODUCERS_REMOVED);
-    // ! UpDownCounter
     public static Counter<int> PubSubProducersTotal = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_PRODUCERS_TOTAL);
     public static Counter<int> PubSubConsumersAdded = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_CONSUMERS_ADDED);
     public static Counter<int> PubSubConsumersRemoved = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_CONSUMERS_REMOVED);
-    // ! UpDownCounter
     public static Counter<int> PubSubConsumersTotal = Instruments.Meter.CreateCounter<int>(InstrumentNames.STREAMS_PUBSUB_CONSUMERS_TOTAL);
 
     public static ObservableGauge<int> PersistentStreamPullingAgents;

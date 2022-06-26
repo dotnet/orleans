@@ -859,13 +859,6 @@ namespace Orleans.Runtime.GrainDirectory
             return CalculateGrainDirectoryPartition(grain);
         }
 
-        // TODO:
-        // collect statistics in orleans
-        // or provide a set of PromQL queries
-        // public override string ToString()
-        // {
-        // }
-
         private long RingDistanceToSuccessor()
         {
             long distance;

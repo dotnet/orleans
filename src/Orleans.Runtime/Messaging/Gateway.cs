@@ -443,7 +443,6 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    // ? why record it twice
                     GatewayInstruments.GatewaySent.Add(1);
                     return true;
                 }

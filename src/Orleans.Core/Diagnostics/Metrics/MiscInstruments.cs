@@ -5,7 +5,6 @@ namespace Orleans.Runtime;
 
 internal static class MiscInstruments
 {
-    // ! UpDownCounter
     internal static Counter<int> GrainCounts = Instruments.Meter.CreateCounter<int>(InstrumentNames.GRAIN_COUNTS);
     internal static void IncrementGrainCounts(string grainTypeName)
     {
@@ -16,7 +15,6 @@ internal static class MiscInstruments
         GrainCounts.Add(-1, new KeyValuePair<string, object>("type", grainTypeName));
     }
 
-    // ! UpDownCounter
     internal static Counter<int> SystemTargetCounts = Instruments.Meter.CreateCounter<int>(InstrumentNames.SYSTEM_TARGET_COUNTS);
     internal static void IncrementSystemTargetCounts(string systemTargetTypeName)
     {

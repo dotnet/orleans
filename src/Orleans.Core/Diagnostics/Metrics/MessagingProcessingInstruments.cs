@@ -15,18 +15,17 @@ internal static class MessagingProcessingInstruments
     internal static void OnDispatcherMessageReceive(Message msg)
     {
         var context = RuntimeContext.Current;
-        dispatcherMessagesReceivedCounter.Add(1, new KeyValuePair<string, object>("Context", context is null ? null : "Activation"), new KeyValuePair<string, object>("Direction", msg.Direction));
+        dispatcherMessagesReceivedCounter.Add(1, new KeyValuePair<string, object>("Context", context is null ? null : "Activation"), new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
     }
 
     internal static void OnDispatcherMessageProcessedOk(Message msg)
     {
-        // TODO: avoid allocation?
-        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction), new KeyValuePair<string, object>("Status", "Ok"));
+        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Ok"));
     }
 
     internal static void OnDispatcherMessageProcessedError(Message msg)
     {
-        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction), new KeyValuePair<string, object>("Status", "Error"));
+        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Error"));
     }
 
     internal static void OnDispatcherMessageForwared(Message msg)
@@ -62,4 +61,5 @@ internal static class MessagingProcessingInstruments
     {
         ActivationDataAll = Instruments.Meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
     }
+
 }
