@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator
 {
@@ -16,7 +17,7 @@ namespace Orleans.CodeGenerator
         public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
         public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
-
+        public ushort ReservedIdRangeStart { get; } = 1000; // todo: make this configurable
         public bool GenerateFieldIds { get; set; } = false;
     }
 
@@ -413,6 +414,22 @@ namespace Orleans.CodeGenerator
             }
 
             var nextFieldId = (ushort)0;
+
+            ImmutableArray<IParameterSymbol> primaryConstructorParameters = default;
+            if (symbol.IsRecord)
+            {
+                // If there is a primary constructor then that will be declared before the copy constructor
+                // A record always generates a copy constructor and marks it as implicitly declared
+                // todo: find an alternative to this magic
+                var potentialPrimaryConstructor = symbol.Constructors[0];
+                if (!potentialPrimaryConstructor.IsImplicitlyDeclared)
+                {
+                    primaryConstructorParameters = potentialPrimaryConstructor.Parameters;
+                }
+            }
+
+            var reservedIdRangeCurrent = _options.ReservedIdRangeStart;
+
             foreach (var member in symbol.GetMembers().OrderBy(m => m.MetadataName))
             {
                 if (member.IsStatic || member.IsAbstract)
@@ -434,6 +451,7 @@ namespace Orleans.CodeGenerator
                 if (member is IPropertySymbol prop)
                 {
                     var id = GetId(prop);
+
                     if (!id.HasValue)
                     {
                         if (hasAttributes || !_options.GenerateFieldIds)
@@ -469,6 +487,15 @@ namespace Orleans.CodeGenerator
                         }
 
                         id = GetId(prop);
+
+                        if (!id.HasValue)
+                        {
+                            var primaryConstructorParameter = primaryConstructorParameters.FirstOrDefault(x => x.Name == prop.Name);
+                            if (primaryConstructorParameter is not null)
+                            {
+                                id = reservedIdRangeCurrent++;
+                            }
+                        }
                     }
 
                     if (!id.HasValue)
