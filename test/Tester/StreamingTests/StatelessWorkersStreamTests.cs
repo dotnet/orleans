@@ -63,14 +63,6 @@ namespace UnitTests.StreamingTests
             var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
             await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
         }
-
-        [Fact, TestCategory("Functional")]
-        public async Task ProduceToStream_FromStatelessWorker_Fail()
-        {
-            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
-            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => runner.ProduceMessage(Guid.NewGuid()));
-        }
     }
 
     public class StatelessWorkersStreamTestsRunner
