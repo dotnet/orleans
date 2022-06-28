@@ -10,7 +10,6 @@ internal static class ApplicationRequestInstruments
 
     internal static void OnAppRequestsEnd(TimeSpan timeSpan)
     {
-        // if (!appRequestsLatencyHistogram.Enabled) return;
         AppRequestsLatencyHistogram.Record(timeSpan.TotalMilliseconds);
     }
 

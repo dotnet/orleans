@@ -90,7 +90,6 @@ namespace Orleans.Streams
                 GetType().Name,
                 streamProviderName);
             this.loggerFactory = loggerFactory;
-            // allocation for tags is not avoidable, but should not be a problem, since observations happens at a controlled rate
             StreamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
         }
 

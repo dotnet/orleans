@@ -69,9 +69,9 @@ internal static class InstrumentNames
     public const string DIRECTORY_PARTITION_SIZE = "orleans-directory-partition-size";
     public const string DIRECTORY_CACHE_SIZE = "orleans-directory-cache-size";
     public const string DIRECTORY_RING_RINGSIZE = "orleans-directory-ring-size";
-    public const string DIRECTORY_RING_MYPORTION_RINGDISTANCE = "orleans-directory-ring-my-portion-distance";
-    public const string DIRECTORY_RING_MYPORTION_RINGPERCENTAGE = "orleans-directory-ring-my-portion-percentage";
-    public const string DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE = "orleans-directory-ring-my-portion-average-percentage";
+    public const string DIRECTORY_RING_MYPORTION_RINGDISTANCE = "orleans-directory-ring-local-portion-distance";
+    public const string DIRECTORY_RING_MYPORTION_RINGPERCENTAGE = "orleans-directory-ring-local-portion-percentage";
+    public const string DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE = "orleans-directory-ring-local-portion-average-percentage";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED = "orleans-directory-registrations-single-act-issued";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL = "orleans-directory-registrations-single-act-local";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT = "orleans-directory-registrations-single-act-remote-sent";
@@ -86,7 +86,7 @@ internal static class InstrumentNames
 
     // ConsistentRing
     public const string CONSISTENTRING_RINGSIZE = "orleans-consistent-ring-size";
-    public const string CONSISTENTRING_MYRANGE_RINGPERCENTAGE = "orleans-consistent-ring-range-percentage-my";
+    public const string CONSISTENTRING_MYRANGE_RINGPERCENTAGE = "orleans-consistent-ring-range-percentage-local";
     public const string CONSISTENTRING_AVERAGERINGPERCENTAGE = "orleans-consistent-ring-range-percentage-average";
 
     // Watchdog
