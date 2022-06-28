@@ -31,7 +31,7 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .ConfigureServices(services =>
                     {
@@ -45,7 +45,7 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+                clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             }
         }
 

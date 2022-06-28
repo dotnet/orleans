@@ -67,7 +67,6 @@ namespace UnitTests.General
 
                             await ctx.Invoke();
                         })
-                        .AddSimpleMessageStreamProvider("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }
@@ -96,8 +95,7 @@ namespace UnitTests.General
                                 result["orig"] = result["result"];
                                 result["result"] = "intercepted!";
                             }
-                        })
-                        .AddSimpleMessageStreamProvider("SMSProvider");
+                        });
 
                     static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {

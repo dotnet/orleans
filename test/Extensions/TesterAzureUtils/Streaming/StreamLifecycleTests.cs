@@ -49,7 +49,6 @@ namespace UnitTests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureQueueStreams(AzureQueueStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
@@ -64,8 +63,6 @@ namespace UnitTests.StreamingTests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
                         options.ConfigureTestDefaults();

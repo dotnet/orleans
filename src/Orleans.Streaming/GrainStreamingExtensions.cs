@@ -1,5 +1,4 @@
 using System;
-using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Streams;
 

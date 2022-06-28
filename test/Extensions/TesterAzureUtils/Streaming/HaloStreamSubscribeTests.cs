@@ -46,8 +46,6 @@ namespace UnitTests.HaloTests.Streaming
                             options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }))
-                        .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                         .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.DeleteStateOnClear = true;

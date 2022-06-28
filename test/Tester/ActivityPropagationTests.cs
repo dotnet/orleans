@@ -56,7 +56,6 @@ namespace UnitTests.General
                 public void Configure(ISiloBuilder hostBuilder) =>
                     hostBuilder
                         .AddActivityPropagation()
-                        .AddSimpleMessageStreamProvider("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
             }
@@ -65,8 +64,7 @@ namespace UnitTests.General
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) =>
                     clientBuilder
-                        .AddActivityPropagation()
-                        .AddSimpleMessageStreamProvider("SMSProvider");
+                        .AddActivityPropagation();
             }
         }
 

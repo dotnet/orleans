@@ -20,7 +20,6 @@ namespace UnitTests
         public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
-                .AddSimpleMessageStreamProvider("sms")
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore")
                 .AddMemoryGrainStorageAsDefault()

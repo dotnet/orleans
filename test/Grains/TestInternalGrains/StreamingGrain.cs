@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
@@ -211,20 +210,8 @@ namespace UnitTests.Grains
             _logger.LogInformation("BecomeProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
             _observer = stream;
-            var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
-            // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
-            if (null == observerAsSMSProducer)
-            {
-                _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
-                _observerDisposedYet = true;
-            }
-            else
-            {
-                _logger.LogInformation("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
-                observerAsSMSProducer.OnDisposeTestHook +=
-                    () =>
-                        _observerDisposedYet = true;
-            }
+            _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
+            _observerDisposedYet = true; // TODO BPETIT remove that
             _streamId = streamId;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
             _providerName = streamProvider.Name;
@@ -238,20 +225,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("RenewProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
             _observer = stream;
-            var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
-            // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
-            if (null == observerAsSMSProducer)
-            {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
-                _observerDisposedYet = true;
-            }
-            else
-            {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
-                observerAsSMSProducer.OnDisposeTestHook +=
-                    () =>
-                        _observerDisposedYet = true;
-            }
+            _observerDisposedYet = true; // TODO BPETIT remove that
         }
 
         private async Task<bool> ProduceItem(string data)
