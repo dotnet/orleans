@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -118,7 +119,12 @@ namespace UnitTests.StreamingTests
 
             await producer.SendItem(1);
 
-            int received1 = await consumer.GetReceivedCount();
+            int received1 = 0;
+            var cts = new CancellationTokenSource(1000);
+            do
+            {
+                received1 = await consumer.GetReceivedCount();
+            } while (received1 <= 1 || !cts.IsCancellationRequested);
 
             Assert.True(received1 > 1, $"Received count for consumer {consumer} is too low = {received1}");
 
@@ -128,6 +134,7 @@ namespace UnitTests.StreamingTests
             // Send one more message
             await producer.SendItem(2);
 
+            await Task.Delay(300);
 
             int received2 = await consumer.GetReceivedCount();
 
