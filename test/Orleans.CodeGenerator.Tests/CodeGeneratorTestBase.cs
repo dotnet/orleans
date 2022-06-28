@@ -75,10 +75,10 @@ namespace Orleans.CodeGenerator.Tests
             return compilation;
         }
 
-        protected CompilationUnitSyntax GenerateCodeFrom(string sourceText)
+        protected CompilationUnitSyntax GenerateCodeFrom(string sourceText, CodeGeneratorOptions codeGeneratorOptions = null)
         {
             var compilation = CreateCompilation(sourceText);
-            var codeGenerator = new CodeGenerator(compilation, new CodeGeneratorOptions());
+            var codeGenerator = new CodeGenerator(compilation, codeGeneratorOptions ?? new CodeGeneratorOptions());
 
             var generatedCode = codeGenerator.GenerateCode(default);
             if (generatedCode.ContainsDiagnostics)
@@ -95,7 +95,7 @@ namespace Orleans.CodeGenerator.Tests
                 }
             }
 
-            return generatedCode;
+            return generatedCode.NormalizeWhitespace();
         }
     }
 }

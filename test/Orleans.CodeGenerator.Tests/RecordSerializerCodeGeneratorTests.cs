@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -22,10 +23,10 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
     {
         var generatedCode = GenerateCodeFrom("""
             [GenerateSerializer]
-            record Test([property: Id(0)]int I);
+            record Test([property: Id(1000)]int A);
             """);
 
-        var resultSourceText = generatedCode.NormalizeWhitespace().ToFullString();
+        var resultSourceText = generatedCode.ToFullString();
         Assert.Equal(_expectedGeneratedCode, resultSourceText);
     }
 
@@ -34,12 +35,12 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
     {
         var generatedCode = GenerateCodeFrom("""
             [GenerateSerializer]
-            record Test(int I){
-                [Id(0)]int I { get; init; } 
+            record Test(int A){
+                [Id(1000)]int A { get; init; } 
             }
             """);
 
-        var resultSourceText = generatedCode.NormalizeWhitespace().ToFullString();
+        var resultSourceText = generatedCode.ToFullString();
         Assert.Equal(_expectedGeneratedCode, resultSourceText);
     }
 
@@ -48,11 +49,60 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
     {
         var generatedCode = GenerateCodeFrom("""
             [GenerateSerializer]
-            record Test(int I);
+            record Test(int A);
             """);
 
-        var resultSourceText = generatedCode.NormalizeWhitespace().ToFullString();
+        var resultSourceText = generatedCode.ToFullString();
         Assert.Equal(_expectedGeneratedCode, resultSourceText);
+    }
+
+
+    [Fact]
+    public void GenerateCode_IntermixedRecord_IncludesAllMembers()
+    {
+        var generatedCode = GenerateCodeFrom("""
+            [GenerateSerializer]
+            record Test(int A, int B, [property: Id(2)]int C) {
+                [Id(1)] public int B { get; init; }
+            };
+            """);
+
+        var generatedSerializableMembers = EnumerateGeneratedSerializableMembers(generatedCode).ToList();
+
+        Assert.Contains(("1000u", "A"), generatedSerializableMembers);
+        Assert.Contains(("1u", "B"), generatedSerializableMembers);
+        Assert.Contains(("2u", "C"), generatedSerializableMembers);
+    }
+
+    [Fact]
+    public void GenerateCode_WithGenerateFieldIds_DoesNotIncludePrimaryConstructorProperties()
+    {
+        var codeGeneratorOptions = new CodeGeneratorOptions { GenerateFieldIds = true };
+        var generatedCode = GenerateCodeFrom("""
+            [GenerateSerializer]
+            record Test(int A);
+            """);
+
+        var generatedSerializableMembers = EnumerateGeneratedSerializableMembers(generatedCode).ToList();
+
+        Assert.Contains(("0", "A"), generatedSerializableMembers);
+        Assert.DoesNotContain(("1000u", "A"), generatedSerializableMembers);
+    }
+
+    IEnumerable<(string indexExpression, string fieldExpression)> EnumerateGeneratedSerializableMembers(CompilationUnitSyntax generatedCode)
+    {
+        return generatedCode
+            .DescendantNodes()
+            .Where(x => x is ClassDeclarationSyntax { Identifier.Text: "Codec_Test" })
+            .SelectMany(x => x.DescendantNodes())
+            .Where(x => x is MethodDeclarationSyntax { Identifier.Text: "Serialize" })
+            .SelectMany(x => x.DescendantNodes())
+            .OfType<InvocationExpressionSyntax>()
+            .Select(x =>
+            (
+                index: x.ArgumentList.Arguments.Skip(1).First().Expression.ToString(),
+                member: x.ArgumentList.Arguments.Skip(3).First().DescendantNodes().OfType<IdentifierNameSyntax>().Last().ToString()
+            ));
     }
 
     const string _expectedGeneratedCode = """
@@ -74,14 +124,14 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
                 public Codec_Test(global::Orleans.Serialization.Activators.IActivator<global::Test> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
                 {
                     this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-                    setField0 = (global::System.Action<global::Test, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::Test).GetField("<I>k__BackingField", (global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Public)));
+                    setField0 = (global::System.Action<global::Test, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::Test).GetField("<A>k__BackingField", (global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Public)));
                 }
 
                 [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
                 public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Test instance)
                     where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
                 {
-                    global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 0U, _int32Type, instance.I);
+                    global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 1000U, _int32Type, instance.A);
                 }
 
                 [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -92,7 +142,7 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
                     while (true)
                     {
                         id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                        if (id == 0)
+                        if (id == 1000)
                         {
                             setField0(instance, (int)global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header));
                             id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
@@ -162,7 +212,7 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
                         return context.DeepCopy(original);
                     result = _activator.Create();
                     context.RecordCopy(original, result);
-                    setField0(result, original.I);
+                    setField0(result, original.A);
                     return result;
                 }
 
@@ -171,13 +221,13 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
                 public Copier_Test(global::Orleans.Serialization.Activators.IActivator<global::Test> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
                 {
                     this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-                    setField0 = (global::System.Action<global::Test, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::Test).GetField("<I>k__BackingField", (global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Public)));
+                    setField0 = (global::System.Action<global::Test, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::Test).GetField("<A>k__BackingField", (global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Public)));
                 }
 
                 [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
                 public void DeepCopy(global::Test input, global::Test output, global::Orleans.Serialization.Cloning.CopyContext context)
                 {
-                    setField0(output, input.I);
+                    setField0(output, input.A);
                 }
             }
         }
