@@ -15,25 +15,25 @@ public class CounterAggregatorGroupTests
         this._output = output;
     }
 
-    [Fact, TestCategory("Functional"), TestCategory("Statistics")]
+    [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void ValidateAggregatorCache()
     {
         var group = new CounterAggregatorGroup();
 
-        var aggregator1 = group.FindOrCreate("foo", "bar");
-        var aggregator2 = group.FindOrCreate("foo", "bar");
+        var aggregator1 = group.FindOrCreate(new("foo", "bar"));
+        var aggregator2 = group.FindOrCreate(new("foo", "bar"));
 
         Assert.Same(aggregator1, aggregator2);
         Assert.Single(group.Aggregators);
     }
 
-    [Fact, TestCategory("Functional"), TestCategory("Statistics")]
+    [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void Collect()
     {
         var group = new CounterAggregatorGroup();
 
-        var aggregator1 = group.FindOrCreate("foo", "bar1");
-        var aggregator2 = group.FindOrCreate("foo", "bar2");
+        var aggregator1 = group.FindOrCreate(new("foo", "bar1"));
+        var aggregator2 = group.FindOrCreate(new("foo", "bar2"));
 
         aggregator1.Add(1);
         aggregator1.Add(2);
@@ -46,7 +46,7 @@ public class CounterAggregatorGroupTests
         Assert.Equal(5, measurements[1].Value);
     }
 
-    [Fact, TestCategory("Functional"), TestCategory("Statistics")]
+    [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void TestMultithreadedCorrectness()
     {
         int numOfIterations = 1000000;
@@ -58,7 +58,7 @@ public class CounterAggregatorGroupTests
         {
             for (int i = 0; i < counterCount; i++)
             {
-                var aggregator = group.FindOrCreate("test", i);
+                var aggregator = group.FindOrCreate(new("test", i));
 
                 for (int k = 0; k < numOfIterations; k++)
                 {

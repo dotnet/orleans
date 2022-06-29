@@ -22,43 +22,40 @@ internal static class MessagingProcessingInstruments
         if (!DispatcherMessagesReceivedCounter.Enabled)
             return;
         var context = RuntimeContext.Current;
-        var aggregator = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(
+        DispatcherMessagesReceivedCounterAggregatorGroup.Add(1,
             "Context", context is null ? null : "Activation",
             "Direction", msg.Direction.ToString()
         );
-        aggregator.Add(1);
     }
 
     internal static void OnDispatcherMessageProcessedOk(Message msg)
     {
-        if (!DispatcherMessagesProcessedCounter.Enabled)
-            return;
-        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(
-            "Direction", msg.Direction.ToString(),
-            "Status", "Ok"
-        );
-        aggregator.Add(1);
+        if (DispatcherMessagesProcessedCounter.Enabled)
+            DispatcherMessagesProcessedCounterAggregatorGroup.Add(1,
+                "Direction", msg.Direction.ToString(),
+                "Status", "Ok"
+            );
     }
 
     internal static void OnDispatcherMessageProcessedError(Message msg)
     {
-        if (!DispatcherMessagesProcessedCounter.Enabled)
-            return;
-        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(
-            "Direction", msg.Direction.ToString(),
-            "Status", "Error"
-        );
-        aggregator.Add(1);
+        if (DispatcherMessagesProcessedCounter.Enabled)
+            DispatcherMessagesProcessedCounterAggregatorGroup.Add(1,
+                "Direction", msg.Direction.ToString(),
+                "Status", "Error"
+            );
     }
 
     internal static void OnDispatcherMessageForwared(Message msg)
     {
-        dispatcherMessagesForwardedCounter.Add(1);
+        if (dispatcherMessagesForwardedCounter.Enabled)
+            dispatcherMessagesForwardedCounter.Add(1);
     }
 
     internal static void OnImaMessageReceived(Message msg)
     {
-        imaReceivedCounterAggregator.Add(1);
+        if (imaReceivedCounter.Enabled)
+            imaReceivedCounterAggregator.Add(1);
     }
 
     internal static void OnImaMessageEnqueued(IGrainContext context)
