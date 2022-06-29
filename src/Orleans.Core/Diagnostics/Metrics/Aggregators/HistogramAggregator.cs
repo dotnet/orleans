@@ -41,21 +41,13 @@ internal class HistogramAggregator
 
     public IEnumerable<Measurement<long>> CollectBuckets()
     {
-        long count = 0;
         foreach (var bucket in _buckets)
         {
-            count += bucket.Value;
-            yield return new Measurement<long>(count, bucket.Tags);
+            yield return bucket.Collect();
         }
     }
 
-    public Measurement<long> CollectCount()
-    {
-        return new Measurement<long>(_count, _tags);
-    }
+    public Measurement<long> CollectCount() => new(_count, _tags);
 
-    public Measurement<long> CollectSum()
-    {
-        return new Measurement<long>(_sum, _tags);
-    }
+    public Measurement<long> CollectSum() => new(_sum, _tags);
 }
