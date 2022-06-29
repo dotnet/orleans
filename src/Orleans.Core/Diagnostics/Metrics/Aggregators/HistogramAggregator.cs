@@ -15,6 +15,11 @@ internal class HistogramAggregator
 
     public HistogramAggregator(long[] buckets, KeyValuePair<string, object>[] tags)
     {
+        if (buckets[^1] != long.MaxValue)
+        {
+            buckets = buckets.Concat(new[] { long.MaxValue }).ToArray();
+        }
+
         _tags = tags;
         _buckets = buckets.Select(b => new HistogramBucketAggregator(tags, b)).ToArray();
     }
@@ -34,7 +39,18 @@ internal class HistogramAggregator
         Interlocked.Add(ref _sum, number);
     }
 
-    public IEnumerable<Measurement<long>> CollectBuckets() => _buckets.Select(c => c.Collect());
+    public IEnumerable<Measurement<long>> CollectBuckets()
+    {
+        long count = 0;
+        foreach (var bucket in _buckets)
+        {
+            count += bucket.Collect().Value;
+            var tags = new KeyValuePair<string, object>[_tags.Length + 1];
+            _tags.CopyTo(tags, 0);
+            tags[^1] = new KeyValuePair<string, object>("le", bucket.Bound);
+            yield return new Measurement<long>(count, tags);
+        }
+    }
 
     public Measurement<long> CollectCount()
     {

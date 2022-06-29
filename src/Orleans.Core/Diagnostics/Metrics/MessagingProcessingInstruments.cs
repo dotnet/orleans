@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -12,10 +11,12 @@ internal static class MessagingProcessingInstruments
     private static readonly CounterAggregatorGroup DispatcherMessagesReceivedCounterAggregatorGroup = new();
     private static readonly ObservableCounter<long> DispatcherMessagesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED, DispatcherMessagesReceivedCounterAggregatorGroup.Collect);
 
-    private static readonly Counter<long> dispatcherMessagesForwardedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED);
-    private static readonly CounterAggregator imaReceivedCounterAggregator = new();
-    private static readonly ObservableCounter<long> imaReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED, imaReceivedCounterAggregator.Collect);
-    private static readonly Counter<long> imaEnqueuedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED);
+    private static readonly CounterAggregator DispatcherMessagesForwardedCounterAggregator = new();
+    private static readonly ObservableCounter<long> DispatcherMessagesForwardedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED, DispatcherMessagesForwardedCounterAggregator.Collect);
+    private static readonly CounterAggregator ImaReceivedCounterAggregator = new();
+    private static readonly ObservableCounter<long> ImaReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED, ImaReceivedCounterAggregator.Collect);
+    private static readonly CounterAggregatorGroup ImaEnqueuedCounterAggregatorGroup = new();
+    private static readonly ObservableCounter<long> ImaEnqueuedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED, ImaEnqueuedCounterAggregatorGroup.Collect);
 
     internal static void OnDispatcherMessageReceive(Message msg)
     {
@@ -48,32 +49,38 @@ internal static class MessagingProcessingInstruments
 
     internal static void OnDispatcherMessageForwared(Message msg)
     {
-        if (dispatcherMessagesForwardedCounter.Enabled)
-            dispatcherMessagesForwardedCounter.Add(1);
+        if (DispatcherMessagesForwardedCounter.Enabled)
+            DispatcherMessagesForwardedCounterAggregator.Add(1);
     }
 
     internal static void OnImaMessageReceived(Message msg)
     {
-        if (imaReceivedCounter.Enabled)
-            imaReceivedCounterAggregator.Add(1);
+        if (ImaReceivedCounter.Enabled)
+            ImaReceivedCounterAggregator.Add(1);
     }
 
     internal static void OnImaMessageEnqueued(IGrainContext context)
     {
-        KeyValuePair<string, object> tag;
+        if (!ImaEnqueuedCounter.Enabled)
+            return;
         if (context == null)
         {
-            tag = new KeyValuePair<string, object>("Context", "ToNull");
+            ImaEnqueuedCounterAggregatorGroup.Add(1,
+                "Context", "ToNull"
+            );
         }
         else if (context is ISystemTargetBase)
         {
-            tag = new KeyValuePair<string, object>("Context", "ToSystemTarget");
+            ImaEnqueuedCounterAggregatorGroup.Add(1,
+                "Context", "ToSystemTarget"
+            );
         }
         else
         {
-            tag = new KeyValuePair<string, object>("Context", "ToActivation");
+            ImaEnqueuedCounterAggregatorGroup.Add(1,
+                "Context", "ToActivation"
+            );
         }
-        imaEnqueuedCounter.Add(1, tag);
     }
 
     internal static ObservableGauge<long> ActivationDataAll;

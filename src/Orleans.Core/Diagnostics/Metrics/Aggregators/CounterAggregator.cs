@@ -9,8 +9,10 @@ internal class CounterAggregator
 {
     private long _delta = 0;
     private readonly KeyValuePair<string, object>[] _tags;
-    public CounterAggregator() : this(Array.Empty<KeyValuePair<string, object>>())
-    { }
+    public CounterAggregator()
+    {
+        _tags = Array.Empty<KeyValuePair<string, object>>();
+    }
 
     public CounterAggregator(TagList tagList)
     {
@@ -49,11 +51,6 @@ internal class CounterAggregator
                 new KeyValuePair<string, object>(tagList.Name4, tagList.Value4)
             };
         }
-    }
-
-    public CounterAggregator(KeyValuePair<string, object>[] tags)
-    {
-        _tags = tags;
     }
 
     public void Add(long measurement) => Interlocked.Add(ref _delta, measurement);
