@@ -81,12 +81,45 @@ public class RecordSerializerCodeGeneratorTests : CodeGeneratorTestBase
         var generatedCode = GenerateCodeFrom("""
             [GenerateSerializer]
             record Test(int A);
-            """);
+            """, codeGeneratorOptions);
 
         var generatedSerializableMembers = EnumerateGeneratedSerializableMembers(generatedCode).ToList();
 
         Assert.Contains(("0", "A"), generatedSerializableMembers);
         Assert.DoesNotContain(("1000u", "A"), generatedSerializableMembers);
+    }
+
+    [Fact]
+    public void Test1()
+    {
+        var generatedCode = GenerateCodeFrom("""
+            [GenerateSerializer]
+            record Foo
+            {
+                [Id(0)]
+                public int A { get; set; }
+            }
+
+            [GenerateSerializer]
+            record Bar(int B) : Foo
+            {
+                [Id(0)]
+                public int C { get; set; }
+            };
+            """);
+    }
+
+    [Fact]
+    public void Test2()
+    {
+        var generatedCode = GenerateCodeFrom("""
+            [GenerateSerializer]
+            record Foo(int A)
+            {
+                [Id(0)]
+                public int B { get; set; }
+            }
+            """);
     }
 
     IEnumerable<(string indexExpression, string fieldExpression)> EnumerateGeneratedSerializableMembers(CompilationUnitSyntax generatedCode)

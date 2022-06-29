@@ -8,9 +8,10 @@ namespace Orleans.CodeGenerator
 {
     internal class FieldDescription : IFieldDescription
     {
-        public FieldDescription(ushort fieldId, IFieldSymbol member)
+        public FieldDescription(ushort fieldId, bool isPrimaryConstructorParameter, IFieldSymbol member)
         {
             FieldId = fieldId;
+            IsPrimaryConstructorParameter = isPrimaryConstructorParameter;
             Field = member;
             Type = member.Type;
             ContainingType = member.ContainingType;
@@ -35,6 +36,7 @@ namespace Orleans.CodeGenerator
         public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
         public string TypeName => Type.ToDisplayName();
         public string TypeNameIdentifier => Type.GetValidIdentifier();
+        public bool IsPrimaryConstructorParameter { get; set; }
 
         public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
     }

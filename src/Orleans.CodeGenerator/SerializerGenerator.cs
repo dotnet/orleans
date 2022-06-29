@@ -326,6 +326,8 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
+
+
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerializing"));
 
             // Order members according to their FieldId, since fields must be serialized in order and FieldIds are serialized as deltas.
@@ -340,6 +342,38 @@ namespace Orleans.CodeGenerator
                             .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
             }
 
+            if (type.HasPrimaryContstructorArguments)
+            {
+                body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
+                body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+            }
+
+            body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
+
+            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerialized"));
+
+            var parameters = new[]
+            {
+                Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter("instance".ToIdentifier()).WithType(type.TypeSyntax)
+            };
+
+            if (type.IsValueType)
+            {
+                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+            }
+
+            return MethodDeclaration(returnType, SerializeMethodName)
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddParameterListParameters(parameters)
+                .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
+                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.Construct(libraryTypes.Byte).ToTypeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddBodyStatements(body.ToArray());
+        }
+
+        private static IEnumerable<StatementSyntax> AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, LibraryTypes libraryTypes, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar)
+        {
             uint previousFieldId = 0;
             foreach (var member in members.OrderBy(m => m.Member.FieldId))
             {
@@ -387,7 +421,7 @@ namespace Orleans.CodeGenerator
                                     }))));
                 if (!type.OmitDefaultMemberValues)
                 {
-                    body.Add(writeFieldExpr);
+                    yield return writeFieldExpr;
                 }
                 else
                 {
@@ -397,34 +431,13 @@ namespace Orleans.CodeGenerator
                         false => IsPatternExpression(member.GetGetter(instanceParam), TypePattern(libraryTypes.Object.ToTypeSyntax()))
                     };
 
-                    body.Add(IfStatement(
+                    yield return IfStatement(
                         condition,
                         Block(
                             writeFieldExpr,
-                            ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, previousFieldIdVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId)))))));
+                            ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, previousFieldIdVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId))))));
                 }
             }
-
-            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerialized"));
-
-            var parameters = new[]
-            {
-                Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter("instance".ToIdentifier()).WithType(type.TypeSyntax)
-            };
-
-            if (type.IsValueType)
-            {
-                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
-            }
-
-            return MethodDeclaration(returnType, SerializeMethodName)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(parameters)
-                .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.Construct(libraryTypes.Byte).ToTypeSyntax())))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
-                .AddBodyStatements(body.ToArray());
         }
 
         private static MemberDeclarationSyntax GenerateDeserializeMethod(
@@ -475,7 +488,12 @@ namespace Orleans.CodeGenerator
 
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserializing"));
 
-            body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody())));
+            if (type.HasPrimaryContstructorArguments)
+            {
+                body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => m.IsPrimaryConstructorParameter)))));
+            }
+
+            body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter)))));
 
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserialized"));
 
@@ -499,7 +517,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
 
             // Create the loop body.
-            List<StatementSyntax> GetDeserializerLoopBody()
+            List<StatementSyntax> GetDeserializerLoopBody(IEnumerable<ISerializableMember> members)
             {
                 var loopBody = new List<StatementSyntax>();
                 var codecs = serializerFields.OfType<ICodecDescription>()
@@ -1088,6 +1106,7 @@ namespace Orleans.CodeGenerator
         {
             bool IsShallowCopyable { get; }
             bool IsValueType { get; }
+            bool IsPrimaryConstructorParameter { get; }
 
             IMemberDescription Member { get; }
 
@@ -1140,6 +1159,8 @@ namespace Orleans.CodeGenerator
             public TypeSyntax TypeSyntax => _member.TypeSyntax;
 
             public bool IsValueType => _member.Type.IsValueType;
+
+            public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
 
             /// <summary>
             /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
@@ -1252,6 +1273,8 @@ namespace Orleans.CodeGenerator
             /// </summary>
             private bool IsObsolete => Member.Symbol.HasAttribute(_libraryTypes.ObsoleteAttribute) ||
                                        Property != null && Property.HasAttribute(_libraryTypes.ObsoleteAttribute);
+
+            public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
 
             /// <summary>
             /// Returns syntax for retrieving the value of this field, deep copying it if necessary.

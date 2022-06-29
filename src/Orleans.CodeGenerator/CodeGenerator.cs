@@ -17,7 +17,6 @@ namespace Orleans.CodeGenerator
         public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
         public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
-        public ushort ReservedIdRangeStart { get; } = 1000; // todo: make this configurable
         public bool GenerateFieldIds { get; set; } = false;
     }
 
@@ -392,7 +391,7 @@ namespace Orleans.CodeGenerator
         // Returns descriptions of all data members (fields and properties) 
         private IEnumerable<IMemberDescription> GetDataMembers(INamedTypeSymbol symbol)
         {
-            var members = new Dictionary<ushort, IMemberDescription>();
+            var members = new Dictionary<(ushort, bool), IMemberDescription>();
             var hasAttributes = false;
             foreach (var member in symbol.GetMembers())
             {
@@ -415,7 +414,7 @@ namespace Orleans.CodeGenerator
 
             var nextFieldId = (ushort)0;
 
-            ImmutableArray<IParameterSymbol> primaryConstructorParameters = default;
+            ImmutableArray<IParameterSymbol> primaryConstructorParameters = ImmutableArray<IParameterSymbol>.Empty;
             if (symbol.IsRecord)
             {
                 // If there is a primary constructor then that will be declared before the copy constructor
@@ -427,8 +426,6 @@ namespace Orleans.CodeGenerator
                     primaryConstructorParameters = potentialPrimaryConstructor.Parameters;
                 }
             }
-
-            var reservedIdRangeCurrent = _options.ReservedIdRangeStart;
 
             foreach (var member in symbol.GetMembers().OrderBy(m => m.MetadataName))
             {
@@ -463,15 +460,17 @@ namespace Orleans.CodeGenerator
                     }
 
                     // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue(id.Value, out var existing))
+                    if (!members.TryGetValue((id.Value, false), out var existing))
                     {
-                        members[id.Value] = new PropertyDescription(id.Value, prop);
+                        members[(id.Value, false)] = new PropertyDescription(id.Value, prop);
                     }
                 }
 
                 if (member is IFieldSymbol field)
                 {
                     var id = GetId(field);
+                    var isPrimaryConstructorParameter = false;
+
                     if (!id.HasValue)
                     {
                         prop = PropertyUtility.GetMatchingProperty(field);
@@ -493,7 +492,8 @@ namespace Orleans.CodeGenerator
                             var primaryConstructorParameter = primaryConstructorParameters.FirstOrDefault(x => x.Name == prop.Name);
                             if (primaryConstructorParameter is not null)
                             {
-                                id = reservedIdRangeCurrent++;
+                                id = (ushort)primaryConstructorParameters.IndexOf(primaryConstructorParameter);
+                                isPrimaryConstructorParameter = true;
                             }
                         }
                     }
@@ -509,9 +509,9 @@ namespace Orleans.CodeGenerator
                     }
 
                     // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue(id.Value, out var existing) || existing is PropertyDescription)
+                    if (!members.TryGetValue((id.Value, isPrimaryConstructorParameter), out var existing) || existing is PropertyDescription)
                     {
-                        members[id.Value] = new FieldDescription(id.Value, field);
+                        members[(id.Value, isPrimaryConstructorParameter)] = new FieldDescription(id.Value, isPrimaryConstructorParameter, field);
                         continue;
                     }
                 }

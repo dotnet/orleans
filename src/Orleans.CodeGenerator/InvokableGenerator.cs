@@ -750,6 +750,8 @@ namespace Orleans.CodeGenerator
                 }
             }
 
+            public bool IsPrimaryConstructorParameter => false;
+
             public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax(Method.TypeParameterSubstitutions);
         }
 
