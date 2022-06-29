@@ -429,7 +429,7 @@ namespace Orleans.Runtime.Messaging
             {
                 result = Encoding.UTF8.GetString(span);
             }
-            else      
+            else
 #endif
             {
                 var bytes = reader.ReadBytes((uint)length);
@@ -563,7 +563,7 @@ namespace Orleans.Runtime.Messaging
     {
         internal static LRU<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
 
-        // Purge entries which have not been accessed in over 2 minutes. 
+        // Purge entries which have not been accessed in over 2 minutes.
         private const long PurgeAfterMilliseconds = 2 * 60 * 1000;
 
         // Scan for entries which are expired every minute
@@ -589,12 +589,13 @@ namespace Orleans.Runtime.Messaging
                 return null;
             }
 
-            var hashCode = reader.ReadInt32();
-            length -= sizeof(int);
             if (!reader.TryReadBytes(length, out var payloadSpan))
             {
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
+
+            var innerReader = Reader.Create(payloadSpan, null);
+            var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
             if (exists && new ReadOnlySpan<byte>(cacheEntry.Encoded).SequenceEqual(payloadSpan))
@@ -611,7 +612,6 @@ namespace Orleans.Runtime.Messaging
                     payloadSpan.CopyTo(payloadArray);
                 }
 
-                var innerReader = Reader.Create(payloadSpan, null);
                 result = ReadSiloAddressInner(ref innerReader);
                 result.InternalSetConsistentHashCode(hashCode);
 
@@ -674,7 +674,7 @@ namespace Orleans.Runtime.Messaging
 #endif
             var port = (int)reader.ReadVarUInt32();
             var generation = reader.ReadInt32();
-            
+
             return SiloAddress.New(new IPEndPoint(ip, port), generation);
         }
 

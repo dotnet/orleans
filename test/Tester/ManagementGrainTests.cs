@@ -39,7 +39,6 @@ namespace UnitTests.Management
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
                 // between silos is obtained using AppDomains.
                 builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
-;
                 builder.Properties["GrainAssembly"] = $"{typeof(SimpleGrain).Assembly}";
             }
         }
