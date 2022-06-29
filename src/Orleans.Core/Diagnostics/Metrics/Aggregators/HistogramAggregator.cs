@@ -8,19 +8,6 @@ namespace Orleans.Runtime;
 
 internal class HistogramAggregator
 {
-    private static readonly Dictionary<AggregatorKey, HistogramAggregator> Aggregators = new();
-
-    public static HistogramAggregator FindOrCreate(string name, long[] buckets, params KeyValuePair<string, object>[] tags)
-    {
-        var key = new AggregatorKey(name, tags);
-        ref var aggregator = ref CollectionsMarshal.GetValueRefOrAddDefault(Aggregators, key, out var exists);
-        if (!exists)
-        {
-            aggregator = new HistogramAggregator(buckets, tags);
-        }
-        return aggregator;
-    }
-
     private readonly KeyValuePair<string, object>[] _tags;
     private readonly HistogramBucketAggregator[] _buckets;
     private long _count;

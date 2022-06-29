@@ -1,52 +1,77 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Orleans.Runtime;
 
 internal class CounterAggregatorGroup
 {
-    private readonly Dictionary<string, CounterAggregator> Aggregators = new();
+    private readonly ConcurrentDictionary<TagList, CounterAggregator> _aggregators = new();
+    internal ConcurrentDictionary<TagList, CounterAggregator> Aggregators => _aggregators;
+    public CounterAggregator FindOrCreate(string tagName1, object tagValue1) => FindOrCreate(new TagList(tagName1, tagValue1));
 
-    public CounterAggregator FindOrCreate(params KeyValuePair<string, object>[] tags)
+    public CounterAggregator FindOrCreate(string tagName1, object tagValue1, string tagName2, object tagValue2) => FindOrCreate(new TagList(tagName1, tagValue1, tagName2, tagValue2));
+
+    public CounterAggregator FindOrCreate(TagList tagGroup)
     {
-        // TODO: better to use a hash of the tags?
-        // or a struct record: TagGroupKey(string? tagName1, object? tagValue1, string? tagName2, object? tagValue2, ...)
-        var key = string.Join("&", tags.Select(t => t.Key + "=" + t.Value));
-        ref var aggregator = ref CollectionsMarshal.GetValueRefOrAddDefault(Aggregators, key, out var exists);
-        if (!exists)
+        if (Aggregators.TryGetValue(tagGroup, out var stat))
         {
-            aggregator = new CounterAggregator(tags);
+            return stat;
         }
-        return aggregator;
+        return Aggregators.GetOrAdd(tagGroup, new CounterAggregator(tagGroup));
     }
 
-    public IEnumerable<Measurement<long>> Collect() => Aggregators.Values.Select(c => c.Collect());
+    public IEnumerable<Measurement<long>> Collect() => _aggregators.Values.Select(c => c.Collect());
 }
 
 internal class CounterAggregator
 {
-    private static readonly Dictionary<AggregatorKey, CounterAggregator> Aggregators = new();
-
-    private static CounterAggregator FindOrCreate(string name, params KeyValuePair<string, object>[] tags)
-    {
-        var key = new AggregatorKey(name, tags);
-        ref var aggregator = ref CollectionsMarshal.GetValueRefOrAddDefault(Aggregators, key, out var exists);
-        if (!exists)
-        {
-            aggregator = new CounterAggregator(tags);
-        }
-        return aggregator;
-    }
-
     private long _delta = 0;
     private KeyValuePair<string, object>[] tags;
-
     public CounterAggregator() : this(Array.Empty<KeyValuePair<string, object>>())
     { }
+
+    public CounterAggregator(TagList tagGroup)
+    {
+        if (tagGroup.Name1 == null)
+        {
+            tags = Array.Empty<KeyValuePair<string, object>>();
+        }
+        else if (tagGroup.Name2 == null)
+        {
+            tags = new[] { new KeyValuePair<string, object>(tagGroup.Name1, tagGroup.Value1) };
+        }
+        else if (tagGroup.Name3 == null)
+        {
+            tags = new[]
+            {
+                new KeyValuePair<string, object>(tagGroup.Name1, tagGroup.Value1),
+                new KeyValuePair<string, object>(tagGroup.Name2, tagGroup.Value2)
+            };
+        }
+        else if (tagGroup.Name4 == null)
+        {
+            tags = new[]
+            {
+                new KeyValuePair<string, object>(tagGroup.Name1, tagGroup.Value1),
+                new KeyValuePair<string, object>(tagGroup.Name2, tagGroup.Value2),
+                new KeyValuePair<string, object>(tagGroup.Name3, tagGroup.Value3)
+            };
+        }
+        else
+        {
+            tags = new[]
+            {
+                new KeyValuePair<string, object>(tagGroup.Name1, tagGroup.Value1),
+                new KeyValuePair<string, object>(tagGroup.Name2, tagGroup.Value2),
+                new KeyValuePair<string, object>(tagGroup.Name3, tagGroup.Value3),
+                new KeyValuePair<string, object>(tagGroup.Name4, tagGroup.Value4)
+            };
+        }
+    }
 
     public CounterAggregator(KeyValuePair<string, object>[] tags)
     {

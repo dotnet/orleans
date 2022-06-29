@@ -19,10 +19,13 @@ internal static class MessagingProcessingInstruments
 
     internal static void OnDispatcherMessageReceive(Message msg)
     {
-        if(!DispatcherMessagesReceivedCounter.Enabled)
+        if (!DispatcherMessagesReceivedCounter.Enabled)
             return;
         var context = RuntimeContext.Current;
-        var aggregator = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Context", context is null ? null : "Activation"), new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+        var aggregator = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(
+            "Context", context is null ? null : "Activation",
+            "Direction", msg.Direction.ToString()
+        );
         aggregator.Add(1);
     }
 
@@ -30,7 +33,10 @@ internal static class MessagingProcessingInstruments
     {
         if (!DispatcherMessagesProcessedCounter.Enabled)
             return;
-        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Ok"));
+        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(
+            "Direction", msg.Direction.ToString(),
+            "Status", "Ok"
+        );
         aggregator.Add(1);
     }
 
@@ -38,7 +44,10 @@ internal static class MessagingProcessingInstruments
     {
         if (!DispatcherMessagesProcessedCounter.Enabled)
             return;
-        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Error"));
+        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(
+            "Direction", msg.Direction.ToString(),
+            "Status", "Error"
+        );
         aggregator.Add(1);
     }
 
