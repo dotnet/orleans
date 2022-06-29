@@ -5,16 +5,16 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-internal class CounterAggregator
+internal sealed class CounterAggregator
 {
-    private long _delta = 0;
     private readonly KeyValuePair<string, object>[] _tags;
+    private long _value = 0;
     public CounterAggregator()
     {
         _tags = Array.Empty<KeyValuePair<string, object>>();
     }
 
-    public CounterAggregator(TagList tagList)
+    public CounterAggregator(in TagList tagList)
     {
         if (tagList.Name1 == null)
         {
@@ -53,11 +53,9 @@ internal class CounterAggregator
         }
     }
 
-    public void Add(long measurement) => Interlocked.Add(ref _delta, measurement);
+    public long Value => _value;
 
-    public Measurement<long> Collect()
-    {
-        var sum = Interlocked.Exchange(ref _delta, 0);
-        return new Measurement<long>(sum, _tags);
-    }
+    public void Add(long measurement) => Interlocked.Add(ref _value, measurement);
+
+    public Measurement<long> Collect() => new(_value, _tags);
 }

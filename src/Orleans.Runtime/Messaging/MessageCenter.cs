@@ -182,6 +182,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+
                     this.ReceiveMessage(msg);
                 }
                 else

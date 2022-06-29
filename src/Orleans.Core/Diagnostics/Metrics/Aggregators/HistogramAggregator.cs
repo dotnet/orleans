@@ -1,7 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Orleans.Runtime;
@@ -13,7 +13,7 @@ internal class HistogramAggregator
     private long _count;
     private long _sum;
 
-    public HistogramAggregator(long[] buckets, KeyValuePair<string, object>[] tags)
+    public HistogramAggregator(long[] buckets, KeyValuePair<string, object>[] tags, Func<long, KeyValuePair<string, object>> getLabel)
     {
         if (buckets[^1] != long.MaxValue)
         {
@@ -21,7 +21,7 @@ internal class HistogramAggregator
         }
 
         _tags = tags;
-        _buckets = buckets.Select(b => new HistogramBucketAggregator(tags, b)).ToArray();
+        _buckets = buckets.Select(b => new HistogramBucketAggregator(tags, b, getLabel(b))).ToArray();
     }
 
     public void Record(long number)
@@ -44,24 +44,18 @@ internal class HistogramAggregator
         long count = 0;
         foreach (var bucket in _buckets)
         {
-            count += bucket.Collect().Value;
-            var tags = new KeyValuePair<string, object>[_tags.Length + 1];
-            _tags.CopyTo(tags, 0);
-            tags[^1] = new KeyValuePair<string, object>("le", bucket.Bound);
-            yield return new Measurement<long>(count, tags);
+            count += bucket.Value;
+            yield return new Measurement<long>(count, bucket.Tags);
         }
     }
 
     public Measurement<long> CollectCount()
     {
-        var count = Interlocked.Exchange(ref _count, 0);
-        return new Measurement<long>(count, _tags);
+        return new Measurement<long>(_count, _tags);
     }
 
     public Measurement<long> CollectSum()
     {
-        var sum = Interlocked.Exchange(ref _sum, 0);
-        return new Measurement<long>(sum, _tags);
+        return new Measurement<long>(_sum, _tags);
     }
-
 }

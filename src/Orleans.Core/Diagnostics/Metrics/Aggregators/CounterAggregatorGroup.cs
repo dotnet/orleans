@@ -1,11 +1,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Linq;
 
 namespace Orleans.Runtime;
 
-internal class CounterAggregatorGroup
+internal sealed class CounterAggregatorGroup
 {
     internal ConcurrentDictionary<TagList, CounterAggregator> Aggregators { get; } = new();
 
@@ -34,5 +33,14 @@ internal class CounterAggregatorGroup
         => FindOrCreate(tagList)
             .Add(measurement);
 
-    public IEnumerable<Measurement<long>> Collect() => Aggregators.Values.Select(c => c.Collect());
+    public IEnumerable<Measurement<long>> Collect()
+    {
+        foreach (var (_, aggregator) in Aggregators)
+        {
+            if (aggregator.Value != 0)
+            {
+                yield return aggregator.Collect();
+            }
+        }
+    }
 }

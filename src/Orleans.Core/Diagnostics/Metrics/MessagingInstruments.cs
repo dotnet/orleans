@@ -2,14 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Threading;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
     internal static class MessagingInstruments
     {
-        internal static readonly Counter<int> HeaderBytesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, "bytes");
-        internal static readonly Counter<int> HeaderBytesReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, "bytes");
+        internal static long _headerBytesSent;
+        internal static long _headerBytesReceived;
+        internal static readonly ObservableCounter<long> HeaderBytesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, () => _headerBytesSent, "bytes");
+        internal static readonly ObservableCounter<long> HeaderBytesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, () => _headerBytesReceived, "bytes");
         internal static readonly CounterAggregator LocalMessagesSentCounterAggregator = new();
         private static readonly ObservableCounter<long> LocalMessagesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES, LocalMessagesSentCounterAggregator.Collect);
 
@@ -32,7 +35,6 @@ namespace Orleans.Runtime
         // (1=2^0, 2=2^2, ... , 256=2^8, 512=2^9, 1024==2^10, ... , up to ... 2^30=1GB)
         internal static readonly Histogram<int> MessageSentSizeHistogram = Instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_SENT_MESSAGES_SIZE, "bytes");
         internal static readonly Histogram<int> MessageReceivedSizeHistogram = Instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE, "bytes");
-
 
         internal enum Phase
         {
@@ -93,29 +95,38 @@ namespace Orleans.Runtime
 
         internal static void OnMessageReceive(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress remoteSiloAddress = null)
         {
-            if (remoteSiloAddress != null)
+            if (MessageReceivedSizeHistogram.Enabled)
             {
-                MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                if (remoteSiloAddress != null)
+                {
+                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                }
+                else
+                {
+                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
+                }
             }
-            else
-            {
-                MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
-            }
-            HeaderBytesReceivedCounter.Add(headerBytes);
+
+            Interlocked.Add(ref _headerBytesReceived, headerBytes);
         }
+
         internal static void OnMessageSend(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress remoteSiloAddress = null)
         {
             Debug.Assert(numTotalBytes >= 0, $"OnMessageSend(numTotalBytes={numTotalBytes})");
 
-            if (remoteSiloAddress != null)
+            if (MessageSentSizeHistogram.Enabled)
             {
-                MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                if (remoteSiloAddress != null)
+                {
+                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                }
+                else
+                {
+                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
+                }
             }
-            else
-            {
-                MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
-            }
-            HeaderBytesSentCounter.Add(headerBytes);
+
+            Interlocked.Add(ref _headerBytesSent, headerBytes);
         }
     }
 }
