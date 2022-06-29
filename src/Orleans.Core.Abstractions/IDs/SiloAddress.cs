@@ -225,7 +225,7 @@ namespace Orleans.Runtime
                 Generation = generation;
             }
 
-            public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
+            public override int GetHashCode() => HashCode.Combine(Endpoint, Generation);
 
             public bool Equals(Key other) => Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
         }
@@ -276,6 +276,12 @@ namespace Orleans.Runtime
             hashCode = CalculateIdHash(siloAddressInfoToHash);
             hashCodeSet = true;
             return hashCode;
+        }
+
+        internal void InternalSetConsistentHashCode(int hashCode)
+        {
+            this.hashCode = hashCode;
+            this.hashCodeSet = true;
         }
 
         // This is the same method as Utils.CalculateIdHash
