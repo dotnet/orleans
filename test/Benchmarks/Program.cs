@@ -7,6 +7,8 @@ using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
 
 namespace Benchmarks
 {
@@ -17,7 +19,7 @@ namespace Benchmarks
             ["MapReduce"] = _ =>
             {
                 RunBenchmark(
-                "Running MapReduce benchmark", 
+                "Running MapReduce benchmark",
                 () =>
                 {
                     var mapReduceBenchmark = new MapReduceBenchmark();
@@ -155,7 +157,7 @@ namespace Benchmarks
             },
             ["ConcurrentPing_SiloToSilo"] = _ =>
             {
-                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();                
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
             },
             ["ConcurrentPing_SiloToSilo_Forever"] = _ =>
             {
@@ -255,6 +257,13 @@ namespace Benchmarks
         // requires benchmark name or 'All' word as first parameter
         public static void Main(string[] args)
         {
+            using var meterProvider = Sdk.CreateMeterProviderBuilder()
+                .AddMeter("Orleans")
+                .AddPrometheusExporter(options=>
+                    options.StartHttpListener = true
+                )
+                .Build();
+
             var slicedArgs = args.Skip(1).ToArray();
             if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
             {
