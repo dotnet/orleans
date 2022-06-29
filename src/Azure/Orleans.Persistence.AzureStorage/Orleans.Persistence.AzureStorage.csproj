@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Persistence.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Persistence Azure Storage</Title>
-    <Description>Microsoft Orleans persistence providers for Azure Storage</Description>
+    <Title>Microsoft Orleans Azure Storage Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence providers backed by Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Blob Storage</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Persistence.AzureStorage</AssemblyName>
