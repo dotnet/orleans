@@ -25,20 +25,20 @@ namespace Orleans.Runtime
         // without having to call AddOrUpdate, which is a nuisance
         private class TimestampedValue : IEquatable<TimestampedValue>
         {
-            public readonly CoarseStopwatch Age;
             public readonly TValue Value;
+            public CoarseStopwatch Age;
             public long Generation;
 
-            public TimestampedValue(LRU<TKey, TValue> l, TValue v)
+            public TimestampedValue(LRU<TKey, TValue> l, TValue v, long generation)
             {
-                Generation = Interlocked.Increment(ref l.nextGeneration);
+                Generation = generation;
                 Value = v;
                 Age = CoarseStopwatch.StartNew();
             }
 
             public override bool Equals(object obj) => obj is TimestampedValue value && Equals(value);
-            public bool Equals(TimestampedValue other) => ReferenceEquals(this, other) || Age == other.Age && EqualityComparer<TValue>.Default.Equals(Value, other.Value) && Generation == other.Generation;
-            public override int GetHashCode() => HashCode.Combine(Age, Value, Generation);
+            public bool Equals(TimestampedValue other) => ReferenceEquals(this, other) || Generation == other.Generation && EqualityComparer<TValue>.Default.Equals(Value, other.Value);
+            public override int GetHashCode() => HashCode.Combine(Value, Generation);
         }
 
         private readonly ConcurrentDictionary<TKey, TimestampedValue> cache = new();
@@ -62,24 +62,51 @@ namespace Orleans.Runtime
             requiredFreshness = maxAge;
         }
 
+        public TValue GetOrAdd<TState>(TKey key, Func<TState, TKey, TValue> addFunc, TState state)
+        {
+            var generation = GetNewGeneration();
+            var storedValue = cache.AddOrUpdate(
+                key,
+                static (key, arg) =>
+                {
+                    return new TimestampedValue(arg.Self, arg.AddFunc(arg.State, key), arg.Generation);
+                },
+                static (key, existing, arg) =>
+                {
+                    existing.Age.Restart();
+                    return existing;
+                },
+                (Self: this, State: state, AddFunc: addFunc, Generation: generation));
+
+            var added = storedValue.Generation == generation;
+            if (added) Interlocked.Increment(ref count);
+
+            return storedValue.Value;
+        }
+
         public void Add(TKey key, TValue value)
         {
-            var result = new TimestampedValue(this, value);
             AdjustSize();
 
             // add/update delegates can be called multiple times, but only the last result counts
-            var added = false;
-            cache.AddOrUpdate(key, _ =>
-            {
-                added = true;
-                return result;
-            }, (_, old) =>
-            {
-                added = false;
-                // if multiple values are added at once for the same key, take the newest one
-                return old.Age.Elapsed >= result.Age.Elapsed && old.Generation > result.Generation ? old : result;
-            });
+            var generation = GetNewGeneration();
+            var storedValue = cache.AddOrUpdate(
+                key,
+                static (key, state) =>
+                {
+                    var (self, value, generation) = state;
+                    return new TimestampedValue(self, value, generation);
+                },
+                static (key, old, state) =>
+                {
+                    var (self, value, generation) = state;
 
+                    // if multiple values are added at once for the same key, take the newest one
+                    return old.Generation > generation ? old : new TimestampedValue(self, value, generation);
+                },
+                (Self: this, Value: value, Generation: generation));
+
+            var added = storedValue.Generation == generation;
             if (added) Interlocked.Increment(ref count);
         }
 
@@ -121,6 +148,8 @@ namespace Orleans.Runtime
             return cacheDictionary.Remove(entry);
 #endif
         }
+
+        private long GetNewGeneration() => Interlocked.Increment(ref nextGeneration);
 
         public void Clear()
         {

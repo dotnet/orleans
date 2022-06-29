@@ -20,6 +20,7 @@ using Orleans.Serialization.WireProtocol;
 using Orleans.Runtime.Serialization;
 using Orleans.Utilities;
 using Orleans.Serialization.Buffers.Adaptors;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -560,11 +561,10 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingSiloAddressCodec
     {
-        // Refresh each entry's timer upon access after 1 minute
-        private const long RefreshAfterMilliseconds = 60 * 1000;
+        internal static LRU<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
 
         // Purge entries which have not been accessed in over 2 minutes. 
-        private const long PurgeAfterMilliseconds = 2 * 60 * 1000 + RefreshAfterMilliseconds;
+        private const long PurgeAfterMilliseconds = 2 * 60 * 1000;
 
         // Scan for entries which are expired every minute
         private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
@@ -596,17 +596,11 @@ namespace Orleans.Runtime.Messaging
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
 
-            if (_cache.TryGetValue(hashCode, out var current) && new ReadOnlySpan<byte>(current.Encoded).SequenceEqual(payloadSpan))
+            ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
+            if (exists && new ReadOnlySpan<byte>(cacheEntry.Encoded).SequenceEqual(payloadSpan))
             {
-                result = current.Value;
-
-                // Refresh the inteval periodically.
-                if (currentTimestamp - current.SloppyLastSeen > RefreshAfterMilliseconds)
-                {
-                    var updatedEntry = current;
-                    updatedEntry.SloppyLastSeen = currentTimestamp;
-                    _cache[hashCode] = updatedEntry;
-                }
+                result = cacheEntry.Value;
+                cacheEntry.LastSeen = currentTimestamp;
             }
 
             if (result is null)
@@ -621,10 +615,11 @@ namespace Orleans.Runtime.Messaging
                 result = ReadSiloAddressInner(ref innerReader);
                 result.InternalSetConsistentHashCode(hashCode);
 
-                var cacheEntry = new CacheEntry { Encoded = payloadArray, Value = result, SloppyLastSeen = currentTimestamp };
+                // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
+                (result, _) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
 
                 // If there is a hash collision, then the last seen entry will always win.
-                _cache.TryAdd(hashCode, cacheEntry);
+                cacheEntry = new CacheEntry { Encoded = payloadArray, Value = result, LastSeen = currentTimestamp };
             }
 
             // Perform periodic maintenance to prevent unbounded memory leaks.
@@ -644,7 +639,7 @@ namespace Orleans.Runtime.Messaging
             List<int> purgeKeys = default;
             foreach (var entry in _cache)
             {
-                if (currentTimestamp - entry.Value.SloppyLastSeen > PurgeAfterMilliseconds)
+                if (currentTimestamp - entry.Value.LastSeen > PurgeAfterMilliseconds)
                 {
                     purgeKeys ??= new();
                     purgeKeys.Add(entry.Key);
@@ -693,18 +688,13 @@ namespace Orleans.Runtime.Messaging
             }
 
             var hashCode = value.GetConsistentHashCode();
-            if (_cache.TryGetValue(hashCode, out var cacheEntry) && value.Equals(cacheEntry.Value))
+            ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
+            if (exists && value.Equals(cacheEntry.Value))
             {
                 writer.WriteVarInt32(cacheEntry.Encoded.Length);
                 writer.Write(cacheEntry.Encoded);
 
-                // Refresh the inteval periodically.
-                if (currentTimestamp - cacheEntry.SloppyLastSeen > RefreshAfterMilliseconds)
-                {
-                    var updatedEntry = cacheEntry;
-                    updatedEntry.SloppyLastSeen = currentTimestamp;
-                    _cache[hashCode] = updatedEntry;
-                }
+                cacheEntry.LastSeen = currentTimestamp;
 
                 // Perform periodic maintenance to prevent unbounded memory leaks.
                 if (currentTimestamp - _lastGarbageCollectionTimestamp > GarbageCollectionIntervalMilliseconds)
@@ -726,10 +716,11 @@ namespace Orleans.Runtime.Messaging
             var payloadArray = innerWriter.Output.ToArray();
             innerWriter.Dispose();
 
-            cacheEntry = new CacheEntry { Encoded = payloadArray, Value = value, SloppyLastSeen = currentTimestamp };
+            // Before adding this value to the private cache, intern it via the shared cache to hopefully reduce duplicates.
+            (_, payloadArray) = SharedCache.GetOrAdd(value, static (encoded, key) => (key, encoded), payloadArray);
 
             // If there is a hash collision, then the last seen entry will always win.
-            _cache.TryAdd(hashCode, cacheEntry);
+            cacheEntry = new CacheEntry { Encoded = payloadArray, Value = value, LastSeen = currentTimestamp };
         }
 
         private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
@@ -774,7 +765,7 @@ namespace Orleans.Runtime.Messaging
         {
             public byte[] Encoded { get; set; }
             public SiloAddress Value { get; set; }
-            public long SloppyLastSeen { get; set; }
+            public long LastSeen { get; set; }
         }
     }
 }
