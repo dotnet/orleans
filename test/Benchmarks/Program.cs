@@ -257,12 +257,12 @@ namespace Benchmarks
         // requires benchmark name or 'All' word as first parameter
         public static void Main(string[] args)
         {
-            using var meterProvider = Sdk.CreateMeterProviderBuilder()
-                .AddMeter("Orleans")
-                .AddPrometheusExporter(options=>
-                    options.StartHttpListener = true
-                )
-                .Build();
+            // using var meterProvider = Sdk.CreateMeterProviderBuilder()
+            //     .AddMeter("Orleans")
+            //     .AddPrometheusExporter(options=>
+            //         options.StartHttpListener = true
+            //     )
+            //     .Build();
 
             var slicedArgs = args.Skip(1).ToArray();
             if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -9,7 +10,10 @@ namespace Orleans.Runtime
     {
         internal static readonly Counter<int> HeaderBytesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, "bytes");
         internal static readonly Counter<int> HeaderBytesReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, "bytes");
-        internal static readonly Counter<int> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES);
+        // internal static readonly Counter<int> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES);
+        internal static readonly CounterAggregator LocalMessagesSentCounterAggregator = new(Array.Empty<KeyValuePair<string, object>>());
+        private static readonly ObservableCounter<long> _localMessagesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES, LocalMessagesSentCounterAggregator.Collect);
+
         internal static readonly Counter<int> FailedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_FAILED);
         internal static readonly Counter<int> DroppedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_DROPPED);
         internal static readonly Counter<int> RejectedMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_REJECTED);

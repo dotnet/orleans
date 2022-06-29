@@ -6,26 +6,40 @@ namespace Orleans.Runtime;
 
 internal static class MessagingProcessingInstruments
 {
-    private static readonly Counter<long> dispatcherMessagesProcessedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_PROCESSED);
-    private static readonly Counter<long> dispatcherMessagesReceivedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED);
+    private static readonly CounterAggregatorGroup DispatcherMessagesProcessedCounterAggregatorGroup = new();
+    private static readonly ObservableCounter<long> DispatcherMessagesProcessedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_PROCESSED, DispatcherMessagesProcessedCounterAggregatorGroup.Collect);
+
+    private static readonly CounterAggregatorGroup DispatcherMessagesReceivedCounterAggregatorGroup = new();
+    private static readonly ObservableCounter<long> DispatcherMessagesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED, DispatcherMessagesReceivedCounterAggregatorGroup.Collect);
+
     private static readonly Counter<long> dispatcherMessagesForwardedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED);
-    private static readonly Counter<long> imaReceivedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED);
+    private static readonly CounterAggregator imaReceivedCounterAggregator = new();
+    private static readonly ObservableCounter<long> imaReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED, imaReceivedCounterAggregator.Collect);
     private static readonly Counter<long> imaEnqueuedCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED);
 
     internal static void OnDispatcherMessageReceive(Message msg)
     {
+        if(!DispatcherMessagesReceivedCounter.Enabled)
+            return;
         var context = RuntimeContext.Current;
-        dispatcherMessagesReceivedCounter.Add(1, new KeyValuePair<string, object>("Context", context is null ? null : "Activation"), new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+        var aggregator = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Context", context is null ? null : "Activation"), new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+        aggregator.Add(1);
     }
 
     internal static void OnDispatcherMessageProcessedOk(Message msg)
     {
-        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Ok"));
+        if (!DispatcherMessagesProcessedCounter.Enabled)
+            return;
+        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Ok"));
+        aggregator.Add(1);
     }
 
     internal static void OnDispatcherMessageProcessedError(Message msg)
     {
-        dispatcherMessagesProcessedCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Error"));
+        if (!DispatcherMessagesProcessedCounter.Enabled)
+            return;
+        var aggregator = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new KeyValuePair<string, object>("Direction", msg.Direction.ToString()), new KeyValuePair<string, object>("Status", "Error"));
+        aggregator.Add(1);
     }
 
     internal static void OnDispatcherMessageForwared(Message msg)
@@ -35,7 +49,7 @@ internal static class MessagingProcessingInstruments
 
     internal static void OnImaMessageReceived(Message msg)
     {
-        imaReceivedCounter.Add(1);
+        imaReceivedCounterAggregator.Add(1);
     }
 
     internal static void OnImaMessageEnqueued(IGrainContext context)
