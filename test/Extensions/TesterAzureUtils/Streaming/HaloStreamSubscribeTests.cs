@@ -102,30 +102,6 @@ namespace UnitTests.HaloTests.Streaming
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Halo_SMS_ResubscribeTest_ConsumerProducer()
-        {
-            this.fixture.Logger.LogInformation("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
-            _streamId = Guid.NewGuid();
-            _streamProvider = SmsStreamProviderName;
-            Guid consumerGuid = Guid.NewGuid();
-            Guid producerGuid = Guid.NewGuid();
-            await ConsumerProducerTest(consumerGuid, producerGuid);
-            await ConsumerProducerTest(consumerGuid, producerGuid);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Halo_SMS_ResubscribeTest_ProducerConsumer()
-        {
-            this.fixture.Logger.LogInformation("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
-            _streamId = Guid.NewGuid();
-            _streamProvider = SmsStreamProviderName;
-            Guid producerGuid = Guid.NewGuid();
-            Guid consumerGuid = Guid.NewGuid();
-            await ProducerConsumerTest(producerGuid, consumerGuid);
-            await ProducerConsumerTest(producerGuid, consumerGuid);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
             this.fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
