@@ -11,7 +11,7 @@ namespace Orleans.Runtime
         private readonly IResponseCompletionSource context;
         private int completed;
         private StatusResponse lastKnownStatus;
-        private ValueStopwatch stopwatch;
+        private CoarseStopwatch stopwatch;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
-            this.stopwatch = ValueStopwatch.StartNew();
+            this.stopwatch = CoarseStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -73,7 +73,6 @@ namespace Orleans.Runtime
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage} Target History is: {messageHistory}.");
             var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
@@ -105,7 +104,6 @@ namespace Orleans.Runtime
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
