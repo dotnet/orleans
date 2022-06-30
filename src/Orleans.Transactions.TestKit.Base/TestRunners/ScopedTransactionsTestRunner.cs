@@ -34,11 +34,10 @@ namespace Orleans.Transactions.TestKit
             var grain = RandomTestGrain(grainStates);
 
             // Act
-            Func<Task> act = () => grain.SetAndThrow(57);
+            Func<Task> act = () => _transactionClient.RunTransaction(TransactionOption.Create, () => grain.SetAndThrow(57));
 
-            await _transactionClient.RunTransaction(TransactionOption.Create, async () =>
-                // Assert
-                await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected"));
+            // Assert
+            await act.Should().ThrowAsync<OrleansTransactionAbortedException>(because: "Failure expected");
         }
 
         public virtual async Task CreateTransactionScopeAndSetValueAndAssert(string grainStates)

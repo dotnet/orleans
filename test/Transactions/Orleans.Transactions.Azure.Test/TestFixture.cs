@@ -6,6 +6,7 @@ using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Tester;
+using Microsoft.Extensions.Configuration;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -20,6 +21,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
         public class SiloBuilderConfigurator : ISiloConfigurator
@@ -34,6 +36,16 @@ namespace Orleans.Transactions.AzureStorage.Tests
                         options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                     })
                     .UseTransactions();
+            }
+        }
+
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .UseTransactions()
+                    .ConfigureTracingForTransactionTests();
             }
         }
     }

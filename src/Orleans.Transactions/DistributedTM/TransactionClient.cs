@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
 using Orleans.Serialization;
@@ -17,15 +18,18 @@ internal class TransactionClient : ITransactionClient
         _serializer = serializer;
     }
 
-    public Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
+    public async Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
     {
-        return transactionDelegate is null
-            ? throw new ArgumentNullException(nameof(transactionDelegate))
-            : RunTransaction(transactionOption, async () =>
-            {
-                await transactionDelegate.Invoke();
-                return true;
-            });
+        if (transactionDelegate is null)
+        {
+            throw new ArgumentNullException(nameof(transactionDelegate));
+        }
+
+        await RunTransaction(transactionOption, async () =>
+        {
+            await transactionDelegate();
+            return true;
+        });
     }
 
     public async Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate)
@@ -75,7 +79,8 @@ internal class TransactionClient : ITransactionClient
             }
         }
         finally
-        {   // Restore ambient transaction context, if any
+        {
+            // Restore ambient transaction context, if any
             TransactionContext.SetTransactionInfo(ambientTransactionInfo);
         }
     }
@@ -83,23 +88,26 @@ internal class TransactionClient : ITransactionClient
     private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is not null)
-        {   // No transaction is allowed within delegate
+        {
+            // No transaction is allowed within delegate
             throw new NotSupportedException("Delegate cannot be executed within a transaction.");
         }
 
         // Run delegate
-        ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        ambientTransactionInfo.TryToCommit = await transactionDelegate();
     }
 
     private static async Task RunDelegateWithSupportedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is null)
-        {   // Run delegate
-            _ = await transactionDelegate.Invoke();
+        {
+            // Run delegate
+            _ = await transactionDelegate();
         }
         else
-        {   // Run delegate
-            ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        {
+            // Run delegate
+            ambientTransactionInfo.TryToCommit = await transactionDelegate();
         }
     }
 
@@ -109,12 +117,14 @@ internal class TransactionClient : ITransactionClient
         TransactionContext.Clear();
 
         if (ambientTransactionInfo is null)
-        {   // Run delegate
-            _ = await transactionDelegate.Invoke();
+        {
+            // Run delegate
+            _ = await transactionDelegate();
         }
         else
-        {   // Run delegate
-            ambientTransactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        {
+            // Run delegate
+            ambientTransactionInfo.TryToCommit = await transactionDelegate();
         }
     }
 
@@ -128,10 +138,11 @@ internal class TransactionClient : ITransactionClient
             var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
             // Start transaction
-            transactionInfo = await _transactionAgent.StartTransaction(false, transactionTimeout);
+            transactionInfo = await _transactionAgent.StartTransaction(readOnly: false, transactionTimeout);
         }
         else
-        {   // Fork ambient transaction
+        {
+            // Fork ambient transaction
             transactionInfo = ambientTransactionInfo.Fork();
         }
 
@@ -139,11 +150,13 @@ internal class TransactionClient : ITransactionClient
         TransactionContext.SetTransactionInfo(transactionInfo);
 
         try
-        {   // Run delegate
-            transactionInfo.TryToCommit = await transactionDelegate.Invoke();
+        {
+            // Run delegate
+            transactionInfo.TryToCommit = await transactionDelegate();
         }
         catch (Exception exception)
-        {   // Record exception with transaction
+        {
+            // Record exception with transaction
             transactionInfo.RecordException(exception, _serializer);
         }
 
@@ -151,7 +164,8 @@ internal class TransactionClient : ITransactionClient
         transactionInfo.ReconcilePending();
 
         if (ambientTransactionInfo is null)
-        {   // Finalize transaction since there is no ambient transaction to join
+        {
+            // Finalize transaction since there is no ambient transaction to join
             await FinalizeTransaction(transactionInfo);
         }
         else
@@ -169,22 +183,27 @@ internal class TransactionClient : ITransactionClient
         transactionException = transactionInfo.MustAbort(_serializer);
 
         if (transactionException is not null || transactionInfo.TryToCommit is false)
-        {   // Transaction is pending for abort
+        {
+            // Transaction is pending for abort
             await _transactionAgent.Abort(transactionInfo);
         }
         else
-        {   // Try to resolve transaction
+        {
+            // Try to resolve transaction
             var (status, exception) = await _transactionAgent.Resolve(transactionInfo);
 
             if (status != TransactionalStatus.Ok)
-            {   // Resolving transaction failed
+            {
+                // Resolving transaction failed
                 transactionException = status.ConvertToUserException(transactionInfo.Id, exception);
+                ExceptionDispatchInfo.SetCurrentStackTrace(transactionException);
             }
         }
 
         if (transactionException != null)
-        {   // Transaction failed - bubble up exception
-            throw transactionException;
+        {
+            // Transaction failed - bubble up exception
+            ExceptionDispatchInfo.Throw(transactionException);
         }
     }
 }
