@@ -279,13 +279,6 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task SMS_StreamRel_SiloJoins()
-        {
-            const string testName = "SMS_StreamRel_SiloJoins";
-
-            await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
-        }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
