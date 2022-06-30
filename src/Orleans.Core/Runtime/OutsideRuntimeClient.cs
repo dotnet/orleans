@@ -507,7 +507,7 @@ namespace Orleans
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = CoarseStopwatch.GetTimestamp();
+            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;

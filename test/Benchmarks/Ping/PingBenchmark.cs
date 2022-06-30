@@ -120,7 +120,7 @@ namespace Benchmarks.Ping
                 blocksPerWorker: blocksPerWorker,
                 requestsPerBlock: 500,
                 issueRequest: g => g.Run(),
-                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
+                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
             await loadGenerator.Warmup();
             while (runs-- > 0) await loadGenerator.Run();
         }

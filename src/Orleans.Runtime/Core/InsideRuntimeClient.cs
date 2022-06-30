@@ -589,7 +589,7 @@ namespace Orleans.Runtime
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = CoarseStopwatch.GetTimestamp();
+            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
             var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {

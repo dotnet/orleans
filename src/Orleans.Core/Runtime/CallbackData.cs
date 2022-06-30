@@ -11,7 +11,7 @@ namespace Orleans.Runtime
         private readonly IResponseCompletionSource context;
         private int completed;
         private StatusResponse lastKnownStatus;
-        private CoarseStopwatch stopwatch;
+        private ValueStopwatch stopwatch;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
-            this.stopwatch = CoarseStopwatch.StartNew();
+            this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             this.shared.Unregister(this.Message);
 
             this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd(this.stopwatch.Elapsed);
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
             OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
@@ -80,7 +80,7 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd(this.stopwatch.Elapsed);
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
@@ -108,7 +108,7 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
             this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd(this.stopwatch.Elapsed);
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
