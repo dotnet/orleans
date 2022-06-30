@@ -11,7 +11,7 @@ public class HistogramAggregatorTests
     public void CollectBuckets()
     {
         var bounds = new long[] { 1, 3, 5, 8, 13 };
-        var aggregator = new HistogramAggregator(bounds, new[] { new KeyValuePair<string, object>("foo", "bar") }, bound => new("bound", bound.ToString()));
+        var aggregator = new HistogramAggregator(bounds, new[] { new KeyValuePair<string, object>("foo", "bar") }, bound => new("le", bound));
         aggregator.Record(0);
         aggregator.Record(2);
         aggregator.Record(5);
@@ -32,10 +32,10 @@ public class HistogramAggregatorTests
         }
         Assert.Equal(long.MaxValue, buckets.Last().Tags[^1].Value);
         Assert.Equal(1, buckets[0].Value);
-        Assert.Equal(2, buckets[1].Value);
-        Assert.Equal(3, buckets[2].Value);
-        Assert.Equal(4, buckets[3].Value);
-        Assert.Equal(7, buckets[4].Value);
-        Assert.Equal(10, buckets[5].Value);
+        Assert.Equal(1, buckets[1].Value);
+        Assert.Equal(1, buckets[2].Value);
+        Assert.Equal(1, buckets[3].Value);
+        Assert.Equal(3, buckets[4].Value);
+        Assert.Equal(3, buckets[5].Value);
     }
 }
