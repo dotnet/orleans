@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Clustering.DynamoDB</PackageId>
-    <Title>Microsoft Orleans clustering provider for AWS DynamoDB</Title>
+    <Title>Microsoft Orleans AWS DynamoDB Clustering Provider</Title>
     <Description>Microsoft Orleans clustering provider backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>

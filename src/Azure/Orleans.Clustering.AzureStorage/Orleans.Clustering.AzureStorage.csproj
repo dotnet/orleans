@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Clustering.AzureStorage</PackageId>
-    <Title>Microsoft Orleans clustering provider for Azure Table Storage</Title>
+    <Title>Microsoft Orleans Azure Table Storage Clustering Provider</Title>
     <Description>Microsoft Orleans clustering provider backed by Azure Table Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Storage</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
