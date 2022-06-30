@@ -68,8 +68,6 @@ namespace Orleans.Transactions.TestKit
             // Act
             await _transactionClient.RunTransaction(TransactionOption.Create, async () =>
             {
-                await grain.Set(57);
-
                 try
                 {
                     await _transactionClient.RunTransaction(TransactionOption.Create, async () => await grain.SetAndThrow(67));
@@ -77,8 +75,10 @@ namespace Orleans.Transactions.TestKit
                 catch
                 { }
 
-                result = await grain.Get();
+                await grain.Set(57);
             });
+
+            result = await grain.Get();
 
             // Assert
             result.Should().OnlyContain(number => number == 57);
