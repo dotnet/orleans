@@ -21,7 +21,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the default period of inactivity necessary for a grain to be available for collection and deactivation.
         /// </summary>
-        public TimeSpan CollectionAge { get; set; } = TimeSpan.FromHours(2);
+        public TimeSpan CollectionAge { get; set; } = TimeSpan.FromMinutes(15);
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
