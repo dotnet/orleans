@@ -42,8 +42,8 @@ public class CounterAggregatorGroupTests
 
         var measurements = group.Collect().ToList();
         Assert.Equal(2, measurements.Count);
-        Assert.Equal(3, measurements[0].Value);
-        Assert.Equal(5, measurements[1].Value);
+        Assert.Equal(3, measurements.Single(m => m.Tags[0].Value is "bar1").Value);
+        Assert.Equal(5, measurements.Single(m => m.Tags[0].Value is "bar2").Value);
     }
 
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
