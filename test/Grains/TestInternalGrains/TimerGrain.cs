@@ -140,7 +140,7 @@ namespace UnitTestGrains
         private IDisposable timer;
         private string timerName;
         private IGrainContext context;
-        private TaskScheduler activationTaskScheduler;
+        private SynchronizationContext synchronizationContext;
 
         private ILogger logger;
 
@@ -155,7 +155,7 @@ namespace UnitTestGrains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             context = RuntimeContext.Current;
-            activationTaskScheduler = TaskScheduler.Current;
+            synchronizationContext = SynchronizationContext.Current;
             return Task.CompletedTask;
         }
 
@@ -242,7 +242,9 @@ namespace UnitTestGrains
                     string.Format("{0} in timer callback with unexpected activation context: Expected={1} Actual={2}",
                                   what, context, RuntimeContext.Current));
             }
-            if (TaskScheduler.Current.Equals(activationTaskScheduler) && TaskScheduler.Current is ActivationTaskScheduler)
+            if (synchronizationContext is OrleansSynchronizationContext activationContext
+                && SynchronizationContext.Current is OrleansSynchronizationContext rsc
+                && rsc.GrainContext.Equals(activationContext.GrainContext))
             {
                 // Everything is as expected
             }
@@ -250,7 +252,7 @@ namespace UnitTestGrains
             {
                 throw new InvalidOperationException(
                     string.Format("{0} in timer callback with unexpected TaskScheduler.Current context: Expected={1} Actual={2}",
-                                  what, activationTaskScheduler, TaskScheduler.Current));
+                                  what, synchronizationContext, TaskScheduler.Current));
             }
         }
 

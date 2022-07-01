@@ -650,10 +650,10 @@ namespace UnitTests.Grains
         public Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc)
         {
             var tcs = new TaskCompletionSource<bool>();
-            var orleansTs = TaskScheduler.Current;
+            var orleansTs = (RequestSynchronizationContext)SynchronizationContext.Current;
             tc.CancellationToken.Register(() =>
             {
-                if (TaskScheduler.Current != orleansTs)
+                if (SynchronizationContext.Current is not RequestSynchronizationContext rsc || orleansTs.GrainContext.Equals(rsc.GrainContext))
                 {
                     tcs.SetException(new Exception("Callback executed on wrong thread"));
                 }

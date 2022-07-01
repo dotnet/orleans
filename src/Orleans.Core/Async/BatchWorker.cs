@@ -105,7 +105,7 @@ namespace Orleans
             scheduledNotify = null;
 
             // Queue a task that is doing the work
-            var task = Task.Factory.StartNew(s => ((BatchWorker)s!).Work(), this, default, default, TaskScheduler.Current).Unwrap();
+            var task = Task.Factory.StartNew(s => ((BatchWorker)s!).Work(), this, default, default, TaskScheduler.FromCurrentSynchronizationContext()).Unwrap();
             currentWorkCycle = task;
 
             // chain a continuation that checks for more work, on the same scheduler

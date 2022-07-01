@@ -2,7 +2,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal abstract class OrleansSynchronizationContext : SynchronizationContext
+    public abstract class OrleansSynchronizationContext : SynchronizationContext
     {
         public static new OrleansSynchronizationContext Current => SynchronizationContext.Current as OrleansSynchronizationContext;
 

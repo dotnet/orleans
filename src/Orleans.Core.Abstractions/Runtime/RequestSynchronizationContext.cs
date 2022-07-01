@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// Implements a per-request <see cref="SynchronizationContext"/>, used to propagate runtime information such as the current
     /// <see cref="IGrainContext"/> and request message along the call.
     /// </summary>
-    internal sealed class RequestSynchronizationContext : OrleansSynchronizationContext
+    public sealed class RequestSynchronizationContext : OrleansSynchronizationContext
     {
         /*
         private SendOrPostCallback _scheduledCallback;
