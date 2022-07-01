@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Scheduler
             Task,
             SendOrPostCallback,
             Action,
-            ActionWithState
+            ActionWithState,
         }
 
         [StructLayout(LayoutKind.Auto)]
@@ -66,6 +66,7 @@ namespace Orleans.Runtime.Scheduler
             public object WorkItem { get; set; }
             public object State { get; set; } // used for SendOrPostCallback from SynchronizationContext
             public WorkItemKind Type { get; set; }
+            public OrleansSynchronizationContext Context { get; internal set; }
 
             public override string ToString() => Type switch
             {
@@ -76,7 +77,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Post(SendOrPostCallback callback, object state)
         {
-            var workItem = new WorkItemEntry { State = state, Type = WorkItemKind.SendOrPostCallback, WorkItem = callback };
+            var workItem = new WorkItemEntry { State = state, Type = WorkItemKind.SendOrPostCallback, WorkItem = callback, Context = this };
             this.EnqueueWorkItem(workItem);
         }
 
@@ -148,6 +149,17 @@ namespace Orleans.Runtime.Scheduler
             totalItemsEnqueued = 0;
             totalItemsProcessed = 0;
             lastLongQueueWarningTime = CoarseStopwatch.StartNew();
+        }
+
+        public override void Schedule(SendOrPostCallback callback, object state, OrleansSynchronizationContext context)
+        {
+            var workItem = new WorkItemEntry{
+                State = state,
+                Type = WorkItemKind.SendOrPostCallback,
+                WorkItem = callback,
+                Context = context,
+            };
+            EnqueueWorkItem(workItem);
         }
 
         /// <summary>
@@ -258,8 +270,6 @@ namespace Orleans.Runtime.Scheduler
             var outer = SynchronizationContext.Current;
             try
             {
-                SynchronizationContext.SetSynchronizationContext(this);
-
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 var executionStopwatch = CoarseStopwatch.StartNew();
                 var activationSchedulingQuantumMillis = Shared.ActivationSchedulingQuantumMillis;
@@ -294,6 +304,7 @@ namespace Orleans.Runtime.Scheduler
                     }
 #endif
                     var taskStartMillis = executionStopwatch.ElapsedMilliseconds;
+                    SynchronizationContext.SetSynchronizationContext(task.Context ?? this);
 
                     try
                     {

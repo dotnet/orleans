@@ -88,7 +88,6 @@ namespace Orleans.Runtime
             {
                 Interlocked.Increment(ref count);
                 AdjustSize();
-                Debug.Assert(cache.Count == count);
             }
 
             return result;
@@ -106,7 +105,6 @@ namespace Orleans.Runtime
             if (!cache.TryRemove(key, out _)) return false;
 
             Interlocked.Decrement(ref count);
-            Debug.Assert(cache.Count == count);
             return true;
         }
 
@@ -114,18 +112,15 @@ namespace Orleans.Runtime
         {
             if (!cache.TryGetValue(key, out var timestampedValue))
             {
-                Debug.Assert(cache.Count == count);
                 return false;
             }
 
             if (predicate(context, timestampedValue.Value) && TryRemoveInternal(key, timestampedValue))
             {
                 Interlocked.Decrement(ref count);
-                Debug.Assert(cache.Count == count);
                 return true;
             }
 
-            Debug.Assert(cache.Count == count);
             return false;
 
             bool TryRemoveInternal(TKey key, TimestampedValue value)

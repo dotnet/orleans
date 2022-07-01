@@ -1,10 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Runtime
 {
@@ -185,80 +181,5 @@ namespace Orleans.Runtime
         {
             if (_context is { } ctx) ctx.IsRequestFlowSuppressed = false;
         }
-    }
-
-    internal abstract class OrleansSynchronizationContext : SynchronizationContext
-    {
-        public static new OrleansSynchronizationContext Current => SynchronizationContext.Current as OrleansSynchronizationContext;
-
-        public static OrleansSynchronizationContext Fork(OrleansSynchronizationContext original)
-        {
-            var innerContext = original switch
-            {
-                RequestSynchronizationContext wrapped => wrapped.InnerContext,
-                _ => original
-            };
-
-            return new RequestSynchronizationContext(innerContext)
-            {
-                CurrentRequest = original.CurrentRequest,
-            };
-        }
-
-        public abstract object CurrentRequest { get; set; }
-        public abstract IGrainContext GrainContext { get; }
-        public bool IsRequestFlowSuppressed { get; set; }
-
-        public override SynchronizationContext CreateCopy() => Fork(this);
-    }
-
-    internal sealed class RequestSynchronizationContext : OrleansSynchronizationContext
-    {
-        public RequestSynchronizationContext(OrleansSynchronizationContext inner)
-        {
-            if (inner is RequestSynchronizationContext)
-            {
-                ThrowInvalidArgumentException();
-            }
-
-            InnerContext = inner;
-        }
-
-        public OrleansSynchronizationContext InnerContext { get; init; }
-
-        public override object CurrentRequest { get; set; }
-
-        public override IGrainContext GrainContext => InnerContext.GrainContext;
-
-        public override void Send(SendOrPostCallback callback, object state) => InnerContext.Send(callback, state);
-
-        public override void Post(SendOrPostCallback callback, object state) => InnerContext.Post(callback, state);
-
-        [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidArgumentException() => throw new ArgumentException();
-
-        /// <inheritdoc/>
-        public override SynchronizationContext CreateCopy()
-        {
-            return new RequestSynchronizationContext(InnerContext)
-            {
-                CurrentRequest = CurrentRequest,
-            };
-        }
-    }
-
-    internal sealed class ThreadPoolSynchronizationContext : OrleansSynchronizationContext
-    {
-        public ThreadPoolSynchronizationContext(IGrainContext grainContext)
-        {
-            GrainContext = grainContext;
-        }
-
-        public override IGrainContext GrainContext { get; }
-        public override object CurrentRequest { get => default; set => throw new NotSupportedException(); }
-        public override void Send(SendOrPostCallback callback, object state) => callback(state);
-
-        public override void Post(SendOrPostCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(s => callback(s), state, preferLocal: true);
     }
 }

@@ -24,7 +24,7 @@ namespace BenchmarkGrains.Ping
             return Task.CompletedTask;
         }
 
-        public ValueTask Run() => default;
+        public async ValueTask Run() => await Task.Yield();
 
         public ValueTask PingPongInterleave(IPingGrain other, int count)
         {
