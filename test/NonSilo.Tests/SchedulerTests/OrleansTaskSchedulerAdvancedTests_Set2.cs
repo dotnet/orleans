@@ -67,32 +67,32 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_NewTask_ContinueWith_Wrapped()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             Task<Task> wrapped = new Task<Task>(() =>
             {
-                this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
+                this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} SynchronizationContext.Current={1}",
+                    SynchronizationContext.Current, SynchronizationContext.Current);
 
                 Task t0 = new Task(() =>
                 {
-                    this.output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
+                    this.output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} SynchronizationContext.Current={1}",
+                        SynchronizationContext.Current, SynchronizationContext.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);  // "SynchronizationContext.Current #1"
                 });
                 Task t1 = t0.ContinueWith(task =>
                 {
                     Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
-                    this.output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
+                    this.output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} SynchronizationContext.Current={1}",
+                        SynchronizationContext.Current, SynchronizationContext.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);  // "SynchronizationContext.Current #2"
                 });
-                t0.Start(scheduler);
+                scheduler.EnqueueTask(t0);
                 return t1;
             });
-            wrapped.Start(scheduler);
+
+            scheduler.EnqueueTask(wrapped);
             bool ok = wrapped.Unwrap().Wait(TimeSpan.FromSeconds(2));
             Assert.True(ok, "Finished OK");
         }
@@ -192,8 +192,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -206,7 +205,7 @@ namespace UnitTests.SchedulerTests
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-1 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current=" + TaskScheduler.Current
+                    Assert.Equal(scheduler, SynchronizationContext.Current);  // "SynchronizationContext.Current=" + SynchronizationContext.Current
                     pause1.WaitOne();
                     this.output.WriteLine("Task-1 Done");
                     return 1;
@@ -214,7 +213,7 @@ namespace UnitTests.SchedulerTests
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-2 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     pause2.WaitOne();
                     this.output.WriteLine("Task-2 Done");
                     return 2;
@@ -224,7 +223,7 @@ namespace UnitTests.SchedulerTests
 
                 finish.SetResult(true);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
@@ -249,8 +248,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Timeout()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -263,7 +261,7 @@ namespace UnitTests.SchedulerTests
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-1 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     pause1.WaitOne();
                     this.output.WriteLine("Task-1 Done");
                     return 1;
@@ -271,7 +269,7 @@ namespace UnitTests.SchedulerTests
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-2 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     pause2.WaitOne();
                     this.output.WriteLine("Task-2 Done");
                     return 2;
@@ -281,7 +279,7 @@ namespace UnitTests.SchedulerTests
 
                 finish.SetResult(true);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
@@ -309,8 +307,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Busy_Timeout()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             var pause1 = new TaskCompletionSource<bool>();
             var pause2 = new TaskCompletionSource<bool>();
@@ -323,7 +320,7 @@ namespace UnitTests.SchedulerTests
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-1 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     int num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
@@ -335,7 +332,7 @@ namespace UnitTests.SchedulerTests
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
                     this.output.WriteLine("Task-2 Started");
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     int num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
@@ -349,7 +346,7 @@ namespace UnitTests.SchedulerTests
 
                 finish.SetResult(true);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
@@ -374,8 +371,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -388,7 +384,7 @@ namespace UnitTests.SchedulerTests
                 task1 = Task.Run(() =>
                 {
                     this.output.WriteLine("Task-1 Started");
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     pause1.WaitOne();
                     this.output.WriteLine("Task-1 Done");
                     return 1;
@@ -396,7 +392,7 @@ namespace UnitTests.SchedulerTests
                 task2 = Task.Run(() =>
                 {
                     this.output.WriteLine("Task-2 Started");
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     pause2.WaitOne();
                     this.output.WriteLine("Task-2 Done");
                     return 2;
@@ -406,13 +402,13 @@ namespace UnitTests.SchedulerTests
                 {
                     this.output.WriteLine("Join Started");
                     if (t.IsFaulted) throw t.Exception;
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     this.output.WriteLine("Join Done");
                 });
 
                 finish.SetResult(true);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
@@ -436,8 +432,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run_Delay()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -450,9 +445,9 @@ namespace UnitTests.SchedulerTests
                 task1 = Task.Run(() =>
                 {
                     this.output.WriteLine("Task-1 Started");
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     Task.Delay(1);
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     pause1.WaitOne();
                     this.output.WriteLine("Task-1 Done");
                     return 1;
@@ -460,9 +455,9 @@ namespace UnitTests.SchedulerTests
                 task2 = Task.Run(() =>
                 {
                     this.output.WriteLine("Task-2 Started");
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     Task.Delay(1);
-                    Assert.NotEqual(scheduler, TaskScheduler.Current);
+                    Assert.NotEqual(scheduler, SynchronizationContext.Current);
                     pause2.WaitOne();
                     this.output.WriteLine("Task-2 Done");
                     return 2;
@@ -472,13 +467,13 @@ namespace UnitTests.SchedulerTests
                 {
                     this.output.WriteLine("Join Started");
                     if (t.IsFaulted) throw t.Exception;
-                    Assert.Equal(scheduler, TaskScheduler.Current);
+                    Assert.Equal(scheduler, SynchronizationContext.Current);
                     this.output.WriteLine("Join Done");
                 });
 
                 finish.SetResult(true);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
@@ -502,18 +497,17 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Delay()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             Task<Task> wrapper = new Task<Task>(async () =>
             {
-                Assert.Equal(scheduler, TaskScheduler.Current);
+                Assert.Equal(scheduler, SynchronizationContext.Current);
                 await DoDelay(1);
-                Assert.Equal(scheduler, TaskScheduler.Current);
+                Assert.Equal(scheduler, SynchronizationContext.Current);
                 await DoDelay(2);
-                Assert.Equal(scheduler, TaskScheduler.Current);
+                Assert.Equal(scheduler, SynchronizationContext.Current);
             });
-            wrapper.Start(scheduler);
+            scheduler.EnqueueTask(wrapper);
 
             await wrapper.Unwrap();
         }
@@ -522,9 +516,9 @@ namespace UnitTests.SchedulerTests
         {
             try
             {
-                this.output.WriteLine("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+                this.output.WriteLine("Before Task.Delay #{0} SynchronizationContext.Current={1}", i, SynchronizationContext.Current);
                 await Task.Delay(1);
-                this.output.WriteLine("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+                this.output.WriteLine("After Task.Delay #{0} SynchronizationContext.Current={1}", i, SynchronizationContext.Current);
             }
             catch (ObjectDisposedException)
             {
@@ -535,8 +529,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Turn_Execution_Order_Loop()
         {
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            TaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
 
             const int NumChains = 100;
             const int ChainLength = 3;
@@ -600,19 +593,19 @@ namespace UnitTests.SchedulerTests
                             executingChain[chainNum] = false;
                             executingGlobal = -1;
                         }
-                    }, scheduler);
+                    }, scheduler.TaskScheduler);
                 }
                 taskChainEnds[chainNum] = task.ContinueWith(t =>
                 {
                     if (t.IsFaulted) throw t.Exception;
                     this.output.WriteLine("Inside Chain {0} Final Task", chainNum);
                     resultHandles[chainNum].SetResult(true);
-                }, scheduler);
+                }, scheduler.TaskScheduler);
             }
 
             for (int i = 0; i < NumChains; i++)
             {
-                taskChains[i].Start(scheduler);
+                taskChains[i].Start(scheduler.TaskScheduler);
             }
 
             for (int i = 0; i < NumChains; i++)
@@ -700,8 +693,8 @@ namespace UnitTests.SchedulerTests
             var wrappedDone = new TaskCompletionSource<bool>();
             Task<Task> wrapper = new Task<Task>(() =>
             {
-                this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
+                this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} SynchronizationContext.Current={1}",
+                    SynchronizationContext.Current, SynchronizationContext.Current);
                 
                 Task t1 = grain.Test1();
 
@@ -760,11 +753,11 @@ namespace UnitTests.SchedulerTests
             {
                 this.output.WriteLine(
                     "{0}\n"
-                    + " TaskScheduler.Current={1}\n"
+                    + " SynchronizationContext.Current={1}\n"
                     + " Task.Factory.Scheduler={2}\n"
                     + " SynchronizationContext.Current={3}",
                     what,
-                    (TaskScheduler.Current == null ? "null" : TaskScheduler.Current.ToString()),
+                    (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString()),
                     (Task.Factory.Scheduler == null ? "null" : Task.Factory.Scheduler.ToString()),
                     (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString())
                 );

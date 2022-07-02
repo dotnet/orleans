@@ -17,7 +17,8 @@ namespace Orleans
     public abstract class BatchWorker
     {
         private readonly object lockable = new object();
-
+        private TaskScheduler? _taskScheduler;
+        private TaskScheduler TaskScheduler => _taskScheduler ??= TaskScheduler.FromCurrentSynchronizationContext();
         private DateTime? scheduledNotify;
 
         // Task for the current work cycle, or null if idle
@@ -105,11 +106,11 @@ namespace Orleans
             scheduledNotify = null;
 
             // Queue a task that is doing the work
-            var task = Task.Factory.StartNew(s => ((BatchWorker)s!).Work(), this, default, default, TaskScheduler.FromCurrentSynchronizationContext()).Unwrap();
+            var task = Task.Factory.StartNew(s => ((BatchWorker)s!).Work(), this, default, default, TaskScheduler).Unwrap();
             currentWorkCycle = task;
 
             // chain a continuation that checks for more work, on the same scheduler
-            task.ContinueWith((_, s) => ((BatchWorker)s!).CheckForMoreWork(), this);
+            task.ContinueWith((_, s) => ((BatchWorker)s!).CheckForMoreWork(), this, TaskScheduler);
             return task;
         }
 

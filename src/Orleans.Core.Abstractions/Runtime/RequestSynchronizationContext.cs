@@ -11,11 +11,6 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class RequestSynchronizationContext : OrleansSynchronizationContext
     {
-        /*
-        private SendOrPostCallback _scheduledCallback;
-        private object _scheduledCallbackState;
-        */
-
         public RequestSynchronizationContext(OrleansSynchronizationContext inner)
         {
             if (inner is RequestSynchronizationContext)
@@ -28,27 +23,14 @@ namespace Orleans.Runtime
 
         public OrleansSynchronizationContext InnerContext { get; init; }
 
-        public override object CurrentRequest { get; set; }
+        private object _currentRequest;
+        public override object CurrentRequest { get => _currentRequest; set => _currentRequest = value; }
 
         public override IGrainContext GrainContext => InnerContext.GrainContext;
 
         public override void Send(SendOrPostCallback callback, object state)
         {
             InnerContext.Send(callback, state);
-/*
-            if (_scheduledCallback == null && Interlocked.CompareExchange(ref _scheduledCallback, callback, null) == null)
-            {
-                _scheduledCallbackState = state;
-                InnerContext.Schedule(callback, state, this);
-            }
-            else
-            {
-                var context = CreateCopy();
-                context._scheduledCallback = callback;
-                context._scheduledCallbackState = state;
-                InnerContext.Schedule(callback, state, this);
-            }
-*/
         }
 
         public override void Post(SendOrPostCallback callback, object state)
@@ -69,5 +51,7 @@ namespace Orleans.Runtime
                 CurrentRequest = CurrentRequest,
             };
         }
+
+        public override string ToString() => $"[RequestSynchronizationContext] Inner=[{InnerContext}] Request=[{CurrentRequest}]";
     }
 }

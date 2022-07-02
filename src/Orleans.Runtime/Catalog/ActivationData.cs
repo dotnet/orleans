@@ -975,8 +975,9 @@ namespace Orleans.Runtime
             }
 
             SynchronizationContext.SetSynchronizationContext(SchedulingContext);
+            Debug.Assert(SynchronizationContext.Current is not RequestSynchronizationContext);
 
-            static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
+            static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)
             {
                 try
                 {

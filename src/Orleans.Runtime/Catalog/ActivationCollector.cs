@@ -517,14 +517,14 @@ namespace Orleans.Runtime
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            Action signalCompletion = () => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {
                 var activationData = list[i];
 
                 // Continue deactivation when ready
-                _ = activationData.DeactivateAsync(reason, cts.Token).ContinueWith(signalCompletion);
+                activationData.DeactivateAsync(reason, cts.Token).GetAwaiter().UnsafeOnCompleted(signalCompletion);
             }
 
             await mtcs.Task;

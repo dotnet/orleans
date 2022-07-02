@@ -163,11 +163,16 @@ namespace Orleans.Runtime.Scheduler
         }
 
         /// <summary>
-        /// Adds a task to this activation.
+        /// Enqueues a task on this activation.
         /// If we're adding it to the run list and we used to be waiting, now we're runnable.
         /// </summary>
         /// <param name="task">The work item to add.</param>
         public void EnqueueTask(Task task)
+        {
+            task.Start(TaskScheduler);
+        }
+
+        public void EnqueueTaskFromTaskScheduler(Task task)
         {
             var workItem = new WorkItemEntry { WorkItem = task, Type = WorkItemKind.Task };
             EnqueueWorkItem(workItem);

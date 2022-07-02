@@ -139,34 +139,36 @@ namespace Orleans.Runtime
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RefreshStatistics");
             await this.RunOrQueueTask(() =>
+            {
+                var tasks = new List<Task>();
+                var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
+                foreach (var siloAddress in members)
                 {
-                    var tasks = new List<Task>();
-                    var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
-                    foreach (var siloAddress in members)
+                    var capture = siloAddress;
+                    tasks.Add(GetSiloStatistics(siloAddress));
+
+                    async Task GetSiloStatistics(SiloAddress siloAddress)
                     {
-                        var capture = siloAddress;
-                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, capture)
-                                .GetRuntimeStatistics()
-                                .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
-                                    {
-                                        if (statsTask.Status == TaskStatus.RanToCompletion)
-                                        {
-                                            UpdateRuntimeStatistics(capture, statsTask.Result);
-                                        }
-                                        else
-                                        {
-                                            logger.LogWarning(
-                                                (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
-                                                statsTask.Exception,
-                                                "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({SiloAddress}). Will keep using stale statistics.",
-                                                capture);
-                                        }
-                                    });
-                        tasks.Add(task);
-                        task.Ignore();
+                        await Task.Yield();
+                        try
+                        {
+                            var siloControlTarget = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, capture);
+                            var runtimeStatistics = await siloControlTarget.GetRuntimeStatistics();
+                            await UpdateRuntimeStatistics(siloAddress, runtimeStatistics);
+                        }
+                        catch (Exception exception)
+                        {
+                            logger.LogWarning(
+                                (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
+                                exception,
+                                "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({SiloAddress}). Will keep using stale statistics.",
+                                capture);
+                        }
                     }
-                    return Task.WhenAll(tasks);
-                });
+                }
+
+                return Task.WhenAll(tasks);
+            });
             return periodicStats;
         }
 

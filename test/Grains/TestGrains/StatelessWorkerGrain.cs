@@ -48,19 +48,20 @@ namespace UnitTests.Grains
             DateTime start = DateTime.UtcNow;
             TaskCompletionSource<bool> resolver = new TaskCompletionSource<bool>();
             RegisterTimer(TimerCallback, resolver, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(-1));
-            return resolver.Task.ContinueWith(
-                (_) =>
-                {
-                    DateTime stop = DateTime.UtcNow;
-                    calls.Add(new Tuple<DateTime, DateTime>(start, stop));
-                    logger.LogInformation("{DurationMilliseconds}", (stop - start).TotalMilliseconds);
-                    logger.LogInformation(
-                        "Start {StartDate}, stop {StopDate}, duration {Duration}. #act {Count}",
-                        LogFormatter.PrintDate(start),
-                        LogFormatter.PrintDate(stop),
-                        stop - start,
-                        count);
-                });
+            return ResolveAsync(resolver.Task);
+            async Task ResolveAsync(Task task)
+            {
+                await task;
+                DateTime stop = DateTime.UtcNow;
+                calls.Add(new Tuple<DateTime, DateTime>(start, stop));
+                logger.LogInformation("{DurationMilliseconds}", (stop - start).TotalMilliseconds);
+                logger.LogInformation(
+                    "Start {StartDate}, stop {StopDate}, duration {Duration}. #act {Count}",
+                    LogFormatter.PrintDate(start),
+                    LogFormatter.PrintDate(stop),
+                    stop - start,
+                    count);
+            }
         }
 
         private static Task TimerCallback(object state)
@@ -68,7 +69,6 @@ namespace UnitTests.Grains
             ((TaskCompletionSource<bool>)state).SetResult(true);
             return Task.CompletedTask;
         }
-
 
         public Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>> GetCallStats()
         {
