@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -84,20 +84,14 @@ namespace Orleans.Runtime
         /// </summary>
         public static bool TryParse(string value, out GrainId grainId)
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                grainId = default;
-                return false;
-            }
-
-            var i = value.IndexOf('/');
+            var i = value?.IndexOf('/') ?? -1;
             if (i < 0)
             {
                 grainId = default;
                 return false;
             }
 
-            grainId = Create(value.Substring(0, i), value.Substring(i + 1));
+            grainId = new(new GrainType(Encoding.UTF8.GetBytes(value, 0, i)), new IdSpan(Encoding.UTF8.GetBytes(value, i + 1, value.Length - i - 1)));
             return true;
         }
 
@@ -170,37 +164,28 @@ namespace Orleans.Runtime
         {
             return $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
         }
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainId"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
-        {
-            /// <summary>
-            /// A singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(GrainId x, GrainId y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(GrainId x, GrainId y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(GrainId obj) => obj.GetHashCode();
-        }
     }
 
     /// <summary>
     /// Functionality for converting a <see cref="GrainId"/> to and from a JSON string.
     /// </summary>
-    public class GrainIdJsonConverter : JsonConverter<GrainId>
+    public sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
         /// <inheritdoc />
         public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString());
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
+        public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)
+        {
+            var type = value.Type.AsSpan();
+            var key = value.Key.AsSpan();
+            Span<byte> buf = stackalloc byte[type.Length + key.Length + 1];
+
+            type.CopyTo(buf);
+            buf[type.Length] = (byte)'/';
+            key.CopyTo(buf[(type.Length + 1)..]);
+
+            writer.WriteStringValue(buf);
+        }
     }
 }

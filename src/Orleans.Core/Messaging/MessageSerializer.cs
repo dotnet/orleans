@@ -516,12 +516,12 @@ namespace Orleans.Runtime.Messaging
         {
             if (reader.ReadByte() == 0)
             {
-                return ActivationId.Zero;
+                return default;
             }
 
             if (reader.TryReadBytes(16, out var readOnly))
             {
-                return ActivationId.GetActivationId(new Guid(readOnly));
+                return new(new Guid(readOnly));
             }
 
             Span<byte> bytes = stackalloc byte[16];
@@ -530,7 +530,7 @@ namespace Orleans.Runtime.Messaging
                 bytes[i] = reader.ReadByte();
             }
 
-            return ActivationId.GetActivationId(new Guid(bytes));
+            return new(new Guid(bytes));
         }
 
         private static void WriteActivationId<TBufferWriter>(ref Writer<TBufferWriter> writer, ActivationId value) where TBufferWriter : IBufferWriter<byte>
