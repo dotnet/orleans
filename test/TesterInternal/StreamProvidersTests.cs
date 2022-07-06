@@ -115,42 +115,4 @@ namespace UnitTests.Streaming
             }
         }
     }
-
-    public class StreamProvidersTests_ProviderConfigLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigLoaded.Fixture>
-    {
-        public class Fixture : BaseTestClusterFixture
-        {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.Options.InitialSilosCount = 4;
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-
-            public class SiloConfigurator : ISiloConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
-                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
-                        .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
-                }
-            }
-        }
-
-        private readonly IGrainFactory grainFactory;
-        public StreamProvidersTests_ProviderConfigLoaded(Fixture fixture)
-        {
-            this.grainFactory = fixture.GrainFactory;
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
-        public async Task ProvidersTests_ProviderWrongName()
-        {
-            Guid streamId = Guid.NewGuid();
-            var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
-            // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = this.grainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, "WrongProviderName", null));
-        }
-    }
 }

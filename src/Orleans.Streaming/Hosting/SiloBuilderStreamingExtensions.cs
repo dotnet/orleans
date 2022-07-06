@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
@@ -43,55 +42,6 @@ namespace Orleans.Hosting
             var streamConfigurator = new SiloPersistentStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), adapterFactory);
             configureStream?.Invoke(streamConfigurator);
             return builder;
-        }
-
-        /// <summary>
-        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureStream">The stream provider configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddSimpleMessageStreamProvider(
-            this ISiloBuilder builder,
-            string name,
-            Action<ISimpleMessageStreamConfigurator> configureStream)
-        {
-            //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), builder);
-            configureStream?.Invoke(streamConfigurator);
-            return builder;
-        }
-
-        /// <summary>
-        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureOptions">The delegate used to configure the stream provider options.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddSimpleMessageStreamProvider(
-            this ISiloBuilder builder,
-            string name,
-            Action<SimpleMessageStreamProviderOptions> configureOptions)
-        {
-            return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
-        }
-
-        /// <summary>
-        /// Adds a new <see cref="SimpleMessageStreamProvider"/> stream provider.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureOptions">The delegate used to configure the stream provider options.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddSimpleMessageStreamProvider(
-            this ISiloBuilder builder,
-            string name,
-            Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
-        {
-            return AddSimpleMessageStreamProvider(builder, name, b => b.Configure(configureOptions));
         }
 
         /// <summary>

@@ -13,6 +13,8 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.Providers;
+using System.Threading;
 
 namespace UnitTests.General
 {
@@ -67,7 +69,7 @@ namespace UnitTests.General
 
                             await ctx.Invoke();
                         })
-                        .AddSimpleMessageStreamProvider("SMSProvider")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }
@@ -97,7 +99,7 @@ namespace UnitTests.General
                                 result["result"] = "intercepted!";
                             }
                         })
-                        .AddSimpleMessageStreamProvider("SMSProvider");
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider");
 
                     static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {
@@ -208,7 +210,13 @@ namespace UnitTests.General
             // The intercepted grain should double the value passed to the stream.
             const int testValue = 43;
             await stream.OnNextAsync(testValue);
-            var actual = await grain.GetLastStreamValue();
+            var cts = new CancellationTokenSource(1000);
+            int actual = 0;
+            while (!cts.IsCancellationRequested)
+            {
+                actual = await grain.GetLastStreamValue();
+                if (actual != 0) break;
+            }
             Assert.Equal(testValue * 2, actual);
         }
 

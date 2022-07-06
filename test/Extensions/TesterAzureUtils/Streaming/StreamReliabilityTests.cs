@@ -26,6 +26,7 @@ using Xunit.Abstractions;
 using Tester.AzureUtils;
 using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -73,7 +74,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConfigureTestDefaults();
                         options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                     }))
-                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
                 .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
             }
         }
@@ -92,7 +93,7 @@ namespace UnitTests.Streaming.Reliability
                         options.DeleteStateOnClear = true;
                     }))
                 .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
-                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.DeleteStateOnClear = true;
@@ -278,13 +279,6 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task SMS_StreamRel_SiloJoins()
-        {
-            const string testName = "SMS_StreamRel_SiloJoins";
-
-            await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
-        }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
