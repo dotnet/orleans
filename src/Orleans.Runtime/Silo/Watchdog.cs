@@ -104,7 +104,7 @@ namespace Orleans.Runtime
                         (int)ErrorCode.Watchdog_ParticipantThrownException,
                         exc,
                         "Health check participant {Participant} has thrown an exception from its CheckHealth method.",
-                        participant?.GetType());
+                        participant.GetType());
                 }
             }
             if (numFailedChecks > 0)

@@ -1,6 +1,7 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
-using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -14,31 +15,35 @@ namespace Orleans.Streams
     internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
         [Id(1)]
-        private readonly InternalStreamId                       streamId;
+        private readonly InternalStreamId                        streamId;
+
         [Id(2)]
-        private readonly bool                                   isRewindable;
-        [NonSerialized]
-        private IInternalStreamProvider                         provider;
-        [NonSerialized]
-        private volatile IInternalAsyncBatchObserver<T>         producerInterface;
-        [NonSerialized]
-        private IInternalAsyncObservable<T>                     consumerInterface;
-        [NonSerialized]
-        private readonly object                                 initLock; // need the lock since the same code runs in the provider on the client and in the silo.
+        private readonly bool                                    isRewindable;
 
         [NonSerialized]
-        private IRuntimeClient                                  runtimeClient;
-        
-        internal InternalStreamId InternalStreamId              { get { return streamId; } }
+        private IInternalStreamProvider?                         provider;
+
+        [NonSerialized]
+        private volatile IInternalAsyncBatchObserver<T>?         producerInterface;
+
+        [NonSerialized]
+        private volatile IInternalAsyncObservable<T>?            consumerInterface;
+
+        [NonSerialized]
+        private readonly object initLock = new object();
+
+        [NonSerialized]
+        private IRuntimeClient?                                  runtimeClient;
+
+        internal InternalStreamId InternalStreamId { get { return streamId; } }
         public StreamId StreamId => streamId;
 
-        public bool IsRewindable                                { get { return isRewindable; } }
-        public string ProviderName                              { get { return streamId.ProviderName; } }
+        public bool IsRewindable => isRewindable;
+        public string ProviderName => streamId.ProviderName;
 
         // IMPORTANT: This constructor needs to be public for Json deserialization to work.
         public StreamImpl()
         {
-            initLock = new object();
         }
 
         internal StreamImpl(InternalStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
@@ -57,7 +62,7 @@ namespace Orleans.Streams
             return GetConsumerInterface().SubscribeAsync(observer, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token, string filterData = null)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token, string? filterData = null)
         {
             return GetConsumerInterface().SubscribeAsync(observer, token, filterData);
         }
@@ -67,7 +72,7 @@ namespace Orleans.Streams
             return GetConsumerInterface().SubscribeAsync(batchObserver);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token)
         {
             return GetConsumerInterface().SubscribeAsync(batchObserver, token);
         }
@@ -89,7 +94,7 @@ namespace Orleans.Streams
             }
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token = null)
+        public Task OnNextAsync(T item, StreamSequenceToken? token = null)
         {
             return GetProducerInterface().OnNextAsync(item, token);
         }
@@ -149,7 +154,7 @@ namespace Orleans.Streams
                 if (provider == null)
                     provider = GetStreamProvider();
                 
-                producerInterface = provider.GetProducerInterface(this);
+                producerInterface = provider!.GetProducerInterface(this);
             }
             return producerInterface;
         }
@@ -165,31 +170,31 @@ namespace Orleans.Streams
                         if (provider == null)
                             provider = GetStreamProvider();
                         
-                        consumerInterface = provider.GetConsumerInterface(this);
+                        consumerInterface = provider!.GetConsumerInterface(this);
                     }
                 }
             }
             return consumerInterface;
         }
 
-        private IInternalStreamProvider GetStreamProvider()
+        private IInternalStreamProvider? GetStreamProvider()
         {
-            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
+            return this.runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
         }
 
-        public int CompareTo(IAsyncStream<T> other)
+        public int CompareTo(IAsyncStream<T>? other)
         {
             var o = other as StreamImpl<T>;
             return o == null ? 1 : streamId.CompareTo(o.streamId);
         }
 
-        public bool Equals(IAsyncStream<T> other)
+        public bool Equals(IAsyncStream<T>? other)
         {
             var o = other as StreamImpl<T>;
             return o != null && streamId.Equals(o.streamId);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             var o = obj as StreamImpl<T>;
             return o != null && streamId.Equals(o.streamId);

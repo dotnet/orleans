@@ -47,12 +47,13 @@ namespace Orleans
             }
 
             // register all named lifecycle participants
-            IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>> namedLifecycleParticipantCollections = ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
-            foreach (var participant in namedLifecycleParticipantCollections
-                ?.GetServices(ServiceProvider)
-                ?.Select(s => s?.GetService(ServiceProvider)))
+            var namedLifecycleParticipantCollection = ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
+            if (namedLifecycleParticipantCollection?.GetServices(ServiceProvider)?.Select(s => s.GetService(ServiceProvider)) is { } namedParticipants)
             {
-                participant?.Participate(_clusterClientLifecycle);
+                foreach (var participant in namedParticipants)
+                {
+                    participant.Participate(_clusterClientLifecycle);
+                }
             }
 
             static void ValidateSystemConfiguration(IServiceProvider serviceProvider)

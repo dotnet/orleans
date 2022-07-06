@@ -24,9 +24,8 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="KeyedService{TKey, TService}"/> class.
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <param name="services">The services.</param>
         /// <param name="factory">The factory.</param>
-        public KeyedService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
+        public KeyedService(TKey key, Func<IServiceProvider, TKey, TService> factory)
         {
             this.Key = key;
             this.factory = factory;
@@ -53,8 +52,8 @@ namespace Orleans.Runtime
         where TInstance : TService
         where TService : class
     {
-        public KeyedService(TKey key, IServiceProvider services)
-            : base(key, services, (sp, k) => sp.GetService<TInstance>())
+        public KeyedService(TKey key)
+            : base(key, (sp, k) => sp.GetService<TInstance>())
         {
         }
     }
@@ -144,7 +143,7 @@ namespace Orleans.Runtime
         public static IServiceCollection AddTransientKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
              where TService : class
         {
-            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService>(key, sp, factory));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService>(key, factory));
         }
 
         /// <summary>
@@ -155,7 +154,7 @@ namespace Orleans.Runtime
             where TService : class
         {
             collection.TryAddTransient<TInstance>();
-            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key,sp));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(_ => new KeyedService<TKey, TService, TInstance>(key));
         }
 
         /// <summary>

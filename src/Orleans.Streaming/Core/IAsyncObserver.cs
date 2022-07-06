@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Threading.Tasks;
 
@@ -35,7 +37,7 @@ namespace Orleans.Streams
         /// <param name="item">The item to be passed.</param>
         /// <param name="token">The stream sequence token of this item.</param>
         /// <returns>A Task that is completed when the item has been accepted.</returns>
-        Task OnNextAsync(T item, StreamSequenceToken token = null);
+        Task OnNextAsync(T item, StreamSequenceToken? token = null);
 
         /// <summary>
         /// Notifies the consumer that the stream was completed.

@@ -99,7 +99,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
     {
         if (await _acceptQueue.Reader.WaitToReadAsync(cancellationToken))
         {
-            while (_acceptQueue.Reader.TryRead(out var item))
+            if (_acceptQueue.Reader.TryRead(out var item))
             {
                 var remoteConnectionContext = item.Connection;
                 var localConnectionContext = InMemoryTransportConnection.Create(

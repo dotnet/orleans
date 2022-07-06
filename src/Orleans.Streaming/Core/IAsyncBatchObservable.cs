@@ -1,4 +1,4 @@
-
+#nullable enable
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -32,6 +32,6 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
-        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token);
+        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken? token);
     }
 }

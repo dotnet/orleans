@@ -299,17 +299,18 @@ namespace Orleans.Runtime.ReminderService
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug(
-                        "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {rangeSerialNumberCopy}.",
+                        "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {RangeSerialNumberCopy}.",
                         RangeSerialNumber,
                         rangeSerialNumberCopy);
                     }
 
                     return;
                 }
+
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
-                // if null is a valid value, it means that there's nothing to do.
-                if (null == table && reminderTable is MockReminderTable) return;
+                // If null is a valid value, it means that there's nothing to do.
+                if (table is null || reminderTable is MockReminderTable) return;
 
                 var remindersNotInTable = localReminders.Where(r => range.InRange(r.Key.GrainRef)).ToDictionary(r => r.Key, r => r.Value); // shallow copy
                 if (logger.IsEnabled(LogLevel.Debug))

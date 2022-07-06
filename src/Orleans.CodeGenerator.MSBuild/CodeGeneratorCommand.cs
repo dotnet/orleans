@@ -114,7 +114,7 @@ namespace Orleans.CodeGenerator.MSBuild
                 );
                 Log.LogDebug("Project: {ProjectInfo}", projectInfo);
 
-                var workspace = new AdhocWorkspace();
+                using var workspace = new AdhocWorkspace();
                 _ = workspace.AddProject(projectInfo);
 
                 var project = workspace.CurrentSolution.Projects.Single();

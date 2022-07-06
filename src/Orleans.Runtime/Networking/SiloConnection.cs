@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -174,7 +176,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnSendMessageFailure(Message message, string error)
         {
-            if (message != null && message.IsPing())
+            if (message.IsPing())
             {
                 this.Log.LogWarning("Failed to send ping message {Message}", message);
             }
@@ -184,7 +186,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            Exception error = default;
+            Exception? error = default;
             try
             {
                 await Task.WhenAll(ReadPreamble(), WritePreamble());
@@ -274,7 +276,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            if (msg != null && msg.IsPing())
+            if (msg.IsPing())
             {
                 this.Log.LogWarning("Failed ping message {Message}", msg);
             }
@@ -293,11 +295,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex = null)
         {
-            if (msg == null) return;
-
-            if (msg != null && msg.IsPing())
+            if (msg.IsPing())
             {
                 this.Log.LogWarning("Retrying ping message {Message}", msg);
             }

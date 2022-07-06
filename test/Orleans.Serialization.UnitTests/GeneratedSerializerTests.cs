@@ -59,6 +59,30 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void RecursiveTypeSerializersRoundTripThroughSerializer()
+        {
+            var original = new RecursiveClass { IntProperty = 30 };
+            original.RecursiveProperty = original;
+            var result = (RecursiveClass)RoundTripThroughUntypedSerializer(original, out _);
+
+            Assert.NotNull(result.RecursiveProperty);
+            Assert.Same(result, result.RecursiveProperty);
+            Assert.Equal(original.IntProperty, result.IntProperty);
+        }
+
+        [Fact]
+        public void RecursiveTypeSerializersRoundTripThroughCodec()
+        {
+            var original = new RecursiveClass { IntProperty = 30 };
+            original.RecursiveProperty = original;
+            var result = RoundTripThroughCodec(original);
+
+            Assert.NotNull(result.RecursiveProperty);
+            Assert.Same(result, result.RecursiveProperty);
+            Assert.Equal(original.IntProperty, result.IntProperty);
+        }
+
+        [Fact]
         public void GeneratedSerializersRoundTripThroughSerializer()
         {
             var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30 };

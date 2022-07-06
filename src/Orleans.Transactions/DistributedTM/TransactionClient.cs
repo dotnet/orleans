@@ -94,7 +94,7 @@ internal class TransactionClient : ITransactionClient
         }
 
         // Run delegate
-        ambientTransactionInfo.TryToCommit = await transactionDelegate();
+        _ = await transactionDelegate();
     }
 
     private static async Task RunDelegateWithSupportedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)

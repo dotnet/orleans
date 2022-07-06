@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.Pipelines;
@@ -14,6 +13,7 @@ using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -305,6 +305,7 @@ namespace Orleans.Runtime.Messaging
                                 (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
                                 if (requiredBytes == 0)
                                 {
+                                    Debug.Assert(message is not null);
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);

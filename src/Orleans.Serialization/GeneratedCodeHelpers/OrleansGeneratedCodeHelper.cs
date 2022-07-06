@@ -94,11 +94,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <returns>The unwrapped service.</returns>
         public static TService UnwrapService<TService>(object caller, TService service)
         {
-            while (service is IServiceHolder<TService> && caller is TService callerService)
-            {
-                return callerService;
-            }
-
             var state = ResolutionState.Value;
 
             try
@@ -107,7 +102,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s && !(c is IServiceHolder<TService>))
+                    if (c is TService s and not IServiceHolder<TService>)
                     {
                         return s;
                     }
@@ -262,12 +257,19 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     continue;
                 }
 
+                var isMatch = true;
                 for (int i = 0; i < parameters.Length; i++)
                 {
-                    if (!parameters[0].ParameterType.Equals(parameterTypes[i]))
+                    if (!parameters[i].ParameterType.Equals(parameterTypes[i]))
                     {
-                        continue;
+                        isMatch = false;
+                        break;
                     }
+                }
+
+                if (!isMatch)
+                {
+                    continue;
                 }
 
                 return method;
