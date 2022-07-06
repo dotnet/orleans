@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -399,6 +400,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Represents the result of probing a silo.
         /// </summary>
+        [StructLayout(LayoutKind.Auto)]
         public readonly struct ProbeResult
         {
             private ProbeResult(int failedProbeCount, ProbeResultStatus status, bool isDirectProbe, int intermediaryHealthDegradationScore)
@@ -424,7 +426,7 @@ namespace Orleans.Runtime.MembershipService
             public int IntermediaryHealthDegradationScore { get; }
         }
 
-        public enum ProbeResultStatus
+        public enum ProbeResultStatus : byte
         {
             Unknown,
             Failed,

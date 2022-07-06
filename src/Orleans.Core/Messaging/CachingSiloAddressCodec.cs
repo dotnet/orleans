@@ -3,9 +3,9 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
-using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
         // Scan for entries which are expired every minute
         private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
 
-        private readonly Dictionary<int, CacheEntry> _cache = new();
+        private readonly Dictionary<int, (byte[] Encoded, SiloAddress Value, long LastSeen)> _cache = new();
         private long _lastGarbageCollectionTimestamp;
 
         public CachingSiloAddressCodec()
@@ -72,7 +72,9 @@ namespace Orleans.Runtime.Messaging
                 (result, _) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
 
                 // If there is a hash collision, then the last seen entry will always win.
-                cacheEntry = new CacheEntry { Encoded = payloadArray, Value = result, LastSeen = currentTimestamp };
+                cacheEntry.Encoded = payloadArray;
+                cacheEntry.Value = result;
+                cacheEntry.LastSeen = currentTimestamp;
             }
 
             // Perform periodic maintenance to prevent unbounded memory leaks.
@@ -89,21 +91,11 @@ namespace Orleans.Runtime.Messaging
         private void PurgeStaleEntries()
         {
             var currentTimestamp = Environment.TickCount64;
-            List<int> purgeKeys = default;
             foreach (var entry in _cache)
             {
                 if (currentTimestamp - entry.Value.LastSeen > PurgeAfterMilliseconds)
                 {
-                    purgeKeys ??= new();
-                    purgeKeys.Add(entry.Key);
-                }
-            }
-
-            if (purgeKeys is not null)
-            {
-                foreach (var key in purgeKeys)
-                {
-                    _cache.Remove(key);
+                    _cache.Remove(entry.Key);
                 }
             }
         }
@@ -112,19 +104,15 @@ namespace Orleans.Runtime.Messaging
         {
             IPAddress ip;
             var length = reader.ReadVarInt32();
-#if NET5_0_OR_GREATER
             if (reader.TryReadBytes(length, out var bytes))
             {
                 ip = new IPAddress(bytes);
             }
             else
             {
-#endif
                 var addressBytes = reader.ReadBytes((uint)length);
                 ip = new IPAddress(addressBytes);
-#if NET5_0_OR_GREATER
             }
-#endif
             var port = (int)reader.ReadVarUInt32();
             var generation = reader.ReadInt32();
 
@@ -173,12 +161,13 @@ namespace Orleans.Runtime.Messaging
             (_, payloadArray) = SharedCache.GetOrAdd(value, static (encoded, key) => (key, encoded), payloadArray);
 
             // If there is a hash collision, then the last seen entry will always win.
-            cacheEntry = new CacheEntry { Encoded = payloadArray, Value = value, LastSeen = currentTimestamp };
+            cacheEntry.Encoded = payloadArray;
+            cacheEntry.Value = value;
+            cacheEntry.LastSeen = currentTimestamp;
         }
 
         private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
         {
-#if NET5_0_OR_GREATER
             var ep = value.Endpoint;
             Span<byte> buffer = stackalloc byte[64];
             if (ep.Address.TryWriteBytes(buffer, out var length))
@@ -200,7 +189,6 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
             }
-#endif
 
             // IP
             var bytes = ep.Address.GetAddressBytes();
@@ -212,13 +200,6 @@ namespace Orleans.Runtime.Messaging
 
             // Generation
             writer.WriteInt32(value.Generation);
-        }
-
-        private struct CacheEntry
-        {
-            public byte[] Encoded { get; set; }
-            public SiloAddress Value { get; set; }
-            public long LastSeen { get; set; }
         }
     }
 }

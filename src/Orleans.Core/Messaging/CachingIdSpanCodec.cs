@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         // Scan for entries which are expired every minute
         private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
 
-        private readonly Dictionary<int, CacheEntry> _cache = new();
+        private readonly Dictionary<int, (byte[] Encoded, IdSpan Value, long LastSeen)> _cache = new();
         private long _lastGarbageCollectionTimestamp;
 
         public CachingIdSpanCodec()
@@ -70,7 +70,9 @@ namespace Orleans.Runtime.Messaging
                 (result, _) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
 
                 // Update the cache. If there is a hash collision, the last entry wins.
-                cacheEntry = new CacheEntry { Encoded = payloadArray, Value = result, LastSeen = currentTimestamp };
+                cacheEntry.Encoded = payloadArray;
+                cacheEntry.Value = result;
+                cacheEntry.LastSeen = currentTimestamp;
             }
 
             // Perform periodic maintenance to prevent unbounded memory leaks.
@@ -87,21 +89,11 @@ namespace Orleans.Runtime.Messaging
         private void PurgeStaleEntries()
         {
             var currentTimestamp = Environment.TickCount64;
-            List<int> purgeKeys = default;
             foreach (var entry in _cache)
             {
                 if (currentTimestamp - entry.Value.LastSeen > PurgeAfterMilliseconds)
                 {
-                    purgeKeys ??= new();
-                    purgeKeys.Add(entry.Key);
-                }
-            }
-
-            if (purgeKeys is not null)
-            {
-                foreach (var key in purgeKeys)
-                {
-                    _cache.Remove(key);
+                    _cache.Remove(entry.Key);
                 }
             }
         }
@@ -148,7 +140,9 @@ namespace Orleans.Runtime.Messaging
             (_, payloadArray) = SharedCache.GetOrAdd(value, static (encoded, key) => (key, encoded), payloadArray);
 
             // If there is a hash collision, then the last seen entry will always win.
-            cacheEntry = new CacheEntry { Encoded = payloadArray, Value = value, LastSeen = currentTimestamp };
+            cacheEntry.Encoded = payloadArray;
+            cacheEntry.Value = value;
+            cacheEntry.LastSeen = currentTimestamp;
         }
 
         /// <summary>
@@ -181,13 +175,6 @@ namespace Orleans.Runtime.Messaging
             var payloadArray = reader.ReadBytes(length);
             var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
             return value;
-        }
-
-        private struct CacheEntry
-        {
-            public byte[] Encoded { get; set; }
-            public IdSpan Value { get; set; }
-            public long LastSeen { get; set; }
         }
     }
 }
