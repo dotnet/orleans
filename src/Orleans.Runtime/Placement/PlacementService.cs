@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Versions;
 
@@ -197,7 +196,6 @@ namespace Orleans.Runtime.Placement
 
             private async Task ProcessLoop()
             {
-                var toRemove = new List<GrainId>();
                 while (true)
                 {
                     try
@@ -236,19 +234,8 @@ namespace Orleans.Runtime.Placement
                             if (workItem.Result.IsCompleted)
                             {
                                 AddressWaitingMessages(workItem);
-                                toRemove.Add(pair.Key);
+                                _inProgress.Remove(pair.Key);
                             }
-                        }
-
-                        // Clean up after completed requests
-                        if (toRemove.Count > 0)
-                        {
-                            foreach (var grainId in toRemove)
-                            {
-                                _inProgress.Remove(grainId);
-                            }
-
-                            toRemove.Clear();
                         }
                     }
                     catch (Exception exception)

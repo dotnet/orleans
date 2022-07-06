@@ -246,10 +246,9 @@ namespace Orleans.Streams
                 {
                     continue;
                 }
-                else if (deactivatedAgents.TryGetValue(queueId, out var agent))
+                else if (deactivatedAgents.Remove(queueId, out var agent))
                 {
                     queuesToAgentsMap[queueId] = agent;
-                    deactivatedAgents.Remove(queueId);
                     agents.Add(agent);
                 }
                 else
@@ -333,14 +332,12 @@ namespace Orleans.Streams
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
             {
-                PersistentStreamPullingAgent agent;
-                if (!queuesToAgentsMap.TryGetValue(queueId, out agent))
+                if (!queuesToAgentsMap.Remove(queueId, out var agent))
                 {
                     continue;
                 }
 
                 agents.Add(agent);
-                queuesToAgentsMap.Remove(queueId);
                 deactivatedAgents[queueId] = agent;
                 var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
                 var task = OrleansTaskExtentions.SafeExecute(agentGrainRef.Shutdown);

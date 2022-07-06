@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -268,9 +267,11 @@ namespace Orleans.Runtime
             return GetDisplayString();
         }
 
-        public static void AddCounters(List<ICounter> list, Func<CounterStatistic, bool> predicate)
+        public static void AddCounters(List<ICounter> list)
         {
-            list.AddRange(registeredStatistics.Select(c => c.Value).Where(c => !c.isHidden && predicate(c)));
+            foreach (var kv in registeredStatistics)
+                if (!kv.Value.isHidden && kv.Value.Storage != CounterStorage.DontStore)
+                    list.Add(kv.Value);
         }
 
         public void TrackMetric(ITelemetryProducer telemetryProducer)

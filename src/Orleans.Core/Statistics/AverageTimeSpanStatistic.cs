@@ -1,8 +1,6 @@
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 
 namespace Orleans.Runtime
 {
@@ -87,18 +85,17 @@ namespace Orleans.Runtime
         {
             lock (classLock)
             {
-                if (registeredStatistics.TryGetValue(name.Name, out _))
-                {
-                    registeredStatistics.Remove(name.Name);
-                }
+                registeredStatistics.Remove(name.Name);
             }
         }
 
-        public static void AddCounters(List<ICounter> list, Func<ICounter, bool> predicate)
+        public static void AddCounters(List<ICounter> list)
         {
             lock (classLock)
             {
-                list.AddRange(registeredStatistics.Values.Where(predicate));
+                foreach (var kv in registeredStatistics)
+                    if (kv.Value.Storage != CounterStorage.DontStore)
+                        list.Add(kv.Value);
             }
         }
 

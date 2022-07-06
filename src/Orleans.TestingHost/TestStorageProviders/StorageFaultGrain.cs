@@ -57,10 +57,8 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public Task OnRead(GrainReference grainReference)
         {
-            Exception exception;
-            if (readFaults.TryGetValue(grainReference, out exception))
+            if (readFaults.Remove(grainReference, out var exception))
             {
-                readFaults.Remove(grainReference);
                 throw exception;
             }
             return Task.CompletedTask;
@@ -69,10 +67,8 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public Task OnWrite(GrainReference grainReference)
         {
-            Exception exception;
-            if (writeFaults.TryGetValue(grainReference, out exception))
+            if (writeFaults.Remove(grainReference, out var exception))
             {
-                writeFaults.Remove(grainReference);
                 throw exception;
             }
             return Task.CompletedTask;
@@ -81,10 +77,8 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public Task OnClear(GrainReference grainReference)
         {
-            Exception exception;
-            if (clearfaults.TryGetValue(grainReference, out exception))
+            if (clearfaults.Remove(grainReference, out var exception))
             {
-                clearfaults.Remove(grainReference);
                 throw exception;
             }
             return Task.CompletedTask;
