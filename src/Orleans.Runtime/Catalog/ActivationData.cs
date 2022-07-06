@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
@@ -272,7 +271,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Check whether this activation is overloaded. 
+        /// Check whether this activation is overloaded.
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
@@ -386,7 +385,7 @@ namespace Orleans.Runtime
             {
                 token = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
             }
-            
+
             StartDeactivating(reason);
             ScheduleOperation(new Command.Deactivate(token.Value));
         }
@@ -493,7 +492,7 @@ namespace Orleans.Runtime
                     {
                         timeSinceQueued = waitTime.Elapsed;
                     }
-                    
+
                     var executionTime = _busyDuration.Elapsed;
                     if (executionTime >= slowRunningRequestDuration)
                     {
@@ -943,7 +942,7 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         private void InvokeIncomingRequest(Message message)
         {
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
             _shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
 
             try
@@ -984,7 +983,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Invoked when an activation has finished a transaction and may be ready for additional transactions
         /// </summary>
-        /// <param name="message">The message that has just completed processing. 
+        /// <param name="message">The message that has just completed processing.
         /// This will be <c>null</c> for the case of completion of Activate/Deactivate calls.</param>
         private void OnCompletedRequest(Message message)
         {
@@ -1023,8 +1022,8 @@ namespace Orleans.Runtime
             // Don't process messages that have already timed out
             if (message.IsExpired)
             {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
-                _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Dispatch);
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+                _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
                 return;
             }
 
@@ -1051,7 +1050,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
                 _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
             }
         }
@@ -1061,7 +1060,7 @@ namespace Orleans.Runtime
             var overloadException = CheckOverloaded();
             if (overloadException != null)
             {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
                 _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
                 return;
             }
@@ -1203,7 +1202,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE).Increment();
+                    CatalogInstruments.ActivationFailedToActivate.Add(1);
 
                     // Capture the exeption so that it can be propagated to rejection messages
                     var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
@@ -1264,7 +1263,7 @@ namespace Orleans.Runtime
         {
             bool success;
 
-            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
+            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (!IsUsingGrainDirectory)
             {
@@ -1288,9 +1287,7 @@ namespace Orleans.Runtime
                         ForwardingAddress = result;
                         DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
                         success = false;
-                        CounterStatistic
-                            .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
-                            .Increment();
+                        CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
                         {
                             // If this was a duplicate, it's not an error, just a race.
@@ -1408,15 +1405,15 @@ namespace Orleans.Runtime
 
             if (IsStuckDeactivating)
             {
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION).Increment();
+                CatalogInstruments.ActiviationShutdownViaDeactivateStuckActivation();
             }
             else if (isInWorkingSet)
             {
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
+                CatalogInstruments.ActiviationShutdownViaDeactivateOnIdle();
             }
             else
             {
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).Increment();
+                CatalogInstruments.ActiviationShutdownViaCollection();
             }
 
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
@@ -1458,7 +1455,7 @@ namespace Orleans.Runtime
                         // just check in case this activation data is already Invalid or not here at all.
                         if (State == ActivationState.Deactivating)
                         {
-                            RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
+                            RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
                             if (GrainInstance is IGrainBase grainBase)
                             {
                                 await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation(ct, $"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete");

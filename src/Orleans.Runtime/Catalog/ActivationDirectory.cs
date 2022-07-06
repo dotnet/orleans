@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -28,14 +29,6 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private CounterStatistic FindSystemTargetCounter(string systemTargetTypeName)
-        {
-            if (systemTargetCounts.TryGetValue(systemTargetTypeName, out var ctr)) return ctr;
-
-            var counterName = new StatisticName(StatisticNames.SYSTEM_TARGET_COUNTS, systemTargetTypeName);
-            return systemTargetCounts.GetOrAdd(systemTargetTypeName, CounterStatistic.FindOrCreate(counterName, false));
-        }
-
         public void RecordNewTarget(IGrainContext target)
         {
             activations.TryAdd(target.GrainId, target);
@@ -47,7 +40,7 @@ namespace Orleans.Runtime
             systemTargets.TryAdd(target.ActivationId, target);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).Increment();
+                MiscInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 
@@ -57,7 +50,7 @@ namespace Orleans.Runtime
             systemTargets.TryRemove(target.ActivationId, out _);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).DecrementBy(1);
+                MiscInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 

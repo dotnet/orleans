@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.ConsistentRing
 {
@@ -40,13 +41,13 @@ namespace Orleans.Runtime.ConsistentRing
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug("Starting {Name} on silo {SiloAddress}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
-            }            
+            }
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
-            IntValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RINGSIZE, () => GetRingSize());
-            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => $"x{((IRingRangeInternal)myRange).RangeSize(),8:X8}");
-            FloatValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGPERCENTAGE, () => (float)((IRingRangeInternal)myRange).RangePercentage());
-            FloatValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_AVERAGERINGPERCENTAGE, () =>
+            ConsistentRingInstruments.RegisterRingSizeObserve(() => GetRingSize());
+            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => String.Format("x{0,8:X8}", ((IRingRangeInternal)myRange).RangeSize()));
+            ConsistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
+            ConsistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
             {
                 int size = GetRingSize();
                 return size == 0 ? 0 : ((float)100.0 / (float)size);
@@ -99,7 +100,7 @@ namespace Orleans.Runtime.ConsistentRing
             {
                 logger.LogTrace((int)ErrorCode.CRP_Notify, "NotifyLocalRangeSubscribers about old {Old} new {New} increased? {IsIncrease}", old.ToString(), now.ToString(), increased);
             }
-            
+
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
@@ -145,7 +146,7 @@ namespace Orleans.Runtime.ConsistentRing
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
                     logger.LogTrace((int)ErrorCode.CRP_Added_Silo, "Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
-                }                
+                }
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
             }

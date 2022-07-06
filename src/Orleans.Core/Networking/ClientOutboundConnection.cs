@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
@@ -35,8 +36,6 @@ namespace Orleans.Runtime.Messaging
             this.connectionPreambleHelper = connectionPreambleHelper;
             this.clusterOptions = clusterOptions;
             this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
-            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
-            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
         }
 
         public SiloAddress RemoteSiloAddress { get; }
@@ -44,6 +43,16 @@ namespace Orleans.Runtime.Messaging
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
+
+        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+        }
+
+        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+        }
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -136,7 +145,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
+            MessagingInstruments.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
@@ -146,7 +155,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+            MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
@@ -156,7 +165,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
 

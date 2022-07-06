@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -19,8 +20,6 @@ namespace Orleans.Runtime.ReminderService
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
-        private readonly AverageTimeSpanStatistic tardinessStat;
-        private readonly CounterStatistic ticksDeliveredStat;
         private readonly TimeSpan initTimeout;
         private readonly IAsyncTimerFactory asyncTimerFactory;
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
@@ -39,9 +38,7 @@ namespace Orleans.Runtime.ReminderService
             this.reminderTable = reminderTable;
             this.initTimeout = initTimeout;
             this.asyncTimerFactory = asyncTimerFactory;
-            tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
-            IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
-            ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
+            ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = loggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(Constants.RefreshReminderList, "ReminderService.ReminderListRefresher");
@@ -189,7 +186,7 @@ namespace Orleans.Runtime.ReminderService
         private void RemoveOutOfRangeReminders()
         {
             var remindersOutOfRange = localReminders.Where(r => !RingRange.InRange(r.Key.GrainRef)).Select(r => r.Value).ToArray();
-            
+
             foreach (var reminder in remindersOutOfRange)
             {
                 if (logger.IsEnabled(LogLevel.Trace))
@@ -378,7 +375,7 @@ namespace Orleans.Runtime.ReminderService
                 } // foreach reminder read from table
 
                 int remindersCountBeforeRemove = localReminders.Count;
-                
+
                 // foreach reminder that is not in global table, but exists locally
                 foreach (var reminder in remindersNotInTable.Values)
                 {
@@ -454,7 +451,7 @@ namespace Orleans.Runtime.ReminderService
             switch (Status)
             {
                 case GrainServiceStatus.Booting:
-                    // if service didn't finish the initial load, it could still be loading normally or it might have already 
+                    // if service didn't finish the initial load, it could still be loading normally or it might have already
                     // failed a few attempts and callers should not be hold waiting for it to complete
                     var task = this.startedTask.Task;
                     if (task.IsCompleted)
@@ -574,7 +571,7 @@ namespace Orleans.Runtime.ReminderService
                     try
                     {
                         await OnTimerTick();
-                        this.reminderService.ticksDeliveredStat.Increment();
+                        ReminderInstruments.TicksDelivered.Add(1);
                     }
                     catch (Exception exception)
                     {
@@ -632,7 +629,7 @@ namespace Orleans.Runtime.ReminderService
                     {
                         stopwatch.Stop();
                         var tardiness = stopwatch.Elapsed - period;
-                        this.reminderService.tardinessStat.AddSample(Math.Max(0, tardiness.Ticks));
+                        ReminderInstruments.TardinessSeconds.Record(Math.Max(0, tardiness.TotalSeconds));
                     }
 
                     await remindable.ReceiveReminder(Identity.ReminderName, status);

@@ -69,11 +69,11 @@ namespace Orleans.Core
 
                 await store.ReadStateAsync(name, grainRef, grainState);
 
-                StorageStatisticsGroup.OnStorageRead(name, grainRef, sw.Elapsed);
+                StorageInstruments.OnStorageRead(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageReadError(name, grainRef);
+                StorageInstruments.OnStorageReadError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
                 this.logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, "{Message}", errMsg);
@@ -100,11 +100,11 @@ namespace Orleans.Core
                 Stopwatch sw = Stopwatch.StartNew();
                 await store.WriteStateAsync(name, grainRef, grainState);
                 sw.Stop();
-                StorageStatisticsGroup.OnStorageWrite(name, grainRef, sw.Elapsed);
+                StorageInstruments.OnStorageWrite(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageWriteError(name, grainRef);
+                StorageInstruments.OnStorageWriteError(name, grainRef);
                 string errMsgToLog = MakeErrorMsg(what, exc);
                 this.logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, "{Message}", errMsgToLog);
                 // If error is not specialization of OrleansException, wrap it
@@ -133,11 +133,11 @@ namespace Orleans.Core
                 grainState.State = Activator.CreateInstance<TState>();
 
                 // Update counters
-                StorageStatisticsGroup.OnStorageDelete(name, grainRef, sw.Elapsed);
+                StorageInstruments.OnStorageDelete(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageDeleteError(name, grainRef);
+                StorageInstruments.OnStorageDeleteError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
                 this.logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, "{Message}", errMsg);

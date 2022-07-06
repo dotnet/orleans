@@ -22,7 +22,7 @@ namespace UnitTests.Management
         private readonly Fixture fixture;
         private readonly ITestOutputHelper output;
         private readonly IManagementGrain mgmtGrain;
-        
+
         public ManagementGrainTests(Fixture fixture, ITestOutputHelper output)
         {
             this.fixture = fixture;
