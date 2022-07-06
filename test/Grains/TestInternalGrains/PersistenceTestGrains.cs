@@ -702,7 +702,7 @@ namespace UnitTests.Grains
 
         private IReentrentGrainWithState _other;
         private IGrainContext _context;
-        private TaskScheduler _scheduler;
+        private SynchronizationContext _scheduler;
         private ILogger logger;
         private bool executing;
         private Task outstandingWriteStateOperation;
@@ -715,7 +715,11 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _context = RuntimeContext.Current;
-            _scheduler = TaskScheduler.Current;
+            _scheduler = SynchronizationContext.Current;
+
+            Assert.NotNull(_scheduler);
+            Assert.False(_scheduler.GetType() == typeof(SynchronizationContext));
+
             executing = false;
             return base.OnActivateAsync(cancellationToken);
         }
@@ -868,10 +872,11 @@ namespace UnitTests.Grains
             }
 
             var context = RuntimeContext.Current;
-            var scheduler = TaskScheduler.Current;
+            var scheduler = SynchronizationContext.Current;
 
             executing = true;
-            Assert.Equal(_scheduler, scheduler);
+            var requestScheduler = Assert.IsType<RequestSynchronizationContext>(scheduler);
+            Assert.Equal(_scheduler, requestScheduler.InnerContext);
             Assert.Equal(_context, context);
             Assert.NotNull(context);
             executing = false;

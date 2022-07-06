@@ -33,10 +33,10 @@ namespace Orleans.Streams.Core
             await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), internalStreamId);
         }
 
-        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId)
+        public async Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId)
         {
             var internalStreamId = new InternalStreamId(streamProviderName, streamId);
-            return streamPubSub.GetAllSubscriptions(internalStreamId).ContinueWith(subs => subs.Result.AsEnumerable());
+            return await streamPubSub.GetAllSubscriptions(internalStreamId);
         }
     }
 

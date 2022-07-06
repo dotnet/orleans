@@ -45,7 +45,7 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             this.output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
@@ -82,7 +82,7 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();
@@ -154,7 +154,7 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             var result1 = new TaskCompletionSource<bool>();
@@ -194,7 +194,7 @@ namespace UnitTests.SchedulerTests
         public async Task Sched_Stopped_WorkItemGroup()
         {
             var context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             void CheckScheduler(object state)
@@ -485,7 +485,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_ContinueWith_1_Test()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();
@@ -517,7 +517,7 @@ namespace UnitTests.SchedulerTests
             stopwatch.Start();
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             // ReSharper disable AccessToModifiedClosure
@@ -562,7 +562,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_ContinueWith_2_OrleansSched()
         {
             var context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             var result1 = new TaskCompletionSource<bool>();
@@ -612,7 +612,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_SchedulingContext()
         {
             var context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
             var result = new TaskCompletionSource<bool>();

@@ -59,6 +59,6 @@ namespace Orleans.Configuration
         /// Whether or not to allow reentrancy for calls within the same call chain.
         /// </summary>
         public bool AllowCallChainReentrancy { get; set; } = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
-        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = true;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
     }
 }

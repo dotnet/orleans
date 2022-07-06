@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -15,16 +16,17 @@ namespace Orleans.Runtime
         /// Imports the specified context data into the current <see cref="RequestContext"/>, clearing all existing values.
         /// </summary>
         /// <param name="contextData">The context data.</param>
-        public static void Import(Dictionary<string, object> contextData) => Import(contextData, null); 
-
-        /// <summary>
-        /// Imports the specified context data into the current <see cref="RequestContext"/>, clearing all existing values.
-        /// </summary>
-        /// <param name="contextData">The context data.</param>
-        /// <param name="requestMessage">The request message, or <see langword="null"/> if no request is present.</param>
-        internal static void Import(Dictionary<string, object> contextData, object requestMessage)
+        public static void Import(Dictionary<string, object> contextData)
         {
             if (RequestContext.PropagateActivityId)
+            {
+                PropagateActivityIdToCorrelationManager(contextData);
+            }
+
+            RequestContext.CallContextData.Value = contextData;
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void PropagateActivityIdToCorrelationManager(Dictionary<string, object> contextData)
             {
                 object activityIdObj = Guid.Empty;
                 if (contextData?.TryGetValue(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) == true)
@@ -36,18 +38,6 @@ namespace Orleans.Runtime
                     Trace.CorrelationManager.ActivityId = Guid.Empty;
                 }
             }
-
-            var values = contextData switch
-            {
-                { Count: > 0 } => contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                _ => null,
-            };
-
-            RequestContext.CallContextData.Value = new RequestContext.ContextProperties
-            {
-                RequestObject = requestMessage,
-                Values = values,
-            };
         }
 
         /// <summary>
@@ -57,21 +47,20 @@ namespace Orleans.Runtime
         /// <returns>A copy of the current request context.</returns>
         public static Dictionary<string, object> Export(DeepCopier copier)
         {
-            var (values, _) = ExportInternal(copier);
-            return values;
-        }
-
-        /// <summary>
-        /// Exports a copy of the current <see cref="RequestContext"/>.
-        /// </summary>
-        /// <param name="copier">The copier.</param>
-        /// <returns>A copy of the current request context.</returns>
-        internal static (Dictionary<string, object> Values, object RequestObject) ExportInternal(DeepCopier copier)
-        {
-            var properties = RequestContext.CallContextData.Value;
-            var values = properties.Values;
-
+            var values = RequestContext.CallContextData.Value;
             if (RequestContext.PropagateActivityId)
+            {
+                ExportActivityId(ref values);
+            }
+
+            return values switch
+            {
+                { Count: > 0 } => copier.Copy(values),
+                _ => null
+            };
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void ExportActivityId(ref Dictionary<string, object> values)
             {
                 var activityIdOverride = Trace.CorrelationManager.ActivityId;
                 if (activityIdOverride != Guid.Empty)
@@ -86,45 +75,6 @@ namespace Orleans.Runtime
                         values[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER] = activityIdOverride;
                     }
                 }
-            }
-
-            var resultValues = (values != null && values.Count > 0)
-                ? copier.Copy(values)
-                : null;
-            return (resultValues, properties.RequestObject);
-        }
-
-        /// <summary>
-        /// Suppresses the flow of the currently executing call chain.
-        /// </summary>
-        internal static object SuppressCurrentCallChainFlow()
-        {
-            var properties = RequestContext.CallContextData.Value;
-            var result = properties.RequestObject;
-            if (result is not null)
-            {
-                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
-                {
-                    Values = properties.Values,
-                };
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Restores the flow of a previously suppressed call chain.
-        /// </summary>
-        internal static void RestoreCurrentCallChainFlow(object requestMessage)
-        {
-            if (requestMessage is not null)
-            {
-                var properties = RequestContext.CallContextData.Value;
-                RequestContext.CallContextData.Value = new RequestContext.ContextProperties
-                {
-                    Values = properties.Values,
-                    RequestObject = requestMessage,
-                };
             }
         }
     }

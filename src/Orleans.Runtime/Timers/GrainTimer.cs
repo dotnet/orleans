@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             {
                 // Schedule call back to grain context
                 var workItem = new AsyncClosureWorkItem(() => ForwardToAsyncCallback(state), this.Name, context);
-                context.Scheduler.QueueWorkItem(workItem);
+                context.Scheduler.QueueAction(AsyncClosureWorkItem.ExecuteAction, workItem);
                 await workItem.Task;
             }
             catch (InvalidSchedulingContextException exc)

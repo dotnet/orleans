@@ -182,7 +182,23 @@ namespace Orleans.Runtime.ReminderService
                 acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
             var task = Task.WhenAll(acks);
-            if (logger.IsEnabled(LogLevel.Trace)) task.ContinueWith(_ => PrintReminders(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                _ = PrintRemindersAsync(task);
+                async Task PrintRemindersAsync(Task ackTasks)
+                {
+                    await Task.Yield();
+                    try
+                    {
+                        await ackTasks;
+                        PrintReminders();
+                    }
+                    catch
+                    {
+                        // Silently ignore exceptions.
+                    }
+                }
+            }
             return task;
         }
 

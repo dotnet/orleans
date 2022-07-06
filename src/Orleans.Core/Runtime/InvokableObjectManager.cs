@@ -220,7 +220,8 @@ namespace Orleans
                             continue;
                         }
 
-                        RequestContextExtensions.Import(message.RequestContextData, message);
+                        RequestContextExtensions.Import(message.RequestContextData);
+                        RequestContext.CurrentRequest = message;
                         IInvokable request = null;
                         try
                         {

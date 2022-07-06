@@ -81,7 +81,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var workItem = new AsyncClosureWorkItem<IndirectProbeResponse>(ProbeIndirectly, this);
-            WorkItemGroup.QueueWorkItem(workItem);
+            WorkItemGroup.QueueAction(AsyncClosureWorkItem<IndirectProbeResponse>.ExecuteAction, workItem);
             return workItem.Task;
         }
 

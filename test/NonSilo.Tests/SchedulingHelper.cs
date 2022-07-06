@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -20,6 +19,7 @@ namespace UnitTests.TesterInternal
             services.AddSingleton<SchedulerStatisticsGroup>();
             services.AddSingleton<StageAnalysisStatisticsGroup>();
             services.AddSingleton(loggerFactory);
+            services.AddSingleton<WorkItemGroupShared>();
             services.Configure<SchedulingOptions>(options =>
             {
                 options.DelayWarningThreshold = TimeSpan.FromMilliseconds(100);
@@ -29,13 +29,7 @@ namespace UnitTests.TesterInternal
             });
 
             var s = services.BuildServiceProvider();
-            var result = new WorkItemGroup(
-                context,
-                s.GetRequiredService<ILogger<WorkItemGroup>>(),
-                s.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                s.GetRequiredService<SchedulerStatisticsGroup>(),
-                s.GetRequiredService<IOptions<StatisticsOptions>>(),
-                s.GetRequiredService<IOptions<SchedulingOptions>>());
+            var result = new WorkItemGroup(context, s.GetRequiredService<WorkItemGroupShared>());
             return result;
         }
     }

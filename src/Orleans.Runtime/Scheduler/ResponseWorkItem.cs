@@ -4,6 +4,8 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class ResponseWorkItem : WorkItemBase
     {
+        public static readonly Action<object> ExecuteAction = state => ((ResponseWorkItem)state).Execute();
+
         private readonly Message response;
         private readonly SystemTarget target;
 
@@ -22,15 +24,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            try
-            {
-                RuntimeContext.SetExecutionContext(this.target);
-                target.HandleResponse(response);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext();
-            }
+            target.HandleResponse(response);
         }
 
         public override string ToString()

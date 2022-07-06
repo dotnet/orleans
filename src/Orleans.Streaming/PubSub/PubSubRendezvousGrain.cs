@@ -90,8 +90,8 @@ namespace Orleans.Streams
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            LogPubSubCounts("OnActivateAsync");
             _storage = _storageFactory.GetStorage(this);
+            LogPubSubCounts("OnActivateAsync");
             await ReadStateAsync();
         }
 
@@ -338,14 +338,16 @@ namespace Orleans.Streams
             {
                 int numProducers = 0;
                 int numConsumers = 0;
-                if (State?.Producers != null)
-                    numProducers = State.Producers.Count;
-                if (State?.Consumers != null)
-                    numConsumers = State.Consumers.Count;
+                HashSet<PubSubPublisherState> producers = State?.Producers;
+                HashSet<PubSubSubscriptionState> consumers = State?.Consumers;
+                if (producers is not null)
+                    numProducers = producers.Count;
+                if (consumers is not null)
+                    numConsumers = consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
                 logger.LogDebug("{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
-                    when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
+                    when, numProducers, numConsumers, Utils.EnumerableToString(consumers), Utils.EnumerableToString(producers));
             }
         }
 

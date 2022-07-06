@@ -92,11 +92,11 @@ namespace Orleans.Runtime.TestHooks
         {
             if (overloaded)
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
+                _ = this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
             }
             else
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
+                _ = this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
             }
 
             return Task.CompletedTask;
@@ -104,20 +104,25 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
 
-        private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
+        private async Task LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
         {
-            var previousValue = this.hostEnvironmentStatistics.CpuUsage;
-            this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
-            Task.Delay(latchPeriod).ContinueWith(t =>
-                {
-                    var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
+            try
+            {
+                var previousValue = this.hostEnvironmentStatistics.CpuUsage;
+                this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
+                await Task.Delay(latchPeriod);
+                var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
 
-                    // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentCpuUsage == cpuUsage)
-                    {
-                        this.hostEnvironmentStatistics.CpuUsage = previousValue;
-                    }
-                }).Ignore();
+                // ReSharper disable once CompareOfFloatsByEqualityOperator
+                if (currentCpuUsage == cpuUsage)
+                {
+                    this.hostEnvironmentStatistics.CpuUsage = previousValue;
+                }
+            }
+            catch
+            {
+                // Silently ignore exceptions.
+            }
         }
     }
 }

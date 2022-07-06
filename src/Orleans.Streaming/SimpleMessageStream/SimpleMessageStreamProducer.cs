@@ -99,7 +99,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnNextAsync"));
 
-            _ = RequestContextExtensions.SuppressCurrentCallChainFlow();
+            using var suppressCallChainFlow = RequestContext.SuppressCallChainFlow();
 
             if (!connectedToRendezvous)
             {
@@ -127,7 +127,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnCompletedAsync"));
 
-            _ = RequestContextExtensions.SuppressCurrentCallChainFlow();
+            using var suppressCallChainFlow = RequestContext.SuppressCallChainFlow();
 
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();
@@ -139,7 +139,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnErrorAsync"));
 
-            _ = RequestContextExtensions.SuppressCurrentCallChainFlow();
+            using var suppressCallChainFlow = RequestContext.SuppressCallChainFlow();
 
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();

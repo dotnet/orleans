@@ -1,7 +1,6 @@
 using System;
+using System.Threading;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Scheduler;
@@ -12,11 +11,7 @@ namespace Orleans.Runtime
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IActivationWorkingSet _activationWorkingSet;
-        private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
-        private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
-        private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
-        private readonly IOptions<SchedulingOptions> _schedulingOptions;
-        private readonly IOptions<StatisticsOptions> _statisticsOptions;
+        private readonly WorkItemGroupShared _workItemGroupShared;
         private readonly GrainTypeSharedContextResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
         private readonly ILoggerFactory _loggerFactory;
@@ -29,18 +24,10 @@ namespace Orleans.Runtime
             GrainReferenceActivator grainReferenceActivator,
             GrainTypeSharedContextResolver sharedComponentsResolver,
             IActivationWorkingSet activationWorkingSet,
-            ILogger<WorkItemGroup> workItemGroupLogger,
-            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-            SchedulerStatisticsGroup schedulerStatisticsGroup,
-            IOptions<SchedulingOptions> schedulingOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+            WorkItemGroupShared workItemGroupShared)
         {
             _activationWorkingSet = activationWorkingSet;
-            _workItemGroupLogger = workItemGroupLogger;
-            _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
-            _schedulerStatisticsGroup = schedulerStatisticsGroup;
-            _schedulingOptions = schedulingOptions;
-            _statisticsOptions = statisticsOptions;
+            _workItemGroupShared = workItemGroupShared;
             _sharedComponentsResolver = sharedComponentsResolver;
             _grainClassMap = grainClassMap;
             _serviceProvider = serviceProvider;
@@ -67,11 +54,7 @@ namespace Orleans.Runtime
                 instanceActivator,
                 _serviceProvider,
                 sharedContext,
-                _workItemGroupLogger,
-                _activationTaskSchedulerLogger,
-                _schedulerStatisticsGroup,
-                _schedulingOptions,
-                _statisticsOptions);
+                _workItemGroupShared);
 
             if (sharedContext.PlacementStrategy is StatelessWorkerPlacement)
             {
@@ -87,52 +70,33 @@ namespace Orleans.Runtime
 
         private class ActivationDataActivator : IGrainContextActivator
         {
-            private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
-            private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
-            private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
-            private readonly IOptions<SchedulingOptions> _schedulingOptions;
-            private readonly IOptions<StatisticsOptions> _statisticsOptions;
+            private readonly WorkItemGroupShared _workItemGroupShared;
             private readonly IGrainActivator _grainActivator;
             private readonly IServiceProvider _serviceProvider;
             private readonly GrainTypeSharedContext _sharedComponents;
-            private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
 
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
                 IServiceProvider serviceProvider,
                 GrainTypeSharedContext sharedComponents,
-                ILogger<WorkItemGroup> workItemGroupLogger,
-                ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-                SchedulerStatisticsGroup schedulerStatisticsGroup,
-                IOptions<SchedulingOptions> schedulingOptions,
-                IOptions<StatisticsOptions> statisticsOptions)
+                WorkItemGroupShared workItemGroupShared)
             {
-                _workItemGroupLogger = workItemGroupLogger;
-                _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
-                _schedulerStatisticsGroup = schedulerStatisticsGroup;
-                _schedulingOptions = schedulingOptions;
-                _statisticsOptions = statisticsOptions;
+                _workItemGroupShared = workItemGroupShared;
                 _grainActivator = grainActivator;
                 _serviceProvider = serviceProvider;
                 _sharedComponents = sharedComponents;
-                _createWorkItemGroup = context => new WorkItemGroup(
-                    context,
-                    _workItemGroupLogger,
-                    _activationTaskSchedulerLogger,
-                    _schedulerStatisticsGroup,
-                    _statisticsOptions,
-                    _schedulingOptions);
             }
 
             public IGrainContext CreateContext(GrainAddress activationAddress)
             {
                 var context = new ActivationData(
                     activationAddress,
-                    _createWorkItemGroup,
+                    _workItemGroupShared,
                     _serviceProvider,
                     _sharedComponents);
 
-                RuntimeContext.SetExecutionContext(context, out var existingContext);
+                var previousContext = SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(context.SchedulingContext);
 
                 try
                 {
@@ -142,7 +106,10 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    RuntimeContext.SetExecutionContext(existingContext);
+                    if (previousContext is not null)
+                    {
+                        SynchronizationContext.SetSynchronizationContext(previousContext);
+                    }
                 }
 
                 return context;

@@ -1,6 +1,8 @@
+using System;
+
 namespace Orleans.Runtime.Scheduler
 {
-    internal abstract class WorkItemBase : IWorkItem
+    internal abstract class WorkItemBase
     {
         public abstract IGrainContext GrainContext { get; }
 

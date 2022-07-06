@@ -63,7 +63,7 @@ namespace BenchmarkGrains.MapReduce
         {
             if (this._processingStarted) return;
 
-            var orleansTs = TaskScheduler.Current;
+            var orleansTs = TaskScheduler.FromCurrentSynchronizationContext();
             if (ProcessOnThreadPool)
             {
                 Task.Run(async () =>
