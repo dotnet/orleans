@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     [Serializable]
     [GenerateSerializer]
     [JsonConverter(typeof(MembershipVersionConverter))]
-    public struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
+    public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MembershipVersion"/> struct.
@@ -99,7 +99,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Functionality for converting <see cref="MembershipVersion"/> instances to and from JSON.
     /// </summary>
-    public class MembershipVersionConverter : JsonConverter<MembershipVersion>
+    public sealed class MembershipVersionConverter : JsonConverter<MembershipVersion>
     {
         /// <inheritdoc />
         public override MembershipVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(reader.GetInt64());

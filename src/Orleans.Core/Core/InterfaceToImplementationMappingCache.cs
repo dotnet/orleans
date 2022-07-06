@@ -76,7 +76,6 @@ namespace Orleans
 
             // Create an invoker for every interface on the provided type.
             var result = new Dictionary<Type, Dictionary<MethodInfo, Entry>>(interfaces.Length);
-            var implementationTypeInfo = implementationType.GetTypeInfo();
             foreach (var iface in interfaces)
             {
                 var methods = GrainInterfaceUtils.GetMethods(iface);
@@ -93,7 +92,7 @@ namespace Orleans
                     // get the mapping for the interface which it does belong to.
                     if (mapping.InterfaceType != method.DeclaringType)
                     {
-                        mapping = implementationTypeInfo.GetRuntimeInterfaceMap(method.DeclaringType);
+                        mapping = implementationType.GetInterfaceMap(method.DeclaringType);
                     }
 
                     // Find the index of the interface method and then get the implementation method at that position.

@@ -5,8 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -17,7 +15,7 @@ namespace Orleans.Runtime
         private readonly IGrainContextActivator _innerActivator;
         private readonly int _maxWorkers;
         private readonly List<IGrainContext> _workers = new();
-        private readonly ConcurrentQueue<StatelessWorkerWorkItem> _workItems = new();
+        private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
 
         /// <summary>
@@ -273,7 +271,7 @@ namespace Orleans.Runtime
 
         public void OnDestroyActivation(IGrainContext grainContext)
         {
-            _workItems.Enqueue(new StatelessWorkerWorkItem(WorkItemType.OnDestroyActivation, grainContext));
+            _workItems.Enqueue((WorkItemType.OnDestroyActivation, grainContext));
             _workSignal.Signal();
             if (_workers.Count == 0)
             {
@@ -281,19 +279,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private struct StatelessWorkerWorkItem
-        {
-            public StatelessWorkerWorkItem(WorkItemType type, object state)
-            {
-                Type = type;
-                State = state;
-            }
-
-            public WorkItemType Type { get; }
-            public object State { get; }
-        }
-
-        private enum WorkItemType : byte
+        private enum WorkItemType
         {
             Activate = 0,
             Message = 1,
