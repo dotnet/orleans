@@ -7,7 +7,7 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainLocatorResolver
     {
-        private readonly ConcurrentDictionary<GrainType, IGrainLocator> resolvedLocators = new(GrainType.Comparer.Instance);
+        private readonly ConcurrentDictionary<GrainType, IGrainLocator> resolvedLocators = new();
         private readonly Func<GrainType, IGrainLocator> getLocatorInternal;
         private readonly IServiceProvider _servicesProvider;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
