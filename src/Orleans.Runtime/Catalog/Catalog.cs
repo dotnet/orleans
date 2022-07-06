@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -21,7 +23,6 @@ namespace Orleans.Runtime
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
         private readonly ActivationCollector activationCollector;
-
         private readonly GrainLocator grainLocator;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
@@ -29,12 +30,9 @@ namespace Orleans.Runtime
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly string localSiloName;
-        private readonly CounterStatistic activationsCreated;
-        private readonly CounterStatistic activationsDestroyed;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly GrainContextActivator grainActivator;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
-
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             GrainLocator grainLocator,
@@ -66,10 +64,8 @@ namespace Orleans.Runtime
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-            IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
-            activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
-            activationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
-            IntValueStatistic.FindOrCreate(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, () =>
+            CatalogInstruments.RegisterActivationCountObserve(() => activations.Count);
+            MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
             {
                 long counter = 0;
                 lock (activations)
@@ -100,7 +96,7 @@ namespace Orleans.Runtime
 
                     // TODO: generic type expansion
                     var grainTypeName = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    
+
                     Dictionary<GrainId, int> grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
@@ -184,7 +180,7 @@ namespace Orleans.Runtime
         public void RegisterMessageTarget(IGrainContext activation)
         {
             activations.RecordNewTarget(activation);
-            activationsCreated.Increment();
+            CatalogInstruments.ActivationsCreated.Add(1);
         }
 
         /// <summary>
@@ -206,7 +202,7 @@ namespace Orleans.Runtime
                 activationCollector.TryCancelCollection(collectibleActivation);
             }
 
-            activationsDestroyed.Increment();
+            CatalogInstruments.ActivationsDestroyed.Add(1);
         }
 
         /// <summary>
@@ -288,7 +284,7 @@ namespace Orleans.Runtime
                     logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation {Activation}", address.ToFullString());
                 }
 
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
+                CatalogInstruments.NonExistentActivations.Add(1);
 
                 this.directory.InvalidateCacheEntry(address);
 

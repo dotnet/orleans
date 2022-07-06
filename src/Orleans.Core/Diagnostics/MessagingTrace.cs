@@ -23,8 +23,8 @@ namespace Orleans.Runtime
         public const string InvokeMessageEventName = Category + ".Invoke";
         public const string RejectSendMessageToDeadSiloEventName = Category + ".Reject.TargetDead";
 
-        private static readonly Action<ILogger, Message, MessagingStatisticsGroup.Phase, Exception> LogDropExpiredMessage
-            = LoggerMessage.Define<Message, MessagingStatisticsGroup.Phase>(
+        private static readonly Action<ILogger, Message, MessagingInstruments.Phase, Exception> LogDropExpiredMessage
+            = LoggerMessage.Define<Message, MessagingInstruments.Phase>(
                 LogLevel.Warning,
                 new EventId((int)ErrorCode.Messaging_DroppingExpiredMessage, DropExpiredMessageEventName),
                 "Dropping expired message {Message} at phase {Phase}");
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
             }
 
             OrleansIncomingMessageAgentEvent.Log.ReceiveMessage(message);
-            MessagingProcessingStatisticsGroup.OnImaMessageReceived(message);
+            MessagingProcessingInstruments.OnImaMessageReceived(message);
         }
 
         public void OnDispatcherReceiveMessage(Message message)
@@ -94,17 +94,17 @@ namespace Orleans.Runtime
             }
 
             OrleansDispatcherEvent.Log.ReceiveMessage(message);
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageReceive(message);
+            MessagingProcessingInstruments.OnDispatcherMessageReceive(message);
         }
 
-        internal void OnDropExpiredMessage(Message message, MessagingStatisticsGroup.Phase phase)
+        internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
         {
             if (this.IsEnabled(DropExpiredMessageEventName))
             {
                 this.Write(DropExpiredMessageEventName, new { Message = message, Phase = phase });
             }
 
-            MessagingStatisticsGroup.OnMessageExpired(phase);
+            MessagingInstruments.OnMessageExpired(phase);
             LogDropExpiredMessage(this, message, phase, null);
         }
 
@@ -120,7 +120,7 @@ namespace Orleans.Runtime
 
         internal void OnSiloDropSendingMessage(SiloAddress localSiloAddress, Message message, string reason)
         {
-            MessagingStatisticsGroup.OnDroppedSentMessage(message);
+            MessagingInstruments.OnDroppedSentMessage(message);
             LogSiloDropSendingMessage(this, localSiloAddress, message, reason, null);
         }
 
@@ -167,7 +167,7 @@ namespace Orleans.Runtime
                 this.Write(EnqueueMessageOnActivationEventName, message);
             }
 
-            MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+            MessagingProcessingInstruments.OnImaMessageEnqueued(context);
         }
 
         public void OnInvokeMessage(Message message)
@@ -180,7 +180,7 @@ namespace Orleans.Runtime
 
         public void OnRejectSendMessageToDeadSilo(SiloAddress localSilo, Message message)
         {
-            MessagingStatisticsGroup.OnFailedSentMessage(message);
+            MessagingInstruments.OnFailedSentMessage(message);
 
             if (this.IsEnabled(RejectSendMessageToDeadSiloEventName))
             {

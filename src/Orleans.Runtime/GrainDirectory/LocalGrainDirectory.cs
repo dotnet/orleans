@@ -1,16 +1,14 @@
 using System;
-
 using System.Collections.Generic;
-using System.Linq;
+using System.Collections.Immutable;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Configuration;
-using System.Collections.Immutable;
-using System.Runtime.Serialization;
+using Orleans.GrainDirectory;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -46,35 +44,6 @@ namespace Orleans.Runtime.GrainDirectory
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
 
         public string ClusterId { get; }
-
-        private readonly CounterStatistic localLookups;
-        private readonly CounterStatistic localSuccesses;
-        private readonly CounterStatistic fullLookups;
-        private readonly CounterStatistic cacheLookups;
-        private readonly CounterStatistic cacheSuccesses;
-        private readonly CounterStatistic registrationsIssued;
-        private readonly CounterStatistic registrationsSingleActIssued;
-        private readonly CounterStatistic unregistrationsIssued;
-        private readonly CounterStatistic unregistrationsManyIssued;
-        private readonly IntValueStatistic directoryPartitionCount;
-
-        internal readonly CounterStatistic RemoteLookupsSent;
-        internal readonly CounterStatistic RemoteLookupsReceived;
-        internal readonly CounterStatistic LocalDirectoryLookups;
-        internal readonly CounterStatistic LocalDirectorySuccesses;
-        internal readonly CounterStatistic CacheValidationsSent;
-        internal readonly CounterStatistic CacheValidationsReceived;
-        internal readonly CounterStatistic RegistrationsLocal;
-        internal readonly CounterStatistic RegistrationsRemoteSent;
-        internal readonly CounterStatistic RegistrationsRemoteReceived;
-        internal readonly CounterStatistic RegistrationsSingleActLocal;
-        internal readonly CounterStatistic RegistrationsSingleActRemoteSent;
-        internal readonly CounterStatistic RegistrationsSingleActRemoteReceived;
-        internal readonly CounterStatistic UnregistrationsLocal;
-        internal readonly CounterStatistic UnregistrationsRemoteSent;
-        internal readonly CounterStatistic UnregistrationsRemoteReceived;
-        internal readonly CounterStatistic UnregistrationsManyRemoteSent;
-        internal readonly CounterStatistic UnregistrationsManyRemoteReceived;
 
         public LocalGrainDirectory(
             IServiceProvider serviceProvider,
@@ -118,59 +87,18 @@ namespace Orleans.Runtime.GrainDirectory
             // add myself to the list of members
             AddServer(MyAddress);
 
-            Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) =>
-                String.Format("{0}/{1:X}", addr.ToLongString(), addr.GetConsistentHashCode());
-
-            localLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
-            localSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
-            fullLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_FULL_ISSUED);
-
-            RemoteLookupsSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_REMOTE_SENT);
-            RemoteLookupsReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_REMOTE_RECEIVED);
-
-            LocalDirectoryLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_ISSUED);
-            LocalDirectorySuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_SUCCESSES);
-
-            cacheLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_ISSUED);
-            cacheSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_HITRATIO, () =>
-                {
-                    long delta1, delta2;
-                    long curr1 = cacheSuccesses.GetCurrentValueAndDelta(out delta1);
-                    long curr2 = cacheLookups.GetCurrentValueAndDelta(out delta2);
-                    return String.Format("{0}, Delta={1}",
-                        (curr2 != 0 ? (float)curr1 / (float)curr2 : 0)
-                        ,(delta2 !=0 ? (float)delta1 / (float)delta2 : 0));
-                });
-
-            CacheValidationsSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_VALIDATIONS_CACHE_SENT);
-            CacheValidationsReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
-
-            registrationsIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_ISSUED);
-            RegistrationsLocal = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_LOCAL);
-            RegistrationsRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_REMOTE_SENT);
-            RegistrationsRemoteReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_REMOTE_RECEIVED);
-            registrationsSingleActIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED);
-            RegistrationsSingleActLocal = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL);
-            RegistrationsSingleActRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT);
-            RegistrationsSingleActRemoteReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED);
-            unregistrationsIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_ISSUED);
-            UnregistrationsLocal = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_LOCAL);
-            UnregistrationsRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_REMOTE_SENT);
-            UnregistrationsRemoteReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_REMOTE_RECEIVED);
-            unregistrationsManyIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_MANY_ISSUED);
-            UnregistrationsManyRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT);
-            UnregistrationsManyRemoteReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED);
-
-            directoryPartitionCount = IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_PARTITION_SIZE, () => DirectoryPartition.Count);
-            IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, () => RingDistanceToSuccessor());
-            FloatValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, () => (((float)this.RingDistanceToSuccessor()) / ((float)(int.MaxValue * 2L))) * 100);
-            FloatValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, () =>
+            DirectoryInstruments.RegisterDirectoryPartitionSizeObserve(() => DirectoryPartition.Count);
+            DirectoryInstruments.RegisterMyPortionRingDistanceObserve(() => RingDistanceToSuccessor());
+            DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => (((float)this.RingDistanceToSuccessor()) / ((float)(int.MaxValue * 2L))) * 100);
+            DirectoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
             {
                 var ring = this.directoryMembership.MembershipRingList;
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
-            IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_RINGSIZE, () => this.directoryMembership.MembershipRingList.Count);
+            DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
+
+            Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) =>
+                String.Format("{0}/{1:X}", addr.ToLongString(), addr.GetConsistentHashCode());
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING, () =>
             {
                 var ring = this.directoryMembership.MembershipRingList;
@@ -529,9 +457,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
-            var counterStatistic = hopCount > 0 ? this.RegistrationsSingleActRemoteReceived : this.registrationsSingleActIssued ;
-
-            counterStatistic.Increment();
+            if (hopCount > 0)
+            {
+                DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+            }
+            else
+            {
+                DirectoryInstruments.RegistrationsSingleActIssued.Add(1);
+            }
 
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
@@ -555,14 +488,14 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (forwardAddress == null)
             {
-                RegistrationsSingleActLocal.Increment();
+                DirectoryInstruments.RegistrationsSingleActLocal.Add(1);
 
-                    var result = DirectoryPartition.AddSingleActivation(address);
-                    return result;
+                var result = DirectoryPartition.AddSingleActivation(address);
+                return result;
             }
             else
             {
-                RegistrationsSingleActRemoteSent.Increment();
+                DirectoryInstruments.RegistrationsSingleActRemoteSent.Add(1);
 
                 // otherwise, notify the owner
                 AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, hopCount + 1);
@@ -600,7 +533,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)
         {
-            (hopCount > 0 ? UnregistrationsRemoteReceived : unregistrationsIssued).Increment();
+            if(hopCount > 0)
+            {
+                DirectoryInstruments.UnregistrationsRemoteReceived.Add(1);
+            }
+            else
+            {
+                DirectoryInstruments.UnregistrationsIssued.Add(1);
+            }
 
             if (hopCount == 0)
                 InvalidateCacheEntry(address);
@@ -623,25 +563,24 @@ namespace Orleans.Runtime.GrainDirectory
             if (forwardAddress == null)
             {
                 // we are the owner
-                UnregistrationsLocal.Increment();
-
+                DirectoryInstruments.UnregistrationsLocal.Add(1);
                 DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
             }
             else
             {
-                UnregistrationsRemoteSent.Increment();
+                DirectoryInstruments.UnregistrationsRemoteSent.Add(1);
                 // otherwise, notify the owner
                 await GetDirectoryReference(forwardAddress).UnregisterAsync(address, cause, hopCount + 1);
             }
         }
 
-        private void AddToDictionary<K,V>(ref Dictionary<K, List<V>> dictionary, K key, V value)
+        private void AddToDictionary<K, V>(ref Dictionary<K, List<V>> dictionary, K key, V value)
         {
             if (dictionary == null)
-               dictionary = new Dictionary<K,List<V>>();
+                dictionary = new Dictionary<K, List<V>>();
             List<V> list;
-            if (! dictionary.TryGetValue(key, out list))
-               dictionary[key] = list = new List<V>();
+            if (!dictionary.TryGetValue(key, out list))
+                dictionary[key] = list = new List<V>();
             list.Add(value);
         }
 
@@ -662,7 +601,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // we are the owner
-                    UnregistrationsLocal.Increment();
+                    DirectoryInstruments.UnregistrationsLocal.Add(1);
 
                     DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
                 }
@@ -672,7 +611,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
         {
-            (hopCount > 0 ? UnregistrationsManyRemoteReceived : unregistrationsManyIssued).Increment();
+            if(hopCount > 0)
+            {
+                DirectoryInstruments.UnregistrationsManyRemoteReceived.Add(1);
+            }
+            else
+            {
+                DirectoryInstruments.UnregistrationsManyIssued.Add(1);
+            }
 
             Dictionary<SiloAddress, List<GrainAddress>> forwardlist = null;
             var tasks = new List<Task>();
@@ -700,7 +646,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var kvp in forwardlist)
                 {
-                    UnregistrationsManyRemoteSent.Increment();
+                    DirectoryInstruments.UnregistrationsManyRemoteSent.Add(1);
                     tasks.Add(GetDirectoryReference(kvp.Key).UnregisterManyAsync(kvp.Value, cause, hopCount + 1));
                 }
             }
@@ -712,7 +658,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool LocalLookup(GrainId grain, out AddressAndTag result)
         {
-            localLookups.Increment();
+            DirectoryInstruments.LookupsLocalIssued.Add(1);
 
             SiloAddress silo = CalculateGrainDirectoryPartition(grain);
 
@@ -735,7 +681,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // handle cache
-            cacheLookups.Increment();
+            DirectoryInstruments.LookupsCacheIssued.Add(1);
             var address = GetLocalCacheData(grain);
             if (address != default)
             {
@@ -745,15 +691,15 @@ namespace Orleans.Runtime.GrainDirectory
                 };
 
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup cache {GrainId}={TargetAddress}", grain, result.Address);
-                cacheSuccesses.Increment();
-                localSuccesses.Increment();
+                DirectoryInstruments.LookupsCacheSuccesses.Add(1);
+                DirectoryInstruments.LookupsLocalSuccesses.Add(1);
                 return true;
             }
 
             // check if we own the grain
             if (silo.Equals(MyAddress))
             {
-                LocalDirectoryLookups.Increment();
+                DirectoryInstruments.LookupsLocalDirectoryIssued.Add(1);
                 result = GetLocalDirectoryData(grain);
                 if (result.Address == null)
                 {
@@ -763,8 +709,8 @@ namespace Orleans.Runtime.GrainDirectory
                     return false;
                 }
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}={Address}", grain, result.Address);
-                LocalDirectorySuccesses.Increment();
-                localSuccesses.Increment();
+                DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
+                DirectoryInstruments.LookupsLocalSuccesses.Add(1);
                 return true;
             }
 
@@ -790,7 +736,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
-            (hopCount > 0 ? RemoteLookupsReceived : fullLookups).Increment();
+            if (hopCount > 0)
+            {
+                DirectoryInstruments.LookupsRemoteReceived.Add(1);
+            }
+            else
+            {
+                DirectoryInstruments.LookupsFullIssued.Add(1);
+            }
 
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
@@ -815,7 +768,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (forwardAddress == null)
             {
                 // we are the owner
-                LocalDirectoryLookups.Increment();
+                DirectoryInstruments.LookupsLocalDirectoryIssued.Add(1);
                 var localResult = DirectoryPartition.LookUpActivation(grainId);
                 if (localResult.Address == null)
                 {
@@ -828,7 +781,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}={Address}", grainId, localResult.Address);
-                LocalDirectorySuccesses.Increment();
+                DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
                 return localResult;
             }
             else
@@ -839,7 +792,7 @@ namespace Orleans.Runtime.GrainDirectory
                     throw new OrleansException($"Current directory at {MyAddress} is not stable to perform the lookup for grainId {grainId} (it maps to {forwardAddress}, which is not a valid silo). Retry later.");
                 }
 
-                RemoteLookupsSent.Increment();
+                DirectoryInstruments.LookupsRemoteSent.Add(1);
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
@@ -904,39 +857,6 @@ namespace Orleans.Runtime.GrainDirectory
         public SiloAddress GetPrimaryForGrain(GrainId grain)
         {
             return CalculateGrainDirectoryPartition(grain);
-        }
-
-        public override string ToString()
-        {
-            var sb = new StringBuilder();
-
-            long localLookupsDelta;
-            long localLookupsCurrent = localLookups.GetCurrentValueAndDelta(out localLookupsDelta);
-            long localLookupsSucceededDelta;
-            long localLookupsSucceededCurrent = localSuccesses.GetCurrentValueAndDelta(out localLookupsSucceededDelta);
-            long fullLookupsDelta;
-            long fullLookupsCurrent = fullLookups.GetCurrentValueAndDelta(out fullLookupsDelta);
-            long directoryPartitionSize = directoryPartitionCount.GetCurrentValue();
-
-            sb.AppendLine("Local Grain Directory:");
-            sb.AppendFormat("   Local partition: {0} entries", directoryPartitionSize).AppendLine();
-            sb.AppendLine("   Since last call:");
-            sb.AppendFormat("      Local lookups: {0}", localLookupsDelta).AppendLine();
-            sb.AppendFormat("      Local found: {0}", localLookupsSucceededDelta).AppendLine();
-            if (localLookupsDelta > 0)
-                sb.AppendFormat("      Hit rate: {0:F1}%", (100.0 * localLookupsSucceededDelta) / localLookupsDelta).AppendLine();
-
-            sb.AppendFormat("      Full lookups: {0}", fullLookupsDelta).AppendLine();
-            sb.AppendLine("   Since start:");
-            sb.AppendFormat("      Local lookups: {0}", localLookupsCurrent).AppendLine();
-            sb.AppendFormat("      Local found: {0}", localLookupsSucceededCurrent).AppendLine();
-            if (localLookupsCurrent > 0)
-                sb.AppendFormat("      Hit rate: {0:F1}%", (100.0 * localLookupsSucceededCurrent) / localLookupsCurrent).AppendLine();
-
-            sb.AppendFormat("      Full lookups: {0}", fullLookupsCurrent).AppendLine();
-            sb.Append(DirectoryCache.ToString());
-
-            return sb.ToString();
         }
 
         private long RingDistanceToSuccessor()

@@ -15,16 +15,14 @@ namespace Orleans.Runtime.Counters
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
-            MessagingStatisticsGroup.Init();
-            MessagingProcessingStatisticsGroup.Init();
-            NetworkingStatisticsGroup.Init();
-            StorageStatisticsGroup.Init();
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
-        
+
         internal void Start(StatisticsOptions options)
         {
+            GrainMetricsListener.Start();
+            SiloRuntimeMetricsListener.Start();
             countersPublisher.Start();
             logStatistics.Start();
         }

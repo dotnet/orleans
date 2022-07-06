@@ -74,7 +74,7 @@ namespace Orleans.Runtime
                 this.Write(DispatcherReceiveInvalidActivationEventName, new { Message = message, ActivationState = activationState });
             }
 
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             LogDispatcherReceiveInvalidActivation(this, activationState, message, null);
         }
 
@@ -85,7 +85,7 @@ namespace Orleans.Runtime
                 this.Write(DispatcherDetectedDeadlockEventName, new { Message = message, Activation = targetActivation, Exception = exception});
             }
 
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             LogDispatcherDetectedDeadlock(this, message, targetActivation, exception);
         }
 
@@ -106,7 +106,7 @@ namespace Orleans.Runtime
                 this.Write(DispatcherRejectedMessageEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
             }
 
-            MessagingStatisticsGroup.OnRejectedMessage(message);
+            MessagingInstruments.OnRejectedMessage(message);
 
             if (this.IsEnabled(LogLevel.Debug))
             {
@@ -126,7 +126,7 @@ namespace Orleans.Runtime
                 LogDispatcherForwarding(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
             }
 
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
+            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
         }
 
         internal void OnDispatcherForwardingFailed(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
@@ -164,7 +164,7 @@ namespace Orleans.Runtime
                 LogDispatcherSelectTargetFailed(this, message, exception);
             }
 
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
 
             static bool ShouldLogError(Exception ex)
             {

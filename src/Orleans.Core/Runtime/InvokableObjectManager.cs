@@ -216,7 +216,7 @@ namespace Orleans
 
                         if (message.IsExpired)
                         {
-                            _manager.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
+                            _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
                             continue;
                         }
 
@@ -273,7 +273,7 @@ namespace Orleans
             {
                 if (message.IsExpired)
                 {
-                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Respond);
+                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
                     return;
                 }
 

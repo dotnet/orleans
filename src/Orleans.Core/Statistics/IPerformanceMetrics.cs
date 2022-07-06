@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Statistics;
@@ -91,10 +91,10 @@ namespace Orleans.Runtime
             AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
             MemoryUsage = appEnvironmentStatistics.MemoryUsage;
             IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
-            ClientCount = MessagingStatisticsGroup.ConnectedClientCount.GetCurrentValue();
+            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
             TotalPhysicalMemory = hostEnvironmentStatistics.TotalPhysicalMemory;
-            ReceivedMessages = MessagingStatisticsGroup.MessagesReceived.GetCurrentValue();
-            SentMessages = MessagingStatisticsGroup.MessagesSentTotal.GetCurrentValue();
+            ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
+            SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
         }
 
@@ -102,9 +102,9 @@ namespace Orleans.Runtime
         {
             return
                 "SiloRuntimeStatistics: "
-                + $"ActivationCount={ActivationCount} " 
+                + $"ActivationCount={ActivationCount} "
                 + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
-                + $"CpuUsage={(CpuUsage.HasValue? CpuUsage : "<unset>")} "
+                + $"CpuUsage={(CpuUsage.HasValue ? CpuUsage : "<unset>")} "
                 + $"AvailableMemory={AvailableMemory} "
                 + $"MemoryUsage={MemoryUsage} "
                 + $"IsOverloaded={IsOverloaded} "
@@ -254,11 +254,11 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return string.Format(Environment.NewLine 
-                + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
+            return string.Format(Environment.NewLine
+                + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine
                 + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
-                + "   PrimaryForGrain={5}" + Environment.NewLine 
+                + "   LocalDirectoryActivationAddresses={4}" + Environment.NewLine
+                + "   PrimaryForGrain={5}" + Environment.NewLine
                 + "   GrainClassTypeName={6}" + Environment.NewLine
                 + "   LocalActivation:" + Environment.NewLine
                 + "{7}." + Environment.NewLine,

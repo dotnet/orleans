@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -15,7 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
             internal int ETag { get; }
 
             /// <summary>
-            /// flag notifying whether this cache entry was accessed lately 
+            /// flag notifying whether this cache entry was accessed lately
             /// (more precisely, since the last refresh)
             /// </summary>
             internal int NumAccesses { get; set; }
@@ -65,11 +66,11 @@ namespace Orleans.Runtime.GrainDirectory
             this.maxExpirationTimer = maxExpirationTimer;
             this.exponentialTimerGrowth = exponentialTimerGrowth;
 
-            IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_CACHE_SIZE, () => cache.Count);
+            DirectoryInstruments.RegisterCacheSizeObserve(() => cache.Count);
         }
 
         public void AddOrUpdate(GrainAddress value, int version)
-        {            
+        {
             var entry = new GrainDirectoryCacheEntry(value, version, initialExpirationTimer);
 
             // Notice that LRU should know how to throw the oldest entry if the cache is full
@@ -86,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             NumAccesses++;      // for stats
 
-            // Here we do not check whether the found entry is expired. 
+            // Here we do not check whether the found entry is expired.
             // It will be done by the thread managing the cache.
             // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refereshed it.
             if (!cache.TryGetValue(key, out var tmp))

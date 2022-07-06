@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     {
         protected object    Lockable;
         protected CounterStatistic[] Buckets;
-        
+
         public abstract void AddData(long data);
         public abstract void AddData(TimeSpan data);
 
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
     internal class ExponentialHistogramValueStatistic : HistogramValueStatistic
     {
         private ExponentialHistogramValueStatistic(string name, int numBuckets)
-            : base(name, numBuckets) 
+            : base(name, numBuckets)
         {
         }
 
@@ -136,7 +136,7 @@ namespace Orleans.Runtime
             return Math.Pow(2, i + 1) - 1;
         }
 
-        // The log base 2 of an integer is the same as the position of the highest bit set (or most significant bit set, MSB). The following log base 2 methods are faster than this one. 
+        // The log base 2 of an integer is the same as the position of the highest bit set (or most significant bit set, MSB). The following log base 2 methods are faster than this one.
         // More impl. methods here: http://graphics.stanford.edu/~seander/bithacks.html
         private static uint Log2(ulong number)
         {
@@ -204,4 +204,4 @@ namespace Orleans.Runtime
         }
     }
 }
- 
+

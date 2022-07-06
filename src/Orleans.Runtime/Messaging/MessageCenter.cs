@@ -155,7 +155,7 @@ namespace Orleans.Runtime.Messaging
                 // Don't process messages that have already timed out
                 if (msg.IsExpired)
                 {
-                    this.messagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
+                    this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
                     return;
                 }
 
@@ -181,7 +181,8 @@ namespace Orleans.Runtime.Messaging
                         log.LogTrace("Message has been looped back to this silo: {Message}", msg);
                     }
 
-                    MessagingStatisticsGroup.LocalMessagesSent.Increment();
+                    MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+
                     this.ReceiveMessage(msg);
                 }
                 else
@@ -200,7 +201,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
-                        // Do not try to establish 
+                        // Do not try to establish
                         this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
                         this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
                         return;
@@ -296,7 +297,7 @@ namespace Orleans.Runtime.Messaging
             Exception exc = null,
             bool rejectMessages = false)
         {
-            // Just use this opportunity to invalidate local Cache Entry as well. 
+            // Just use this opportunity to invalidate local Cache Entry as well.
             if (oldAddress != null)
             {
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
@@ -373,7 +374,7 @@ namespace Orleans.Runtime.Messaging
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
+            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
             ResendMessageImpl(message, forwardingAddress);
             return true;
         }
@@ -413,7 +414,7 @@ namespace Orleans.Runtime.Messaging
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
         /// - add ordering info and maintain send order
-        /// 
+        ///
         /// </summary>
         internal Task AddressAndSendMessage(Message message)
         {
@@ -496,7 +497,7 @@ namespace Orleans.Runtime.Messaging
                 SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
                 if (target == null)
                 {
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
+                    MessagingInstruments.OnRejectedMessage(msg);
                     this.log.LogWarning(
                         (int) ErrorCode.MessagingMessageFromUnknownActivation,
                         "Received a message {Message} for an unknown SystemTarget: {Target}",
@@ -549,11 +550,11 @@ namespace Orleans.Runtime.Messaging
                         }
 
                         targetActivation.ReceiveMessage(msg);
-                    } 
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(msg);
+                    MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
                     log.LogError(
                         (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
                         ex,
@@ -569,12 +570,12 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
+            MessagingInstruments.OnRejectedMessage(msg);
 
             if (msg.Direction == Message.Directions.Response && msg.Result == Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                MessagingInstruments.OnDroppedSentMessage(msg);
                 if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
             }
             else

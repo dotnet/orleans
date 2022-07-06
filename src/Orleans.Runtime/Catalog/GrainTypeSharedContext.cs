@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,40 +9,17 @@ using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
-    /// <summary>
-    /// Centralized statistics on per-grain-type activation counts.
-    /// </summary>
-    internal class GrainCountStatistics
-    {
-        private static readonly Func<string, CounterStatistic> CreateCounter = Create;
-        private readonly ConcurrentDictionary<string, CounterStatistic> _grainCounts = new();
-        public CounterStatistic GetGrainCount(string grainTypeName) => _grainCounts.GetOrAdd(grainTypeName, CreateCounter);
-
-        public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
-        {
-            return _grainCounts
-                .Select(s => new KeyValuePair<string, long>(s.Key, s.Value.GetCurrentValue()))
-                .Where(p => p.Value > 0);
-        }
-
-        private static CounterStatistic Create(string grainTypeName)
-        {
-            var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainTypeName);
-            return CounterStatistic.FindOrCreate(counterName, false);
-        }
-    }
-
     /// <summary>
     /// Functionality which is shared between all instances of a grain type.
     /// </summary>
     public class GrainTypeSharedContext
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly CounterStatistic _grainCountsPerGrain;
-        private readonly GrainCountStatistics _grainCountStatistics;
+        private readonly string _grainTypeName;
         private readonly Dictionary<Type, object> _components = new();
         private InternalGrainRuntime _internalGrainRuntime;
 
@@ -66,9 +41,7 @@ namespace Orleans.Runtime
                 throw new KeyNotFoundException($"Could not find corresponding grain class for grain of type {grainType.ToString()}");
             }
 
-            var grainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
-            _grainCountStatistics = serviceProvider.GetRequiredService<GrainCountStatistics>();
-            _grainCountsPerGrain = _grainCountStatistics.GetGrainCount(grainTypeName);
+            _grainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
             Logger = logger;
             MessagingOptions = messagingOptions.Value;
             GrainReferenceActivator = grainReferenceActivator;
@@ -159,12 +132,12 @@ namespace Orleans.Runtime
 
         public void OnCreateActivation(IGrainContext grainContext)
         {
-            _grainCountsPerGrain.Increment();
+            MiscInstruments.IncrementGrainCounts(_grainTypeName);
         }
 
         public void OnDestroyActivation(IGrainContext grainContext)
         {
-            _grainCountsPerGrain.DecrementBy(1);
+            MiscInstruments.DecrementGrainCounts(_grainTypeName);
         }
     }
 
