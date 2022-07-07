@@ -139,7 +139,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.Log.LogDebug(
                         "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}.",
-                        msg.TargetSilo.ToLongString(),
+                        msg.TargetSilo?.ToLongString() ?? "null",
                         this.LocalSiloAddress.ToLongString(),
                         msg);
                 }

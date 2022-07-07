@@ -6,6 +6,12 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
+    <WarningLevel>3</WarningLevel>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <Features>strict</Features>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <StandardTargetFrameworks>net6.0</StandardTargetFrameworks>
     <MultiTargetFrameworks>net6.0</MultiTargetFrameworks>
   </PropertyGroup>
