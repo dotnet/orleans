@@ -13,7 +13,6 @@ using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
-using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {

@@ -236,22 +236,33 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             foreach (var method in interfaceType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
             {
-                if (method.Name != methodName)
+                var current = method;
+                if (current.Name != methodName)
                 {
                     continue;
                 }
 
-                if (!method.ContainsGenericParameters && methodTypeParameters is { Length: > 0 })
+                if (!current.ContainsGenericParameters && methodTypeParameters is { Length: > 0 })
                 {
                     continue;
                 }
 
-                if (method.ContainsGenericParameters && methodTypeParameters is null or { Length: 0 })
+                if (current.ContainsGenericParameters && methodTypeParameters is null or { Length: 0 })
                 {
                     continue;
                 }
 
-                var parameters = method.GetParameters();
+                if (methodTypeParameters is { Length: > 0 })
+                {
+                    if (methodTypeParameters.Length != current.GetGenericArguments().Length)
+                    {
+                        continue;
+                    }
+
+                    current = current.MakeGenericMethod(methodTypeParameters);
+                }
+
+                var parameters = current.GetParameters();
                 if (parameters.Length != parameterTypes.Length)
                 {
                     continue;
@@ -272,7 +283,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     continue;
                 }
 
-                return method;
+                return current;
             }
 
             foreach (var implemented in interfaceType.GetInterfaces())
