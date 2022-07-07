@@ -520,11 +520,13 @@ namespace Orleans.Streams
         private void CleanupPubSubCache(DateTime now)
         {
             foreach (var tuple in pubSubCache)
+            {
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
                 {
                     pubSubCache.Remove(tuple.Key);
                     tuple.Value.DisposeAll(logger);
                 }
+            }
         }
 
         private async Task RegisterStream(InternalStreamId streamId, StreamSequenceToken firstToken, DateTime now)
