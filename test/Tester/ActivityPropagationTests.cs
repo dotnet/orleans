@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -91,7 +92,7 @@ namespace UnitTests.General
 
             static async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -124,7 +125,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -158,7 +159,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
 
                 var result = await grain.GetActivityId();
 
