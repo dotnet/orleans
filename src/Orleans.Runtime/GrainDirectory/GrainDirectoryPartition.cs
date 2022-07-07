@@ -6,37 +6,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
     [Serializable]
-    internal class ActivationInfo
-    {
-        public SiloAddress SiloAddress { get; private set; }
-
-        public DateTime TimeCreated { get; private set; }
-
-        public ActivationInfo(SiloAddress siloAddress)
-        {
-            SiloAddress = siloAddress;
-            TimeCreated = DateTime.UtcNow;
-        }
-
-        public ActivationInfo(ActivationInfo iActivationInfo)
-        {
-            SiloAddress = iActivationInfo.SiloAddress;
-            TimeCreated = iActivationInfo.TimeCreated;
-        }
-
-        public override string ToString()
-        {
-            return String.Format("{0}, {1}", SiloAddress, TimeCreated);
-        }
-    }
-
-    [Serializable]
-    internal class GrainInfo
+    internal sealed class GrainInfo
     {
         public const int NO_ETAG = -1;
 
@@ -77,7 +51,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Activation = address;
                 TimeCreated = DateTime.UtcNow;
-                VersionTag = ThreadSafeRandom.Next();
+                VersionTag = Random.Shared.Next();
                 return address;
             }
         }
@@ -85,11 +59,11 @@ namespace Orleans.Runtime.GrainDirectory
         public bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out bool wasRemoved)
         {
             wasRemoved = false;
-            if (Activation is { } existing  && existing.ActivationId.Equals(act) && OkToRemove(cause, lazyDeregistrationDelay))
+            if (Activation is { } existing && existing.ActivationId.Equals(act) && OkToRemove(cause, lazyDeregistrationDelay))
             {
                 wasRemoved = true;
                 Activation = null;
-                VersionTag = ThreadSafeRandom.Next();
+                VersionTag = Random.Shared.Next();
             }
 
             return wasRemoved;
@@ -102,9 +76,9 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Activation = other.Activation;
                 TimeCreated = other.TimeCreated;
-                VersionTag = ThreadSafeRandom.Next();
+                VersionTag = Random.Shared.Next();
             }
-            else if (Activation is not null && otherActivation is not null) 
+            else if (Activation is not null && otherActivation is not null)
             {
                 // Grain is supposed to be in single activation mode, but we have two activations!!
                 // Eventually we should somehow delegate handling this to the silo, but for now, we'll arbitrarily pick one value.
@@ -113,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
                     var activationToDrop = Activation;
                     Activation = otherActivation;
                     TimeCreated = other.TimeCreated;
-                    VersionTag = ThreadSafeRandom.Next();
+                    VersionTag = Random.Shared.Next();
                     return activationToDrop;
                 }
 
@@ -125,7 +99,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 
-    internal class GrainDirectoryPartition
+    internal sealed class GrainDirectoryPartition
     {
         // Should we change this to SortedList<> or SortedDictionary so we can extract chunks better for shipping the full
         // parition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
@@ -136,22 +110,18 @@ namespace Orleans.Runtime.GrainDirectory
         private Dictionary<GrainId, GrainInfo> partitionData;
         private readonly object lockable;
         private readonly ILogger log;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IInternalGrainFactory grainFactory;
         private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, GrainInfo>();
             lockable = new object();
             log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
             this.grainDirectoryOptions = grainDirectoryOptions;
-            this.grainFactory = grainFactory;
-            this.loggerFactory = loggerFactory;
         }
 
         private bool IsValidSilo(SiloAddress silo)
@@ -183,11 +153,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a new activation to the directory partition
         /// </summary>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal virtual AddressAndTag AddSingleActivation(GrainAddress address)
+        internal AddressAndTag AddSingleActivation(GrainAddress address)
         {
             if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Adding single activation for grain {SiloAddress} {GrainId} {ActivationId}", address.SiloAddress, address.GrainId, address.ActivationId);
-
-            AddressAndTag result = new AddressAndTag();
 
             if (!IsValidSilo(address.SiloAddress))
             {
@@ -195,10 +163,10 @@ namespace Orleans.Runtime.GrainDirectory
                 throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 
-            GrainInfo grainInfo;
+            AddressAndTag result;
             lock (lockable)
             {
-                if (!partitionData.TryGetValue(address.GrainId, out grainInfo))
+                if (!partitionData.TryGetValue(address.GrainId, out var grainInfo))
                 {
                     partitionData[address.GrainId] = grainInfo = new GrainInfo();
                 }
@@ -232,7 +200,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Removing activation for grain {GrainId} cause={Cause} was_removed={WasRemoved}", grain.ToString(), cause, wasRemoved);
         }
 
-   
+
         /// <summary>
         /// Removes the grain (and, effectively, all its activations) from the directory
         /// </summary>
@@ -276,15 +244,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns></returns>
         internal int GetGrainETag(GrainId grain)
         {
-            GrainInfo grainInfo;
             lock (lockable)
             {
-                if (!partitionData.TryGetValue(grain, out grainInfo))
-                {
-                    return GrainInfo.NO_ETAG;
-                }
-
-                return grainInfo.VersionTag;
+                return partitionData.TryGetValue(grain, out var info) ? info.VersionTag : GrainInfo.NO_ETAG;
             }
         }
 
@@ -337,42 +299,27 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="predicate">filter predicate (usually if the given grain is owned by particular silo)</param>
-        /// <param name="modifyOrigin">flag controlling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
-        /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
-        internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
+        /// <returns>Entries satisfying the given predicate</returns>
+        internal List<GrainAddress> Split(Predicate<GrainId> predicate)
         {
-            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.grainDirectoryOptions, this.grainFactory, this.loggerFactory);
+            var result = new List<GrainAddress>();
 
             lock (lockable)
             {
                 foreach (var pair in partitionData)
                 {
-                    if (predicate(pair.Key))
+                    if (pair.Value.Activation is { } address && predicate(pair.Key))
                     {
-                        newDirectory.partitionData.Add(pair.Key, pair.Value);
-
-                        if (modifyOrigin)
-                        {
-                            partitionData.Remove(pair.Key);
-                        }
+                        result.Add(address);
                     }
                 }
             }
 
-            return newDirectory;
-        }
-
-        internal List<GrainAddress> ToListOfActivations()
-        {
-            var result = new List<GrainAddress>();
-            lock (lockable)
+            for (var i = result.Count - 1; i >= 0; i--)
             {
-                foreach (var pair in partitionData)
+                if (!IsValidSilo(result[i].SiloAddress))
                 {
-                    if (pair.Value.Activation is { } address && IsValidSilo(address.SiloAddress))
-                    {
-                        result.Add(address);
-                    }
+                    result.RemoveAt(i);
                 }
             }
 

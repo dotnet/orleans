@@ -12,7 +12,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// Most methods of this class are synchronized since they might be called both
     /// from LocalGrainDirectory on CacheValidator.SchedulingContext and from RemoteGrainDirectory.
     /// </summary>
-    internal class GrainDirectoryHandoffManager
+    internal sealed class GrainDirectoryHandoffManager
     {
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private const int MAX_OPERATION_DEQUEUE = 2;
@@ -58,7 +58,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (!directoryPartitionsMap.TryGetValue(removedSilo, out var partition)) return;
 
                 // at least one predcessor should exist, which is me
-                SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
+                SiloAddress predecessor = localDirectory.FindPredecessor(removedSilo);
                 Debug.Assert(predecessor is not null);
                 Dictionary<SiloAddress, List<GrainAddress>> duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
@@ -91,69 +91,46 @@ namespace Orleans.Runtime.GrainDirectory
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
 
-                // check if this is one of our successors (i.e., if I should hold this silo's copy)
+                // check if this is the immediate successors (i.e., if I should hold this silo's copy)
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
-                List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
-                if (!successors.Contains(addedSilo))
+                var successor = localDirectory.FindSuccessor(localDirectory.MyAddress);
+                if (!successor.Equals(addedSilo))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not one of my successors.", addedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not my immediate successor.", addedSilo);
                     return;
                 }
 
-                // check if this is an immediate successor
-                if (successors[0].Equals(addedSilo))
-                {
-                    // split my local directory and send to my new immediate successor his share
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting my partition between me and {AddedSilo}", addedSilo);
-                    GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
-                        grain =>
-                        {
-                            var s = localDirectory.CalculateGrainDirectoryPartition(grain);
-                            return (s != null) && !localDirectory.MyAddress.Equals(s);
-                        }, false);
-                    List<GrainAddress> splitPartListSingle = splitPart.ToListOfActivations();
+                // split my local directory and send to my new immediate successor his share
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting my partition between me and {AddedSilo}", addedSilo);
+                var splitPartListSingle = localDirectory.DirectoryPartition.Split(
+                    grain =>
+                    {
+                        var s = localDirectory.CalculateGrainDirectoryPartition(grain);
+                        return s != null && !localDirectory.MyAddress.Equals(s);
+                    });
 
-                    EnqueueOperation(
-                        $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
-                        () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle));
-                }
-                else
-                {
-                    // adjust partitions by splitting them accordingly between new and old silos
-                    SiloAddress predecessorOfNewSilo = localDirectory.FindPredecessors(addedSilo, 1)[0];
-                    if (!directoryPartitionsMap.TryGetValue(predecessorOfNewSilo, out var predecessorPartition))
-                    {
-                        // we should have the partition of the predcessor of our new successor
-                        logger.LogWarning((int)ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of {PredecessorOfNewSilo}", predecessorOfNewSilo);
-                    }
-                    else
-                    {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting partition of {Predecessor} and creating a copy for {AddedSilo}", predecessorOfNewSilo, addedSilo);
-                        GrainDirectoryPartition splitPart = predecessorPartition.Split(
-                            grain =>
-                            {
-                                // Need to review the 2nd line condition.
-                                var s = localDirectory.CalculateGrainDirectoryPartition(grain);
-                                return (s != null) && !predecessorOfNewSilo.Equals(s);
-                            }, true);
-                        directoryPartitionsMap[addedSilo] = splitPart;
-                    }
-                }
+                EnqueueOperation(
+                    $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
+                    () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle));
 
                 // remove partition of one of the old successors that we do not need to now
-                SiloAddress oldSuccessor = directoryPartitionsMap.FirstOrDefault(pair => !successors.Contains(pair.Key)).Key;
-                if (oldSuccessor == null) return;
-
-                if (logger.IsEnabled(LogLevel.Debug))
+                foreach (var pair in directoryPartitionsMap)
                 {
-                    logger.LogDebug(
-                        "Removing copy of the directory partition of silo {OldSuccessor} (holding copy of {AddedSilo} instead)",
-                        oldSuccessor,
-                        addedSilo);
-                }
+                    if (!successor.Equals(pair.Key))
+                    {
+                        if (logger.IsEnabled(LogLevel.Debug))
+                        {
+                            logger.LogDebug(
+                                "Removing copy of the directory partition of silo {OldSuccessor} (holding copy of {AddedSilo} instead)",
+                                pair.Key,
+                                addedSilo);
+                        }
 
-                directoryPartitionsMap.Remove(oldSuccessor);
+                        directoryPartitionsMap.Remove(pair.Key);
+                        break;
+                    }
+                }
             }
         }
 
@@ -180,9 +157,10 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removing {Count} single activation after partition split", splitPartListSingle.Count);
 
-                splitPartListSingle.ForEach(
-                    activationAddress =>
-                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.GrainId));
+                foreach (var activationAddress in splitPartListSingle)
+                {
+                    localDirectory.DirectoryPartition.RemoveGrain(activationAddress.GrainId);
+                }
             }
         }
 
