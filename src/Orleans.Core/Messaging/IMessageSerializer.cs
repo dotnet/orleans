@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Buffers;
 
@@ -10,7 +12,7 @@ namespace Orleans.Runtime.Messaging
         /// <returns>
         /// The minimum number of bytes in <paramref name="input"/> before trying again, or 0 if a message was successfully read.
         /// </returns>
-        (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message message);
+        (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message);
     }
 
     internal struct MessageBufferWriter<TBufferWriter> : IBufferWriter<byte> where TBufferWriter : IBufferWriter<byte>

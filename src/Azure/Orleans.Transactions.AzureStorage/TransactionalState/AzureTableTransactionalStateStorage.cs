@@ -337,16 +337,16 @@ namespace Orleans.Transactions.AzureStorage
                             }
                         }
 
-                        batchOperation.Clear();
-                        keyIndex = -1;
-
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op ok     {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op ok {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
                         }
+
+                        batchOperation.Clear();
+                        keyIndex = -1;
                     }
                     catch (Exception ex)
                     {

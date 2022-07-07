@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -60,7 +62,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ThreadPoolMonitor _threadPoolMonitor;
         private readonly ProbeRequestMonitor _probeRequestMonitor; 
         private ValueStopwatch _clusteredDuration;
-        private Task _runTask;
+        private Task? _runTask;
         private bool _isActive;
         private DateTime _lastHealthCheckTime;
 
@@ -101,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="checkTime">The time which the check is taking place.</param>
         /// <param name="complaints">If not null, will be populated with the current set of detected health issues.</param>
         /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).</returns>
-        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string> complaints) 
+        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints) 
         {
             var score = 0;
             score += CheckSuspectingNodes(checkTime, complaints);
@@ -134,7 +136,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckThreadPoolQueueDelay(DateTime checkTime, List<string> complaints)
+        private int CheckThreadPoolQueueDelay(DateTime checkTime, List<string>? complaints)
         {
             var threadPoolDelaySeconds = _threadPoolMonitor.MeasureQueueDelay().TotalSeconds;
 
@@ -162,7 +164,7 @@ namespace Orleans.Runtime.MembershipService
             return (int)threadPoolDelaySeconds;
         }
 
-        private int CheckSuspectingNodes(DateTime now, List<string> complaints)
+        private int CheckSuspectingNodes(DateTime now, List<string>? complaints)
         {
             var score = 0;
             var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
@@ -202,7 +204,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckReceivedProbeRequests(DateTime now, List<string> complaints)
+        private int CheckReceivedProbeRequests(DateTime now, List<string>? complaints)
         {
             // Have we received ping REQUESTS from other nodes?
             var score = 0;
@@ -233,7 +235,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckReceivedProbeResponses(DateTime now, List<string> complaints)
+        private int CheckReceivedProbeResponses(DateTime now, List<string>? complaints)
         {
             // Determine how recently the latest successful ping response was received.
             var siloMonitors = _clusterHealthMonitor.SiloMonitors;
@@ -271,7 +273,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckLocalHealthCheckParticipants(DateTime now, List<string> complaints)
+        private int CheckLocalHealthCheckParticipants(DateTime now, List<string>? complaints)
         {
             // Check for execution delays and other local health warning signs.
             var score = 0;
@@ -281,16 +283,16 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (!participant.CheckHealth(_lastHealthCheckTime, out var reason))
                     {
-                        _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy with complaint: {Reason}", participant?.GetType().ToString(), reason);
-                        complaints?.Add($"Health check participant {participant?.GetType().ToString()} is reporting that it is unhealthy with complaint: {reason}");
+                        _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy with complaint: {Reason}", participant.GetType().ToString(), reason);
+                        complaints?.Add($"Health check participant {participant.GetType().ToString()} is reporting that it is unhealthy with complaint: {reason}");
 
                         ++score;
                     }
                 }
                 catch (Exception exception)
                 {
-                    _log.LogError(exception, "Error checking health for {Participant}", participant?.GetType().ToString());
-                    complaints?.Add($"Error checking health for participant {participant?.GetType().ToString()}: {LogFormatter.PrintException(exception)}");
+                    _log.LogError(exception, "Error checking health for {Participant}", participant.GetType().ToString());
+                    complaints?.Add($"Error checking health for participant {participant.GetType().ToString()}: {LogFormatter.PrintException(exception)}");
 
                     ++score;
                 }
@@ -352,7 +354,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         private class ThreadPoolMonitor
         {
-            private static readonly WaitCallback Callback = state => ((ThreadPoolMonitor)state).Execute();
+            private static readonly WaitCallback Callback = state => ((ThreadPoolMonitor)state!).Execute();
             private readonly object _lockObj = new object();
             private readonly ILogger<ThreadPoolMonitor> _log;
             private bool _scheduled;

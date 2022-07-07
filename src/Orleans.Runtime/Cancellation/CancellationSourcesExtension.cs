@@ -127,7 +127,7 @@ namespace Orleans.Runtime
 
             public bool IsExpired(TimeSpan expiry, long nowTimestamp)
             {
-                var untouchedTime = TimeSpan.FromSeconds((nowTimestamp - _createdTime) / Stopwatch.Frequency);
+                var untouchedTime = TimeSpan.FromSeconds((nowTimestamp - _createdTime) / (double)Stopwatch.Frequency);
 
                 return untouchedTime >= expiry;
             }

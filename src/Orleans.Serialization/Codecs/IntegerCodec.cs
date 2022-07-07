@@ -1,6 +1,5 @@
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Utilities;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
@@ -407,7 +406,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1 << 20)
+            if (value > 1U << 20)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
                 writer.WriteUInt32(value);
@@ -431,7 +430,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1 << 20)
+            if (value > 1U << 20)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
                 writer.WriteUInt32(value);
@@ -597,7 +596,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             if (value <= int.MaxValue && value >= int.MinValue)
             {
-                if (value > 1 << 20 || -value > 1 << 20)
+                if (value > 1L << 20 || -value > 1L << 20)
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
                     writer.WriteInt32((int)value);
@@ -608,7 +607,7 @@ namespace Orleans.Serialization.Codecs
                     writer.WriteVarInt64(value);
                 }
             }
-            else if (value > 1 << 41 || -value > 1 << 41)
+            else if (value > 1L << 41 || -value > 1L << 41)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
                 writer.WriteInt64(value);
@@ -634,7 +633,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             if (value <= int.MaxValue && value >= int.MinValue)
             {
-                if (value > 1 << 20 || -value > 1 << 20)
+                if (value > 1L << 20 || -value > 1L << 20)
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
                     writer.WriteInt32((int)value);
@@ -645,7 +644,7 @@ namespace Orleans.Serialization.Codecs
                     writer.WriteVarInt64(value);
                 }
             }
-            else if (value > 1 << 41 || -value > 1 << 41)
+            else if (value > 1L << 41 || -value > 1L << 41)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed64);
                 writer.WriteInt64(value);
@@ -706,7 +705,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             if (value <= int.MaxValue)
             {
-                if (value > 1 << 20)
+                if (value > 1UL << 20)
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
                     writer.WriteUInt32((uint)value);
@@ -717,7 +716,7 @@ namespace Orleans.Serialization.Codecs
                     writer.WriteVarUInt64(value);
                 }
             }
-            else if (value > 1 << 41)
+            else if (value > 1UL << 41)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
                 writer.WriteUInt64(value);
@@ -743,7 +742,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             if (value <= int.MaxValue)
             {
-                if (value > 1 << 20)
+                if (value > 1UL << 20)
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
                     writer.WriteUInt32((uint)value);
@@ -754,7 +753,7 @@ namespace Orleans.Serialization.Codecs
                     writer.WriteVarUInt64(value);
                 }
             }
-            else if (value > 1 << 41)
+            else if (value > 1UL << 41)
             {
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed64);
                 writer.WriteUInt64(value);

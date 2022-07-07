@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly object initializationLock = new object();
-        private bool isInitialized;
+        private volatile bool isInitialized;
         private ClientMessageCenter messageCenter;
         private ConnectionManager connectionManager;
 

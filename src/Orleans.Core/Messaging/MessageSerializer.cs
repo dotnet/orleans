@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
@@ -14,6 +16,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Buffers;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -35,7 +38,7 @@ namespace Orleans.Runtime.Messaging
         private readonly int _maxBodyLength;
         private readonly SerializerSessionPool _sessionPool;
         private readonly DictionaryCodec<string, object> _requestContextCodec;
-        private object _bufferWriter;
+        private object? _bufferWriter;
 
         public MessageSerializer(
             Serializer<object> bodySerializer,
@@ -63,7 +66,7 @@ namespace Orleans.Runtime.Messaging
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
         }
 
-        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message message)
+        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
         {
             if (input.Length < FramingLength)
             {
@@ -206,7 +209,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
             {
-                writer.WriteInt64(value.TimeToLive.Value.Ticks);
+                writer.WriteInt64(value.TimeToLive!.Value.Ticks);
             }
 
             if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
@@ -387,7 +390,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static string ReadString<TInput>(ref Reader<TInput> reader)
+        private static string? ReadString<TInput>(ref Reader<TInput> reader)
         {
             var length = reader.ReadVarInt32();
             if (length <= 0)
@@ -473,6 +476,8 @@ namespace Orleans.Runtime.Messaging
             {
                 var key = ReadString(ref reader);
                 var value = _serializer.Deserialize<object, TInput>(ref reader);
+
+                Debug.Assert(key is not null);
                 result.Add(key, value);
             }
 

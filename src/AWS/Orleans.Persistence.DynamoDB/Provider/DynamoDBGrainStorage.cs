@@ -385,7 +385,7 @@ namespace Orleans.Storage
 
                 if (dataValue != null)
                 {
-                    sb.AppendFormat("Data Value={DataValue} Type={DataType}", dataValue, dataValue.GetType());
+                    sb.Append($"Data Value={dataValue} Type={dataValue.GetType()}");
                 }
 
                 var message = sb.ToString();

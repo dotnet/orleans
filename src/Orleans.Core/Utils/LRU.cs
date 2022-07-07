@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             public CoarseStopwatch Age;
             public long Generation;
 
-            public TimestampedValue(LRU<TKey, TValue> l, TValue v, long generation)
+            public TimestampedValue(TValue v, long generation)
             {
                 Generation = generation;
                 Value = v;
@@ -70,8 +70,8 @@ namespace Orleans.Runtime
                 key,
                 static (key, state) =>
                 {
-                    var (self, outerState, addFunc, generation) = state;
-                    return new TimestampedValue(self, addFunc(outerState, key), generation);
+                    var (_, outerState, addFunc, generation) = state;
+                    return new TimestampedValue(addFunc(outerState, key), generation);
                 },
                 static (key, existing, state) =>
                 {

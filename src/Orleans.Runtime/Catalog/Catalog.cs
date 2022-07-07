@@ -43,7 +43,6 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             IOptions<GrainCollectionOptions> collectionOptions,
-            RuntimeMessagingTrace messagingTrace,
             GrainContextActivator grainActivator,
             GrainPropertiesResolver grainPropertiesResolver)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)

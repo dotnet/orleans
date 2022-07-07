@@ -80,9 +80,9 @@ namespace Orleans.Runtime
         {
             this.id = grainId;
             this.Silo = silo;
+            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
             this.IsLowPriority = lowPriority;
-            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             this.logger = loggerFactory.CreateLogger(this.GetType());
         }
