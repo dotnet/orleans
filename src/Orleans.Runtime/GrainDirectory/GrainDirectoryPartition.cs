@@ -346,13 +346,17 @@ namespace Orleans.Runtime.GrainDirectory
             lock (lockable)
             {
                 foreach (var pair in partitionData)
+                {
                     if (predicate(pair.Key))
                     {
                         newDirectory.partitionData.Add(pair.Key, pair.Value);
 
                         if (modifyOrigin)
+                        {
                             partitionData.Remove(pair.Key);
+                        }
                     }
+                }
             }
 
             return newDirectory;
