@@ -239,11 +239,6 @@ namespace Orleans.Runtime.Messaging
                 writer.WriteByte((byte)value.Result);
             }
 
-            if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-            {
-                WriteActivationId(ref writer, value.SendingActivation);
-            }
-
             if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
             {
                 WriteGrainId(ref writer, value.SendingGrain);
@@ -252,11 +247,6 @@ namespace Orleans.Runtime.Messaging
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
                 _writerSiloAddressCodec.WriteRaw(ref writer, value.SendingSilo);
-            }
-
-            if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
-            {
-                WriteActivationId(ref writer, value.TargetActivation);
             }
 
             if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
@@ -333,11 +323,6 @@ namespace Orleans.Runtime.Messaging
             if ((headers & Headers.RESULT) != Headers.NONE)
                 result.Result = (ResponseTypes)reader.ReadByte();
 
-            if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-            {
-                result.SendingActivation = ReadActivationId(ref reader);
-            }
-
             if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
             {
                 result.SendingGrain = ReadGrainId(ref reader);
@@ -346,11 +331,6 @@ namespace Orleans.Runtime.Messaging
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
                 result.SendingSilo = _readerSiloAddressCodec.ReadRaw(ref reader);
-            }
-
-            if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
-            {
-                result.TargetActivation = ReadActivationId(ref reader);
             }
 
             if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)

@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
 
         /// <inheritdoc/>
-        GrainId IGrainContext.GrainId => this.id.GrainId;
+        public GrainId GrainId => this.id.GrainId;
 
         /// <inheritdoc/>
         object IGrainContext.GrainInstance => this;

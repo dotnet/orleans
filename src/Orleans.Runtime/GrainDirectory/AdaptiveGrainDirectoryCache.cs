@@ -42,7 +42,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressEqual = (addr, entry) => addr.Equals(entry.Address);
+        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressesMatches = (addr, entry) => addr.Matches(entry.Address);
 
         private readonly LRU<GrainId, GrainDirectoryCacheEntry> cache;
         /// controls the time the new entry is considered "fresh" (unit: ms)
@@ -79,7 +79,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 
-        public bool Remove(GrainAddress key) => cache.TryRemove(key.GrainId, ActivationAddressEqual, key);
+        public bool Remove(GrainAddress key) => cache.TryRemove(key.GrainId, ActivationAddressesMatches, key);
 
         public void Clear() => cache.Clear();
 

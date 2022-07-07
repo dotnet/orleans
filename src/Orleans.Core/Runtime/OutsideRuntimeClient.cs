@@ -261,14 +261,12 @@ namespace Orleans
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
-            message.SendingActivation = CurrentActivationAddress.ActivationId;
             message.TargetGrain = targetGrainId;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
             }
 
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))

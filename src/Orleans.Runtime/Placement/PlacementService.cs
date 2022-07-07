@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Placement
             var grainId = message.TargetGrain;
             if (_grainLocator.TryLookupInCache(grainId, out var result))
             {
-                SetMessageTargetPlacement(message, result.ActivationId, result.SiloAddress);
+                SetMessageTargetPlacement(message, result.SiloAddress);
                 return Task.CompletedTask;
             }
 
@@ -83,9 +83,8 @@ namespace Orleans.Runtime.Placement
             static void ThrowMissingAddress() => throw new InvalidOperationException("Cannot address a message without a target");
         }
 
-        private void SetMessageTargetPlacement(Message message, ActivationId activationId, SiloAddress targetSilo)
+        private void SetMessageTargetPlacement(Message message, SiloAddress targetSilo)
         {
-            message.TargetActivation = activationId;
             message.TargetSilo = targetSilo;
 #if DEBUG
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace((int)ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {Message}", message);
@@ -256,7 +255,7 @@ namespace Orleans.Runtime.Placement
                     foreach (var message in messages)
                     {
                         var result = resultTask.Result;
-                        _placementService.SetMessageTargetPlacement(message.Message, result.ActivationId, result.SiloAddress);
+                        _placementService.SetMessageTargetPlacement(message.Message, result.SiloAddress);
                         message.Completion.TrySetResult(true);
                     }
 

@@ -41,20 +41,39 @@ namespace Orleans.Runtime
         public override bool Equals(object obj)
         {
             return obj is GrainAddress address &&
-                   this.Matches(address) &&
+                   this.ActivationEqual(address) &&
                    this.MembershipVersion == address.MembershipVersion;
         }
 
         /// <summary>
-        /// Two grain addresses match if they are equal ignoring their <see cref="MembershipVersion"/> value.
+        /// Two grain addresses have equal activations if they are equal ignoring their <see cref="MembershipVersion"/> value.
         /// </summary>
-        /// <param name="address"> The other GrainAddress to compare this one with.</param>
-        /// <returns> Returns <c>true</c> if the two GrainAddress are considered to match</returns>
-        public bool Matches(GrainAddress address)
+        /// <param name="address"> The other <see cref="GrainAddress"/> to compare this one with.</param>
+        /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match</returns>
+        public bool ActivationEqual(GrainAddress address)
         {
-            return this.SiloAddress == address.SiloAddress &&
+            return this.SiloAddress.Equals(address.SiloAddress) &&
                    this.GrainId == address.GrainId &&
                    this.ActivationId == address.ActivationId;
+        }
+
+        /// <summary>
+        /// Two grain addresses match if they have equal <see cref="SiloAddress"/> and <see cref="GrainId"/> values
+        /// and either one has a default <see cref="ActivationId"/> value or both have equal <see cref="ActivationId"/> values.
+        /// </summary>
+        /// <param name="other"> The other <see cref="GrainAddress"/> to compare this one with.</param>
+        /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match.</returns>
+        public bool Matches(GrainAddress other)
+        {
+            if (other is null || GrainId != other.GrainId || !SiloAddress.Equals(other.SiloAddress)) return false;
+
+            // If both activation ids are set, compare them, otherwise, ignore them.
+            if (!ActivationId.IsDefault && !other.ActivationId.IsDefault)
+            {
+                return ActivationId.Equals(other.ActivationId);
+            }
+
+            return true;
         }
 
         public override int GetHashCode() => HashCode.Combine(this.SiloAddress, this.GrainId, this.ActivationId);
