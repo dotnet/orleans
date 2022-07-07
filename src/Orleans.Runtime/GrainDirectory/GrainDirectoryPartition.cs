@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     [Serializable]
@@ -14,7 +15,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         public const int NO_ETAG = -1;
 
-        public GrainAddress Activation { get; private set; }
+        public GrainAddress? Activation { get; private set; }
 
         public DateTime TimeCreated { get; private set; }
 
@@ -69,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
             return wasRemoved;
         }
 
-        public GrainAddress Merge(GrainInfo other)
+        public GrainAddress? Merge(GrainInfo other)
         {
             var otherActivation = other.Activation;
             if (otherActivation is not null && Activation is null)
@@ -256,9 +257,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="other"></param>
         /// <returns>Activations which must be deactivated.</returns>
-        internal Dictionary<SiloAddress, List<GrainAddress>> Merge(GrainDirectoryPartition other)
+        internal Dictionary<SiloAddress, List<GrainAddress>>? Merge(GrainDirectoryPartition other)
         {
-            Dictionary<SiloAddress, List<GrainAddress>> activationsToRemove = null;
+            Dictionary<SiloAddress, List<GrainAddress>>? activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)

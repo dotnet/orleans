@@ -1,23 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
-        private readonly SiloAddress seed;
+        private readonly SiloAddress? seed;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private readonly object writeLock = new object();
-        private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
+        private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
         // Consider: move these constants into an apropriate place
@@ -264,7 +266,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal SiloAddress FindPredecessor(SiloAddress silo)
+        internal SiloAddress? FindPredecessor(SiloAddress silo)
         {
             var existing = directoryMembership.MembershipRingList;
             int index = existing.IndexOf(silo);
@@ -280,7 +282,7 @@ namespace Orleans.Runtime.GrainDirectory
             return existing.Count > 1 ? existing[(index == 0 ? existing.Count : index) - 1] : null;
         }
 
-        internal SiloAddress FindSuccessor(SiloAddress silo)
+        internal SiloAddress? FindSuccessor(SiloAddress silo)
         {
             var existing = directoryMembership.MembershipRingList;
             int index = existing.IndexOf(silo);
@@ -325,7 +327,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grainId"></param>
         /// <returns></returns>
-        public SiloAddress CalculateGrainDirectoryPartition(GrainId grainId)
+        public SiloAddress? CalculateGrainDirectoryPartition(GrainId grainId)
         {
             // give a special treatment for special grains
             if (grainId.IsSystemTarget())
@@ -349,7 +351,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return MyAddress;
             }
 
-            SiloAddress siloAddress = null;
+            SiloAddress? siloAddress = null;
             int hash = unchecked((int)grainId.GetUniformHashCode());
 
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
@@ -398,9 +400,9 @@ namespace Orleans.Runtime.GrainDirectory
             return siloAddress;
         }
 
-        public SiloAddress CheckIfShouldForward(GrainId grainId, int hopCount, string operationDescription)
+        public SiloAddress? CheckIfShouldForward(GrainId grainId, int hopCount, string operationDescription)
         {
-            SiloAddress owner = CalculateGrainDirectoryPartition(grainId);
+            var owner = CalculateGrainDirectoryPartition(grainId);
 
             if (owner is null || owner.Equals(MyAddress))
             {
@@ -542,7 +544,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         // helper method to avoid code duplication inside UnregisterManyAsync
         private void UnregisterOrPutInForwardList(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount,
-            ref Dictionary<SiloAddress, List<GrainAddress>> forward, string context)
+            ref Dictionary<SiloAddress, List<GrainAddress>>? forward, string context)
         {
             foreach (var address in addresses)
             {
@@ -578,7 +580,7 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.UnregistrationsManyIssued.Add(1);
             }
 
-            Dictionary<SiloAddress, List<GrainAddress>> forwardlist = null;
+            Dictionary<SiloAddress, List<GrainAddress>>? forwardlist = null;
 
             UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist, "UnregisterManyAsync");
 
@@ -586,7 +588,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardlist != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                Dictionary<SiloAddress, List<GrainAddress>> forwardlist2 = null;
+                Dictionary<SiloAddress, List<GrainAddress>>? forwardlist2 = null;
                 UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, "UnregisterManyAsync");
                 forwardlist = forwardlist2;
                 if (forwardlist != null)
@@ -618,8 +620,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             DirectoryInstruments.LookupsLocalIssued.Add(1);
 
-            SiloAddress silo = CalculateGrainDirectoryPartition(grain);
-
+            var silo = CalculateGrainDirectoryPartition(grain);
 
             if (log.IsEnabled(LogLevel.Debug))
                 log.LogDebug(
@@ -677,20 +678,9 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public AddressAndTag GetLocalDirectoryData(GrainId grain)
-        {
-            return DirectoryPartition.LookUpActivation(grain);
-        }
+        public AddressAndTag GetLocalDirectoryData(GrainId grain) => DirectoryPartition.LookUpActivation(grain);
 
-        public GrainAddress GetLocalCacheData(GrainId grain)
-        {
-            if (DirectoryCache.LookUp(grain, out var cache) && IsValidSilo(cache.SiloAddress))
-            {
-                return cache;
-            }
-
-            return null;
-        }
+        public GrainAddress? GetLocalCacheData(GrainId grain) => DirectoryCache.LookUp(grain, out var cache) && IsValidSilo(cache.SiloAddress) ? cache : null;
 
         public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
@@ -812,10 +802,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        public SiloAddress GetPrimaryForGrain(GrainId grain)
-        {
-            return CalculateGrainDirectoryPartition(grain);
-        }
+        public SiloAddress? GetPrimaryForGrain(GrainId grain) => CalculateGrainDirectoryPartition(grain);
 
         private long RingDistanceToSuccessor() => FindSuccessor(MyAddress) is { } successor ? CalcRingDistance(MyAddress, successor) : 0;
 
@@ -847,7 +834,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
-        public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => (address = GetLocalCacheData(grainId)) is not null;
+        public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
 
         private class DirectoryMembership
         {

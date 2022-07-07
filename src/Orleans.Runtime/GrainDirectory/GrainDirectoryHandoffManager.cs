@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -58,9 +59,9 @@ namespace Orleans.Runtime.GrainDirectory
                 if (!directoryPartitionsMap.TryGetValue(removedSilo, out var partition)) return;
 
                 // at least one predcessor should exist, which is me
-                SiloAddress predecessor = localDirectory.FindPredecessor(removedSilo);
+                var predecessor = localDirectory.FindPredecessor(removedSilo);
                 Debug.Assert(predecessor is not null);
-                Dictionary<SiloAddress, List<GrainAddress>> duplicates;
+                Dictionary<SiloAddress, List<GrainAddress>>? duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Merging my partition with the copy of silo {RemovedSilo}", removedSilo);
@@ -91,10 +92,11 @@ namespace Orleans.Runtime.GrainDirectory
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
 
-                // check if this is the immediate successors (i.e., if I should hold this silo's copy)
+                // check if this is our immediate successor (i.e., if I should hold this silo's copy)
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
                 var successor = localDirectory.FindSuccessor(localDirectory.MyAddress);
+                Debug.Assert(successor is not null);
                 if (!successor.Equals(addedSilo))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not my immediate successor.", addedSilo);
@@ -286,7 +288,7 @@ namespace Orleans.Runtime.GrainDirectory
                 .Ignore();
         }
 
-        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>> duplicates)
+        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>>? duplicates)
         {
             if (duplicates == null || duplicates.Count == 0) return;
             this.EnqueueOperation(
