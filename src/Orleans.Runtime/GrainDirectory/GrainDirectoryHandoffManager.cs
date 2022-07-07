@@ -96,8 +96,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
                 var successor = localDirectory.FindSuccessor(localDirectory.MyAddress);
-                Debug.Assert(successor is not null);
-                if (!successor.Equals(addedSilo))
+                if (successor is null || !successor.Equals(addedSilo))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not my immediate successor.", addedSilo);
                     return;
