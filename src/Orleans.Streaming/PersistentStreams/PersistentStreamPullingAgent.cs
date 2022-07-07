@@ -519,14 +519,14 @@ namespace Orleans.Streams
 
         private void CleanupPubSubCache(DateTime now)
         {
-            if (pubSubCache.Count == 0) return;
-            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, this.options.StreamInactivityPeriod))
-                         .ToList();
-            toRemove.ForEach(tuple =>
+            foreach (var tuple in pubSubCache)
             {
-                pubSubCache.Remove(tuple.Key);
-                tuple.Value.DisposeAll(logger);
-            });
+                if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
+                {
+                    pubSubCache.Remove(tuple.Key);
+                    tuple.Value.DisposeAll(logger);
+                }
+            }
         }
 
         private async Task RegisterStream(InternalStreamId streamId, StreamSequenceToken firstToken, DateTime now)

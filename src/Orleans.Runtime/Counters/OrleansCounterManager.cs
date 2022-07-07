@@ -14,11 +14,11 @@ namespace Orleans.Runtime.Counters
             int numWriteErrors = 0;
 
             List<ICounter> allCounters = new List<ICounter>();
-            CounterStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
-            IntValueStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
-            StringValueStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
-            FloatValueStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
-            AverageTimeSpanStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
+            CounterStatistic.AddCounters(allCounters);
+            IntValueStatistic.AddCounters(allCounters);
+            StringValueStatistic.AddCounters(allCounters);
+            FloatValueStatistic.AddCounters(allCounters);
+            AverageTimeSpanStatistic.AddCounters(allCounters);
 
             foreach (ICounter counter in allCounters)
             {

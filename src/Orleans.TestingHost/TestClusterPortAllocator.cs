@@ -217,9 +217,8 @@ namespace Orleans.TestingHost
                 {
                     _workItems.Add(() =>
                     {
-                        if (_mutexes.TryGetValue(name, out var value))
+                        if (_mutexes.Remove(name, out var value))
                         {
-                            _mutexes.Remove(name);
                             value.ReleaseMutex();
                             value.Close();
                         }

@@ -222,7 +222,7 @@ namespace Orleans.Runtime.GrainDirectory
             var wasRemoved = false;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, this.grainDirectoryOptions.Value.LazyDeregistrationDelay, out wasRemoved))
+                if (partitionData.TryGetValue(grain, out var value) && value.RemoveActivation(activation, cause, this.grainDirectoryOptions.Value.LazyDeregistrationDelay, out wasRemoved))
                 {
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);
@@ -301,14 +301,14 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var pair in other.partitionData)
                 {
-                    if (partitionData.ContainsKey(pair.Key))
+                    if (partitionData.TryGetValue(pair.Key, out var existing))
                     {
                         if (log.IsEnabled(LogLevel.Debug))
                         {
                             log.LogDebug("While merging two disjoint partitions, same grain {GrainId} was found in both partitions", pair.Key);
                         }
 
-                        var activationToDrop = partitionData[pair.Key].Merge(pair.Value);
+                        var activationToDrop = existing.Merge(pair.Value);
                         if (activationToDrop == null) continue;
 
                         activationsToRemove ??= new Dictionary<SiloAddress, List<GrainAddress>>();
@@ -343,35 +343,18 @@ namespace Orleans.Runtime.GrainDirectory
         {
             var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.grainDirectoryOptions, this.grainFactory, this.loggerFactory);
 
-            if (modifyOrigin)
+            lock (lockable)
             {
-                // SInce we use the "pairs" list to modify the underlying collection below, we need to turn it into an actual list here
-                List<KeyValuePair<GrainId, GrainInfo>> pairs;
-                lock (lockable)
+                foreach (var pair in partitionData)
                 {
-                    pairs = partitionData.Where(pair => predicate(pair.Key)).ToList();
-                }
-
-                foreach (var pair in pairs)
-                {
-                    newDirectory.partitionData.Add(pair.Key, pair.Value);
-                }
-
-                lock (lockable)
-                {
-                    foreach (var pair in pairs)
-                    {
-                        partitionData.Remove(pair.Key);
-                    }
-                }
-            }
-            else
-            {
-                lock (lockable)
-                {
-                    foreach (var pair in partitionData.Where(pair => predicate(pair.Key)))
+                    if (predicate(pair.Key))
                     {
                         newDirectory.partitionData.Add(pair.Key, pair.Value);
+
+                        if (modifyOrigin)
+                        {
+                            partitionData.Remove(pair.Key);
+                        }
                     }
                 }
             }

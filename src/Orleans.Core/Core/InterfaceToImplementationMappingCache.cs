@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using Orleans.CodeGeneration;
@@ -36,8 +37,7 @@ namespace Orleans
         /// <summary>
         /// The map from implementation types to interface types to map of method to method infos.
         /// </summary>
-        private readonly CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings =
-            new CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>>();
+        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
 
         /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.
@@ -53,7 +53,7 @@ namespace Orleans
             if (!this.mappings.TryGetValue(implementationType, out var invokerMap))
             {
                 // Generate an the invoker mapping using the provided invoker.
-                this.mappings[implementationType] = invokerMap = CreateInterfaceToImplementationMap(implementationType);
+                invokerMap = mappings.GetOrAdd(implementationType, CreateInterfaceToImplementationMap(implementationType));
             }
 
             // Attempt to get the invoker for the provided interfaceId.

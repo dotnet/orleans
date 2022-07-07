@@ -1,8 +1,6 @@
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 
 namespace Orleans.Runtime
 {
@@ -57,9 +55,8 @@ namespace Orleans.Runtime
         {
             lock (dict)
             {
-                if (dict.TryGetValue(name.Name, out var stat))
+                if (dict.Remove(name.Name, out var stat))
                 {
-                    dict.Remove(name.Name);
                     // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
                     stat.fetcher = null;
                     stat.valueConverter = null;
@@ -105,11 +102,13 @@ namespace Orleans.Runtime
             return current;
         }
 
-        public static void AddCounters(List<ICounter> list, Func<ICounter, bool> predicate)
+        public static void AddCounters(List<ICounter> list)
         {
             lock (dict)
             {
-                list.AddRange(dict.Values.Where(predicate));
+                foreach (var kv in dict)
+                    if (kv.Value.Storage != CounterStorage.DontStore)
+                        list.Add(kv.Value);
             }
         }
 
