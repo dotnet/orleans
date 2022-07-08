@@ -80,7 +80,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, "Failed to clean up defunct membership table entries: {Exception}", exception);
+                        this.log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, exception, "Failed to clean up defunct membership table entries");
                     }
                 }
             }

@@ -38,7 +38,7 @@ namespace UnitTests.Grains
 
             Task OnError(Exception ex)
             {
-                this.logger.LogError("Error: {Exception}", ex);
+                this.logger.LogError(ex, "Error");
                 this.errorCounter++;
                 return Task.CompletedTask;
             }
