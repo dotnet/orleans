@@ -10,7 +10,6 @@ using Orleans.CodeGeneration;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
-using Orleans.Reminders;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 
@@ -41,7 +40,11 @@ namespace Orleans.Runtime.ReminderService
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
             Catalog catalog)
-            : base(SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, localSiloDetails.SiloAddress), localSiloDetails.SiloAddress, loggerFactory, ringProvider)
+            : base(
+                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, localSiloDetails.SiloAddress),
+                  localSiloDetails.SiloAddress,
+                  loggerFactory,
+                  ringProvider)
         {
             this.reminderOptions = reminderOptions.Value;
             this.initTimeout = this.reminderOptions.InitializationTimeout;

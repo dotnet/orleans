@@ -2,14 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Services;
@@ -98,10 +96,10 @@ namespace UnitTests.Grains
             // the previous activation (incarnation of the grain) registered... so, play it safe
             if (!this.sequence.ContainsKey(reminderName))
             {
-                // allReminders.Add(reminderName, r); // not using allReminders at the moment
-                //counters.Add(reminderName, 0);
                 this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
             }
+
+            allReminders[reminderName].Fired.Add(status.CurrentTickTime);
 
             // calculating tick sequence number
 
@@ -122,7 +120,6 @@ namespace UnitTests.Grains
                 this.logger.LogInformation("ReceiveReminder: {Reminder} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
                 return Task.CompletedTask;
             }
-
             this.sequence[reminderName] = sequenceNumber;
             this.logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
 
