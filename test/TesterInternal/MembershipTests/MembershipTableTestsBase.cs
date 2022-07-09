@@ -49,6 +49,12 @@ namespace UnitTests.MembershipTests
 
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
+            this.connectionString = fixture.ConnectionString;
+        }
+
+        protected MembershipTableTestsBase(TestEnvironmentFixture environment, LoggerFilterOptions filters)
+        {
             this.environment = environment;
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             logger = loggerFactory.CreateLogger(this.GetType().FullName);
@@ -57,14 +63,11 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("ClusterId={ClusterId}", this.clusterId);
 
-            fixture.InitializeConnectionStringAccessor(GetConnectionString);
-            this.connectionString = fixture.ConnectionString;
             if (string.IsNullOrEmpty(this.connectionString))
             {
                 throw new SkipException("No connection string configured");
             }
             this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
-            var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
@@ -457,7 +460,7 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow Joining failed");
 
             newTableVersion = table.Version.Next();
-            var  newEntry = CreateMembershipEntryForTest();
+            var newEntry = CreateMembershipEntryForTest();
             ok = await membershipTable.InsertRow(newEntry, newTableVersion);
 
             Assert.True(ok, "InsertRow failed");
