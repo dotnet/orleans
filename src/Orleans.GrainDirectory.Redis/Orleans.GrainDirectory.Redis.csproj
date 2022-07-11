@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.GrainDirectory.Redis</PackageId>
-    <Title>Microsoft Orleans Grain Directory Redis</Title>
+    <Title>Microsoft Orleans Grain Directory Redis Provider</Title>
     <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>

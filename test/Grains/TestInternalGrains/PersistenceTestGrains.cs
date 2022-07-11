@@ -731,9 +731,16 @@ namespace UnitTests.Grains
             {
                 await outstandingWriteStateOperation;
             }
-            outstandingWriteStateOperation = WriteStateAsync();
-            await outstandingWriteStateOperation;
-            outstandingWriteStateOperation = null;
+
+            try
+            {
+                outstandingWriteStateOperation = WriteStateAsync();
+                await outstandingWriteStateOperation;
+            }
+            finally
+            {
+                outstandingWriteStateOperation = null;
+            }
         }
 
         public Task Setup(IReentrentGrainWithState other)

@@ -32,7 +32,6 @@ set TESTS=^
 '%CMDHOME%\test\Extensions\AWSUtils.Tests',^
 '%CMDHOME%\test\Extensions\Consul.Tests',^
 '%CMDHOME%\test\Extensions\ServiceBus.Tests',^
-'%CMDHOME%\test\Extensions\TestServiceFabric',^
 '%CMDHOME%\test\Extensions\TesterAdoNet',^
 '%CMDHOME%\test\Extensions\TesterZooKeeperUtils',^
 '%CMDHOME%\test\Transactions\Orleans.Transactions.Tests',^

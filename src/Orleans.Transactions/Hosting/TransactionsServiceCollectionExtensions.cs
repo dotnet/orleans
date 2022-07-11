@@ -11,12 +11,9 @@ namespace Orleans.Hosting
     /// </summary>
     public static class TransactionsServiceCollectionExtensions
     {
-        internal static IServiceCollection UseTransactions(this IServiceCollection services, bool withReporter)
+        internal static IServiceCollection UseTransactionsWithSilo(this IServiceCollection services, bool withReporter)
         {
-            services.TryAddSingleton<IClock,Clock>();
-            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
-            services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
-            services.AddSingleton<ITransactionAgent, TransactionAgent>();
+            services.AddTransactionsBaseline();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
@@ -26,6 +23,18 @@ namespace Orleans.Hosting
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
             if (withReporter)
                 services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
+            return services;
+        }
+
+        internal static IServiceCollection UseTransactionsWithClient(this IServiceCollection services) => services.AddTransactionsBaseline();
+
+        internal static IServiceCollection AddTransactionsBaseline(this IServiceCollection services)
+        {
+            services.TryAddSingleton<IClock, Clock>();
+            services.AddSingleton<ITransactionAgent, TransactionAgent>();
+            services.AddSingleton<ITransactionClient, TransactionClient>();
+            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
+            services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
             return services;
         }
     }

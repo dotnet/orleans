@@ -23,7 +23,9 @@ namespace Orleans.BroadcastChannel
         /// <param name="regex">The stream namespace regular expression.</param>
         public RegexChannelNamespacePredicate(string regex)
         {
-            this.regex = new Regex(regex, RegexOptions.Compiled) ?? throw new ArgumentNullException(nameof(regex));
+            if (regex is null) throw new ArgumentNullException(nameof(regex));
+            
+            this.regex = new Regex(regex, RegexOptions.Compiled);
         }
 
         /// <inheritdoc />

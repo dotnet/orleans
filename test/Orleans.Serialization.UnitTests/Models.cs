@@ -238,6 +238,16 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    public class RecursiveClass
+    {
+        [Id(0)]
+        public int IntProperty { get; set; }
+
+        [Id(1)]
+        public RecursiveClass RecursiveProperty { get; set; }
+    }
+
+    [GenerateSerializer]
     [WellKnownId(3201)]
     public class SomeClassWithSerializers
     {

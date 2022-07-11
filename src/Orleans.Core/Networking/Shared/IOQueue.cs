@@ -7,14 +7,12 @@ namespace Orleans.Networking.Shared
 {
     internal sealed class IOQueue : PipeScheduler,  IThreadPoolWorkItem
     {
-        private readonly ConcurrentQueue<Work> _workItems = new();
+        private readonly ConcurrentQueue<(Action<object> Callback, object State)> _workItems = new();
         private int _doingWork;
 
         public override void Schedule(Action<object> action, object state)
         {
-            var work = new Work(action, state);
-
-            _workItems.Enqueue(work);
+            _workItems.Enqueue((action, state));
 
             // Set working if it wasn't (via atomic Interlocked).
             if (Interlocked.CompareExchange(ref _doingWork, 1, 0) == 0)
@@ -58,18 +56,6 @@ namespace Orleans.Networking.Shared
                 }
 
                 // Is work, wasn't already scheduled so continue loop.
-            }
-        }
-
-        private readonly struct Work
-        {
-            public readonly Action<object> Callback;
-            public readonly object State;
-
-            public Work(Action<object> callback, object state)
-            {
-                Callback = callback;
-                State = state;
             }
         }
     }

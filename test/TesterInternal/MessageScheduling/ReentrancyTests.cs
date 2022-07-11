@@ -20,7 +20,6 @@ namespace UnitTests
         public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
-                .AddSimpleMessageStreamProvider("sms")
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore")
                 .AddMemoryGrainStorageAsDefault()
@@ -88,22 +87,6 @@ namespace UnitTests
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
-            grain.SubscribeToStream().Wait();
-            try
-            {
-                grain.PushToStream("reentrant").Wait(2000);
-            }
-            catch (Exception ex)
-            {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
-            }
-            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -262,7 +245,7 @@ namespace UnitTests
         private async Task Do_FanOut_Task_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = random.Next();
+            int id = ThreadSafeRandom.Next();
             if (doNonReentrant)
             {
                 IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
@@ -292,7 +275,7 @@ namespace UnitTests
         private async Task Do_FanOut_AC_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = random.Next();
+            int id = ThreadSafeRandom.Next();
             if (doNonReentrant)
             {
                 IFanOutACGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);

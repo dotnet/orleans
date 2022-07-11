@@ -21,6 +21,11 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// The number of ticks per second for this stopwatch.
+        /// </summary>
+        public const long Frequency = 1000;
+
+        /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
         public bool IsRunning => _value > 0;

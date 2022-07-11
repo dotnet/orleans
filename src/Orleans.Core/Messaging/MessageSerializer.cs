@@ -1,8 +1,9 @@
+#nullable enable
+
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +16,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Utilities;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -25,6 +26,10 @@ namespace Orleans.Runtime.Messaging
         private const int MessageSizeHint = 4096;
         private readonly Serializer<object> _bodySerializer;
         private readonly Serializer<GrainAddress> _activationAddressCodec;
+        private readonly CachingSiloAddressCodec _readerSiloAddressCodec;
+        private readonly CachingSiloAddressCodec _writerSiloAddressCodec;
+        private readonly CachingIdSpanCodec _readerIdSpanCodec;
+        private readonly CachingIdSpanCodec _writerIdSpanCodec;
         private readonly Serializer _serializer;
         private readonly SerializerSession _serializationSession;
         private readonly SerializerSession _deserializationSession;
@@ -33,7 +38,7 @@ namespace Orleans.Runtime.Messaging
         private readonly int _maxBodyLength;
         private readonly SerializerSessionPool _sessionPool;
         private readonly DictionaryCodec<string, object> _requestContextCodec;
-        private object _bufferWriter;
+        private object? _bufferWriter;
 
         public MessageSerializer(
             Serializer<object> bodySerializer,
@@ -45,6 +50,10 @@ namespace Orleans.Runtime.Messaging
             int maxHeaderSize,
             int maxBodySize)
         {
+            _readerSiloAddressCodec = new CachingSiloAddressCodec();
+            _writerSiloAddressCodec = new CachingSiloAddressCodec();
+            _readerIdSpanCodec = new CachingIdSpanCodec();
+            _writerIdSpanCodec = new CachingIdSpanCodec();
             _serializer = ActivatorUtilities.CreateInstance<Serializer>(services);
             _activationAddressCodec = activationAddressSerializer;
             _serializationSession = sessionPool.GetSession();
@@ -57,7 +66,7 @@ namespace Orleans.Runtime.Messaging
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
         }
 
-        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message message)
+        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
         {
             if (input.Length < FramingLength)
             {
@@ -200,7 +209,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
             {
-                writer.WriteInt64(value.TimeToLive.Value.Ticks);
+                writer.WriteInt64(value.TimeToLive!.Value.Ticks);
             }
 
             if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
@@ -233,11 +242,6 @@ namespace Orleans.Runtime.Messaging
                 writer.WriteByte((byte)value.Result);
             }
 
-            if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-            {
-                WriteActivationId(ref writer, value.SendingActivation);
-            }
-
             if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
             {
                 WriteGrainId(ref writer, value.SendingGrain);
@@ -245,12 +249,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
-                WriteSiloAddress(ref writer, value.SendingSilo);
-            }
-
-            if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
-            {
-                WriteActivationId(ref writer, value.TargetActivation);
+                _writerSiloAddressCodec.WriteRaw(ref writer, value.SendingSilo);
             }
 
             if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
@@ -265,12 +264,12 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)
             {
-                WriteSiloAddress(ref writer, value.TargetSilo);
+                _writerSiloAddressCodec.WriteRaw(ref writer, value.TargetSilo);
             }
 
             if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
             {
-                IdSpanCodec.WriteRaw(ref writer, value.InterfaceType.Value);
+                _writerIdSpanCodec.WriteRaw(ref writer, value.InterfaceType.Value);
             }
 
             // Always write RequestContext last
@@ -327,11 +326,6 @@ namespace Orleans.Runtime.Messaging
             if ((headers & Headers.RESULT) != Headers.NONE)
                 result.Result = (ResponseTypes)reader.ReadByte();
 
-            if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-            {
-                result.SendingActivation = ReadActivationId(ref reader);
-            }
-
             if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
             {
                 result.SendingGrain = ReadGrainId(ref reader);
@@ -339,12 +333,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.SENDING_SILO) != Headers.NONE)
             {
-                result.SendingSilo = ReadSiloAddress(ref reader);
-            }
-
-            if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
-            {
-                result.TargetActivation = ReadActivationId(ref reader);
+                result.SendingSilo = _readerSiloAddressCodec.ReadRaw(ref reader);
             }
 
             if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
@@ -359,12 +348,12 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TARGET_SILO) != Headers.NONE)
             {
-                result.TargetSilo = ReadSiloAddress(ref reader);
+                result.TargetSilo = _readerSiloAddressCodec.ReadRaw(ref reader);
             }
 
             if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
             {
-                var interfaceTypeSpan = IdSpanCodec.ReadRaw(ref reader);
+                var interfaceTypeSpan = _readerIdSpanCodec.ReadRaw(ref reader);
                 result.InterfaceType = new GrainInterfaceType(interfaceTypeSpan);
             }
 
@@ -401,7 +390,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static string ReadString<TInput>(ref Reader<TInput> reader)
+        private static string? ReadString<TInput>(ref Reader<TInput> reader)
         {
             var length = reader.ReadVarInt32();
             if (length <= 0)
@@ -420,7 +409,7 @@ namespace Orleans.Runtime.Messaging
             {
                 result = Encoding.UTF8.GetString(span);
             }
-            else      
+            else
 #endif
             {
                 var bytes = reader.ReadBytes((uint)length);
@@ -487,93 +476,24 @@ namespace Orleans.Runtime.Messaging
             {
                 var key = ReadString(ref reader);
                 var value = _serializer.Deserialize<object, TInput>(ref reader);
+
+                Debug.Assert(key is not null);
                 result.Add(key, value);
             }
 
             return result;
         }
 
-        public static SiloAddress ReadSiloAddress<TInput>(ref Reader<TInput> reader)
+        private GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
         {
-            IPAddress ip;
-            var length = reader.ReadVarInt32();
-            if (length < 0)
-            {
-                return null;
-            }
-#if NET5_0_OR_GREATER
-            if (reader.TryReadBytes(length, out var bytes))
-            {
-                ip = new IPAddress(bytes);
-            }
-            else
-            {
-#endif
-                var addressBytes = reader.ReadBytes((uint)length);
-                ip = new IPAddress(addressBytes);
-#if NET5_0_OR_GREATER
-            }
-#endif
-            var port = (int)reader.ReadVarUInt32();
-            var generation = reader.ReadInt32();
-            
-            return SiloAddress.New(new IPEndPoint(ip, port), generation);
-        }
-
-        public static void WriteSiloAddress<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
-        {
-            if (value is null)
-            {
-                writer.WriteVarInt32(-1);
-                return;
-            }
-
-            var ep = value.Endpoint;
-#if NET5_0_OR_GREATER
-            Span<byte> buffer = stackalloc byte[64];
-            if (ep.Address.TryWriteBytes(buffer, out var length))
-            {
-                var writable = writer.WritableSpan;
-                if (writable.Length > length)
-                {
-                    // IP
-                    writer.WriteVarInt32(length);
-                    buffer.Slice(0, length).CopyTo(writable[1..]);
-                    writer.AdvanceSpan(length);
-
-                    // Port
-                    writer.WriteVarUInt32((uint)ep.Port);
-
-                    // Generation
-                    writer.WriteInt32(value.Generation);
-
-                    return;
-                }
-            }
-#endif
-
-            // IP
-            var bytes = ep.Address.GetAddressBytes();
-            writer.WriteVarInt32(bytes.Length);
-            writer.Write(bytes);
-
-            // Port
-            writer.WriteVarUInt32((uint)ep.Port);
-
-            // Generation
-            writer.WriteInt32(value.Generation);
-        }
-
-        private static GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
-        {
-            var grainType = IdSpanCodec.ReadRaw(ref reader);
+            var grainType = _readerIdSpanCodec.ReadRaw(ref reader);
             var grainKey = IdSpanCodec.ReadRaw(ref reader);
             return new GrainId(new GrainType(grainType), grainKey);
         }
 
-        private static void WriteGrainId<TBufferWriter>(ref Writer<TBufferWriter> writer, GrainId value) where TBufferWriter : IBufferWriter<byte>
+        private void WriteGrainId<TBufferWriter>(ref Writer<TBufferWriter> writer, GrainId value) where TBufferWriter : IBufferWriter<byte>
         {
-            IdSpanCodec.WriteRaw(ref writer, value.Type.Value);
+            _writerIdSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
         }
 
@@ -581,12 +501,12 @@ namespace Orleans.Runtime.Messaging
         {
             if (reader.ReadByte() == 0)
             {
-                return ActivationId.Zero;
+                return default;
             }
 
             if (reader.TryReadBytes(16, out var readOnly))
             {
-                return ActivationId.GetActivationId(new Guid(readOnly));
+                return new(new Guid(readOnly));
             }
 
             Span<byte> bytes = stackalloc byte[16];
@@ -595,7 +515,7 @@ namespace Orleans.Runtime.Messaging
                 bytes[i] = reader.ReadByte();
             }
 
-            return ActivationId.GetActivationId(new Guid(bytes));
+            return new(new Guid(bytes));
         }
 
         private static void WriteActivationId<TBufferWriter>(ref Writer<TBufferWriter> writer, ActivationId value) where TBufferWriter : IBufferWriter<byte>

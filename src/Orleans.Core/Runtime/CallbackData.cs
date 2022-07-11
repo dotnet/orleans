@@ -15,7 +15,7 @@ namespace Orleans.Runtime
 
         public CallbackData(
             SharedCallbackData shared,
-            IResponseCompletionSource ctx, 
+            IResponseCompletionSource ctx,
             Message msg)
         {
             this.shared = shared;
@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         {
             this.lastKnownStatus = status;
         }
-        
+
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
@@ -48,13 +48,9 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
 
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                requestStatistics.OnAppRequestsTimedOut();
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
             OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
 
@@ -73,7 +69,6 @@ namespace Orleans.Runtime
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage} Target History is: {messageHistory}.");
             var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
@@ -84,12 +79,8 @@ namespace Orleans.Runtime
             }
 
             this.shared.Unregister(this.Message);
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
@@ -105,7 +96,6 @@ namespace Orleans.Runtime
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             var error = Message.CreatePromptExceptionResponse(msg, exception);
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
@@ -117,12 +107,8 @@ namespace Orleans.Runtime
 
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);

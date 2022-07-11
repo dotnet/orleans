@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly SchedulingOptions schedulingOptions;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
 
-        internal ActivationTaskScheduler TaskScheduler { get; } 
+        internal ActivationTaskScheduler TaskScheduler { get; }
 
         public IGrainContext GrainContext { get; set; }
 
@@ -192,7 +192,7 @@ namespace Orleans.Runtime.Scheduler
             return o;
         }
 
-        // Execute one or more turns for this activation. 
+        // Execute one or more turns for this activation.
         // This method is always called in a single-threaded environment -- that is, no more than one
         // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
         public void Execute()
@@ -241,9 +241,8 @@ namespace Orleans.Runtime.Scheduler
                         this.log.LogError(
                             (int)ErrorCode.SchedulerExceptionFromExecute,
                             ex,
-                            "Worker thread caught an exception thrown from Execute by task {Task}. Exception: {Exception}",
-                            OrleansTaskExtentions.ToString(task),
-                            ex);
+                            "Worker thread caught an exception thrown from Execute by task {Task}",
+                            OrleansTaskExtentions.ToString(task));
                         throw;
                     }
                     finally
@@ -252,7 +251,7 @@ namespace Orleans.Runtime.Scheduler
                         var taskLength = stopwatch.Elapsed - taskStart;
                         if (taskLength > schedulingOptions.TurnWarningLengthThreshold)
                         {
-                            this.schedulerStatistics.NumLongRunningTurns.Increment();
+                            SchedulerInstruments.LongRunningTurnsCounter.Add(1);
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerTurnTooLong3,
                                 "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
@@ -274,14 +273,13 @@ namespace Orleans.Runtime.Scheduler
                 this.log.LogError(
                     (int)ErrorCode.Runtime_Error_100032,
                     ex,
-                    "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute: {Exception}",
-                    Thread.CurrentThread.ManagedThreadId,
-                    ex);
+                    "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
+                    Thread.CurrentThread.ManagedThreadId);
             }
             finally
             {
-                // Now we're not Running anymore. 
-                // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue; 
+                // Now we're not Running anymore.
+                // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue;
                 // If our run list is empty, then we're waiting.
                 lock (lockable)
                 {

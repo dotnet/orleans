@@ -254,22 +254,18 @@ namespace Orleans.Transactions.State
                 currentGroup.Next = null;
         }
 
-        public async Task Rollback(Guid guid, bool notify)
+        public void Rollback(Guid guid) => currentGroup?.Remove(guid);
+
+        public Task Rollback(Guid guid, bool notify)
         {
             // no-op if the transaction never happened or already rolled back
-            if (currentGroup == null || !currentGroup.TryGetValue(guid, out var record))
+            if (currentGroup == null || !currentGroup.Remove(guid, out var record))
             {
-                return;
+                return Task.CompletedTask;
             }
-
-            // remove record for this transaction
-            currentGroup.Remove(guid);
 
             // notify remote listeners
-            if (notify)
-            {
-                await this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
-            }
+            return notify ? queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null) : Task.CompletedTask;
         }
 
         private async Task LockWork()
@@ -342,25 +338,14 @@ namespace Orleans.Transactions.State
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the 
                             // total transaction timeout
-                            List<Guid> expiredWaiters = null;
                             foreach (var kvp in currentGroup)
                             {
                                 if (now > kvp.Value.Deadline)
                                 {
-                                    if (expiredWaiters == null)
-                                        expiredWaiters = new List<Guid>();
-                                    expiredWaiters.Add(kvp.Key);
+                                    currentGroup.Remove(kvp.Key);
 
                                     if (logger.IsEnabled(LogLevel.Trace))
                                         logger.LogTrace("Expire-lock-waiter {Key}", kvp.Key);
-                                }
-                            }
-
-                            if (expiredWaiters != null)
-                            {
-                                foreach (var guid in expiredWaiters)
-                                {
-                                    currentGroup.Remove(guid);
                                 }
                             }
 

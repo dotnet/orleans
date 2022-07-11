@@ -35,14 +35,13 @@ namespace Orleans
         private readonly MessagingTrace messagingTrace;
         private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
-        
+
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
-        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
 
         private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
         private readonly SharedCallbackData sharedCallbackData;
@@ -66,10 +65,9 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
-            ILoggerFactory loggerFactory, 
+            ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IOptions<StatisticsOptions> statisticsOptions,
-            ApplicationRequestsStatisticsGroup appRequestStatistics,
             StageAnalysisStatisticsGroup schedulerStageStatistics,
             ClientStatisticsManager clientStatisticsManager,
             MessagingTrace messagingTrace,
@@ -78,7 +76,6 @@ namespace Orleans
             this.ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
             this.statisticsOptions = statisticsOptions;
-            this.appRequestStatistics = appRequestStatistics;
             this.schedulerStageStatistics = schedulerStageStatistics;
             this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
@@ -91,7 +88,6 @@ namespace Orleans
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
-                this.appRequestStatistics,
                 this.clientMessagingOptions.ResponseTimeout);
         }
 
@@ -126,7 +122,7 @@ namespace Orleans
                 var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-                
+
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
@@ -165,7 +161,7 @@ namespace Orleans
 
             logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), clientId);
         }
-        
+
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(CancellationToken cancellationToken)
         {
@@ -265,14 +261,12 @@ namespace Orleans
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
-            message.SendingActivation = CurrentActivationAddress.ActivationId;
             message.TargetGrain = targetGrainId;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
             }
 
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
@@ -334,7 +328,7 @@ namespace Orleans
 
                 return;
             }
-            
+
             CallbackData callbackData;
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
@@ -396,7 +390,7 @@ namespace Orleans
                     logger.LogInformation("OutsideRuntimeClient.ConstructorReset(): client Id {ClientId}", clientId);
                 }
             });
-            
+
             Utils.SafeExecute(() => this.Dispose());
         }
 
@@ -454,9 +448,9 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
-            
+
             Utils.SafeExecute(() => this.callbackTimer?.Dispose());
-            
+
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
             this.ClusterConnectionLost = null;
@@ -476,7 +470,7 @@ namespace Orleans
                 }
             }
         }
-        
+
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost;
 
@@ -511,7 +505,7 @@ namespace Orleans
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;

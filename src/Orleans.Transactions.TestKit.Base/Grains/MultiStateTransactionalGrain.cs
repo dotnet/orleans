@@ -130,6 +130,12 @@ namespace Orleans.Transactions.TestKit
             throw new AddAndThrowException($"{GetType().Name} test exception");
         }
 
+        public async Task SetAndThrow(int numberToSet)
+        {
+            await Set(numberToSet);
+            throw new AddAndThrowException($"{GetType().Name} test exception");
+        }
+
         public Task Deactivate()
         {
             DeactivateOnIdle();

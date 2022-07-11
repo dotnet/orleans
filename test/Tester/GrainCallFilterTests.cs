@@ -13,6 +13,9 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.Providers;
+using System.Threading;
+using Orleans.Internal;
 
 namespace UnitTests.General
 {
@@ -67,7 +70,7 @@ namespace UnitTests.General
 
                             await ctx.Invoke();
                         })
-                        .AddSimpleMessageStreamProvider("SMSProvider")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }
@@ -97,7 +100,7 @@ namespace UnitTests.General
                                 result["result"] = "intercepted!";
                             }
                         })
-                        .AddSimpleMessageStreamProvider("SMSProvider");
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider");
 
                     static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {
@@ -165,8 +168,8 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Outgoing_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IOutgoingMethodInterceptionGrain>(random.Next());
-            var grain2 = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IOutgoingMethodInterceptionGrain>(ThreadSafeRandom.Next());
+            var grain2 = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(ThreadSafeRandom.Next());
 
             // This grain method reads the context and returns it
             var result = await grain.EchoViaOtherGrain(grain2, "ab");
@@ -186,7 +189,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_Order_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(ThreadSafeRandom.Next());
 
             // This grain method reads the context and returns it
             var context = await grain.GetRequestContext();
@@ -208,7 +211,13 @@ namespace UnitTests.General
             // The intercepted grain should double the value passed to the stream.
             const int testValue = 43;
             await stream.OnNextAsync(testValue);
-            var actual = await grain.GetLastStreamValue();
+            var cts = new CancellationTokenSource(1000);
+            int actual = 0;
+            while (!cts.IsCancellationRequested)
+            {
+                actual = await grain.GetLastStreamValue();
+                if (actual != 0) break;
+            }
             Assert.Equal(testValue * 2, actual);
         }
 
@@ -315,7 +324,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_ExceptionHandling_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(ThreadSafeRandom.Next());
 
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
@@ -330,7 +339,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_FilterThrows_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(ThreadSafeRandom.Next());
             
             var exception = await Assert.ThrowsAsync<MethodInterceptionGrain.MyDomainSpecificException>(() => grain.FilterThrows());
             Assert.NotNull(exception);
@@ -344,7 +353,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_SetIncorrectResultType_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(ThreadSafeRandom.Next());
 
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
@@ -358,7 +367,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_GenericInterface_ConcreteGrain_Test()
         {
-            var id = random.Next();
+            var id = ThreadSafeRandom.Next();
             var hungry = this.fixture.GrainFactory.GetGrain<IHungryGrain<Apple>>(id);
             var caterpillar = this.fixture.GrainFactory.GetGrain<ICaterpillarGrain>(id);
             var omnivore = this.fixture.GrainFactory.GetGrain<IOmnivoreGrain>(id);
@@ -386,7 +395,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_SystemWideDoesNotCallContextInvoke_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(ThreadSafeRandom.Next());
 
             // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
             // InvalidOperationException, not an NullReferenceException.
@@ -400,7 +409,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_GrainSpecificDoesNotCallContextInvoke_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(ThreadSafeRandom.Next());
 
             // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
             // InvalidOperationException, not an NullReferenceException.
@@ -414,7 +423,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Outgoing_SystemWideDoesNotCallContextInvoke_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(ThreadSafeRandom.Next());
 
             // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
             // InvalidOperationException, not an NullReferenceException.

@@ -52,12 +52,11 @@ namespace Orleans.Serialization
         /// </summary>
         /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
         /// <param name="value">The value to serialize.</param>
-        /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
         /// <returns>A byte array containing the serialized value.</returns>
-        public byte[] SerializeToArray<T>(T value, int sizeHint = 0)
+        public byte[] SerializeToArray<T>(T value)
         {
             using var session = _sessionPool.GetSession();
-            var writer = Writer.Create(new PooledArrayBufferWriter(sizeHint), session);
+            var writer = Writer.CreatePooled(session);
             try
             {
                 var codec = _codecProvider.GetCodec<T>();
@@ -547,12 +546,11 @@ namespace Orleans.Serialization
         /// Serializes the provided <paramref name="value"/> into a new array.
         /// </summary>
         /// <param name="value">The value to serialize.</param>
-        /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
         /// <returns>A byte array containing the serialized value.</returns>
-        public byte[] SerializeToArray(T value, int sizeHint = 0)
+        public byte[] SerializeToArray(T value)
         {
             using var session = _sessionPool.GetSession();
-            var writer = Writer.Create(new PooledArrayBufferWriter(sizeHint), session);
+            var writer = Writer.CreatePooled(session);
             try
             {
                 _codec.WriteField(ref writer, 0, typeof(T), value);
@@ -927,12 +925,11 @@ namespace Orleans.Serialization
         /// Serializes the provided <paramref name="value"/> into a new array.
         /// </summary>
         /// <param name="value">The value to serialize.</param>
-        /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
         /// <returns>A byte array containing the serialized value.</returns>
-        public byte[] SerializeToArray(ref T value, int sizeHint = 0)
+        public byte[] SerializeToArray(ref T value)
         {
             using var session = _sessionPool.GetSession();
-            var writer = Writer.Create(new PooledArrayBufferWriter(sizeHint), session);
+            var writer = Writer.CreatePooled(session);
             try
             {
                 _codec.Serialize(ref writer, ref value);

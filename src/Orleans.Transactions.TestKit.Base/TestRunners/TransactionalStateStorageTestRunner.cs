@@ -326,8 +326,8 @@ namespace Orleans.Transactions.TestKit
             {
                 if (reverseOrder)
                 {
-                    etag = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
-                    _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
+                    etag = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
+                    _ = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
                 }
                 else
                 {

@@ -35,7 +35,6 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
@@ -67,7 +66,6 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", (System.Action<Orleans.Configuration.SqsOptions>)(options =>
                     {
                         options.ConnectionString = AWSTestConstants.SqsConnectionString;

@@ -54,7 +54,6 @@ namespace Orleans
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.AddLogging();
@@ -87,7 +86,7 @@ namespace Orleans
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
-            // Add default option formatter if none is configured, for options which are required to be configured 
+            // Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<ConnectionOptions>();
@@ -164,7 +163,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A marker type used to determine 
+        /// A marker type used to determine
         /// </summary>
         private class ServicesAdded { }
     }

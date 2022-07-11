@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -30,6 +30,9 @@ namespace Orleans.Transactions.TestKit
 
         [Transaction(TransactionOption.CreateOrJoin)]
         Task AddAndThrow(int numberToAdd);
+
+        [Transaction(TransactionOption.CreateOrJoin)]
+        Task SetAndThrow(int numberToSet);
 
         Task Deactivate();
     }

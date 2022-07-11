@@ -183,7 +183,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
 
-        public void CachePlacementDecision(GrainAddress address) => cache.AddOrUpdate(address, 0);
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(GrainAddress address) => cache.Remove(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address)

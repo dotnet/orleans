@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -263,7 +264,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (failureException is null)
             {
-                MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                 if (_log.IsEnabled(LogLevel.Trace))
                 {
@@ -281,7 +282,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                 var failedProbes = ++_failedProbes;
                 _log.LogWarning(
@@ -348,14 +349,14 @@ namespace Orleans.Runtime.MembershipService
                             roundTripTimer.Elapsed,
                             indirectResult.ProbeResponseTime);
 
-                        MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                        MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                         _failedProbes = 0;
                         probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
                     }
                     else
                     {
-                        MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                        MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                         if (indirectResult.IntermediaryHealthScore > 0)
                         {
@@ -399,6 +400,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Represents the result of probing a silo.
         /// </summary>
+        [StructLayout(LayoutKind.Auto)]
         public readonly struct ProbeResult
         {
             private ProbeResult(int failedProbeCount, ProbeResultStatus status, bool isDirectProbe, int intermediaryHealthDegradationScore)
@@ -424,7 +426,7 @@ namespace Orleans.Runtime.MembershipService
             public int IntermediaryHealthDegradationScore { get; }
         }
 
-        public enum ProbeResultStatus
+        public enum ProbeResultStatus : byte
         {
             Unknown,
             Failed,

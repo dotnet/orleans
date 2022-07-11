@@ -122,13 +122,13 @@ namespace Orleans
                     this.OnStartStageCompleted(stage);
                 }
             }
-            catch (Exception ex) when (!(ex is OrleansLifecycleCanceledException))
+            catch (Exception ex) when (ex is not OrleansLifecycleCanceledException)
             {
                 this.logger.LogError(
                     (int)ErrorCode.LifecycleStartFailure,
-                    "Lifecycle start canceled due to errors at stage {Stage}: {Exception}",
-                    this.highStage,
-                    ex);
+                    ex,
+                    "Lifecycle start canceled due to errors at stage {Stage}",
+                    this.highStage);
                 throw;
             }
 
@@ -199,7 +199,9 @@ namespace Orleans
                 {
                     this.logger.LogError(
                         (int)ErrorCode.LifecycleStopFailure,
-                        "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop. Exception: {Exception}", this.highStage, ex);
+                        ex,
+                        "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop.",
+                        this.highStage);
                 }
 
                 this.OnStopStageCompleted(stage);

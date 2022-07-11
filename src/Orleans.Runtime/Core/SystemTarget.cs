@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
 
         /// <inheritdoc/>
-        GrainId IGrainContext.GrainId => this.id.GrainId;
+        public GrainId GrainId => this.id.GrainId;
 
         /// <inheritdoc/>
         object IGrainContext.GrainInstance => this;
@@ -80,9 +80,9 @@ namespace Orleans.Runtime
         {
             this.id = grainId;
             this.Silo = silo;
+            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
             this.IsLowPriority = lowPriority;
-            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             this.logger = loggerFactory.CreateLogger(this.GetType());
         }

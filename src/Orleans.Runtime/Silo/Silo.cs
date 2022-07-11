@@ -19,6 +19,7 @@ using Orleans.Services;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Internal;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
@@ -189,13 +190,15 @@ namespace Orleans.Runtime
             {
                 participant?.Participate(this.siloLifecycle);
             }
+
             // register all named lifecycle participants
-            IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>> namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
-            foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedLifecycleParticipantCollection
-                ?.GetServices(this.Services)
-                ?.Select(s => s.GetService(this.Services)))
+            var namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
+            if (namedLifecycleParticipantCollection?.GetServices(Services)?.Select(s => s.GetService(Services)) is { } namedParticipants)
             {
-                participant?.Participate(this.siloLifecycle);
+                foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedParticipants)
+                {
+                    participant.Participate(this.siloLifecycle);
+                }
             }
 
             // add self to lifecycle

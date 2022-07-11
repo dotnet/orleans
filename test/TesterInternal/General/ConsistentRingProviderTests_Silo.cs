@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
@@ -216,7 +217,7 @@ namespace UnitTests.General
             var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             for (int i = 0; i < iteration; i++)
             {
-                double next = random.NextDouble();
+                double next = ThreadSafeRandom.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
                 SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
@@ -244,7 +245,7 @@ namespace UnitTests.General
             // some random keys
             for (int i = 0; i < 3; i++)
             {
-                VerifyKey((uint)random.Next(), silos);
+                VerifyKey((uint)ThreadSafeRandom.Next(), silos);
             }
             // lowest key
             uint lowest = (uint)(silos.First().GetConsistentHashCode() - 1);
@@ -340,10 +341,10 @@ namespace UnitTests.General
                 default:
                     while (count++ < numOfFailures)
                     {
-                        SiloHandle r = ids.Values[random.Next(ids.Count)];
+                        SiloHandle r = ids.Values[ThreadSafeRandom.Next(ids.Count)];
                         while (failures.Contains(r))
                         {
-                            r = ids.Values[random.Next(ids.Count)];
+                            r = ids.Values[ThreadSafeRandom.Next(ids.Count)];
                         }
                         failures.Add(r);
                     }

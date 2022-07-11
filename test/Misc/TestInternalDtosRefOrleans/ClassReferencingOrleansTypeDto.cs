@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans;
 
 namespace UnitTests.DtosRefOrleans
@@ -9,7 +9,7 @@ namespace UnitTests.DtosRefOrleans
     {
         static ClassReferencingOrleansTypeDto()
         {
-            typeof(IGrain).ToString();
+            _ = typeof(IGrain).ToString();
         }
 
         [Id(0)]

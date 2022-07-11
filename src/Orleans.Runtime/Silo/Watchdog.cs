@@ -15,8 +15,6 @@ namespace Orleans.Runtime
         private DateTime lastWatchdogCheck;
         private readonly List<IHealthCheckParticipant> participants;
         private readonly ILogger logger;
-        private readonly CounterStatistic watchdogChecks;
-        private CounterStatistic watchdogFailedChecks;
         private Thread thread;
 
         public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILogger<Watchdog> logger)
@@ -24,7 +22,6 @@ namespace Orleans.Runtime
             this.logger = logger;
             healthCheckPeriod = watchdogPeriod;
             participants = watchables;
-            watchdogChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_HEALTH_CHECKS);
         }
 
         public void Start()
@@ -77,11 +74,11 @@ namespace Orleans.Runtime
             {
                 lastHeartbeat = DateTime.UtcNow;
             }
-            
+
             var timeSinceLastWatchdogCheck = (DateTime.UtcNow - lastWatchdogCheck);
             if (timeSinceLastWatchdogCheck <= healthCheckPeriod) return;
 
-            watchdogChecks.Increment();
+            WatchdogInstruments.HealthChecks.Add(1);
             int numFailedChecks = 0;
             StringBuilder reasons = null;
             foreach (IHealthCheckParticipant participant in participants)
@@ -101,22 +98,19 @@ namespace Orleans.Runtime
                         numFailedChecks++;
                     }
                 }
-                catch (Exception exc) 
+                catch (Exception exc)
                 {
                     logger.LogWarning(
                         (int)ErrorCode.Watchdog_ParticipantThrownException,
                         exc,
                         "Health check participant {Participant} has thrown an exception from its CheckHealth method.",
-                        participant?.GetType());
+                        participant.GetType());
                 }
             }
             if (numFailedChecks > 0)
             {
-                if (watchdogFailedChecks == null)
-                    watchdogFailedChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_FAILED_HEALTH_CHECKS);
-                
-                watchdogFailedChecks.Increment();
-                logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "Watchdog had {FailedChecks} health Check failure(s) out of {ParticipantCount} health Check participants: {Reasons}", numFailedChecks, participants.Count, reasons.ToString()); 
+                WatchdogInstruments.FailedHealthChecks.Add(1);
+                logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "Watchdog had {FailedChecks} health Check failure(s) out of {ParticipantCount} health Check participants: {Reasons}", numFailedChecks, participants.Count, reasons.ToString());
             }
             lastWatchdogCheck = DateTime.UtcNow;
         }

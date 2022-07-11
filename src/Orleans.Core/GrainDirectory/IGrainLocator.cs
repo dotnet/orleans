@@ -34,8 +34,9 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Records a grain placement decision.
         /// </summary>
-        /// <param name="address">The newly placed grain's new address.</param>
-        void CachePlacementDecision(GrainAddress address);
+        /// <param name="grainId">The newly placed grain.</param>
+        /// <param name="siloAddress">The placement result.</param>
+        void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress);
 
         /// <summary>
         /// Invalidates any lookup cache entry associated with the provided grain id.

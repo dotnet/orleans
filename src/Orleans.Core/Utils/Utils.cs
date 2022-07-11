@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -24,7 +23,7 @@ namespace Orleans.Runtime
         /// <param name="putInBrackets">Puts elements within brackets</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// elements with square brackets and separating them with commas.</returns>
-        public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null, 
+        public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null,
                                                         string separator = ", ", bool putInBrackets = true)
         {
             if (collection == null)
@@ -167,19 +166,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="text">The string to hash.</param>
         /// <returns>An integer hash for the string.</returns>
-        public static int CalculateIdHash(string text)
-        {
-            var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
-
-            Span<int> result = stackalloc int[256 / 8 / sizeof(int)];
-            var sha = SHA256.Create();
-            sha.TryComputeHash(input, MemoryMarshal.AsBytes(result), out _);
-            sha.Dispose();
-
-            var hash = 0;
-            for (var i = 0; i < result.Length; i++) hash ^= result[i];
-            return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
-        }
+        public static int CalculateIdHash(string text) => SiloAddress.CalculateIdHash(text);
 
         /// <summary>
         /// Calculates a Guid hash value based on the consistent identity a string.
@@ -191,9 +178,7 @@ namespace Orleans.Runtime
             var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
 
             Span<byte> result = stackalloc byte[256 / 8];
-            var sha = SHA256.Create();
-            sha.TryComputeHash(input, result, out _);
-            sha.Dispose();
+            SHA256.HashData(input, result);
 
             MemoryMarshal.AsRef<long>(result) ^= MemoryMarshal.Read<long>(result.Slice(16));
             MemoryMarshal.AsRef<long>(result.Slice(8)) ^= MemoryMarshal.Read<long>(result.Slice(24));

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // at least one predcessor should exist, which is me
                 SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
+                Debug.Assert(predecessor is not null);
                 Dictionary<SiloAddress, List<GrainAddress>> duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {

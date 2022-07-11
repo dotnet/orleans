@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Statistics;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
@@ -24,8 +25,6 @@ namespace Orleans.Streams
         private readonly Dictionary<InternalStreamId, StreamConsumerCollection> pubSubCache;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
-        private readonly CounterStatistic numReadMessagesCounter;
-        private readonly CounterStatistic numSentMessagesCounter;
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
@@ -77,8 +76,6 @@ namespace Orleans.Streams
                 streamProviderName,
                 Silo,
                 QueueId.ToStringWithHashCode());
-            numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
-            numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
         }
 
         /// <summary>
@@ -87,7 +84,7 @@ namespace Orleans.Streams
         /// ERROR HANDLING:
         ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
         ///     The agent will call Initialize once and log an error. It will not call initialize again.
-        ///     The receiver itself may attempt later to recover from this error and do initialization again. 
+        ///     The receiver itself may attempt later to recover from this error and do initialization again.
         ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
         ///     Same applies to shutdown.
         /// </summary>
@@ -144,12 +141,12 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Initialize. No need to log again.
             }
 
-            // Setup a reader for a new receiver. 
+            // Setup a reader for a new receiver.
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
-            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
+            StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {Queue} under my responsibility.", QueueId.ToStringWithHashCode());
         }
@@ -232,8 +229,6 @@ namespace Orleans.Streams
                     "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.");
             }
             pubSubCache.Clear();
-            IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));
-            //IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, StatisticUniquePostfix));
         }
 
         public Task AddSubscriber(
@@ -379,7 +374,7 @@ namespace Orleans.Streams
                 if (IsShutdown) return; // timer was already removed, last tick
 
                 // loop through the queue until it is empty.
-                while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
+                while (!IsShutdown) // timer will be set to null when we are asked to shudown.
                 {
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
@@ -480,7 +475,7 @@ namespace Orleans.Streams
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
-            numReadMessagesCounter.IncrementBy(multiBatch.Count);
+            StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count);
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace(
                     (int)ErrorCode.PersistentStreamPullingAgent_11,
@@ -524,14 +519,14 @@ namespace Orleans.Streams
 
         private void CleanupPubSubCache(DateTime now)
         {
-            if (pubSubCache.Count == 0) return;
-            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, this.options.StreamInactivityPeriod))
-                         .ToList();
-            toRemove.ForEach(tuple =>
+            foreach (var tuple in pubSubCache)
             {
-                pubSubCache.Remove(tuple.Key);
-                tuple.Value.DisposeAll(logger);
-            });
+                if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
+                {
+                    pubSubCache.Remove(tuple.Key);
+                    tuple.Value.DisposeAll(logger);
+                }
+            }
         }
 
         private async Task RegisterStream(InternalStreamId streamId, StreamSequenceToken firstToken, DateTime now)
@@ -540,7 +535,7 @@ namespace Orleans.Streams
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
-            // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer) 
+            // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
             var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
 
@@ -605,14 +600,14 @@ namespace Orleans.Streams
 
                     try
                     {
-                        numSentMessagesCounter.Increment();
+                        StreamInstruments.PersistentStreamSentMessages.Add(1);
                         if (batch != null)
                         {
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown, 
+                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
                                 DeliveryBackoffProvider);
                             if (newToken != null)
@@ -830,7 +825,7 @@ namespace Orleans.Streams
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                async i => { streamData = 
+                                async i => { streamData =
                                     await PubsubRegisterProducer(pubSub, streamId, meAsStreamProducer, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,

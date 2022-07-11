@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.EventHubs</PackageId>
-    <Title>Microsoft Orleans EventHubs Provider</Title>
-    <Description>Microsoft Orleans. streaming provider for Azure EventHubs</Description>
+    <Title>Microsoft Orleans Azure Event Hubs Streaming Provider</Title>
+    <Description>Microsoft Orleans streaming provider backed by Azure Event Hubs</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>
     <DefineConstants>$(DefineConstants);ORLEANS_EVENTHUBS</DefineConstants>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>

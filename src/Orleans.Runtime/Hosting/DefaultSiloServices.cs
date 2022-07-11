@@ -76,7 +76,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<SiloStatisticsManager>();
-            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
@@ -177,7 +176,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ClientDirectory>();
             services.AddFromExisting<ILocalClientDirectory, ClientDirectory>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientDirectory>();
-            
+
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
 

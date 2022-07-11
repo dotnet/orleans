@@ -1,6 +1,6 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
@@ -9,10 +9,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
-
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
@@ -34,7 +33,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly List<Message> inflight = new List<Message>(4);
-        private readonly TaskCompletionSource<int> _transportConnectionClosed = new (TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
         private Task _processIncomingTask;
@@ -62,8 +61,6 @@ namespace Orleans.Runtime.Messaging
         public string ConnectionId => this.Context?.ConnectionId;
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }
-        protected CounterStatistic MessageReceivedCounter { get; set; }
-        protected CounterStatistic MessageSentCounter { get; set; }
         protected ConnectionContext Context { get; }
         protected NetworkingTrace Log => this.shared.NetworkingTrace;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
@@ -104,7 +101,7 @@ namespace Orleans.Runtime.Messaging
             var connection = context.Features.Get<Connection>();
             context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
-            NetworkingStatisticsGroup.OnOpenedSocket(connection.ConnectionDirection);
+            NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
         }
 
@@ -169,7 +166,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
+            NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
@@ -274,6 +271,9 @@ namespace Orleans.Runtime.Messaging
 
         public override string ToString() => $"[Local: {this.LocalEndPoint}, Remote: {this.RemoteEndPoint}, ConnectionId: {this.Context.ConnectionId}]";
 
+        protected abstract void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes);
+        protected abstract void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes);
+
         protected abstract void OnReceivedMessage(Message message);
 
         protected abstract void OnSendMessageFailure(Message message, string error);
@@ -304,7 +304,8 @@ namespace Orleans.Runtime.Messaging
                                 (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
                                 if (requiredBytes == 0)
                                 {
-                                    MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
+                                    Debug.Assert(message is not null);
+                                    RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
@@ -371,7 +372,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
-                            MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
+                            RecordMessageSend(message, headerLength + bodyLength, headerLength);
                         }
                     }
                     catch (Exception exception) when (message != default)
@@ -459,7 +460,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // The message body was not successfully decoded, but the headers were.
-            MessagingStatisticsGroup.OnRejectedMessage(message);
+            MessagingInstruments.OnRejectedMessage(message);
 
             if (message.HasDirection)
             {
@@ -497,7 +498,7 @@ namespace Orleans.Runtime.Messaging
                 "Unexpected error serializing message {Message}",
                 message);
 
-            MessagingStatisticsGroup.OnFailedSentMessage(message);
+            MessagingInstruments.OnFailedSentMessage(message);
 
             if (message.Direction == Message.Directions.Request)
             {
@@ -525,7 +526,7 @@ namespace Orleans.Runtime.Messaging
                     "Dropping message which failed during serialization: {Message}",
                     message);
 
-                MessagingStatisticsGroup.OnDroppedSentMessage(message);
+                MessagingInstruments.OnDroppedSentMessage(message);
             }
         }
 

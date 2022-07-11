@@ -26,6 +26,8 @@ using Xunit.Abstractions;
 using Tester.AzureUtils;
 using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers;
+using Orleans.Internal;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -73,7 +75,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConfigureTestDefaults();
                         options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                     }))
-                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
                 .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
             }
         }
@@ -92,7 +94,7 @@ namespace UnitTests.Streaming.Reliability
                         options.DeleteStateOnClear = true;
                     }))
                 .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
-                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.DeleteStateOnClear = true;
@@ -190,8 +192,8 @@ namespace UnitTests.Streaming.Reliability
 
             // Grain Producer -> Grain Consumer
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -208,8 +210,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -278,13 +280,6 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task SMS_StreamRel_SiloJoins()
-        {
-            const string testName = "SMS_StreamRel_SiloJoins";
-
-            await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
-        }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
@@ -429,8 +424,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = GetGrain(producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
@@ -487,8 +482,8 @@ namespace UnitTests.Streaming.Reliability
 
             // Grain Producer -> Grain 2 x Consumer
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             string when;
             logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
@@ -524,8 +519,8 @@ namespace UnitTests.Streaming.Reliability
 
             // Grain Producer -> Grain 2 x Consumer
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             string when;
             logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
@@ -566,8 +561,8 @@ namespace UnitTests.Streaming.Reliability
             // Grain Producer -> Grain 2 x Consumer
             // Note: PubSub should only count distinct grains, even if a grain has multiple consumer handles
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             string when;
             logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
@@ -626,7 +621,7 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
             var consumerGrain = this.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
 
             logger.LogInformation("Subscribe: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
@@ -666,8 +661,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -692,8 +687,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
 #if USE_GENERICS
             IStreamReliabilityTestGrain<int> producerGrain =
@@ -734,8 +729,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -774,8 +769,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -812,8 +807,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -851,8 +846,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = await Do_BaselineTest(consumerGrainId, producerGrainId);
 
@@ -890,8 +885,8 @@ namespace UnitTests.Streaming.Reliability
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
-            long consumerGrainId = random.Next();
-            long producerGrainId = random.Next();
+            long consumerGrainId = ThreadSafeRandom.Next();
+            long producerGrainId = ThreadSafeRandom.Next();
 
             var producerGrain = GetGrain(producerGrainId);
             SiloAddress producerLocation = await producerGrain.GetLocation();
@@ -1040,7 +1035,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // Find a Grain to use which is located on the specified silo
             IStreamReliabilityTestGrain newGrain;
-            long kp = random.Next();
+            long kp = ThreadSafeRandom.Next();
             while (true)
             {
                 newGrain = GetGrain(++kp);

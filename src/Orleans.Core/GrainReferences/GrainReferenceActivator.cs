@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -8,11 +7,9 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
-using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Versions;
-using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
@@ -28,7 +25,7 @@ namespace Orleans.GrainReferences
         private readonly object _lockObj = new object();
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
-        private Dictionary<(GrainType, GrainInterfaceType), Entry> _activators = new Dictionary<(GrainType, GrainInterfaceType), Entry>();
+        private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
@@ -56,7 +53,7 @@ namespace Orleans.GrainReferences
                 entry = CreateActivator(grainId.Type, interfaceType);
             }
 
-            var result = entry.Activator.CreateReference(grainId);
+            var result = entry.CreateReference(grainId);
             return result;
         }
 
@@ -67,7 +64,7 @@ namespace Orleans.GrainReferences
         /// <param name="interfaceType">the grain interface type.</param>
         /// <returns>An activator for the provided arguments.</returns>
         /// <exception cref="InvalidOperationException">No suitable activator was found.</exception>
-        private Entry CreateActivator(GrainType grainType, GrainInterfaceType interfaceType)
+        private IGrainReferenceActivator CreateActivator(GrainType grainType, GrainInterfaceType interfaceType)
         {
             lock (_lockObj)
             {
@@ -87,32 +84,12 @@ namespace Orleans.GrainReferences
                         throw new InvalidOperationException($"Unable to find an {nameof(IGrainReferenceActivatorProvider)} for grain type {grainType}");
                     }
 
-                    entry = new Entry(activator);
-                    _activators = new Dictionary<(GrainType, GrainInterfaceType), Entry>(_activators) { [(grainType, interfaceType)] = entry };
+                    entry = activator;
+                    _activators = new(_activators) { [(grainType, interfaceType)] = entry };
                 }
 
                 return entry;
             }
-        }
-
-        /// <summary>
-        /// Holds a grain reference activator.
-        /// </summary>
-        private readonly struct Entry
-        {
-            /// <summary>
-            /// Initializes a new instance of the <see cref="Entry"/> struct.
-            /// </summary>
-            /// <param name="activator">The activator.</param>
-            public Entry(IGrainReferenceActivator activator)
-            {
-                this.Activator = activator;
-            }
-
-            /// <summary>
-            /// Gets the grain reference activator.
-            /// </summary>
-            public IGrainReferenceActivator Activator { get; }
         }
     }
 
@@ -156,7 +133,7 @@ namespace Orleans.GrainReferences
             }
 
             var interfaceVersion = _versionManifest.GetLocalVersion(interfaceType);
-       
+
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
             var shared = new GrainReferenceShared(
                 grainType,

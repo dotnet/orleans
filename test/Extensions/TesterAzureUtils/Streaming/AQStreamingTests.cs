@@ -34,7 +34,6 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
                     b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
@@ -50,7 +49,6 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
                         options.ConfigureTestDefaults();

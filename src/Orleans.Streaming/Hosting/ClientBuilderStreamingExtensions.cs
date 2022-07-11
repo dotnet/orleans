@@ -59,55 +59,5 @@ namespace Orleans.Hosting
             configureStream?.Invoke(streamConfigurator);
             return builder;
         }
-
-        /// <summary>
-        /// Adds a new simple message streams provider to the client.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureStream">The configuration delegate.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder AddSimpleMessageStreamProvider(
-            this IClientBuilder builder,
-            string name,
-            Action<ISimpleMessageStreamConfigurator> configureStream)
-        {
-            //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), builder);
-            configureStream?.Invoke(streamConfigurator);
-            return builder;
-        }
-
-        /// <summary>
-        /// Adds a new simple message streams provider to the client.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder AddSimpleMessageStreamProvider(
-            this IClientBuilder builder,
-            string name,
-            Action<SimpleMessageStreamProviderOptions> configureOptions)
-        {
-            return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
-        }
-
-        /// <summary>
-        /// Adds a new simple message streams provider to the client.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The provider name.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder AddSimpleMessageStreamProvider(
-            this IClientBuilder builder,
-            string name,
-            Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
-        {
-            return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure(configureOptions));
-        }
     }
 }
