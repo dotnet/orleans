@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -185,8 +186,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogError(
                     (int)ErrorCode.MembershipGossipProcessingFailure,
-                    "Error refreshing membership table: {Exception}",
-                    exception);
+                    exception,
+                    "Error refreshing membership table");
             }
         }
 

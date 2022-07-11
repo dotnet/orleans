@@ -578,10 +578,9 @@ namespace Orleans.Runtime.ReminderService
                     {
                         this.reminderService.logger.LogWarning(
                             exception,
-                            "Exception firing reminder \"{ReminderName}\" for grain {GrainId}: {Exception}",
+                            "Exception firing reminder \"{ReminderName}\" for grain {GrainId}",
                             this.Identity.ReminderName,
-                            this.Identity.GrainRef?.GrainId,
-                            exception);
+                            this.Identity.GrainRef?.GrainId);
                     }
 
                     dueTimeSpan = CalculateDueTime();

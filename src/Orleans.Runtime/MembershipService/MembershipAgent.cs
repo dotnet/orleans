@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using Orleans.Internal;
+using System.Reflection.Metadata;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -75,8 +76,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         this.log.LogError(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
-                            "Failed to update table entry for this silo, will retry shortly: {Exception}",
-                            exception);
+                            exception,
+                            "Failed to update table entry for this silo, will retry shortly");
 
                         // Retry quickly
                         onceOffDelay = TimeSpan.FromMilliseconds(200);
@@ -85,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError("Error updating liveness timestamp: {Exception}", exception);
+                this.log.LogError(exception, "Error updating liveness timestamp");
                 this.fatalErrorHandler.OnFatalException(this, nameof(UpdateIAmAlive), exception);
             }
             finally
@@ -113,8 +114,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogInformation(
                     (int)ErrorCode.MembershipFailedToBecomeActive,
-                    "BecomeActive failed: {Exception}",
-                    exception);
+                    exception,
+                    "BecomeActive failed");
                 throw;
             }
         }
@@ -177,7 +178,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception) when (canContinue)
                 {
-                    this.log.LogError("Failed to validate initial cluster connectivity: {Exception}", exception);
+                    this.log.LogError(exception, "Failed to validate initial cluster connectivity");
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
 

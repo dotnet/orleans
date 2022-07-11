@@ -88,7 +88,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError("Error processing membership updates: {Exception}", exception);
+                this.log.LogError(exception, "Error processing membership updates");
                 this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
@@ -121,9 +121,9 @@ namespace Orleans.Runtime.MembershipService
                     catch (Exception exception)
                     {
                         this.log.LogError(
-                            "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener {Listener}: {Exception}",
-                            listener,
-                            exception);
+                            exception,
+                            "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener {Listener}",
+                            listener);
                     }
                 }
             }

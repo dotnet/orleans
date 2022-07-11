@@ -224,7 +224,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown an exception: {Exception}. Continuing.", exception);
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
                 }
             }
         }
