@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime.ConsistentRing
 {
@@ -24,6 +23,7 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly int numBucketsPerSilo;
         private bool running;
         private IRingRange myRange;
+        private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
         internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets)
         {
@@ -37,6 +37,7 @@ namespace Orleans.Runtime.ConsistentRing
             myAddress = siloAddress;
             running = true;
             myRange = RangeFactory.CreateFullRange();
+            lastNotification = (myRange, myRange, true);
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -77,13 +78,17 @@ namespace Orleans.Runtime.ConsistentRing
 
         public bool SubscribeToRangeChangeEvents(IRingRangeListener observer)
         {
+            (IRingRange OldRange, IRingRange NewRange, bool Increased) notification;
             lock (statusListeners)
             {
                 if (statusListeners.Contains(observer)) return false;
 
+                notification = lastNotification;
                 statusListeners.Add(observer);
-                return true;
             }
+
+            observer.RangeChangeNotification(notification.OldRange, notification.NewRange, notification.Increased);
+            return true;
         }
 
         public bool UnSubscribeFromRangeChangeEvents(IRingRangeListener observer)
@@ -104,6 +109,7 @@ namespace Orleans.Runtime.ConsistentRing
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
+                lastNotification = (old, now, increased);
                 copy = statusListeners.ToArray();
             }
             foreach (IRingRangeListener listener in copy)
@@ -326,5 +332,4 @@ namespace Orleans.Runtime.ConsistentRing
         }
     }
 }
-
 

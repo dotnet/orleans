@@ -26,6 +26,7 @@ namespace Orleans.Runtime.ConsistentRing
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners = new();
+        private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
         public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
         {
@@ -33,10 +34,11 @@ namespace Orleans.Runtime.ConsistentRing
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
 
+            myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
+            lastNotification = (myRange, myRange, true);
+
             // add myself to the list of members
             AddServer(MyAddress);
-            myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
-
             Start();
         }
 
@@ -180,13 +182,17 @@ namespace Orleans.Runtime.ConsistentRing
 
         public bool SubscribeToRangeChangeEvents(IRingRangeListener observer)
         {
+            (IRingRange OldRange, IRingRange NewRange, bool Increased) notification;
             lock (statusListeners)
             {
                 if (statusListeners.Contains(observer)) return false;
 
                 statusListeners.Add(observer);
-                return true;
+                notification = lastNotification;
             }
+
+            observer.RangeChangeNotification(notification.OldRange, notification.NewRange, notification.Increased);
+            return true;
         }
 
         public bool UnSubscribeFromRangeChangeEvents(IRingRangeListener observer)
@@ -203,6 +209,7 @@ namespace Orleans.Runtime.ConsistentRing
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
+                lastNotification = (old, now, increased);
                 copy = statusListeners.ToArray();
             }
             foreach (IRingRangeListener listener in copy)
