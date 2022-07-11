@@ -28,7 +28,9 @@ namespace UnitTests.TimerTests
             {
                 public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.UseInMemoryReminderService();
+                    hostBuilder.AddMemoryGrainStorageAsDefault()
+                        .AddReminders()
+                        .UseInMemoryReminderService();
                 }
             }
         }
@@ -58,7 +60,6 @@ namespace UnitTests.TimerTests
         [Fact]
         public async Task Rem_Grain_MultipleReminders()
         {
-            //log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
@@ -77,7 +78,6 @@ namespace UnitTests.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
     }
-
 }
 // ReSharper restore InconsistentNaming
 // ReSharper restore UnusedVariable

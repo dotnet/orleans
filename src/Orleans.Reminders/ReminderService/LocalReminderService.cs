@@ -2,21 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Metadata;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
-using Orleans.Statistics;
+using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal sealed class LocalReminderService : GrainService, IReminderService
+    internal sealed class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>
     {
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
+        private readonly ReminderOptions reminderOptions;
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
@@ -27,21 +32,48 @@ namespace Orleans.Runtime.ReminderService
         private uint initialReadCallCount = 0;
         private Task runTask;
 
-        internal LocalReminderService(
-            Silo silo,
+        public LocalReminderService(
+            ILocalSiloDetails localSiloDetails,
             IReminderTable reminderTable,
-            TimeSpan initTimeout,
             ILoggerFactory loggerFactory,
-            IAsyncTimerFactory asyncTimerFactory)
-            : base(SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, silo.SiloAddress), silo, loggerFactory)
+            IAsyncTimerFactory asyncTimerFactory,
+            IOptions<ReminderOptions> reminderOptions,
+            IConsistentRingProvider ringProvider,
+            Catalog catalog)
+            : base(
+                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, localSiloDetails.SiloAddress),
+                  localSiloDetails.SiloAddress,
+                  loggerFactory,
+                  ringProvider)
         {
+            this.reminderOptions = reminderOptions.Value;
+            this.initTimeout = this.reminderOptions.InitializationTimeout;
             this.reminderTable = reminderTable;
-            this.initTimeout = initTimeout;
             this.asyncTimerFactory = asyncTimerFactory;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = loggerFactory.CreateLogger<LocalReminderService>();
-            this.listRefreshTimer = asyncTimerFactory.Create(Constants.RefreshReminderList, "ReminderService.ReminderListRefresher");
+            this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
+            catalog.RegisterSystemTarget(this);
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
+        {
+            observer.Subscribe(
+                nameof(LocalReminderService),
+                ServiceLifecycleStage.Active,
+                async ct =>
+                {
+                    using var timeoutCancellation = new CancellationTokenSource(initTimeout);
+                    var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCancellation.Token);
+                    await this.QueueTask(Start)
+                        .WithCancellation(ct, $"Starting ReminderService failed due to timeout {initTimeout}");
+                },
+                async ct =>
+                {
+                    await this.QueueTask(Stop)
+                        .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
+                });
         }
 
         /// <summary>

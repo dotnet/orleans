@@ -14,11 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="..\DistributedTests.Common\DistributedTests.Common.csproj" />
-    <ProjectReference Include="..\DistributedTests.Grains\DistributedTests.Grains.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\DistributedTests\DistributedTests.Common\DistributedTests.Common.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\DistributedTests\DistributedTests.Grains\DistributedTests.Grains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

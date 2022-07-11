@@ -52,6 +52,7 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemDiagnosticsPerformanceCounterVersion>6.0.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemCollectionsImmutableVersion>6.0.0</SystemCollectionsImmutableVersion>
     <SystemDiagnosticsDiagnosticSourceVersion>6.0.0</SystemDiagnosticsDiagnosticSourceVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>

@@ -13,7 +13,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
@@ -37,7 +36,6 @@ namespace Orleans.Runtime
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
-        private IReminderService reminderService;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private Watchdog platformWatchdog;
@@ -74,7 +72,6 @@ namespace Orleans.Runtime
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
-        private IGrainContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
@@ -261,17 +258,6 @@ namespace Orleans.Runtime
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
-            var reminderTable = Services.GetService<IReminderTable>();
-            if (reminderTable != null)
-            {
-                logger.LogInformation("Creating reminder grain service for type {ReminderTableType}", reminderTable.GetType());
-
-                // Start the reminder service system target
-                var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
-                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
-                RegisterSystemTarget((SystemTarget)reminderService);
-            }
-
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(fallbackScheduler);
@@ -383,20 +369,6 @@ namespace Orleans.Runtime
 
         private async Task OnActiveStart(CancellationToken ct)
         {
-            var stopWatch = Stopwatch.StartNew();
-            if (this.reminderService != null)
-            {
-                await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
-
-                async Task StartReminderService()
-                {
-                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    this.reminderServiceContext = (this.reminderService as IGrainContext) ?? this.fallbackScheduler;
-                    await this.reminderServiceContext.QueueTask(this.reminderService.Start)
-                        .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
-                    this.logger.LogDebug("Reminder service started successfully.");
-                }
-            }
             foreach (var grainService in grainServices)
             {
                 await StartGrainService(grainService);
@@ -646,13 +618,6 @@ namespace Orleans.Runtime
                 await lifecycleSchedulingSystemTarget
                     .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory))
                     .WithCancellation(ct, "Sending gateway disconnection requests failed because the task was cancelled");
-            }
-
-            if (reminderService != null)
-            {
-                await reminderServiceContext
-                    .QueueTask(reminderService.Stop)
-                    .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
             }
 
             foreach (var grainService in grainServices)

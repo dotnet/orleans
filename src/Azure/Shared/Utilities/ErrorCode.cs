@@ -8,6 +8,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Clustering.AzureStorage.Utilities
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage.Utilities
+#elif ORLEANS_REMINDERS_PROVIDER
+namespace Orleans.Reminders
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.AzureStorage.Utilities
 #elif ORLEANS_STREAMING

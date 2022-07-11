@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 namespace Orleans
 {

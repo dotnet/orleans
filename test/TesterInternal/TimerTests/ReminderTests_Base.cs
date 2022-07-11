@@ -154,6 +154,7 @@ namespace UnitTests.TimerTests
             };
 
             await Task.Delay(period.Multiply(5));
+
             // start another silo ... although it will take it a while before it stabilizes
             log.LogInformation("Starting another silo");
             await this.HostedCluster.StartAdditionalSilosAsync(1, true);
@@ -263,56 +264,48 @@ namespace UnitTests.TimerTests
             await g.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
             await Task.Delay(sleepFor);
-            long last = await g.GetCounter(DR);
-            AssertIsInRange(last, 1, 2, g, DR, sleepFor);
+            var reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[DR].Fired.Count, 1, 2, g, DR, sleepFor);
 
             // Start R1
             await g.StartReminder(R1);
             await Task.Delay(sleepFor);
-            last = await g.GetCounter(R1);
-            AssertIsInRange(last, 1, 2, g, R1, sleepFor);
+            reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[R1].Fired.Count, 1, 2, g, R1, sleepFor);
 
             // Start R2
             await g.StartReminder(R2);
             await Task.Delay(sleepFor);
-            last = await g.GetCounter(R1);
-            AssertIsInRange(last, 3, 4, g, R1, sleepFor);
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 1, 2, g, R2, sleepFor);
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 5, 6, g, DR, sleepFor);
+            reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, 1, 2, g, R2, sleepFor);
+            AssertIsInRange(reminders[DR].Fired.Count, 5, 6, g, DR, sleepFor);
 
             // Stop R1
             await g.StopReminder(R1);
             await Task.Delay(sleepFor);
-            last = await g.GetCounter(R1);
-            AssertIsInRange(last, 3, 4, g, R1, sleepFor);
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 3, 4, g, R2, sleepFor);
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 7, 8, g, DR, sleepFor);
+            reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
+            AssertIsInRange(reminders[DR].Fired.Count, 7, 8, g, DR, sleepFor);
 
             // Stop R2
             await g.StopReminder(R2);
             sleepFor = period.Multiply(3) + LEEWAY; // giving some leeway
             await Task.Delay(sleepFor);
-            last = await g.GetCounter(R1);
-            AssertIsInRange(last, 3, 4, g, R1, sleepFor);
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 3, 4, g, R2, sleepFor);
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 10, 12, g, DR, sleepFor);
+            reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
+            AssertIsInRange(reminders[DR].Fired.Count, 10, 12, g, DR, sleepFor);
 
             // Stop Default reminder
             await g.StopReminder(DR);
             sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
             await Task.Delay(sleepFor);
-            last = await g.GetCounter(R1);
-            AssertIsInRange(last, 3, 4, g, R1, sleepFor);
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 3, 4, g, R2, sleepFor);
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 10, 12, g, DR, sleepFor);
+            reminders = await g.GetReminderStates();
+            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
+            AssertIsInRange(reminders[DR].Fired.Count, 10, 12, g, DR, sleepFor);
 
             return true;
         }
@@ -353,7 +346,10 @@ namespace UnitTests.TimerTests
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 
-            Skip.IfNot(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
+            if (!tickCountIsInsideRange)
+            {
+                Assert.True(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
+            }
         }
 
         protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
