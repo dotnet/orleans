@@ -80,7 +80,14 @@ namespace Orleans.Runtime
 
                 if (this.assemblyCache.TryGetValue(fullAssemblyName, out result)) return result;
 
-                result = Assembly.Load(RemapAssemblyName(assemblyName));
+                try
+                { 
+                    result = Assembly.Load(RemapAssemblyName(assemblyName));
+                }
+                catch(Exception ex)
+                {
+                    throw new TypeLoadException($"Unable to load {fullName} from assembly", ex);
+                }
                 var resultName = result.GetName();
                 this.assemblyCache[assemblyName.Name] = result;
                 this.assemblyCache[assemblyName.FullName] = result;
