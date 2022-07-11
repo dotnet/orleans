@@ -11,7 +11,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Statistics
 {
-    internal class LinuxEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleParticipant<ISiloLifecycle>, ILifecycleParticipant<IClusterClientLifecycle>, ILifecycleObserver, IDisposable
+    internal class LinuxEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleObserver, IDisposable
     {
         private readonly ILogger _logger;
 
@@ -54,16 +54,6 @@ namespace Orleans.Statistics
             {
                 _cts.Cancel();
             }
-        }
-
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
-        }
-
-        public void Participate(IClusterClientLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }
 
         public async Task OnStart(CancellationToken ct)

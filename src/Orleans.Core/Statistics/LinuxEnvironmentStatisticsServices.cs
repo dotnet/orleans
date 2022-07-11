@@ -24,7 +24,7 @@ namespace Orleans.Statistics
             services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
             services.AddSingleton<LinuxEnvironmentStatistics>();
             services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
-            services.AddFromExisting(typeof(ILifecycleParticipant<TLifecycleObservable>), typeof(LinuxEnvironmentStatistics));
+            services.AddSingleton<ILifecycleParticipant<TLifecycleObservable>, LinuxEnvironmentStatisticsLifecycleAdapter<TLifecycleObservable>>();
         }
     }
 }

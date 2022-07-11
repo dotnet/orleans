@@ -39,6 +39,7 @@ using Orleans.Storage;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Hosting
 {
@@ -69,11 +70,17 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
             services.AddSingleton<SiloOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
-            services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>(services);
+            }
+            else
+            {
+                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            }
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<SiloStatisticsManager>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();

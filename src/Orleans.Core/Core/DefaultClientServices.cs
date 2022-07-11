@@ -20,6 +20,7 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
+using System.Runtime.InteropServices;
 
 namespace Orleans
 {
@@ -49,9 +50,16 @@ namespace Orleans
 
             services.AddSingleton<ClientOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
-            services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
-            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                LinuxEnvironmentStatisticsServices.RegisterServices<IClusterClientLifecycle>(services);
+            }
+            else
+            {
+                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            }
+
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
