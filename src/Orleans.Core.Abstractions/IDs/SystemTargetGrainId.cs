@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     /// Identifies a system target.
     /// </summary>
     [Immutable]
-    public readonly struct SystemTargetGrainId : IEquatable<SystemTargetGrainId>, IComparable<SystemTargetGrainId>
+    public readonly struct SystemTargetGrainId : IEquatable<SystemTargetGrainId>, IComparable<SystemTargetGrainId>, ISpanFormattable
     {
         private const char SegmentSeparator = '+';
 
@@ -228,6 +228,11 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
 
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
+
         /// <inheritdoc/>
         public int CompareTo(SystemTargetGrainId other) => this.GrainId.CompareTo(other.GrainId);
 
@@ -278,25 +283,5 @@ namespace Orleans.Runtime
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >=(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) >= 0;
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="SystemTargetGrainId"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<SystemTargetGrainId>, IComparer<SystemTargetGrainId>
-        {
-            /// <summary>
-            /// Gets the singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(SystemTargetGrainId x, SystemTargetGrainId y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(SystemTargetGrainId x, SystemTargetGrainId y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(SystemTargetGrainId obj) => obj.GetHashCode();
-        }
     }
 }

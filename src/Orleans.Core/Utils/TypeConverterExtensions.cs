@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Text;
+using System.Text;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
@@ -57,7 +58,7 @@ namespace Orleans.Utilities
                 typeSpecs[i] = RuntimeTypeNameParser.Parse(formatter.Format(typeArguments[i]));
             }
 
-            var constructed = new ConstructedGenericTypeSpec(new NamedTypeSpec(null, unconstructed.ToStringUtf8(), typeArguments.Length), typeSpecs).Format();
+            var constructed = new ConstructedGenericTypeSpec(new NamedTypeSpec(null, unconstructed.ToString(), typeArguments.Length), typeSpecs).Format();
             return IdSpan.Create(constructed);
         }
 
@@ -90,7 +91,7 @@ namespace Orleans.Utilities
                 return Array.Empty<Type>();
             }
 
-            var safeString = "safer" + str.Slice(str.IndexOf((byte)GenericTypeIndicator)).GetUtf8String();
+            var safeString = "safer" + Encoding.UTF8.GetString(str.Slice(str.IndexOf((byte)GenericTypeIndicator)));
             var parsed = RuntimeTypeNameParser.Parse(safeString);
             if (!(parsed is ConstructedGenericTypeSpec spec))
             {

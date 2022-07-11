@@ -134,9 +134,9 @@ namespace Orleans.Runtime.MembershipService
                 log.LogError(
                     (int)ErrorCode.Runtime_Error_100305,
                     "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
-                    self.SiloAddress.ToLongString(),
+                    self.SiloAddress.ToString(),
                     self.Status);
-                throw new OrleansMissingMembershipEntryException($"This silo {self.SiloAddress.ToLongString()} status {self.Status} is not in its own local silo list! This is a bug!");
+                throw new OrleansMissingMembershipEntryException($"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
             }
 
             // Go over every node excluding me,
@@ -184,7 +184,7 @@ namespace Orleans.Runtime.MembershipService
                     (int)ErrorCode.MembershipWatchList,
                     "Will watch (actively ping) {ProbedSiloCount} silos: {ProbedSilos}",
                     newProbedSilos.Count,
-                    Utils.EnumerableToString(newProbedSilos.Keys, silo => silo.ToLongString()));
+                    Utils.EnumerableToString(newProbedSilos.Keys));
             }
 
             return result;

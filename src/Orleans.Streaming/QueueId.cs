@@ -10,7 +10,7 @@ namespace Orleans.Streams
     [Serializable]
     [Immutable]
     [GenerateSerializer]
-    public sealed class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>
+    public sealed class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>, ISpanFormattable
     {
         // TODO: Need to integrate with Orleans serializer to really use Interner.        
         private static readonly Interner<QueueId, QueueId> queueIdInternCache = new Interner<QueueId, QueueId>(InternerConstants.SIZE_LARGE);
@@ -105,18 +105,27 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public override string ToString()
+        public override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
         {
-            return $"{queueNamePrefix?.ToLowerInvariant()}-{queueId.ToString()}";
+            var len = queueNamePrefix.AsSpan().ToLowerInvariant(destination);
+            if (len >= 0 && destination[len..].TryWrite($"-{queueId}", out var len2))
+            {
+                charsWritten = len + len2;
+                return true;
+            }
+
+            charsWritten = 0;
+            return false;
         }
 
         /// <summary>
         /// Returns a string representation of this instance which includes its uniform hash code.
         /// </summary>
         /// <returns>A string representation of this instance which includes its uniform hash code.</returns>
-        public string ToStringWithHashCode()
-        {
-            return $"{queueNamePrefix?.ToLowerInvariant()}-{queueId.ToString()}-0x{GetUniformHashCode().ToString("X8")}";
-        }
+        public string ToStringWithHashCode() => $"{this}-0x{GetUniformHashCode():X8}";
     }
 }

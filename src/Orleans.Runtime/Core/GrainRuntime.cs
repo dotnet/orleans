@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory)
         {
             SiloAddress = localSiloDetails.SiloAddress;
-            SiloIdentity = SiloAddress.ToLongString();
+            SiloIdentity = SiloAddress.ToString();
             this.grainFactory = grainFactory;
             this.timerRegistry = timerRegistry;
             this.serviceProvider = serviceProvider;

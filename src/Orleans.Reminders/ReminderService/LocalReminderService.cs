@@ -695,16 +695,7 @@ namespace Orleans.Runtime.ReminderService
             }
 
             public override string ToString()
-            {
-                return string.Format("[{0}, {1}, {2}, {3}, {4}, {5}, {6}]",
-                                        Identity.ReminderName,
-                                        Identity.GrainRef?.ToString(),
-                                        period,
-                                        LogFormatter.PrintDate(firstTickTime),
-                                        ETag,
-                                        LocalSequenceNumber,
-                                        timer == null ? "Not_ticking" : "Ticking");
-            }
+                => $"[{Identity.ReminderName}, {Identity.GrainRef}, {period}, {LogFormatter.PrintDate(firstTickTime)}, {ETag}, {LocalSequenceNumber}, {(timer == null ? "Not_ticking" : "Ticking")}]";
         }
 
         private readonly struct ReminderIdentity : IEquatable<ReminderIdentity>

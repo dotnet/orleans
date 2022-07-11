@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     [Serializable, Immutable]
     [GenerateSerializer]
     [JsonConverter(typeof(ActivationIdConverter))]
-    public readonly struct ActivationId : IEquatable<ActivationId>
+    public readonly struct ActivationId : IEquatable<ActivationId>, ISpanFormattable
     {
         [DataMember(Order = 0)]
         [Id(0)]
@@ -64,6 +64,11 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public override string ToString() => $"@{Key:N}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"@{Key:N}", out charsWritten);
 
         /// <summary>
         /// Returns a string representation of this activation id which can be parsed by <see cref="FromParsableString"/>.

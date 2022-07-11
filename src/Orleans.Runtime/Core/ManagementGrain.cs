@@ -216,7 +216,7 @@ namespace Orleans.Runtime.Management
         public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
             return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
-                String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
+                $"SendControlCommandToProvider of type {providerTypeFullName} and name {providerName} command {command}.");
         }
 
         public ValueTask<SiloAddress> GetActivationAddress(IAddressable reference)

@@ -76,15 +76,7 @@ namespace Orleans.Runtime
 
         public static ushort DefaultInterfaceVersion = 1;
 
-        public static string SystemTargetName(GrainType id)
-        {
-            if (singletonSystemTargetNames.TryGetValue(id, out var name))
-            {
-                return name;
-            }
-
-            return id.ToStringUtf8();
-        }
+        public static string SystemTargetName(GrainType id) => singletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();
 
         public static bool IsSingletonSystemTarget(GrainType id)
         {

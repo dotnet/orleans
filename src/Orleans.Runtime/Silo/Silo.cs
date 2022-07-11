@@ -115,7 +115,7 @@ namespace Orleans.Runtime
                 (int)ErrorCode.SiloGcSetting,
                 "Silo starting with GC settings: ServerGC={ServerGC} GCLatencyMode={GCLatencyMode}",
                 GCSettings.IsServerGC,
-                Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
+                GCSettings.LatencyMode.ToString());
             if (!GCSettings.IsServerGC)
             {
                 logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
@@ -204,7 +204,7 @@ namespace Orleans.Runtime
             logger.LogInformation(
                 (int)ErrorCode.SiloInitializingFinished,
                 "-------------- Started silo {SiloAddress}, ConsistentHashCode {HashCode} --------------",
-                SiloAddress.ToLongString(),
+                SiloAddress.ToString(),
                 SiloAddress.GetConsistentHashCode().ToString("X"));
         }
 

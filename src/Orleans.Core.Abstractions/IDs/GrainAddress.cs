@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// Represents an entry in a <see cref="IGrainDirectory"/>
     /// </summary>
     [GenerateSerializer]
-    public class GrainAddress
+    public sealed class GrainAddress : ISpanFormattable
     {
         /// <summary>
         /// Identifier of the Grain
@@ -78,9 +78,14 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() => HashCode.Combine(this.SiloAddress, this.GrainId, this.ActivationId);
 
-        public override string ToString() => $"[{nameof(GrainAddress)} GrainId {GrainId.ToString()}, ActivationId: {ActivationId.ToParsableString()}, SiloAddress: {SiloAddress.ToParsableString()}]";
+        public override string ToString() => $"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}]";
 
-        public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {GrainId.ToString()}, ActivationId: {ActivationId.ToParsableString()}, SiloAddress: {SiloAddress.ToParsableString()}, MembershipVersion: {MembershipVersion}]";
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}]", out charsWritten);
+
+        public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}, MembershipVersion: {MembershipVersion}]";
 
         internal static GrainAddress NewActivationAddress(SiloAddress silo, GrainId grain)
         {

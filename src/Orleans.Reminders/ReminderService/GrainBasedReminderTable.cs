@@ -62,7 +62,7 @@ namespace Orleans.Runtime.ReminderService
                     list.Count,
                     reminderTable.Values.Sum(r => r.Count),
                     range.ToString(),
-                    Utils.EnumerableToString(list, e => e.ToString()));
+                    Utils.EnumerableToString(list));
             }
 
             var result = new ReminderTableData(list);

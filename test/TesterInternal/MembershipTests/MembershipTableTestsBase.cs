@@ -279,7 +279,7 @@ namespace UnitTests.MembershipTests
 
                 tableData = await membershipTable.ReadAll();
 
-                var etagBefore = tableData.Get(siloEntry.SiloAddress).Item2;
+                var etagBefore = tableData.TryGet(siloEntry.SiloAddress)?.Item2;
 
                 Assert.NotNull(etagBefore);
 
@@ -317,9 +317,9 @@ namespace UnitTests.MembershipTests
 
                 tableData = await membershipTable.ReadAll();
 
-                var tuple = tableData.Get(siloEntry.SiloAddress);
+                var tuple = tableData.TryGet(siloEntry.SiloAddress);
 
-                Assert.Equal(tuple.Item1.ToFullString(true), siloEntry.ToFullString(true));
+                Assert.Equal(tuple.Item1.ToFullString(), siloEntry.ToFullString());
 
                 var etagAfter = tuple.Item2;
 
@@ -340,7 +340,7 @@ namespace UnitTests.MembershipTests
 
                 etagBefore = etagAfter;
 
-                etagAfter = tableData.Get(siloEntry.SiloAddress).Item2;
+                etagAfter = tableData.TryGet(siloEntry.SiloAddress)?.Item2;
 
                 Assert.Equal(etagBefore, etagAfter);
                 Assert.NotNull(tableData.Version);
@@ -369,7 +369,7 @@ namespace UnitTests.MembershipTests
                 do
                 {
                     var updatedTableData = await membershipTable.ReadAll();
-                    var updatedRow = updatedTableData.Get(data.SiloAddress);
+                    var updatedRow = updatedTableData.TryGet(data.SiloAddress);
 
                     TableVersion tableVersion = updatedTableData.Version.Next();
 

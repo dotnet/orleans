@@ -116,8 +116,8 @@ namespace Orleans.Runtime.MembershipService
                     this.log.LogWarning(
                         (int)ErrorCode.MembershipFoundMyselfDead1,
                         "I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {Entry}.",
-                        localSiloEntry.ToFullString(full: true));
-                    this.KillMyselfLocally($"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.");
+                        localSiloEntry.ToFullString());
+                    this.KillMyselfLocally($"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString())}.");
                 }
 
                 snapshot = MembershipTableSnapshot.Create(localSiloEntry.WithStatus(this.CurrentStatus), snapshot);
@@ -414,8 +414,8 @@ namespace Orleans.Runtime.MembershipService
                 this.log.LogWarning(
                     (int)ErrorCode.MembershipFoundMyselfDead1,
                     "I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {Entry}.",
-                    myEntry.ToFullString(full: true));
-                this.KillMyselfLocally($"I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {(myEntry.ToFullString(full: true))}.");
+                    myEntry.ToFullString());
+                this.KillMyselfLocally($"I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {(myEntry.ToFullString())}.");
                 return true;
             }
 
@@ -451,9 +451,8 @@ namespace Orleans.Runtime.MembershipService
 
         private (MembershipEntry Entry, string ETag) GetOrCreateLocalSiloEntry(MembershipTableData table, SiloStatus currentStatus)
         {
-            if (table.Contains(this.myAddress))
+            if (table.TryGet(myAddress) is { } myTuple)
             {
-                var myTuple = table.Get(this.myAddress);
                 return (myTuple.Item1.Copy(), myTuple.Item2);
             }
 
@@ -545,15 +544,15 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (entry.Status == SiloStatus.Dead)
                     {
-                        log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead2, "I should be Dead according to membership table (in CleanupTableEntries): entry = {Entry}.", entry.ToFullString(full: true));
-                        KillMyselfLocally($"I should be Dead according to membership table (in CleanupTableEntries): entry = {(entry.ToFullString(full: true))}.");
+                        log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead2, "I should be Dead according to membership table (in CleanupTableEntries): entry = {Entry}.", entry.ToFullString());
+                        KillMyselfLocally($"I should be Dead according to membership table (in CleanupTableEntries): entry = {(entry.ToFullString())}.");
                     }
                     continue;
                 }
                 
                 if (entry.Status == SiloStatus.Dead)
                 {
-                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Skipping my previous old Dead entry in membership table: {Entry}", entry.ToFullString(full: true));
+                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Skipping my previous old Dead entry in membership table: {Entry}", entry.ToFullString());
                     continue;
                 }
 
@@ -571,7 +570,7 @@ namespace Orleans.Runtime.MembershipService
                         "Detected older version of myself - Marking other older clone as Dead -- Current Me={LocalSiloAddress} Older Me={OlderSiloAddress}, Old entry={Entry}",
                         myAddress,
                         siloAddress,
-                        entry.ToFullString());
+                        entry.ToString());
                     // Declare older clone of me as Dead.
                     silosToDeclareDead.Add(tuple);   //return DeclareDead(entry, eTag, tableVersion);
                 }
@@ -583,9 +582,9 @@ namespace Orleans.Runtime.MembershipService
                         "Detected newer version of myself - I am the older clone so I will stop -- Current Me={LocalSiloAddress} Newer Me={NewerSiloAddress}, Current entry={Entry}",
                         myAddress,
                         siloAddress,
-                        entry.ToFullString());
+                        entry.ToString());
                     await this.UpdateStatus(SiloStatus.Dead);
-                    KillMyselfLocally($"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry.ToFullString()}");
+                    KillMyselfLocally($"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry}");
                     return true; // No point continuing!
                 }
             }
@@ -593,7 +592,7 @@ namespace Orleans.Runtime.MembershipService
             if (silosToDeclareDead.Count == 0) return true;
 
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("CleanupTableEntries: About to DeclareDead {Count} outdated silos in the table: {Silos}", silosToDeclareDead.Count,
-                Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1), entry => entry.ToString()));
+                Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1)));
 
             var result = true;
             var nextVersion = table.Version;
@@ -669,20 +668,19 @@ namespace Orleans.Runtime.MembershipService
             var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
             if (localSiloEntry.Status == SiloStatus.Dead)
             {
-                var msg = string.Format("I should be Dead according to membership table (in TryKill): entry = {0}.", localSiloEntry.ToFullString(full: true));
+                var msg = string.Format("I should be Dead according to membership table (in TryKill): entry = {0}.", localSiloEntry.ToFullString());
                 log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead3, msg);
                 KillMyselfLocally(msg);
                 return true;
             }
 
-            if (!table.Contains(silo))
+            if (table.TryGet(silo) is not { } tuple)
             {
-                var str = string.Format("Could not find silo entry for silo {0} in the table.", silo);
+                var str = $"Could not find silo entry for silo {silo} in the table.";
                 log.LogError((int)ErrorCode.MembershipFailedToReadSilo, str);
                 throw new KeyNotFoundException(str);
             }
 
-            var tuple = table.Get(silo);
             var entry = tuple.Item1.Copy();
             string eTag = tuple.Item2;
 
@@ -719,7 +717,7 @@ namespace Orleans.Runtime.MembershipService
             var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
             if (localSiloEntry.Status == SiloStatus.Dead)
             {
-                var localSiloEntryDetails = localSiloEntry.ToFullString(full: true);
+                var localSiloEntryDetails = localSiloEntry.ToFullString();
                 log.LogWarning(
                     (int)ErrorCode.MembershipFoundMyselfDead3,
                     "I should be Dead according to membership table (in TryToSuspectOrKill): entry = {Entry}.",
@@ -728,14 +726,13 @@ namespace Orleans.Runtime.MembershipService
                 return true;
             }
 
-            if (!table.Contains(silo))
+            if (table.TryGet(silo) is not { } tuple)
             {
                 // this should not happen ...
                 log.LogError((int)ErrorCode.MembershipFailedToReadSilo, "Could not find silo entry for silo {Silo} in the table.", silo);
                 throw new KeyNotFoundException($"Could not find silo entry for silo {silo} in the table.");
             }
 
-            var tuple = table.Get(silo);
             var entry = tuple.Item1.Copy();
             string eTag = tuple.Item2;
             if (log.IsEnabled(LogLevel.Debug))
@@ -745,7 +742,7 @@ namespace Orleans.Runtime.MembershipService
                     entry.SiloAddress, // First
                     entry.SiloAddress, // Second
                     entry.Status,
-                    entry.ToFullString());
+                    entry.ToString());
             }
 
             // Check if the table already knows that this silo is dead
@@ -825,8 +822,7 @@ namespace Orleans.Runtime.MembershipService
 
             string PrintSuspectList(IEnumerable<Tuple<SiloAddress, DateTime>> list)
             {
-                return Utils.EnumerableToString(list, t => string.Format("<{0}, {1}>",
-                    t.Item1, LogFormatter.PrintDate(t.Item2)));
+                return Utils.EnumerableToString(list, t => $"<{t.Item1}, {LogFormatter.PrintDate(t.Item2)}>");
             }
         }
 
@@ -839,7 +835,7 @@ namespace Orleans.Runtime.MembershipService
                 // Add the killer (myself) to the suspect list, for easier diagnosis later on.
                 entry.AddSuspector(myAddress, time);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to DeclareDead silo {SiloAddress} in the table. About to write entry {Entry}.", entry.SiloAddress, entry.ToFullString());
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to DeclareDead silo {SiloAddress} in the table. About to write entry {Entry}.", entry.SiloAddress, entry.ToString());
                 entry.Status = SiloStatus.Dead;
                 bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
                 if (ok)

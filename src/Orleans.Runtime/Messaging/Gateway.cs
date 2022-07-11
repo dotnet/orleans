@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Messaging
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
-            string stringToHash = clientId.ToString() + siloAddress.Endpoint + siloAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string stringToHash = $"{clientId}{new SpanFormattableIPEndPoint(siloAddress.Endpoint)}{siloAddress.Generation}";
             Guid hash = Utils.CalculateGuidHash(stringToHash);
             var activationId = new ActivationId(hash);
             return GrainAddress.GetAddress(siloAddress, clientId, activationId);

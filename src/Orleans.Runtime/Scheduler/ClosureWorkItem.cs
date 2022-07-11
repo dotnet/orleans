@@ -1,10 +1,9 @@
 using System;
-using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class AsyncClosureWorkItem : WorkItemBase
+    internal sealed class AsyncClosureWorkItem : WorkItemBase
     {
         private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Func<Task> continuation;
@@ -46,18 +45,11 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public override IGrainContext GrainContext { get; }
-        
-        internal static string GetMethodName(Delegate action)
-        {
-            var continuationMethodInfo = action.GetMethodInfo();
-            return string.Format(
-                "{0}->{1}",
-                action.Target?.ToString() ?? string.Empty,
-                continuationMethodInfo == null ? string.Empty : continuationMethodInfo.ToString());
-        }
+
+        internal static string GetMethodName(Delegate action) => $"{action.Target}->{action.Method}";
     }
 
-    internal class AsyncClosureWorkItem<T> : WorkItemBase
+    internal sealed class AsyncClosureWorkItem<T> : WorkItemBase
     {
         private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Func<Task<T>> continuation;

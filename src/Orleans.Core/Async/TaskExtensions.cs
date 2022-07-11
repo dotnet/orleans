@@ -42,10 +42,7 @@ namespace Orleans.Internal
             }
         }
 
-        internal static string ToString(this Task t)
-        {
-            return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));
-        }
+        internal static string ToString(this Task t) => t == null ? "null" : $"[Id={t.Id}, Status={t.Status}]";
 
         public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {

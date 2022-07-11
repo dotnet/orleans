@@ -156,13 +156,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {Entry}, table version = {Version}", entry.ToFullString(), tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {Entry}, table version = {Version}", entry.ToString(), tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
                 logger.LogInformation(
                     (int)ErrorCode.MembershipGrainBasedTable2,
                     "Insert of {Entry} and table version {Version} failed. Table now is {Table}",
-                    entry.ToFullString(),
+                    entry.ToString(),
                     tableVersion,
                     table.ReadAll());
 
@@ -171,13 +171,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}", entry.ToFullString(), etag, tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}", entry.ToString(), etag, tableVersion);
             bool result = table.Update(entry, etag, tableVersion);
             if (result == false)
                 logger.LogInformation(
                     (int)ErrorCode.MembershipGrainBasedTable3,
                     "Update of {Entry}, eTag {ETag}, table version {Version} failed. Table now is {Table}",
-                    entry.ToFullString(),
+                    entry.ToString(),
                     etag,
                     tableVersion,
                     table.ReadAll());
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {Entry}", entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {Entry}", entry.ToString());
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }

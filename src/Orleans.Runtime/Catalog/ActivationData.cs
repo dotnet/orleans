@@ -20,7 +20,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, IAsyncDisposable
+    internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, IAsyncDisposable
     {
         private readonly GrainTypeSharedContext _shared;
         private readonly IServiceScope serviceScope;
@@ -567,31 +567,22 @@ namespace Orleans.Runtime
             }
         }
 
-        public override string ToString()
-        {
-            return string.Format("[Activation: {0}/{1}{2}{3} State={4}]",
-                 Address.SiloAddress,
-                 GrainId.ToString(),
-                 ActivationId,
-                 GetActivationInfoString(),
-                 State);
-        }
+        public override string ToString() => $"[Activation: {Address.SiloAddress}/{GrainId}{ActivationId}{GetActivationInfoString()} State={State}]";
 
         internal string ToDetailedString(bool includeExtraDetails = false)
         {
             lock (this)
             {
-                return
-                    $"[Activation: {Address.SiloAddress.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
-                    + $"State={State} NonReentrancyQueueSize={WaitingCount} NumRunning={_runningRequests.Count} "
-                    + $"IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}"
-                    + $"{((includeExtraDetails && _blockingRequest != null) ? " CurrentlyExecuting=" + _blockingRequest : "")}]";
+                var currentlyExecuting = includeExtraDetails ? _blockingRequest : null;
+                return @$"[Activation: {Address.SiloAddress}/{GrainId}{ActivationId} {GetActivationInfoString()} State={State} NonReentrancyQueueSize={WaitingCount
+                    } NumRunning={_runningRequests.Count} IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}{
+                    (currentlyExecuting != null ? " CurrentlyExecuting=" : null)}{currentlyExecuting}]";
             }
         }
 
         private string GetActivationInfoString()
         {
-            var placement = PlacementStrategy != null ? PlacementStrategy.GetType().Name : "";
+            var placement = PlacementStrategy?.GetType().Name;
             return GrainInstance is null ? $"#Placement={placement}" : $"#GrainType={RuntimeTypeNameFormatter.Format(GrainInstance?.GetType())} Placement={placement}";
         }
 
@@ -835,8 +826,8 @@ namespace Orleans.Runtime
                         IsStuckDeactivating = true;
                         if (DeactivationReason.Description is { Length: > 0 } && DeactivationReason.ReasonCode != DeactivationReasonCode.ActivationUnresponsive)
                         {
-                            var msg = $"Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck";
-                            DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive, DeactivationReason.Description + ". " + msg);
+                            DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive,
+                                $"{DeactivationReason.Description}. Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck");
                         }
                     }
 

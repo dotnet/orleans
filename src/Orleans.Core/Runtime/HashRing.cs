@@ -41,14 +41,6 @@ namespace Orleans.Runtime
         }
 
         public override string ToString()
-        {
-            return String.Format("All {0}:" + Environment.NewLine + "{1}",
-                typeof(T).Name,
-                Utils.EnumerableToString(
-                    sortedRingList,
-                    elem => String.Format("{0}/x{1,8:X8}", elem, elem.GetUniformHashCode()),
-                    Environment.NewLine,
-                    false));
-        }
+            => $"All {typeof(T).Name}:{Environment.NewLine}{(Utils.EnumerableToString(sortedRingList, elem => $"{elem}/x{elem.GetUniformHashCode():X8}", Environment.NewLine, false))}";
     }
 }

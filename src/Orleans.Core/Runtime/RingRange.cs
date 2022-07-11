@@ -126,11 +126,9 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            if (begin == 0 && end == 0)
-            {
-                return "<(0 0], Size=x100000000, %Ring=100%>";
-            }
-            return String.Format("<(x{0,8:X8} x{1,8:X8}], Size=x{2,8:X8}, %Ring={3:0.000}%>", begin, end, RangeSize(), RangePercentage());
+            return begin == 0 && end == 0
+                ? "<(0 0], Size=x100000000, %Ring=100%>"
+                : $"<(x{begin:X8} x{end:X8}], Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>";
         }
 
         public string ToFullString()
@@ -327,14 +325,14 @@ namespace Orleans.Runtime
         {
             if (ranges.Count == 0) return "Empty MultiRange";
             if (ranges.Count == 1) return ranges[0].ToString();
-            return String.Format("<MultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%>", RangeSize(), RangePercentage());
+            return $"<MultiRange: Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>";
         }
 
         public string ToFullString()
         {
             if (ranges.Count == 0) return "Empty MultiRange";
             if (ranges.Count == 1) return ranges[0].ToString();
-            return String.Format("<MultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%, {2} Ranges: {3}>", RangeSize(), RangePercentage(), ranges.Count, Utils.EnumerableToString(ranges, r => r.ToFullString()));
+            return $"<MultiRange: Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%, {ranges.Count} Ranges: {Utils.EnumerableToString(ranges)}>";
         }
     }
 

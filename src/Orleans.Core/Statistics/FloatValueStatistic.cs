@@ -114,11 +114,7 @@ namespace Orleans.Runtime
 
         public bool IsValueDelta => false;
 
-        public string GetValueString()
-        {
-            float current = GetCurrentValue();
-            return String.Format(CultureInfo.InvariantCulture, "{0:0.000}", current);
-        }
+        public string GetValueString() => GetCurrentValue().ToString("0.000", CultureInfo.InvariantCulture);
 
         public string GetDeltaString()
         {
