@@ -78,15 +78,9 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() => HashCode.Combine(this.SiloAddress, this.GrainId, this.ActivationId);
 
-        public string ToFullString()
-        {
-            return
-                String.Format(
-                    "[GrainAddress: {0}, Full GrainId: {1}, Full ActivationId: {2}]",
-                    this.ToString(),                        // 0
-                    this.GrainId.ToString(),                  // 1
-                    this.ActivationId.ToParsableString());        // 2
-        }
+        public override string ToString() => $"[{nameof(GrainAddress)} GrainId {GrainId.ToString()}, ActivationId: {ActivationId.ToParsableString()}, SiloAddress: {SiloAddress.ToParsableString()}]";
+
+        public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {GrainId.ToString()}, ActivationId: {ActivationId.ToParsableString()}, SiloAddress: {SiloAddress.ToParsableString()}, MembershipVersion: {MembershipVersion}]";
 
         internal static GrainAddress NewActivationAddress(SiloAddress silo, GrainId grain)
         {
