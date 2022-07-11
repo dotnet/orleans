@@ -23,10 +23,10 @@ namespace Orleans.Storage
     /// </summary>
     public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private BlobContainerClient container;
         private ILogger logger;
         private readonly string name;
         private AzureBlobStorageOptions options;
+        private readonly IBlobContainerFactory blobContainerFactory;
         private IGrainStorageSerializer grainStorageSerializer;
         private readonly IServiceProvider services;
 
@@ -35,11 +35,13 @@ namespace Orleans.Storage
             string name,
             AzureBlobStorageOptions options,
             IGrainStorageSerializer grainStorageSerializer,
+            IBlobContainerFactory blobContainerFactory,
             IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
+            this.blobContainerFactory = blobContainerFactory;
             this.grainStorageSerializer = options.GrainStorageSerializer;
             this.services = services;
             this.logger = logger;
@@ -50,6 +52,8 @@ namespace Orleans.Storage
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
                 "Reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                 grainType,
@@ -142,6 +146,8 @@ namespace Orleans.Storage
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Writing,
@@ -186,6 +192,8 @@ namespace Orleans.Storage
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ClearingData,
@@ -237,6 +245,8 @@ namespace Orleans.Storage
 
         private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
         {
+            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+
             try
             {
                 var conditions = string.IsNullOrEmpty(grainState.ETag)
@@ -306,8 +316,7 @@ namespace Orleans.Storage
                 }
 
                 var client = await createClient();
-                container = client.GetBlobContainerClient(this.options.ContainerName);
-                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+                await this.blobContainerFactory.Init(client);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider,
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",
@@ -348,7 +357,11 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsMonitor.Get(name));
+            var options = optionsMonitor.Get(name);
+
+            var containerFactory = options.BuildContainerFactory(services, options);
+
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, containerFactory);
         }
     }
 }
