@@ -86,7 +86,7 @@ namespace Orleans.Runtime
                 }
                 catch(Exception ex)
                 {
-                    throw new TypeLoadException($"Unable to load {fullName} from assembly", ex);
+                    throw new TypeLoadException($"Unable to load {fullName} from assembly {assemblyName}", ex);
                 }
                 
                 var resultName = result.GetName();
