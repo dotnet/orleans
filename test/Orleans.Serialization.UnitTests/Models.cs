@@ -25,6 +25,16 @@ public record Person2(int Age, string Name)
     public string StarSign { get; init; }
 }
 
+[GenerateSerializer(IncludePrimaryCtorParameters = false)]
+public record Person3(int Age, string Name)
+{
+    [Id(0)]
+    public string FavouriteColor { get; init; }
+
+    [Id(1)]
+    public string StarSign { get; init; }
+}
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
 {

@@ -14,9 +14,10 @@ namespace Orleans.CodeGenerator
         private TypeSyntax _typeSyntax;
         private TypeSyntax _baseTypeSyntax;
 
-        public SerializableTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes)
+        public SerializableTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, bool supportsPrimaryContstructorParameters, IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes)
         {
             Type = type;
+            SupportsPrimaryContstructorParameters = supportsPrimaryContstructorParameters;
             Members = members.ToList();
             SemanticModel = semanticModel;
             _libraryTypes = libraryTypes;
@@ -114,7 +115,7 @@ namespace Orleans.CodeGenerator
                                           Type.BaseType != null &&
                                           Type.BaseType.SpecialType != SpecialType.System_Object;
 
-        public bool SupportsPrimaryContstructorArguments => Type.IsRecord;
+        public bool SupportsPrimaryContstructorParameters { get; }
 
         public INamedTypeSymbol BaseType => Type.EnumUnderlyingType ?? Type.BaseType;
 

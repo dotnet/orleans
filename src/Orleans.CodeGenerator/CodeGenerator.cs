@@ -206,7 +206,8 @@ namespace Orleans.CodeGenerator
                         else
                         {
                             // Regular type
-                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, GetDataMembers(symbol), LibraryTypes);
+                            var supportsPrimaryContstructorParameters = ShouldSupportPrimaryConstructorParameters(symbol);
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryContstructorParameters, GetDataMembers(symbol), LibraryTypes);
                             metadataModel.SerializableTypes.Add(typeDescription);
                         }
                     }
@@ -299,6 +300,49 @@ namespace Orleans.CodeGenerator
                         }
 
                         return false;
+                    }
+
+                    bool ShouldSupportPrimaryConstructorParameters(INamedTypeSymbol t)
+                    {
+                        static bool TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
+                        {
+                            var attribute = HasAttribute(t, at);
+                            if (attribute != null)
+                            {
+                                foreach (var namedArgument in attribute.NamedArguments)
+                                {
+                                    if (namedArgument.Key == "IncludePrimaryCtorParameters")
+                                    {
+                                        if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b && b == false)
+                                        {
+                                            return false;
+                                        }
+                                    }
+                                }
+                            }
+
+                            return true;
+                        }
+
+                        if (!t.IsRecord)
+                        {
+                            return false;
+                        }
+
+                        if (!TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute))
+                        {
+                            return false;
+                        }
+
+                        foreach (var attr in _generateSerializerAttributes)
+                        {
+                            if (!TestGenerateSerializerAttribute(t, attr))
+                            {
+                                return false;
+                            }
+                        }
+
+                        return true;
                     }
                 }
             }

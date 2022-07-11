@@ -98,7 +98,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpUnionCaseTypeDescription : SerializableTypeDescription
         {
-            public FSharpUnionCaseTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpUnionCaseTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 
@@ -261,7 +261,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpRecordTypeDescription : SerializableTypeDescription
         {
-            public FSharpRecordTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, GetRecordDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpRecordTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetRecordDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 

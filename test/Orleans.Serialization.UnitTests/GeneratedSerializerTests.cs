@@ -76,6 +76,23 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void GeneratedRecordWithExcludedPCtorSerializersRoundTripThroughCodec()
+        {
+            var original = new Person3(2, "harry")
+            {
+                FavouriteColor = "redborine",
+                StarSign = "Aquaricorn"
+            };
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(default, result.Age);
+            Assert.Equal(default, result.Name);
+            Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+            Assert.Equal(original.StarSign, result.StarSign);
+        }
+
+        [Fact]
         public void GeneratedSerializersRoundTripThroughSerializer()
         {
             var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30 };
