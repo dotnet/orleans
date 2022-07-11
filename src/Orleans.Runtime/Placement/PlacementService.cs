@@ -70,10 +70,20 @@ namespace Orleans.Runtime.Placement
             if (message.TargetGrain.IsDefault) ThrowMissingAddress();
 
             var grainId = message.TargetGrain;
-            if (_grainLocator.TryLookupInCache(grainId, out var result))
+            if (_grainLocator.TryLookupInCache(grainId, out var result) && CachedAddressIsValid(message, result))
             {
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Found address {Address} for grain {GrainId} in cache for message {Message}", result, grainId, message);
+                }
+
                 SetMessageTargetPlacement(message, result.SiloAddress);
                 return Task.CompletedTask;
+            }
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Placing grain {GrainId} for message {Message}", grainId, message);
             }
 
             var worker = _workers[grainId.GetUniformHashCode() % PlacementWorkerCount];
@@ -146,6 +156,39 @@ namespace Orleans.Runtime.Placement
                 .SuitableSilosByVersion;
 
             return silos;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool CachedAddressIsValid(Message message, GrainAddress cachedAddress)
+        {
+            // Verify that the result from the cache has not been invalidated by the message being addressed.
+            return message.CacheInvalidationHeader switch
+            {
+                { Count: > 0 } invalidAddresses => CachedAddressIsValidCore(message, cachedAddress, invalidAddresses),
+                _ => true
+            };
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            bool CachedAddressIsValidCore(Message message, GrainAddress cachedAddress, List<GrainAddress> invalidAddresses)
+            {
+                var resultIsValid = true;
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Invalidating {Count} cached entries for message {Message}", invalidAddresses.Count, message);
+                }
+
+                foreach (var address in invalidAddresses)
+                {
+                    // Invalidate the cache entries while we are examining them.
+                    _grainLocator.InvalidateCache(address);
+                    if (cachedAddress.Matches(address))
+                    {
+                        resultIsValid = false;
+                    }
+                }
+
+                return resultIsValid;
+            }
         }
 
         private class PlacementWorker
@@ -254,8 +297,8 @@ namespace Orleans.Runtime.Placement
                 {
                     foreach (var message in messages)
                     {
-                        var result = resultTask.Result;
-                        _placementService.SetMessageTargetPlacement(message.Message, result.SiloAddress);
+                        var siloAddress = resultTask.Result;
+                        _placementService.SetMessageTargetPlacement(message.Message, siloAddress);
                         message.Completion.TrySetResult(true);
                     }
 
@@ -282,7 +325,7 @@ namespace Orleans.Runtime.Placement
                 }
             }
 
-            private async Task<GrainAddress> GetOrPlaceActivationAsync(Message firstMessage)
+            private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
                 var target = new PlacementTarget(
@@ -295,41 +338,29 @@ namespace Orleans.Runtime.Placement
                 var result = await _placementService._grainLocator.Lookup(targetGrain);
                 if (result is not null)
                 {
-                    return result;
+                    return result.SiloAddress;
                 }
 
                 var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
                 var director = _placementService._directorResolver.GetPlacementDirector(strategy);
                 var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
-                
+
                 // Give the grain locator one last chance to tell us that the grain has already been placed
-                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result))
+                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
                 {
-                    return result;
+                    return result.SiloAddress;
                 }
 
-                ActivationId activationId;
-                if (strategy.IsDeterministicActivationId)
-                {
-                    // Use the grain id as the activation id.
-                    activationId = ActivationId.GetDeterministic(target.GrainIdentity);
-                }
-                else
-                {
-                    activationId = ActivationId.NewId();
-                }
-
-                result = GrainAddress.GetAddress(siloAddress, targetGrain, activationId);
                 _placementService._grainLocator.InvalidateCache(targetGrain);
-                _placementService._grainLocator.CachePlacementDecision(result);
-                return result;
+                _placementService._grainLocator.CachePlacementDecision(targetGrain, siloAddress);
+                return siloAddress;
             }
 
             private class GrainPlacementWorkItem
             {
                 public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = new();
 
-                public Task<GrainAddress> Result { get; set; }
+                public Task<SiloAddress> Result { get; set; }
             }
         }
     }

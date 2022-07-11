@@ -772,6 +772,10 @@ namespace Orleans.Runtime
                                 var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
                                 if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                                 {
+                                    // Add this activation to cache invalidation headers.
+                                    message.CacheInvalidationHeader ??= new();
+                                    message.CacheInvalidationHeader.Add(new GrainAddress { GrainId = GrainId, SiloAddress = Address.SiloAddress });
+
                                     var reason = new DeactivationReason(
                                         DeactivationReasonCode.IncompatibleRequest,
                                         $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");

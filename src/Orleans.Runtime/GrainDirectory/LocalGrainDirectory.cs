@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -918,7 +917,7 @@ namespace Orleans.Runtime.GrainDirectory
             return this.directoryMembership.MembershipCache.Contains(silo);
         }
 
-        public void CachePlacementDecision(GrainAddress activation) => this.DirectoryCache.AddOrUpdate(activation, 0);
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => (address = GetLocalCacheData(grainId)) is not null;
 
         private class DirectoryMembership

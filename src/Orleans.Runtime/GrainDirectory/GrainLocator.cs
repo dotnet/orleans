@@ -27,7 +27,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCache(GrainAddress address) => GetGrainLocator(address.GrainId.Type).InvalidateCache(address);
 
-        public void CachePlacementDecision(GrainAddress address) => GetGrainLocator(address.GrainId.Type).CachePlacementDecision(address);
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => GetGrainLocator(grainId.Type).CachePlacementDecision(grainId, siloAddress);
 
         private IGrainLocator GetGrainLocator(GrainType grainType) => _grainLocatorResolver.GetGrainLocator(grainType);
     }
