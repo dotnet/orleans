@@ -114,7 +114,7 @@ namespace Orleans.CodeGenerator
                                           Type.BaseType != null &&
                                           Type.BaseType.SpecialType != SpecialType.System_Object;
 
-        public bool HasPrimaryContstructorArguments => Type.IsRecord;
+        public bool SupportsPrimaryContstructorArguments => Type.IsRecord;
 
         public INamedTypeSymbol BaseType => Type.EnumUnderlyingType ?? Type.BaseType;
 
