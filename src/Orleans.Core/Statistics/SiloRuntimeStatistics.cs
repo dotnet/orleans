@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Statistics;

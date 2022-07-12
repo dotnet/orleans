@@ -31,19 +31,15 @@ namespace Orleans
         private bool disposing;
         private bool disposed;
 
-        internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly ClientGrainId clientId;
-        private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IOptions<StatisticsOptions> statisticsOptions;
 
-        private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
         private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
         public GrainAddress CurrentActivationAddress
@@ -67,17 +63,11 @@ namespace Orleans
         public OutsideRuntimeClient(
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
-            IOptions<StatisticsOptions> statisticsOptions,
-            StageAnalysisStatisticsGroup schedulerStageStatistics,
-            ClientStatisticsManager clientStatisticsManager,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
             this.ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
-            this.statisticsOptions = statisticsOptions;
-            this.schedulerStageStatistics = schedulerStageStatistics;
-            this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.clientId = ClientGrainId.Create();
@@ -134,12 +124,6 @@ namespace Orleans
                 {
                     throw new InvalidOperationException("TestOnlyThrowExceptionDuringInit");
                 }
-
-                var statisticsLevel = statisticsOptions.Value.CollectionLevel;
-                if (statisticsLevel.CollectThreadTimeTrackingStats())
-                {
-                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory, this.statisticsOptions, this.schedulerStageStatistics);
-                }
             }
             catch (Exception exc)
             {
@@ -189,8 +173,6 @@ namespace Orleans
                 async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
                 retryFilter,
                 cancellationToken);
-
-            ClientStatistics.Start(MessageCenter, clientId.GrainId);
 
             static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter retryFilter, CancellationToken cancellationToken)
             {
@@ -360,24 +342,12 @@ namespace Orleans
             }, this.logger);
 
             Utils.SafeExecute(() =>
-            {
-                incomingMessagesThreadTimeTracking?.OnStopExecution();
-            }, logger, "Client.incomingMessagesThreadTimeTracking.OnStopExecution");
-
-            Utils.SafeExecute(() =>
                 {
                     if (MessageCenter != null)
                     {
                         MessageCenter.Stop();
                     }
                 }, logger, "Client.Stop-Transport");
-            Utils.SafeExecute(() =>
-            {
-                if (ClientStatistics != null)
-                {
-                    ClientStatistics.Stop();
-                }
-            }, logger, "Client.Stop-ClientStatistics");
             ConstructorReset();
         }
 

@@ -62,12 +62,10 @@ namespace Orleans.Messaging
         private readonly WeakReference<ClientOutboundConnection>[] grainBuckets;
         private readonly ILogger logger;
         public SiloAddress MyAddress { get; private set; }
-        private readonly QueueTrackingStatistic queueTracking;
         private int numberOfConnectedGateways = 0;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
         private readonly ConnectionManager connectionManager;
-        private StatisticsLevel statisticsLevel;
 
         public ClientMessageCenter(
             IOptions<ClientMessagingOptions> clientMessagingOptions,
@@ -78,7 +76,6 @@ namespace Orleans.Messaging
             MessageFactory messageFactory,
             IClusterConnectionStatusListener connectionStatusListener,
             ILoggerFactory loggerFactory,
-            IOptions<StatisticsOptions> statisticsOptions,
             ConnectionManager connectionManager,
             GatewayManager gatewayManager)
         {
@@ -95,21 +92,11 @@ namespace Orleans.Messaging
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client constructed");
             ClientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
-            statisticsLevel = statisticsOptions.Value.CollectionLevel;
-            if (statisticsLevel.CollectQueueStats())
-            {
-                queueTracking = new QueueTrackingStatistic("ClientReceiver", statisticsOptions);
-            }
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await EstablishInitialConnection(cancellationToken);
-
-            if (this.statisticsLevel.CollectQueueStats())
-            {
-                queueTracking.OnStartExecution();
-            }
 
             Running = true;
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client started");
@@ -166,11 +153,6 @@ namespace Orleans.Messaging
         public void Stop()
         {
             Running = false;
-
-            if (this.statisticsLevel.CollectQueueStats())
-            {
-                queueTracking.OnStopExecution();
-            }
             gatewayManager.Stop();
         }
 

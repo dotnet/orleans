@@ -11,7 +11,6 @@ namespace Orleans.Runtime
     {
         private readonly ConcurrentDictionary<GrainId, IGrainContext> activations = new();                // Activation data (app grains) only.
         private readonly ConcurrentDictionary<GrainId, SystemTarget> systemTargets = new();                // SystemTarget only.
-        private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts = new();             // simple statistics systemTargetTypeName->count
 
         public int Count => activations.Count;
 

@@ -44,14 +44,12 @@ namespace Orleans.Runtime.ConsistentRing
                 logger.LogDebug("Starting {Name} on silo {SiloAddress}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
             }
 
-            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             ConsistentRingInstruments.RegisterRingSizeObserve(() => GetRingSize());
-            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => $"x{((IRingRangeInternal)myRange).RangeSize():X8}");
             ConsistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
             ConsistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
             {
                 int size = GetRingSize();
-                return size == 0 ? 0 : ((float)100.0 / (float)size);
+                return size == 0 ? 0 : ((float)100.0 / size);
             });
 
             // add myself to the list of members

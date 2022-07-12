@@ -61,9 +61,6 @@ namespace Orleans
             }
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
-            services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<OutsideRuntimeClient>();
@@ -98,7 +95,6 @@ namespace Orleans
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<ConnectionOptions>();
-            services.ConfigureFormatter<StatisticsOptions>();
 
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();

@@ -1,5 +1,3 @@
-using System.Diagnostics.Metrics;
-
 namespace Orleans.Runtime;
 
 internal static class InstrumentNames
@@ -85,9 +83,9 @@ internal static class InstrumentNames
     public const string DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED = "orleans-directory-unregistrations-many-remote-received";
 
     // ConsistentRing
-    public const string CONSISTENTRING_RINGSIZE = "orleans-consistent-ring-size";
-    public const string CONSISTENTRING_MYRANGE_RINGPERCENTAGE = "orleans-consistent-ring-range-percentage-local";
-    public const string CONSISTENTRING_AVERAGERINGPERCENTAGE = "orleans-consistent-ring-range-percentage-average";
+    public const string CONSISTENTRING_SIZE = "orleans-consistent-ring-size";
+    public const string CONSISTENTRING_LOCAL_SIZE_PERCENTAGE = "orleans-consistent-ring-range-percentage-local";
+    public const string CONSISTENTRING_AVERAGE_SIZE_PERCENTAGE = "orleans-consistent-ring-range-percentage-average";
 
     // Watchdog
     public const string WATCHDOG_NUM_HEALTH_CHECKS = "orleans-watchdog-health-checks";
@@ -129,4 +127,38 @@ internal static class InstrumentNames
     public const string STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES = "orleans-streams-persistent-stream-messages-read";
     public const string STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = "orleans-streams-persistent-stream-messages-sent";
     public const string STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = "orleans-streams-persistent-stream-pubsub-cache-size";
+
+    public const string STREAMS_QUEUE_INITIALIZATION_FAILURES = "orleans-streams-queue-initialization-failures";
+    public const string STREAMS_QUEUE_INITIALIZATION_DURATION = "orleans-streams-queue-initialization-duration";
+    public const string STREAMS_QUEUE_INITIALIZATION_EXCEPTIONS = "orleans-streams-queue-initialization-exceptions";
+    public const string STREAMS_QUEUE_READ_FAILURES = "orleans-streams-queue-read-failures";
+    public const string STREAMS_QUEUE_READ_DURATION = "orleans-streams-queue-read-duration";
+    public const string STREAMS_QUEUE_READ_EXCEPTIONS = "orleans-streams-queue-read-exceptions";
+    public const string STREAMS_QUEUE_SHUTDOWN_FAILURES = "orleans-streams-queue-shutdown-failures";
+    public const string STREAMS_QUEUE_SHUTDOWN_DURATION = "orleans-streams-queue-shutdown-duration";
+    public const string STREAMS_QUEUE_SHUTDOWN_EXCEPTIONS = "orleans-streams-queue-shutdown-exceptions";
+    public const string STREAMS_QUEUE_MESSAGES_RECEIVED = "orleans-streams-queue-messages-received";
+    public const string STREAMS_QUEUE_OLDEST_MESSAGE_ENQUEUE_AGE = "orleans-streams-queue-oldest-message-enqueue-age";
+    public const string STREAMS_QUEUE_NEWEST_MESSAGE_ENQUEUE_AGE = "orleans-streams-queue-newest-message-enqueue-age";
+
+    public const string STREAMS_BLOCK_POOL_TOTAL_MEMORY = "orleans-streams-block-pool-total-memory";
+    public const string STREAMS_BLOCK_POOL_AVAILABLE_MEMORY = "orleans-streams-block-pool-available-memory";
+    public const string STREAMS_BLOCK_POOL_CLAIMED_MEMORY = "orleans-streams-block-pool-claimed-memory";
+    public const string STREAMS_BLOCK_POOL_RELEASED_MEMORY = "orleans-streams-block-pool-released-memory";
+    public const string STREAMS_BLOCK_POOL_ALLOCATED_MEMORY = "orleans-streams-block-pool-allocated-memory";
+
+    public const string STREAMS_QUEUE_CACHE_SIZE = "orleans-streams-queue-cache-size";
+    public const string STREAMS_QUEUE_CACHE_LENGTH = "orleans-streams-queue-cache-length";
+    public const string STREAMS_QUEUE_CACHE_MESSAGES_ADDED = "orleans-streams-queue-cache-messages-added";
+    public const string STREAMS_QUEUE_CACHE_MESSAGES_PURGED = "orleans-streams-queue-cache-messages-purged";
+    public const string STREAMS_QUEUE_CACHE_MEMORY_ALLOCATED = "orleans-streams-queue-cache-memory-allocated";
+    public const string STREAMS_QUEUE_CACHE_MEMORY_RELEASED = "orleans-streams-queue-cache-memory-released";
+    public const string STREAMS_QUEUE_CACHE_OLDEST_TO_NEWEST_DURATION = "orleans-streams-queue-cache-oldest-to-newest-duration";
+    public const string STREAMS_QUEUE_CACHE_OLDEST_AGE = "orleans-streams-queue-cache-oldest-age";
+    public const string STREAMS_QUEUE_CACHE_PRESSURE = "orleans-streams-queue-cache-pressure";
+    public const string STREAMS_QUEUE_CACHE_UNDER_PRESSURE = "orleans-streams-queue-cache-under-pressure";
+    public const string STREAMS_QUEUE_CACHE_PRESSURE_CONTRIBUTION_COUNT = "orleans-streams-queue-cache-pressure-contribution-count";
+
+    public const string RUNTIME_MEMORY_TOTAL_PHSYSICAL_MEMORY_MB = "orleans-runtime-total-phsyical-memory";
+    public const string RUNTIME_MEMORY_AVAILABLE_MEMORY_MB = "orleans-runtime-available-memory";
 }

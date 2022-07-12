@@ -14,9 +14,7 @@ namespace Orleans.Runtime
         private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
         private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
-        private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
-        private readonly IOptions<StatisticsOptions> _statisticsOptions;
         private readonly GrainTypeSharedContextResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
         private readonly ILoggerFactory _loggerFactory;
@@ -31,16 +29,12 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             ILogger<WorkItemGroup> workItemGroupLogger,
             ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-            SchedulerStatisticsGroup schedulerStatisticsGroup,
-            IOptions<SchedulingOptions> schedulingOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+            IOptions<SchedulingOptions> schedulingOptions)
         {
             _activationWorkingSet = activationWorkingSet;
             _workItemGroupLogger = workItemGroupLogger;
             _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
-            _schedulerStatisticsGroup = schedulerStatisticsGroup;
             _schedulingOptions = schedulingOptions;
-            _statisticsOptions = statisticsOptions;
             _sharedComponentsResolver = sharedComponentsResolver;
             _grainClassMap = grainClassMap;
             _serviceProvider = serviceProvider;
@@ -69,9 +63,7 @@ namespace Orleans.Runtime
                 sharedContext,
                 _workItemGroupLogger,
                 _activationTaskSchedulerLogger,
-                _schedulerStatisticsGroup,
-                _schedulingOptions,
-                _statisticsOptions);
+                _schedulingOptions);
 
             if (sharedContext.PlacementStrategy is StatelessWorkerPlacement)
             {
@@ -89,9 +81,7 @@ namespace Orleans.Runtime
         {
             private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
             private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
-            private readonly SchedulerStatisticsGroup _schedulerStatisticsGroup;
             private readonly IOptions<SchedulingOptions> _schedulingOptions;
-            private readonly IOptions<StatisticsOptions> _statisticsOptions;
             private readonly IGrainActivator _grainActivator;
             private readonly IServiceProvider _serviceProvider;
             private readonly GrainTypeSharedContext _sharedComponents;
@@ -103,15 +93,11 @@ namespace Orleans.Runtime
                 GrainTypeSharedContext sharedComponents,
                 ILogger<WorkItemGroup> workItemGroupLogger,
                 ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-                SchedulerStatisticsGroup schedulerStatisticsGroup,
-                IOptions<SchedulingOptions> schedulingOptions,
-                IOptions<StatisticsOptions> statisticsOptions)
+                IOptions<SchedulingOptions> schedulingOptions)
             {
                 _workItemGroupLogger = workItemGroupLogger;
                 _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
-                _schedulerStatisticsGroup = schedulerStatisticsGroup;
                 _schedulingOptions = schedulingOptions;
-                _statisticsOptions = statisticsOptions;
                 _grainActivator = grainActivator;
                 _serviceProvider = serviceProvider;
                 _sharedComponents = sharedComponents;
@@ -119,8 +105,6 @@ namespace Orleans.Runtime
                     context,
                     _workItemGroupLogger,
                     _activationTaskSchedulerLogger,
-                    _schedulerStatisticsGroup,
-                    _statisticsOptions,
                     _schedulingOptions);
             }
 
