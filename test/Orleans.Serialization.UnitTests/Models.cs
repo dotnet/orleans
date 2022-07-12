@@ -25,7 +25,7 @@ public record Person2(int Age, string Name)
     public string StarSign { get; init; }
 }
 
-[GenerateSerializer(IncludePrimaryCtorParameters = false)]
+[GenerateSerializer(IncludePrimaryConstructorParameters = false)]
 public record Person3(int Age, string Name)
 {
     [Id(0)]

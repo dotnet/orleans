@@ -13,7 +13,7 @@ namespace Orleans
         /// Get or sets if primary constructor parameters should automatically be included as Serializable fields.
         /// Defaults to <see langword="true"/> for record types.
         /// </summary>
-        public bool IncludePrimaryCtorParameters { get; init; } = true;
+        public bool IncludePrimaryConstructorParameters { get; init; } = true;
     }
 
     /// <summary>
