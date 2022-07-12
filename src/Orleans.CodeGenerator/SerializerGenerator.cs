@@ -345,7 +345,10 @@ namespace Orleans.CodeGenerator
             if (type.SupportsPrimaryContstructorParameters)
             {
                 body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
-                body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+                if (members.Any(m => !m.IsPrimaryConstructorParameter))
+                {
+                    body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+                }
             }
 
             body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
@@ -492,9 +495,16 @@ namespace Orleans.CodeGenerator
             {
                 body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => m.IsPrimaryConstructorParameter)))));
                 body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
-            }
 
-            body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter)))));
+                body.Add(
+                    IfStatement(
+                        IdentifierName(headerVar.Identifier).Member("IsEndBaseFields"),
+                        WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter))))));
+            }
+            else
+            {
+                body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter)))));
+            }
 
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserialized"));
 

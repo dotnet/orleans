@@ -117,6 +117,17 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void GeneratedRecordWithExclusiveCtorSerializersRoundTripThroughCodec()
+        {
+            var original = new Person4(2, "harry");
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original.Age, result.Age);
+            Assert.Equal(original.Name, result.Name);
+        }
+
+        [Fact]
         public void GeneratedSerializersRoundTripThroughSerializer()
         {
             var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30 };
@@ -142,7 +153,7 @@ namespace Orleans.Serialization.UnitTests
         public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
         {
             var original = new ImmutableStruct(30, 2);
-            var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+             var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
             Assert.Equal(original.GetIntField(), result.GetIntField());
             Assert.Equal(original.IntProperty, result.IntProperty);

@@ -35,6 +35,9 @@ public record Person3(int Age, string Name)
     public string StarSign { get; init; }
 }
 
+[GenerateSerializer]
+public record Person4(int Age, string Name);
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
 {
