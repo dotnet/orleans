@@ -311,7 +311,7 @@ namespace Orleans.CodeGenerator
                             {
                                 foreach (var namedArgument in attribute.NamedArguments)
                                 {
-                                    if (namedArgument.Key == "IncludePrimaryCtorParameters")
+                                    if (namedArgument.Key == "IncludePrimaryConstructorParameters")
                                     {
                                         if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b && b == false)
                                         {
