@@ -143,13 +143,7 @@ namespace Orleans.Runtime
             return currentlyExecutingTickTask ?? Task.CompletedTask;
         }
 
-        private string GetFullName()
-        {
-            var callback = asyncCallback;
-            var callbackTarget = callback?.Target?.ToString() ?? string.Empty;
-            var callbackMethodInfo = callback?.GetMethodInfo()?.ToString() ?? string.Empty;
-            return $"GrainTimer.{this.Name ?? string.Empty} TimerCallbackHandler:{callbackTarget ?? string.Empty}->{callbackMethodInfo ?? string.Empty}";
-        }
+        private string GetFullName() => $"GrainTimer.{Name} TimerCallbackHandler:{asyncCallback?.Target}->{asyncCallback?.Method}";
 
         // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer
         // is that SafeTimer may tick OK (no starvation by .NET thread pool), but then scheduler.QueueWorkItem

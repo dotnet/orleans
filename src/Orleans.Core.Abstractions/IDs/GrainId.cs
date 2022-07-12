@@ -16,7 +16,7 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(GrainIdJsonConverter))]
     [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
-    public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
+    public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable
     {
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -72,7 +72,6 @@ namespace Orleans.Runtime
             {
                 ThrowInvalidGrainId(value);
 
-                [MethodImpl(MethodImplOptions.NoInlining)]
                 static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
             }
 
@@ -160,10 +159,12 @@ namespace Orleans.Runtime
         public static bool operator !=(GrainId left, GrainId right) => !left.Equals(right);
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
-        }
+        public override string ToString() => $"{Type}/{Key}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"{Type}/{Key}", out charsWritten);
     }
 
     /// <summary>

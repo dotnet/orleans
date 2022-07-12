@@ -27,35 +27,41 @@ namespace Orleans.Runtime
                                                         string separator = ", ", bool putInBrackets = true)
         {
             if (collection == null)
-            {
-                if (putInBrackets) return "[]";
-                else return "null";
-            }
-            var sb = new StringBuilder();
-            if (putInBrackets) sb.Append("[");
-            var enumerator = collection.GetEnumerator();
-            bool firstDone = false;
-            while (enumerator.MoveNext())
-            {
-                T value = enumerator.Current;
-                string val;
-                if (toString != null)
-                    val = toString(value);
-                else
-                    val = value == null ? "null" : value.ToString();
+                return putInBrackets ? "[]" : "null";
 
-                if (firstDone)
-                {
-                    sb.Append(separator);
-                    sb.Append(val);
-                }
-                else
-                {
-                    sb.Append(val);
-                    firstDone = true;
-                }
+            if (collection is ICollection<T> { Count: 0 })
+                return putInBrackets ? "[]" : "";
+
+            var enumerator = collection.GetEnumerator();
+            if (!enumerator.MoveNext())
+                return putInBrackets ? "[]" : "";
+
+            var firstValue = enumerator.Current;
+            if (!enumerator.MoveNext())
+            {
+                return putInBrackets
+                    ? toString != null ? $"[{toString(firstValue)}]" : firstValue == null ? "[null]" : $"[{firstValue}]"
+                    : toString != null ? toString(firstValue) : firstValue == null ? "null" : firstValue.ToString();
             }
-            if (putInBrackets) sb.Append("]");
+
+            var sb = new StringBuilder();
+            if (putInBrackets) sb.Append('[');
+
+            if (toString != null) sb.Append(toString(firstValue));
+            else if (firstValue == null) sb.Append("null");
+            else sb.Append($"{firstValue}");
+
+            do
+            {
+                sb.Append(separator);
+
+                var value = enumerator.Current;
+                if (toString != null) sb.Append(toString(value));
+                else if (value == null) sb.Append("null");
+                else sb.Append($"{value}");
+            } while (enumerator.MoveNext());
+
+            if (putInBrackets) sb.Append(']');
             return sb.ToString();
         }
 
@@ -110,7 +116,7 @@ namespace Orleans.Runtime
         public static string TimeSpanToString(TimeSpan timeSpan)
         {
             //00:03:32.8289777
-            return String.Format("{0}h:{1}m:{2}s.{3}ms", timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds, timeSpan.Milliseconds);
+            return $"{timeSpan.Hours}h:{timeSpan.Minutes}m:{timeSpan.Seconds}s.{timeSpan.Milliseconds}ms";
         }
 
         public static long TicksToMilliSeconds(long ticks) => ticks / TimeSpan.TicksPerMillisecond;
@@ -152,14 +158,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ep">The input IP end point</param>
         /// <returns></returns>
-        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep) => new Uri("gwy.tcp://" + ep.ToString() + "/0");
+        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(ep)}/0");
 
         /// <summary>
         /// Represent a silo address in the gateway URI format.
         /// </summary>
         /// <param name="address">The input silo address</param>
         /// <returns></returns>
-        public static Uri ToGatewayUri(this SiloAddress address) => new Uri("gwy.tcp://" + address.Endpoint.ToString() + "/" + address.Generation.ToString());
+        public static Uri ToGatewayUri(this SiloAddress address) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(address.Endpoint)}/{address.Generation}");
 
         /// <summary>
         /// Calculates an integer hash value based on the consistent identity hash of a string.

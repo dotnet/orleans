@@ -2,7 +2,7 @@ using System;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class RequestWorkItem : WorkItemBase
+    internal sealed class RequestWorkItem : WorkItemBase
     {
         private readonly Message request;
         private readonly SystemTarget target;
@@ -13,10 +13,7 @@ namespace Orleans.Runtime.Scheduler
             request = m;
         }
 
-        public override string Name
-        {
-            get { return $"RequestWorkItem:Id={request.Id}"; }
-        }
+        public override string Name => $"RequestWorkItem:Id={request.Id}";
 
         public override IGrainContext GrainContext => this.target;
 
@@ -33,9 +30,16 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        public override string ToString()
+        public override bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
         {
-            return String.Format("{0}: {1} -> {2}", base.ToString(), target, request);
+            if (base.TryFormat(destination, out var len, format, provider) && destination[len..].TryWrite($": {request}", out var len2))
+            {
+                charsWritten = len + len2;
+                return true;
+            }
+
+            charsWritten = 0;
+            return false;
         }
     }
 }

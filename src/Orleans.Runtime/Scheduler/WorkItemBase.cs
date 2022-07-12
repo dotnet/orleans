@@ -1,6 +1,8 @@
+using System;
+
 namespace Orleans.Runtime.Scheduler
 {
-    internal abstract class WorkItemBase : IWorkItem
+    internal abstract class WorkItemBase : IWorkItem, ISpanFormattable
     {
         public abstract IGrainContext GrainContext { get; }
 
@@ -8,14 +10,12 @@ namespace Orleans.Runtime.Scheduler
 
         public abstract void Execute();
 
-        public override string ToString()
-        {
-            return string.Format("[{0} WorkItem Name={1}, Ctx={2}]", 
-                GetType().Name, 
-                Name ?? string.Empty,
-                GrainContext?.ToString() ?? "null"
-            );
-        }
+        public sealed override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        public virtual bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"[{GetType().Name} WorkItem Name={Name}, Ctx={GrainContext}{(GrainContext != null ? null : "null")}]", out charsWritten);
     }
 }
 

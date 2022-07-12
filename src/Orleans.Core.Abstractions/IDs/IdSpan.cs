@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
-    public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable
+    public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable, ISpanFormattable
     {
         /// <summary>
         /// The stable hash of the underlying value.
@@ -163,20 +163,36 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public int CompareTo(IdSpan other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
 
-        /// <inheritdoc/>
-        public override string ToString() => this.ToStringUtf8();
-
         /// <summary>
         /// Returns a string representation of this instance, decoding the value as UTF8.
         /// </summary>
         /// <returns>
         /// A string representation fo this instance.
         /// </returns>
-        public string ToStringUtf8()
+        public override string ToString() => _value is null ? null : Encoding.UTF8.GetString(_value);
+
+        public bool TryFormat(Span<char> destination, out int charsWritten)
         {
-            if (_value is not null) return Encoding.UTF8.GetString(_value);
-            return null;
+            if (_value is null)
+            {
+                charsWritten = 0;
+                return true;
+            }
+
+            var len = Encoding.UTF8.GetCharCount(_value);
+            if (destination.Length < len)
+            {
+                charsWritten = 0;
+                return false;
+            }
+
+            charsWritten = Encoding.UTF8.GetChars(_value, destination);
+            return true;
         }
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider) => TryFormat(destination, out charsWritten);
 
         /// <summary>
         /// Compares the provided operands for equality.
@@ -200,25 +216,5 @@ namespace Orleans.Runtime
         /// <param name="value">The value.</param>
         /// <returns>A hashed representation of the provided value.</returns>
         private static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="IdSpan"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<IdSpan>, IComparer<IdSpan>
-        {
-            /// <summary>
-            /// Gets the singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(IdSpan x, IdSpan y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(IdSpan x, IdSpan y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(IdSpan obj) => obj.GetHashCode();
-        }
     }
 }

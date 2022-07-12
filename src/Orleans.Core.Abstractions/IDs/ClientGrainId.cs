@@ -5,7 +5,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies a client.
     /// </summary>
-    internal readonly struct ClientGrainId : IEquatable<ClientGrainId>, IComparable<ClientGrainId>
+    internal readonly struct ClientGrainId : IEquatable<ClientGrainId>, IComparable<ClientGrainId>, ISpanFormattable
     {
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
@@ -63,6 +63,11 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
         public bool Equals(ClientGrainId other) => this.GrainId.Equals(other.GrainId);

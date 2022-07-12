@@ -36,7 +36,7 @@ namespace Orleans.Metadata
                 };
                 var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(type);
                 var key = WellKnownGrainTypeProperties.ImplementedInterfacePrefix + counter.ToString(CultureInfo.InvariantCulture);
-                properties[key] = interfaceId.ToStringUtf8();
+                properties[key] = interfaceId.ToString();
                 ++counter;
             }
         }

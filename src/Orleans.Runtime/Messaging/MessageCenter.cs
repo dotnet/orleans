@@ -249,7 +249,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
 
-                var str = string.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
+                var str = $"{rejectInfo} {exc}";
                 var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
                 SendMessage(rejection);
             }

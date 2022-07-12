@@ -202,11 +202,8 @@ namespace Orleans.Runtime
         {
             var now = DateTime.UtcNow;
             var all = buckets.ToList();
-            return string.Format("<#Activations={0}, #Buckets={1}, buckets={2}>",
-                    all.Sum(b => b.Value.Items.Count),
-                    all.Count,
-                    Utils.EnumerableToString(
-                        all.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.Value.Items.Count + " items"));
+            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
+            return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
         }
 
         /// <summary>

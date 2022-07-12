@@ -163,9 +163,9 @@ namespace Orleans.Serialization
             GrainId id = (GrainId)value;
             writer.WriteStartObject();
             writer.WritePropertyName("Type");
-            writer.WriteValue(id.Type.ToStringUtf8());
+            writer.WriteValue(id.Type.ToString());
             writer.WritePropertyName("Key");
-            writer.WriteValue(id.Key.ToStringUtf8());
+            writer.WriteValue(id.Key.ToString());
             writer.WriteEndObject();
         }
 
@@ -364,12 +364,12 @@ namespace Orleans.Serialization
             writer.WritePropertyName("Id");
             writer.WriteStartObject();
             writer.WritePropertyName("Type");
-            writer.WriteValue(val.GrainId.Type.ToStringUtf8());
+            writer.WriteValue(val.GrainId.Type.ToString());
             writer.WritePropertyName("Key");
-            writer.WriteValue(val.GrainId.Key.ToStringUtf8());
+            writer.WriteValue(val.GrainId.Key.ToString());
             writer.WriteEndObject();
             writer.WritePropertyName("Interface");
-            writer.WriteValue(val.InterfaceType.ToStringUtf8());
+            writer.WriteValue(val.InterfaceType.ToString());
             writer.WriteEndObject();
         }
 

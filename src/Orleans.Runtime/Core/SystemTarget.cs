@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable
     {
         private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
@@ -190,16 +190,15 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"[{(IsLowPriority ? "LowPriority" : string.Empty)}SystemTarget: {Silo}/{this.id.ToString()}{this.ActivationId}]";
-        }
+        public sealed override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"[{(IsLowPriority ? "LowPriority" : null)}SystemTarget: {Silo}/{id}{ActivationId}]", out charsWritten);
 
         /// <summary>Adds details about message currently being processed</summary>
-        internal string ToDetailedString()
-        {
-            return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
-        }
+        internal string ToDetailedString() => $"{this} CurrentlyExecuting={running}{(running != null ? null : "null")}";
 
         /// <inheritdoc/>
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);

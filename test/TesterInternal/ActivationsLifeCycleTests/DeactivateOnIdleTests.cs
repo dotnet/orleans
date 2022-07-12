@@ -257,11 +257,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                     continue;
                 }
                 string siloHostingActivation = await grain.GetRuntimeInstanceId();
-                if (this.testCluster.Primary.SiloAddress.ToLongString().Equals(siloHostingActivation))
+                if (this.testCluster.Primary.SiloAddress.ToString().Equals(siloHostingActivation))
                 {
                     continue;
                 }
-                this.output.WriteLine("\nCreated grain with key {0} whose primary directory owner is silo {1} and which was activated on silo {2}\n", i, primaryForGrain.ToLongString(), siloHostingActivation);
+                this.output.WriteLine("\nCreated grain with key {0} whose primary directory owner is silo {1} and which was activated on silo {2}\n", i, primaryForGrain.ToString(), siloHostingActivation);
                 return grain;
             }
 

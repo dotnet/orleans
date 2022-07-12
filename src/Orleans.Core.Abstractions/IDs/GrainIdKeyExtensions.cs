@@ -128,7 +128,7 @@ namespace Orleans.Runtime
             var keyString = grainId.Key.AsSpan();
             if (keyString.IndexOf((byte)'+') is int index && index >= 0)
             {
-                keyExt = keyString.Slice(index + 1).GetUtf8String();
+                keyExt = Encoding.UTF8.GetString(keyString.Slice(index + 1));
                 keyString = keyString.Slice(0, index);
             }
 
@@ -208,7 +208,7 @@ namespace Orleans.Runtime
             var keyString = grainId.Key.AsSpan();
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
             {
-                keyExt = keyString.Slice(33).GetUtf8String();
+                keyExt = Encoding.UTF8.GetString(keyString.Slice(33));
                 keyString = keyString.Slice(0, 32);
             }
             else if(keyString.Length != 32)
@@ -285,7 +285,6 @@ namespace Orleans.Runtime
         /// <param name="grainId">
         /// The grain id.
         /// </param>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidGuidKeyFormat(GrainId grainId) => throw new ArgumentException($"Value \"{grainId}\" is not in the correct format for a Guid key.", nameof(grainId));
 
         /// <summary>
@@ -294,21 +293,6 @@ namespace Orleans.Runtime
         /// <param name="grainId">
         /// The grain id.
         /// </param>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidIntegerKeyFormat(GrainId grainId) => throw new ArgumentException($"Value \"{grainId}\" is not in the correct format for an Integer key.", nameof(grainId));
-
-        /// <summary>
-        /// Parses the provided value as a UTF8 string and returns the <see cref="string"/> representation of it.
-        /// </summary>
-        /// <param name="span">
-        /// The span to convert.
-        /// </param>
-        /// <returns>
-        /// The <see cref="string"/> representation of the input.
-        /// </returns>
-        internal static unsafe string GetUtf8String(this ReadOnlySpan<byte> span)
-        {
-            fixed (byte* bytes = span) return Encoding.UTF8.GetString(bytes, span.Length);
-        }
     }
 }
