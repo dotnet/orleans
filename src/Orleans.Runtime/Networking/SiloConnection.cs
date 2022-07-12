@@ -125,7 +125,7 @@ namespace Orleans.Runtime.Messaging
                 var rejection = this.MessageFactory.CreateRejectionResponse(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. The rejected message is {msg}.");
+                    $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected message is {msg}.");
 
                 // Invalidate the remote caller's activation cache entry.
                 if (msg.TargetSilo != null)
@@ -139,8 +139,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.Log.LogDebug(
                         "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}.",
-                        msg.TargetSilo?.ToLongString() ?? "null",
-                        this.LocalSiloAddress.ToLongString(),
+                        msg.TargetSilo?.ToString() ?? "null",
+                        this.LocalSiloAddress.ToString(),
                         msg);
                 }
             }
@@ -161,8 +161,7 @@ namespace Orleans.Runtime.Messaging
                 // Got ping that is not destined to me. For example, got a ping to my older incarnation.
                 MessagingInstruments.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. " +
-                    $"The rejected ping message is {msg}.");
+                    $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected ping message is {msg}.");
                 this.Send(rejection);
             }
             else

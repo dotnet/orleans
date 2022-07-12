@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
@@ -10,8 +11,10 @@ namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
+
 namespace Orleans.Reminders.AdoNet.Storage
 #elif TESTER_SQLUTILS
+
 namespace Orleans.Tests.SqlUtils
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
@@ -86,8 +89,8 @@ namespace Orleans.Tests.SqlUtils
             var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command));
             return aggregator(ret);
         }
-        
-#if REMINDERS_ADONET || TESTER_SQLUTILS
+
+#if REMINDERS_ADONET || TESTER_SQLUTILS 
 
         /// <summary>
         /// Reads Orleans reminder data from the tables.
@@ -97,7 +100,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainReference grainRef)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
+            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainRef.ToKeyString() },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -114,12 +117,38 @@ namespace Orleans.Tests.SqlUtils
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
+            return ReadAsync(query, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
 
 
+        internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
+        {
+            return new KeyValuePair<string, string>(record.GetValue<string>("QueryKey"),
+                record.GetValue<string>("QueryText"));
+        }
+
+        internal static ReminderEntry GetReminderEntry(IDataRecord record, GrainReferenceKeyStringConverter grainReferenceConverter)
+        {
+            //Having non-null field, GrainId, means with the query filter options, an entry was found.
+            string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
+            if (grainId != null)
+            {
+                return new ReminderEntry
+                {
+                    GrainRef = grainReferenceConverter.FromKeyString(grainId),
+                    ReminderName = record.GetValue<string>(nameof(DbStoredQueries.Columns.ReminderName)),
+                    StartAt = record.GetDateTimeValue(nameof(DbStoredQueries.Columns.StartTime)),
+
+                    //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
+                    //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
+                    Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
+                    ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
+                };
+            }
+            return null;
+        }
         /// <summary>
         /// Reads one row of reminder data.
         /// </summary>
@@ -130,7 +159,7 @@ namespace Orleans.Tests.SqlUtils
         internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainReference grainRef,
             string reminderName)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowKey, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
+            return ReadAsync(dbStoredQueries.ReadReminderRowKey, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

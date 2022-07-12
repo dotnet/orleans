@@ -89,7 +89,7 @@ namespace Orleans
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class ReminderTableData
+    public sealed class ReminderTableData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ReminderTableData"/> class.
@@ -123,15 +123,12 @@ namespace Orleans
         /// <value>The reminders.</value>
         [Id(0)]
         public IList<ReminderEntry> Reminders { get; private set; }
+
         /// <summary>
         /// Returns a <see cref="System.String" /> that represents this instance.
         /// </summary>
         /// <returns>A <see cref="System.String" /> that represents this instance.</returns>
-        public override string ToString()
-        {
-            return string.Format("[{0} reminders: {1}.", Reminders.Count, 
-                Utils.EnumerableToString(Reminders, e => e.ToString()));
-        }
+        public override string ToString() => $"[{Reminders.Count} reminders: {Utils.EnumerableToString(Reminders)}.";
     }
 
     /// <summary>
@@ -139,7 +136,7 @@ namespace Orleans
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class ReminderEntry
+    public sealed class ReminderEntry
     {
         /// <summary>
         /// Gets or sets the grain reference of the grain that created the reminder. Forms the reminder
@@ -175,10 +172,7 @@ namespace Orleans
         public string ETag { get; set; }
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return string.Format("<GrainRef={0} ReminderName={1} Period={2}>", GrainRef.ToString(), ReminderName, Period);
-        }
+        public override string ToString() => $"<GrainRef={GrainRef} ReminderName={ReminderName} Period={Period}>";
 
         /// <summary>
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
@@ -192,7 +186,7 @@ namespace Orleans
 
     [Serializable]
     [GenerateSerializer]
-    internal class ReminderData : IGrainReminder
+    internal sealed class ReminderData : IGrainReminder
     {
         [Id(1)]
         public GrainReference GrainRef { get; private set; }
@@ -208,9 +202,6 @@ namespace Orleans
             ETag = eTag;
         }
 
-        public override string ToString()
-        {
-            return string.Format("<IOrleansReminder: GrainRef={0} ReminderName={1} ETag={2}>", GrainRef.ToString(), ReminderName, ETag);
-        }
+        public override string ToString() => $"<IOrleansReminder: GrainRef={GrainRef} ReminderName={ReminderName} ETag={ETag}>";
     }
 }

@@ -54,7 +54,7 @@ namespace Orleans.Runtime
             if (storage != expected.Storage)
             {
                 throw new ArgumentException(
-                    $"Please verity that all invocations of AverageTimeSpanStatistic.FindOrCreate() for instance \"{name.Name}\" all specify the same storage type {Enum.GetName(typeof(CounterStorage), expected.Storage)}",
+                    $"Please verity that all invocations of AverageTimeSpanStatistic.FindOrCreate() for instance \"{name.Name}\" all specify the same storage type {expected.Storage}",
                     nameof(storage)); 
             }
         }

@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
+    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable, ISpanFormattable
     {
         [NonSerialized]
         private int hashCode = 0;
@@ -106,7 +106,7 @@ namespace Orleans.Runtime
             // This must be the "inverse" of FromParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
             if (utf8 != null) return Encoding.UTF8.GetString(utf8);
-            return String.Format("{0}:{1}@{2}", Endpoint.Address, Endpoint.Port, Generation);
+            return $"{new SpanFormattableIPAddress(Endpoint.Address)}:{Endpoint.Port}@{Generation}";
         }
 
         /// <summary>
@@ -206,7 +206,7 @@ namespace Orleans.Runtime
         }
 
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
-            => throw new FormatException("Invalid string SiloAddress: " + addr.GetUtf8String());
+            => throw new FormatException("Invalid string SiloAddress: " + Encoding.UTF8.GetString(addr));
 
         [Immutable]
         private readonly struct Key : IEquatable<Key>
@@ -225,23 +225,19 @@ namespace Orleans.Runtime
             public bool Equals(Key other) => Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
         }
 
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            return string.Format(IsClient ? "C{0}:{1}" : "S{0}:{1}", Endpoint, Generation);
-        }
-
         /// <summary>
         /// Return a long string representation of this SiloAddress.
         /// </summary>
         /// <remarks>
-        /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
+        /// Note: This string value is not comparable with the <see cref="FromParsableString"/> method -- use the <see cref="ToParsableString"/> method for that purpose.
         /// </remarks>
         /// <returns>String representation of this SiloAddress.</returns>
-        public string ToLongString()
-        {
-            return ToString();
-        }
+        public override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"{(IsClient ? 'C' : 'S')}{new SpanFormattableIPEndPoint(Endpoint)}:{Generation}", out charsWritten);
 
         /// <summary>
         /// Return a long string representation of this SiloAddress, including it's consistent hash value.
@@ -250,10 +246,7 @@ namespace Orleans.Runtime
         /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
         /// </remarks>
         /// <returns>String representation of this SiloAddress.</returns>
-        public string ToStringWithHashCode()
-        {
-            return string.Format(IsClient ? "C{0}:{1}/x{2:X8}" : "S{0}:{1}/x{2:X8}", Endpoint, Generation, GetConsistentHashCode());
-        }
+        public string ToStringWithHashCode() => $"{this}/x{GetConsistentHashCode():X8}";
 
         /// <inheritdoc />
         public override bool Equals(object obj) => Equals(obj as SiloAddress);
@@ -267,8 +260,7 @@ namespace Orleans.Runtime
         {
             if (hashCodeSet) return hashCode;
 
-            string siloAddressInfoToHash = Endpoint.ToString() + Generation.ToString(CultureInfo.InvariantCulture);
-            hashCode = CalculateIdHash(siloAddressInfoToHash);
+            hashCode = CalculateIdHash($"{new SpanFormattableIPEndPoint(Endpoint)}{Generation}");
             hashCodeSet = true;
             return hashCode;
         }

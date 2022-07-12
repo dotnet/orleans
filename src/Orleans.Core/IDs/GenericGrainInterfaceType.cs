@@ -68,7 +68,9 @@ namespace Orleans.Runtime
         /// </summary>
         public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.Value.Value);
 
-        /// <inheritdoc/>
-        public override string ToString() => this.Value.ToStringUtf8();
+        /// <summary>
+        /// Returns a UTF8 interpretation of the current instance.
+        /// </summary>
+        public override string ToString() => Value.ToString();
     }
 }

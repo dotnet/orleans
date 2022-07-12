@@ -151,13 +151,11 @@ namespace Orleans.Core
 
         private string MakeErrorMsg(string what, Exception exc)
         {
-            string errorCode = string.Empty;
+            string errorCode = null;
+            (store as IRestExceptionDecoder)?.DecodeException(exc, out _, out errorCode, true);
 
-            var decoder = store as IRestExceptionDecoder;
-            decoder?.DecodeException(exc, out _, out errorCode, true);
-
-            return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
-                $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+            return @$"Error from storage provider {$"{store.GetType().Name}.{name}"} during {what} for grain Type={name} Pk={grainRef.GrainId} Id={grainRef} Error={errorCode
+                }{Environment.NewLine} {LogFormatter.PrintException(exc)}";
         }
     }
 }

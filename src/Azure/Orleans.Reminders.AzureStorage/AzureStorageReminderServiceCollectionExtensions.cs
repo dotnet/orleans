@@ -5,7 +5,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Reminders.AzureStorage;
 using Orleans.Runtime.ReminderService;
-
 namespace Orleans.Hosting
 {
     /// <summary>

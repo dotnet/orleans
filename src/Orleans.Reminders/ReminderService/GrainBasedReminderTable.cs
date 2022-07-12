@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
+using Orleans.Reminders;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -61,7 +62,7 @@ namespace Orleans.Runtime.ReminderService
                     list.Count,
                     reminderTable.Values.Sum(r => r.Count),
                     range.ToString(),
-                    Utils.EnumerableToString(list, e => e.ToString()));
+                    Utils.EnumerableToString(list));
             }
 
             var result = new ReminderTableData(list);
@@ -143,8 +144,8 @@ namespace Orleans.Runtime.ReminderService
             }
 
             logger.LogWarning(
-                (int)ErrorCode.RS_Table_Remove,
-                "RemoveRow failed for Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}. Table now is: {3}",
+                (int)RSErrorCode.RS_Table_Remove,
+                "RemoveRow failed for Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}. Table now is: {NewValues}",
                 grainRef,
                 reminderName,
                 eTag,

@@ -46,14 +46,20 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
-            : base(SystemTargetGrainId.Create(grainId.Type, silo.SiloAddress), silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
+        internal GrainService(GrainId grainId, SiloAddress siloAddress, ILoggerFactory loggerFactory, IConsistentRingProvider ringProvider)
+            : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, lowPriority: true, loggerFactory: loggerFactory)
         {
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);
 
-            ring = silo.RingProvider;
+            ring = ringProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
+        }
+
+        /// <summary>Constructor to use for grain services</summary>
+        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
+            : this(grainId, silo.SiloAddress, loggerFactory, silo.RingProvider)
+        {
         }
 
         /// <summary>

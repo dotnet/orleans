@@ -24,5 +24,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("CodeGenerator.Tests")]
 
+[assembly: InternalsVisibleTo("Orleans.Reminders")]
+
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

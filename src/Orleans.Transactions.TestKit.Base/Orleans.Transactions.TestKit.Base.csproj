@@ -20,9 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
-    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>
 
 </Project>

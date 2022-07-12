@@ -184,7 +184,6 @@ namespace Orleans.Runtime
         /// Throws an exception indicating that a parameter type is not supported.
         /// </summary>
         /// <param name="observer">The observer.</param>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void ThrowGrainObserverInvalidException(IGrainObserver observer)
             => throw new NotSupportedException($"IGrainObserver parameters must be GrainReference or Grain and cannot be type {observer.GetType()}. Did you forget to CreateObjectReference?");
     }
@@ -263,7 +262,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
-    public class GrainReference : IAddressable, IEquatable<GrainReference>
+    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
     {
         /// <summary>
         /// The grain reference functionality which is shared by all grain references of a given type.
@@ -402,10 +401,15 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the interface name.
         /// </summary>
-        public virtual string InterfaceName => InterfaceType.ToStringUtf8();
+        public virtual string InterfaceName => InterfaceType.ToString();
 
         /// <inheritdoc/>
         public override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 

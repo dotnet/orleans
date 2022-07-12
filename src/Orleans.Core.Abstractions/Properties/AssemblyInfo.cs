@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.Streaming")]
 [assembly: InternalsVisibleTo("Orleans.Streaming.Abstractions")]
+[assembly: InternalsVisibleTo("Orleans.Reminders")]
 
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]

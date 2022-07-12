@@ -11,7 +11,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -85,8 +84,7 @@ namespace Orleans.Hosting
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.AddTransient<IConfigurationValidator, ReminderOptionsValidator>();
+            
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();

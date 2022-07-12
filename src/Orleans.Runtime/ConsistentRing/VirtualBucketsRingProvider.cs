@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ConsistentRing
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             ConsistentRingInstruments.RegisterRingSizeObserve(() => GetRingSize());
-            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => String.Format("x{0,8:X8}", ((IRingRangeInternal)myRange).RangeSize()));
+            StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_MYRANGE_RINGDISTANCE, () => $"x{((IRingRangeInternal)myRange).RangeSize():X8}");
             ConsistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
             ConsistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
             {
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.ConsistentRing
         {
             var sortedList = GetRanges();
             sortedList.Sort((t1, t2) => t1.Value.RangePercentage().CompareTo(t2.Value.RangePercentage()));
-            return Utils.EnumerableToString(sortedList, kv => String.Format("{0} -> {1}", kv.Key, kv.Value.ToString()));
+            return Utils.EnumerableToString(sortedList, kv => $"{kv.Key} -> {kv.Value}");
         }
 
         // Internal: for testing/logging only!

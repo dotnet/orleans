@@ -49,8 +49,7 @@ namespace Orleans
         /// Client code should use the GrainFactory property to get a reference to a Grain.
         /// </summary>
         protected Grain() : this(RuntimeContext.Current, grainRuntime: null)
-        {
-        }
+        {}
 
         /// <summary>
         /// Grain implementers do NOT have to expose this constructor but can choose to do so.
@@ -112,66 +111,6 @@ namespace Orleans
 
             EnsureRuntime();
             return Runtime.TimerRegistry.RegisterTimer(GrainContext ?? RuntimeContext.Current, asyncCallback, state, dueTime, period);
-        }
-
-        /// <summary>
-        /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain.
-        /// The grain must implement the <c>Orleans.IRemindable</c> interface, and reminders for this grain will be sent to the <c>ReceiveReminder</c> callback method.
-        /// If the current grain is deactivated when the timer fires, a new activation of this grain will be created to receive this reminder.
-        /// If an existing reminder with the same name already exists, that reminder will be overwritten with this new reminder.
-        /// Reminders will always be received by one activation of this grain, even if multiple activations exist for this grain.
-        /// </summary>
-        /// <param name="reminderName">Name of this reminder</param>
-        /// <param name="dueTime">Due time for this reminder</param>
-        /// <param name="period">Frequency period for this reminder</param>
-        /// <returns>Promise for Reminder handle.</returns>
-        protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-        {
-            if (string.IsNullOrWhiteSpace(reminderName))
-                throw new ArgumentNullException(nameof(reminderName));
-            if (!(this is IRemindable))
-                throw new InvalidOperationException($"Grain {IdentityString} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service");
-
-            EnsureRuntime();
-            return Runtime.ReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, period);
-        }
-
-        /// <summary>
-        /// Unregisters a previously registered reminder.
-        /// </summary>
-        /// <param name="reminder">Reminder to unregister.</param>
-        /// <returns>Completion promise for this operation.</returns>
-        protected Task UnregisterReminder(IGrainReminder reminder)
-        {
-            if (reminder == null)
-                throw new ArgumentNullException(nameof(reminder));
-
-            EnsureRuntime();
-            return Runtime.ReminderRegistry.UnregisterReminder(GrainId, reminder);
-        }
-
-        /// <summary>
-        /// Returns a previously registered reminder.
-        /// </summary>
-        /// <param name="reminderName">Reminder to return</param>
-        /// <returns>Promise for Reminder handle.</returns>
-        protected Task<IGrainReminder> GetReminder(string reminderName)
-        {
-            if (string.IsNullOrWhiteSpace(reminderName))
-                throw new ArgumentNullException(nameof(reminderName));
-
-            EnsureRuntime();
-            return Runtime.ReminderRegistry.GetReminder(GrainId, reminderName);
-        }
-
-        /// <summary>
-        /// Returns a list of all reminders registered by the grain.
-        /// </summary>
-        /// <returns>Promise for list of Reminders registered for this grain.</returns>
-        protected Task<List<IGrainReminder>> GetReminders()
-        {
-            EnsureRuntime();
-            return Runtime.ReminderRegistry.GetReminders(GrainId);
         }
 
         /// <summary>

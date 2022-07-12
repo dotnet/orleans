@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    internal class Constants
+    internal static class Constants
     {
         // This needs to be first, as GrainId static initializers reference it. Otherwise, GrainId actually see a uninitialized (ie Zero) value for that "constant"!
         public static readonly TimeSpan INFINITE_TIMESPAN = TimeSpan.FromMilliseconds(-1);
@@ -48,15 +48,6 @@ namespace Orleans.Runtime
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),
             IdSpan.Create("01111111-1111-1111-1111-111111111111"));
 
-        /// <summary>
-        /// Minimum period for registering a reminder ... we want to enforce a lower bound
-        /// </summary>
-        public static readonly TimeSpan MinReminderPeriod = TimeSpan.FromMinutes(1); // increase this period, reminders are supposed to be less frequent ... we use 2 seconds just to reduce the running time of the unit tests
-        /// <summary>
-        /// Refresh local reminder list to reflect the global reminder table every 'REFRESH_REMINDER_LIST' period
-        /// </summary>
-        public static readonly TimeSpan RefreshReminderList = TimeSpan.FromMinutes(5);
-
         public const int LARGE_OBJECT_HEAP_THRESHOLD = 85000;
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
@@ -85,15 +76,7 @@ namespace Orleans.Runtime
 
         public static ushort DefaultInterfaceVersion = 1;
 
-        public static string SystemTargetName(GrainType id)
-        {
-            if (singletonSystemTargetNames.TryGetValue(id, out var name))
-            {
-                return name;
-            }
-
-            return id.ToStringUtf8();
-        }
+        public static string SystemTargetName(GrainType id) => singletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();
 
         public static bool IsSingletonSystemTarget(GrainType id)
         {

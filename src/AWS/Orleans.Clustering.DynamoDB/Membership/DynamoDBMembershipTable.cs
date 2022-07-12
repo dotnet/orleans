@@ -188,7 +188,7 @@ namespace Orleans.Clustering.DynamoDB
                     new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToLongString(), data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -197,7 +197,7 @@ namespace Orleans.Clustering.DynamoDB
                     (int)ErrorCode.MembershipBase,
                     exc,
                     "Intermediate error reading silo entry for key {SiloAddress} from the table {TableName}",
-                    siloAddress.ToLongString(),
+                    siloAddress.ToString(),
                     this.options.TableName);
                 throw;
             }
@@ -250,7 +250,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("InsertRow entry = {Entry}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("InsertRow entry = {Entry}", entry.ToString());
                 var tableEntry = Convert(entry, tableVersion);
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
@@ -258,7 +258,7 @@ namespace Orleans.Clustering.DynamoDB
                     this.logger.LogWarning(
                         (int)ErrorCode.MembershipBase,
                         "Insert failed. Invalid ETag value. Will retry. Entry {Entry}, eTag {ETag}",
-                        entry.ToFullString(),
+                        entry.ToString(),
                         tableVersion.VersionEtag);
                     return false;
                 }
@@ -301,7 +301,7 @@ namespace Orleans.Clustering.DynamoDB
                         this.logger.LogWarning(
                             (int)ErrorCode.MembershipBase,
                             "Insert failed due to contention on the table. Will retry. Entry {Entry}",
-                            entry.ToFullString());
+                            entry.ToString());
                     }
                     else
                     {
@@ -317,7 +317,7 @@ namespace Orleans.Clustering.DynamoDB
                     (int)ErrorCode.MembershipBase,
                     exc,
                     "Intermediate error inserting entry {Entry} to the table {TableName}.",
-                    entry.ToFullString(),
+                    entry.ToString(),
                     this.options.TableName);
                 throw;
             }
@@ -327,14 +327,14 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpdateRow entry = {Entry}, etag = {}", entry.ToFullString(), etag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpdateRow entry = {Entry}, etag = {}", entry.ToString(), etag);
                 var siloEntry = Convert(entry, tableVersion);
                 if (!int.TryParse(etag, out var currentEtag))
                 {
                     this.logger.LogWarning(
                         (int)ErrorCode.MembershipBase,
                         "Update failed. Invalid ETag value. Will retry. Entry {Entry}, eTag {ETag}",
-                        entry.ToFullString(),
+                        entry.ToString(),
                         etag);
                     return false;
                 }
@@ -346,7 +346,7 @@ namespace Orleans.Clustering.DynamoDB
                     this.logger.LogWarning(
                         (int)ErrorCode.MembershipBase,
                         "Update failed. Invalid ETag value. Will retry. Entry {Entry}, eTag {ETag}",
-                        entry.ToFullString(),
+                        entry.ToString(),
                         tableVersion.VersionEtag);
                     return false;
                 }
@@ -392,7 +392,7 @@ namespace Orleans.Clustering.DynamoDB
                             (int)ErrorCode.MembershipBase,
                             canceledException,
                             "Update failed due to contention on the table. Will retry. Entry {Entry}, eTag {ETag}",
-                            entry.ToFullString(),
+                            entry.ToString(),
                             etag);
                     }
                     else
@@ -409,7 +409,7 @@ namespace Orleans.Clustering.DynamoDB
                     (int)ErrorCode.MembershipBase,
                     exc,
                     "Intermediate error updating entry {Entry} to the table {TableName}.",
-                    entry.ToFullString(),
+                    entry.ToString(),
                     this.options.TableName);
                 throw;
             }
@@ -419,7 +419,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Merge entry = {Entry}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Merge entry = {Entry}", entry.ToString());
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
@@ -431,7 +431,7 @@ namespace Orleans.Clustering.DynamoDB
                     (int)ErrorCode.MembershipBase,
                     exc,
                     "Intermediate error updating IAmAlive field for entry {Entry} to the table {TableName}.",
-                    entry.ToFullString(),
+                    entry.ToString(),
                     this.options.TableName);
                 throw;
             }
@@ -476,7 +476,7 @@ namespace Orleans.Clustering.DynamoDB
                     (int)ErrorCode.MembershipBase,
                     exc,
                     "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Entries}.",
-                    Utils.EnumerableToString(entries, e => e.ToString()));
+                    Utils.EnumerableToString(entries));
                 throw;
             }
         }
