@@ -57,27 +57,13 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
                 CallChainId = request.CallChainId,
+                TargetGrain = request.SendingGrain,
+                SendingSilo = request.TargetSilo,
+                SendingGrain = request.TargetGrain,
+                CacheInvalidationHeader = request.CacheInvalidationHeader,
+                TimeToLive = request.TimeToLive,
+                RequestContextData = RequestContextExtensions.Export(this.deepCopier),
             };
-
-            if (!request.SendingGrain.IsDefault)
-            {
-                response.TargetGrain = request.SendingGrain;
-            }
-
-            response.SendingSilo = request.TargetSilo;
-            if (!request.TargetGrain.IsDefault)
-            {
-                response.SendingGrain = request.TargetGrain;
-            }
-
-            response.CacheInvalidationHeader = request.CacheInvalidationHeader;
-            response.TimeToLive = request.TimeToLive;
-
-            var contextData = RequestContextExtensions.Export(this.deepCopier);
-            if (contextData != null)
-            {
-                response.RequestContextData = contextData;
-            }
 
             messagingTrace.OnCreateMessage(response);
             return response;
