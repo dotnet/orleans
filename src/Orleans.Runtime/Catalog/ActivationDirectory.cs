@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             systemTargets.TryAdd(target.GrainId, target);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                MiscInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
+                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             systemTargets.TryRemove(target.GrainId, out _);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                MiscInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
+                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 

@@ -3,8 +3,13 @@ using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
 
-internal static class MiscInstruments
+internal static class GrainInstruments
 {
+    static GrainInstruments()
+    {
+        GrainMetricsListener.Start();
+    }
+
     internal static Counter<int> GrainCounts = Instruments.Meter.CreateCounter<int>(InstrumentNames.GRAIN_COUNTS);
     internal static void IncrementGrainCounts(string grainTypeName)
     {
