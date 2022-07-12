@@ -47,7 +47,7 @@ namespace Orleans.Runtime
 
         /// <summary>Constructor to use for grain services</summary>
         internal GrainService(GrainId grainId, SiloAddress siloAddress, ILoggerFactory loggerFactory, IConsistentRingProvider ringProvider)
-            : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, lowPriority: true, loggerFactory: loggerFactory)
+            : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, loggerFactory: loggerFactory)
         {
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);

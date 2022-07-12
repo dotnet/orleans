@@ -52,7 +52,7 @@ namespace Orleans.Streams
             ILoggerFactory loggerFactory,
             SiloAddress siloAddress,
             IQueueAdapter queueAdapter)
-            : base(managerId, siloAddress, lowPriority: false, loggerFactory)
+            : base(managerId, siloAddress, loggerFactory)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
