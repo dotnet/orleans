@@ -328,7 +328,7 @@ namespace Orleans.Streams
                 (int)ErrorCode.PersistentStreamPullingManager_10,
                 "About to remove {RemovedCount} agents from my responsibility: {RemovedQueues}",
                 queuesToRemove.Count,
-                Utils.EnumerableToString(queuesToRemove, q => q.ToString()));
+                Utils.EnumerableToString(queuesToRemove));
 
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
@@ -438,10 +438,7 @@ namespace Orleans.Streams
             });
         }
 
-        private static string PrintQueues(ICollection<QueueId> myQueues)
-        {
-            return Utils.EnumerableToString(myQueues, q => q.ToString());
-        }
+        private static string PrintQueues(ICollection<QueueId> myQueues) => Utils.EnumerableToString(myQueues);
 
         // Just print our queue assignment periodicaly, for easy monitoring.
         private Task AsyncTimerCallback(object state)

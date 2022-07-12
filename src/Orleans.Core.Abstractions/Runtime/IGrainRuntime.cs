@@ -30,11 +30,7 @@ namespace Orleans.Runtime
         /// </summary>
         ITimerRegistry TimerRegistry { get; }
 
-        /// <summary>
-        /// Gets the reminder registry.
-        /// </summary>
-        IReminderRegistry ReminderRegistry { get; }
-
+        
         /// <summary>
         /// Gets the service provider.
         /// </summary>

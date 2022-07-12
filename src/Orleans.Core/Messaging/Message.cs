@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
     [WellKnownId(101)]
-    internal sealed class Message
+    internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -312,56 +314,89 @@ namespace Orleans.Runtime
             // used only under log3 level
             if ((GetHeadersMask() & header) != Headers.NONE)
             {
-                sb.AppendFormat("{0}={1};", header, valueProvider(this));
-                sb.AppendLine();
+                sb.AppendLine($"{header}={valueProvider(this)};");
             }
         }
 
-        public override string ToString()
+        public override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> dst, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
         {
-            var response = "";
+            ref var origin = ref MemoryMarshal.GetReference(dst);
+            int len;
+
+            if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
+            if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
+
             if (Direction == Directions.Response)
             {
                 switch (Result)
                 {
                     case ResponseTypes.Error:
-                        response = "Error ";
+                        if (!Append(ref dst, "Error ")) goto grow;
                         break;
 
                     case ResponseTypes.Rejection:
-                        response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
+                        if (!dst.TryWrite($"{RejectionType} Rejection (info: {RejectionInfo}) ", out len)) goto grow;
+                        dst = dst[len..];
                         break;
 
                     case ResponseTypes.Status:
-                        response = "Status ";
-                        break;
-
-                    default:
+                        if (!Append(ref dst, "Status ")) goto grow;
                         break;
                 }
             }
 
-            return $"{(IsReadOnly ? "ReadOnly" : "")}" +
-                $"{(IsAlwaysInterleave ? " IsAlwaysInterleave" : "")}" +
-                $" {response}{Direction}" +
-                $" {$"[{SendingSilo} {SendingGrain}]"}->{$"[{TargetSilo} {TargetGrain}]"}" +
-                $"{(BodyObject is { } request ? $" {request}" : string.Empty)}" +
-                $" #{Id}{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}";
+            if (!dst.TryWrite($"{Direction} [{SendingSilo} {SendingGrain}]->[{TargetSilo} {TargetGrain}]", out len)) goto grow;
+            dst = dst[len..];
+
+            if (BodyObject is { } request)
+            {
+                if (!dst.TryWrite($" {request}", out len)) goto grow;
+                dst = dst[len..];
+            }
+
+            if (!dst.TryWrite($" #{Id}", out len)) goto grow;
+            dst = dst[len..];
+
+            if (ForwardCount > 0)
+            {
+                if (!dst.TryWrite($"[ForwardCount={ForwardCount}]", out len)) goto grow;
+                dst = dst[len..];
+            }
+
+            charsWritten = (int)Unsafe.ByteOffset(ref origin, ref MemoryMarshal.GetReference(dst)) / sizeof(char);
+            return true;
+
+grow:
+            charsWritten = 0;
+            return false;
+
+            static bool Append(ref Span<char> dst, ReadOnlySpan<char> value)
+            {
+                if (!value.TryCopyTo(dst))
+                    return false;
+
+                dst = dst[value.Length..];
+                return true;
+            }
         }
 
         public string GetTargetHistory()
         {
             var history = new StringBuilder();
-            history.Append("<");
+            history.Append('<');
             if (TargetSilo != null)
             {
-                history.Append(TargetSilo).Append(":");
+                history.Append($"{TargetSilo}:");
             }
             if (!TargetGrain.IsDefault)
             {
-                history.Append(TargetGrain).Append(":");
+                history.Append($"{TargetGrain}:");
             }
-            history.Append(">");
+            history.Append('>');
             if (!string.IsNullOrEmpty(TargetHistory))
             {
                 history.Append("    ").Append(TargetHistory);
@@ -480,5 +515,7 @@ namespace Orleans.Runtime
             headers = _interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
             return headers;
         }
+
+        internal bool IsPing() => _requestContextData?.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var value) == true && value is bool isPing && isPing;
     }
 }

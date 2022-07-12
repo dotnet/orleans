@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class SiloRuntimeStatistics
+    public sealed class SiloRuntimeStatistics
     {
         /// <summary>
         /// Total number of activations in a silo.
@@ -98,60 +98,9 @@ namespace Orleans.Runtime
             DateTime = dateTime;
         }
 
-        public override string ToString()
-        {
-            return
-                "SiloRuntimeStatistics: "
-                + $"ActivationCount={ActivationCount} "
-                + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
-                + $"CpuUsage={(CpuUsage.HasValue ? CpuUsage : "<unset>")} "
-                + $"AvailableMemory={AvailableMemory} "
-                + $"MemoryUsage={MemoryUsage} "
-                + $"IsOverloaded={IsOverloaded} "
-                + $"ClientCount={ClientCount} "
-                + $"TotalPhysicalMemory={TotalPhysicalMemory} "
-                + $"DateTime={DateTime}";
-        }
-    }
-
-    /// <summary>
-    /// Snapshot of current statistics for a given grain type.
-    /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    internal class GrainStatistic
-    {
-        /// <summary>
-        /// The type of the grain for this GrainStatistic.
-        /// </summary>
-        [Id(1)]
-        public string GrainType { get; set; }
-
-        /// <summary>
-        /// Number of grains of a this type.
-        /// </summary>
-        [Id(2)]
-        public int GrainCount { get; set; }
-
-        /// <summary>
-        /// Number of activation of a grain of this type.
-        /// </summary>
-        [Id(3)]
-        public int ActivationCount { get; set; }
-
-        /// <summary>
-        /// Number of silos that have activations of this grain type.
-        /// </summary>
-        [Id(4)]
-        public int SiloCount { get; set; }
-
-        /// <summary>
-        /// Returns the string representation of this GrainStatistic.
-        /// </summary>
-        public override string ToString()
-        {
-            return string.Format("GrainStatistic: GrainType={0} NumSilos={1} NumGrains={2} NumActivations={3} ", GrainType, SiloCount, GrainCount, ActivationCount);
-        }
+        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
+            } CpuUsage={CpuUsage?.ToString() ?? "<unset>"} AvailableMemory={AvailableMemory} MemoryUsage={MemoryUsage} IsOverloaded={IsOverloaded
+            } ClientCount={ClientCount} TotalPhysicalMemory={TotalPhysicalMemory} DateTime={DateTime}";
     }
 
     /// <summary>
@@ -182,10 +131,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the string representation of this SimpleGrainStatistic.
         /// </summary>
-        public override string ToString()
-        {
-            return string.Format("SimpleGrainStatistic: GrainType={0} Silo={1} NumActivations={2} ", GrainType, SiloAddress, ActivationCount);
-        }
+        public override string ToString() => $"SimpleGrainStatistic: GrainType={GrainType} Silo={SiloAddress} NumActivations={ActivationCount} ";
     }
 
     [Serializable]
@@ -219,7 +165,7 @@ namespace Orleans.Runtime
 
     [Serializable]
     [GenerateSerializer]
-    internal class DetailedGrainReport
+    internal sealed class DetailedGrainReport
     {
         [Id(1)]
         public GrainId Grain { get; set; }
@@ -252,24 +198,13 @@ namespace Orleans.Runtime
         [Id(8)]
         public string LocalActivation { get; set; }
 
-        public override string ToString()
-        {
-            return string.Format(Environment.NewLine
-                + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine
-                + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={4}" + Environment.NewLine
-                + "   PrimaryForGrain={5}" + Environment.NewLine
-                + "   GrainClassTypeName={6}" + Environment.NewLine
-                + "   LocalActivation:" + Environment.NewLine
-                + "{7}." + Environment.NewLine,
-                    Grain.ToString(),                                   // {0}
-                    SiloName,                                                   // {1}
-                    SiloAddress.ToLongString(),                                 // {2}
-                    LocalCacheActivationAddress,    // {3}
-                    LocalDirectoryActivationAddress,// {4}
-                    PrimaryForGrain,                                            // {5}
-                    GrainClassTypeName,                                         // {6}
-                    LocalActivation); // {7}
-        }
+        public override string ToString() => @$"{Environment.NewLine
+            }**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine
+            }   LocalCacheActivationAddresses={LocalCacheActivationAddress}{Environment.NewLine
+            }   LocalDirectoryActivationAddresses={LocalDirectoryActivationAddress}{Environment.NewLine
+            }   PrimaryForGrain={PrimaryForGrain}{Environment.NewLine
+            }   GrainClassTypeName={GrainClassTypeName}{Environment.NewLine
+            }   LocalActivation:{Environment.NewLine
+            }{LocalActivation}.{Environment.NewLine}";
     }
 }

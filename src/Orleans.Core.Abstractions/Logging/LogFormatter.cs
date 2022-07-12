@@ -53,7 +53,12 @@ namespace Orleans.Runtime
         /// <returns>Formatted string representation of the exception, including expanding and formatting any nested sub-expressions.</returns>
         public static string PrintException(Exception exception)
         {
-            return exception == null ? String.Empty : PrintException_Helper(exception, 0, true);
+            if (exception == null)
+                return "";
+
+            var sb = new StringBuilder();
+            PrintException_Helper(sb, exception, 0);
+            return sb.ToString();
         }
 
         /// <summary>
@@ -66,15 +71,21 @@ namespace Orleans.Runtime
             exceptionDecoders.TryAdd(exceptionType, decoder);
         }
 
-        private static string PrintException_Helper(Exception exception, int level, bool includeStackTrace)
+        private static void PrintException_Helper(StringBuilder sb, Exception exception, int level)
         {
-            if (exception == null) return String.Empty;
-            var sb = new StringBuilder();
-            sb.Append(PrintOneException(exception, level, includeStackTrace));
-            if (exception is ReflectionTypeLoadException)
+            if (exception == null) return;
+
+            var message = exceptionDecoders.TryGetValue(exception.GetType(), out var decoder) ? decoder(exception) : exception.Message;
+            sb.Append($"{Environment.NewLine}Exc level {level}: {exception.GetType()}: {message}");
+
+            if (exception.StackTrace is { } stack)
             {
-                Exception[] loaderExceptions =
-                    ((ReflectionTypeLoadException)exception).LoaderExceptions;
+                sb.Append($"{Environment.NewLine}{stack}");
+            }
+
+            if (exception is ReflectionTypeLoadException typeLoadException)
+            {
+                var loaderExceptions = typeLoadException.LoaderExceptions;
                 if (loaderExceptions == null || loaderExceptions.Length == 0)
                 {
                     sb.Append("No LoaderExceptions found");
@@ -84,48 +95,26 @@ namespace Orleans.Runtime
                     foreach (Exception inner in loaderExceptions)
                     {
                         // call recursively on all loader exceptions. Same level for all.
-                        sb.Append(PrintException_Helper(inner, level + 1, includeStackTrace));
+                        PrintException_Helper(sb, inner, level + 1);
                     }
-                }
-            }
-            else if (exception is AggregateException)
-            {
-                var innerExceptions = ((AggregateException)exception).InnerExceptions;
-                if (innerExceptions == null) return sb.ToString();
-
-                foreach (Exception inner in innerExceptions)
-                {
-                    // call recursively on all inner exceptions. Same level for all.
-                    sb.Append(PrintException_Helper(inner, level + 1, includeStackTrace));
                 }
             }
             else if (exception.InnerException != null)
             {
-                // call recursively on a single inner exception.
-                sb.Append(PrintException_Helper(exception.InnerException, level + 1, includeStackTrace));
+                if (exception is AggregateException { InnerExceptions: { Count: > 1 } innerExceptions })
+                {
+                    foreach (Exception inner in innerExceptions)
+                    {
+                        // call recursively on all inner exceptions. Same level for all.
+                        PrintException_Helper(sb, inner, level + 1);
+                    }
+                }
+                else
+                {
+                    // call recursively on a single inner exception.
+                    PrintException_Helper(sb, exception.InnerException, level + 1);
+                }
             }
-            return sb.ToString();
-        }
-
-        private static string PrintOneException(Exception exception, int level, bool includeStackTrace)
-        {
-            if (exception == null) return String.Empty;
-            string stack = String.Empty;
-            if (includeStackTrace && exception.StackTrace != null)
-                stack = String.Format(Environment.NewLine + exception.StackTrace);
-
-            string message = exception.Message;
-            var excType = exception.GetType();
-
-            Func<Exception, string> decoder;
-            if (exceptionDecoders.TryGetValue(excType, out decoder))
-                message = decoder(exception);
-
-            return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
-                level,
-                exception.GetType(),
-                message,
-                stack);
         }
     }
 }

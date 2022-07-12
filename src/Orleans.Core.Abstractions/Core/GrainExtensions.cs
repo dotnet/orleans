@@ -271,7 +271,7 @@ namespace Orleans
                 return legacyId.GetPrimaryKeyString();
             }
 
-            return grainId.Key.ToStringUtf8();
+            return grainId.Key.ToString();
         }
 
         /// <summary>
@@ -279,7 +279,6 @@ namespace Orleans
         /// </summary>
         /// <exception cref="ArgumentNullException">The grain argument is null.</exception>
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowGrainNull() => throw new ArgumentNullException("grain");
     }
 }

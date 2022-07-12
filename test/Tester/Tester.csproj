@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Condition="'$(TargetFramework)' == NETCOREAPP3_1" Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
@@ -20,6 +21,8 @@
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestVersionGrains\TestVersionGrains.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharp\TestFSharp.fsproj" />
-    <ProjectReference Include="..\..\src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
   </ItemGroup>
 </Project>

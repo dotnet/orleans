@@ -67,7 +67,7 @@ namespace TestGrains
 
         public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
         {
-            return Task.FromResult(RuntimeIdentity == siloAddress.ToLongString());
+            return Task.FromResult(RuntimeIdentity == siloAddress.ToString());
         }
     }
 }

@@ -25,6 +25,7 @@
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
   </ItemGroup>
 
   <ItemGroup>

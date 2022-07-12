@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Reminders</PackageId>
+    <Title>Microsoft Orleans Reminders Library</Title>
+    <Description>Reminders library for Microsoft Orleans used both on the server.</Description>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS_PROVIDER</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+</Project>

@@ -439,11 +439,6 @@ namespace Orleans
             }
         }
 
-        private string PrintAppDomainDetails()
-        {
-            return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
-        }
-
         public void Dispose()
         {
             if (this.disposing) return;
@@ -514,7 +509,6 @@ namespace Orleans
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ThrowIfDisposed()
         {
             if (disposed)
@@ -522,7 +516,6 @@ namespace Orleans
                 ThrowObjectDisposedException();
             }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             void ThrowObjectDisposedException() => throw new ObjectDisposedException(nameof(OutsideRuntimeClient));
         }
     }

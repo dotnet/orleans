@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
-    public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
+    public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable, ISpanFormattable
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainType"/> struct. 
@@ -126,16 +126,18 @@ namespace Orleans.Runtime
             info.AddValue("h", Value.GetHashCode());
         }
 
-        /// <inheritdoc/>
-        public override string ToString() => this.ToStringUtf8();
-
         /// <summary>
         /// Returns a string representation of this instance, decoding the value as UTF8.
         /// </summary>
         /// <returns>
         /// A <see cref="string"/> representation of this instance.
         /// </returns>
-        public string ToStringUtf8() => Value.ToStringUtf8();
+        public override string ToString() => Value.ToString();
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => Value.TryFormat(destination, out charsWritten);
 
         /// <summary>
         /// Compares the provided operands for equality.
@@ -157,26 +159,6 @@ namespace Orleans.Runtime
         public static bool operator !=(GrainType left, GrainType right)
         {
             return !(left == right);
-        }
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainType"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<GrainType>, IComparer<GrainType>
-        {
-            /// <summary>
-            /// Gets the singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(GrainType x, GrainType y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(GrainType x, GrainType y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(GrainType obj) => obj.GetHashCode();
         }
     }
 }

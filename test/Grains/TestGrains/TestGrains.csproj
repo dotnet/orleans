@@ -11,6 +11,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharpGrainInterfaces\TestFSharpGrainInterfaces.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
   </ItemGroup>
 </Project>
