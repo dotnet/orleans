@@ -58,7 +58,6 @@ namespace Orleans.Runtime
         public enum Categories : byte
         {
             None,
-            Ping,
             System,
             Application,
         }

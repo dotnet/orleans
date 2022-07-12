@@ -135,8 +135,7 @@ namespace Orleans.Runtime.Messaging
         public void SendMessage(Message msg)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
-                && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
+            if (IsBlockingApplicationMessages && msg.Category is Message.Categories.Application && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
@@ -471,13 +470,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void PrepareSystemTargetMessage(Message message)
         {
-            message.Category = message.TargetGrain.Equals(Constants.MembershipServiceType) ?
-                Message.Categories.Ping : Message.Categories.System;
-
-            if (message.TargetSilo == null)
-            {
-                message.TargetSilo = _siloAddress;
-            }
+            message.Category = Message.Categories.System;
         }
 
         public void ReceiveMessage(Message msg)

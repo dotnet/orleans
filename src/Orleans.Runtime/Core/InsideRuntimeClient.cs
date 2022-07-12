@@ -144,8 +144,7 @@ namespace Orleans.Runtime
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.Category = targetGrainId.Type.Equals(Constants.MembershipServiceType) ?
-                    Message.Categories.Ping : Message.Categories.System;
+                message.Category = Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
             }
             else
