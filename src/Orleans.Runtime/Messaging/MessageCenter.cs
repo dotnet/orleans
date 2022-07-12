@@ -482,83 +482,85 @@ namespace Orleans.Runtime.Messaging
 
         public void ReceiveMessage(Message msg)
         {
-            this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
-
-            // Find the activation it targets; first check for a system activation, then an app activation
-            if (msg.TargetGrain.IsSystemTarget())
+            try
             {
-                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetGrain);
-                if (target == null)
+                this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
+                if (TryDeliverToProxy(msg))
                 {
-                    MessagingInstruments.OnRejectedMessage(msg);
-                    this.log.LogWarning(
-                        (int) ErrorCode.MessagingMessageFromUnknownActivation,
-                        "Received a message {Message} for an unknown SystemTarget: {Target}",
-                         msg,
-                         msg.TargetGrain);
-
-                    // Send a rejection only on a request
-                    if (msg.Direction == Message.Directions.Request)
-                    {
-                        var response = this.messageFactory.CreateRejectionResponse(
-                            msg,
-                            Message.RejectionTypes.Unrecoverable,
-                            $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
-
-                        SendMessage(response);
-                    }
                     return;
                 }
+                else if (msg.Direction == Message.Directions.Response)
+                {
+                    this.catalog.RuntimeClient.ReceiveResponse(msg);
+                }
+                else
+                {
+                    var targetActivation = catalog.GetOrCreateActivation(
+                        msg.TargetGrain,
+                        msg.RequestContextData);
 
-                target.ReceiveMessage(msg);
+                    if (targetActivation is null)
+                    {
+                        ProcessMessageToNonExistentActivation(msg);
+                        return;
+                    }
+
+                    targetActivation.ReceiveMessage(msg);
+                }
             }
-            else if (TryDeliverToProxy(msg))
+            catch (Exception ex)
             {
-                return;
+                HandleReceiveFailure(msg, ex);
+            }
+
+            void HandleReceiveFailure(Message msg, Exception ex)
+            {
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
+                log.LogError(
+                    (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
+                    ex,
+                    "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}",
+                    msg.TargetGrain,
+                    msg.InterfaceType,
+                    msg);
+
+                this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
+            }
+        }
+
+        private void ProcessMessageToNonExistentActivation(Message msg)
+        {
+            var target = msg.TargetGrain;
+            if (target.IsSystemTarget())
+            {
+                MessagingInstruments.OnRejectedMessage(msg);
+                this.log.LogWarning(
+                    (int) ErrorCode.MessagingMessageFromUnknownActivation,
+                    "Received a message {Message} for an unknown SystemTarget: {Target}",
+                     msg,
+                     msg.TargetGrain);
+
+                // Send a rejection only on a request
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    var response = this.messageFactory.CreateRejectionResponse(
+                        msg,
+                        Message.RejectionTypes.Unrecoverable,
+                        $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
+
+                    SendMessage(response);
+                }
             }
             else
             {
-                try
-                {
-                    if (msg.Direction == Message.Directions.Response)
-                    {
-                        this.catalog.RuntimeClient.ReceiveResponse(msg);
-                    }
-                    else
-                    {
-                        var targetActivation = catalog.GetOrCreateActivation(
-                            msg.TargetGrain,
-                            msg.RequestContextData);
+                // Activation does not exists and is not a new placement.
+                log.LogInformation(
+                    (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                    "Intermediate NonExistentActivation for message {Message}",
+                    msg);
 
-                        if (targetActivation is null)
-                        {
-                            // Activation does not exists and is not a new placement.
-                            log.LogInformation(
-                                (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                                "Intermediate NonExistentActivation for message {Message}",
-                                msg);
-
-                            var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
-                            ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
-                            return;
-                        }
-
-                        targetActivation.ReceiveMessage(msg);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
-                    log.LogError(
-                        (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
-                        ex,
-                        "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}",
-                        msg.TargetGrain,
-                        msg.InterfaceType,
-                        msg);
-
-                    this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
-                }
+                var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
+                ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
             }
         }
 

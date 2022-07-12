@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable
     {
         private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
@@ -79,8 +79,12 @@ namespace Orleans.Runtime
             this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             this.logger = loggerFactory.CreateLogger(this.GetType());
-        }
 
+            if (!Constants.IsSingletonSystemTarget(GrainId.Type))
+            {
+                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+            }
+        }
 
         internal WorkItemGroup WorkItemGroup { get; set; }
 
@@ -279,14 +283,6 @@ namespace Orleans.Runtime
                         break;
                     }
 
-                case Message.Directions.Response:
-                    {
-                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
-                        var workItem = new ResponseWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
-                        break;
-                    }
-
                 default:
                     this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
                     break;
@@ -304,5 +300,13 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
+
+        public void Dispose()
+        {
+            if (!Constants.IsSingletonSystemTarget(GrainId.Type))
+            {
+                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+            }
+        }
     }
 }
