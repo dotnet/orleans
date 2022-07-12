@@ -109,6 +109,10 @@ namespace Orleans.Runtime
             {
                 result = (TComponent)resultObj;
             }
+            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            {
+                result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
+            }
             else
             {
                 result = default;
