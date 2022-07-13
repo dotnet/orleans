@@ -251,7 +251,7 @@ namespace UnitTests.TimerTests
 
         protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g)
         {
-            TimeSpan period = await g.GetReminderPeriod(DR);
+            var (dueTime, period) = await g.GetReminderDueTimeAndPeriod(DR);
 
             this.log.LogInformation("PerGrainMultiReminderTest Period={Period} Grain={Grain}", period, g);
 
@@ -262,52 +262,68 @@ namespace UnitTests.TimerTests
 
             // Start Default Reminder
             await g.StartReminder(DR);
-            TimeSpan sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
+            TimeSpan sleepFor = dueTime + period;
             await Task.Delay(sleepFor);
             var reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[DR].Fired.Count, 1, 2, g, DR, sleepFor);
+            var (min, max) = GetExpectedRange(1);
+            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
 
             // Start R1
             await g.StartReminder(R1);
             await Task.Delay(sleepFor);
             reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[R1].Fired.Count, 1, 2, g, R1, sleepFor);
+            (min, max) = GetExpectedRange(1);
+            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
 
             // Start R2
             await g.StartReminder(R2);
             await Task.Delay(sleepFor);
             reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, 1, 2, g, R2, sleepFor);
-            AssertIsInRange(reminders[DR].Fired.Count, 5, 6, g, DR, sleepFor);
+            (min, max) = GetExpectedRange(2);
+            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
+            (min, max) = GetExpectedRange(1);
+            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
+            (min, max) = GetExpectedRange(3);
+            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
 
             // Stop R1
             await g.StopReminder(R1);
             await Task.Delay(sleepFor);
             reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
-            AssertIsInRange(reminders[DR].Fired.Count, 7, 8, g, DR, sleepFor);
+            (min, max) = GetExpectedRange(2);
+            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
+            (min, max) = GetExpectedRange(4);
+            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
 
             // Stop R2
             await g.StopReminder(R2);
-            sleepFor = period.Multiply(3) + LEEWAY; // giving some leeway
             await Task.Delay(sleepFor);
             reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
-            AssertIsInRange(reminders[DR].Fired.Count, 10, 12, g, DR, sleepFor);
+            (min, max) = GetExpectedRange(2);
+            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
+            (min, max) = GetExpectedRange(5);
+            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
 
             // Stop Default reminder
             await g.StopReminder(DR);
-            sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
             await Task.Delay(sleepFor);
             reminders = await g.GetReminderStates();
-            AssertIsInRange(reminders[R1].Fired.Count, 3, 4, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, 3, 4, g, R2, sleepFor);
-            AssertIsInRange(reminders[DR].Fired.Count, 10, 12, g, DR, sleepFor);
+            (min, max) = GetExpectedRange(2);
+            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
+            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
+            (min, max) = GetExpectedRange(5);
+            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
 
             return true;
+
+            (int MinFires, int MaxFires) GetExpectedRange(int numPeriods)
+            {
+                var minExpected = ((sleepFor - LEEWAY) * numPeriods - dueTime) / period;
+                var maxExpected = ((sleepFor + LEEWAY) * numPeriods - dueTime) / period;
+                return ((int)Math.Floor(minExpected), (int)Math.Ceiling(maxExpected));
+            }
         }
 
         protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)

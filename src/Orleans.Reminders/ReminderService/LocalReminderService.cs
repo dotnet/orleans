@@ -638,9 +638,19 @@ namespace Orleans.Runtime.ReminderService
                     var sinceFirstTick = now.Subtract(firstTickTime);
                     var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % period.Ticks);
                     dueTimeSpan = period.Subtract(sinceLastTick);
+
                     // in corner cases, dueTime can be equal to period ... so, take another mod
                     dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % period.Ticks);
                 }
+
+                // If the previous tick took no percievable time, be sure to wait at least one period until the next tick.
+                // If the previous tick took one period or greater, then we will skip up to one period.
+                // That is preferable over double-firing for fast ticks, which are expected to be more common.
+                if (dueTimeSpan <= TimeSpan.FromMilliseconds(30))
+                {
+                    dueTimeSpan = period;
+                }
+
                 return dueTimeSpan;
             }
 
