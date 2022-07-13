@@ -26,6 +26,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseAzureTableReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)
         {
+            services.AddReminders();
             services.AddSingleton<IReminderTable, AzureBasedReminderTable>();
             services.Configure<AzureTableReminderStorageOptions>(configure);
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
@@ -46,6 +47,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseAzureTableReminderService(this IServiceCollection services, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)
         {
+            services.AddReminders();
             services.AddSingleton<IReminderTable, AzureBasedReminderTable>();
             configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();

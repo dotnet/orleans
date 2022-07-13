@@ -190,6 +190,11 @@ namespace UnitTests.Grains
             return Task.FromResult(this.period);
         }
 
+        public Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName)
+        {
+            return Task.FromResult((this.period - TimeSpan.FromSeconds(2), this.period));
+        }
+
         public Task<long> GetCounter(string name)
         {
             string fileName = GetFileName(name);
@@ -274,7 +279,7 @@ namespace UnitTests.Grains
             this.logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, this.GrainId);
             IGrainReminder r;
             if (validate)
-                r = await this.RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
+                r = await this.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
                 r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
                     this.GrainId,
