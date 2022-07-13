@@ -38,6 +38,8 @@ namespace Orleans.CodeGenerator
         public string TypeName => Type.ToDisplayName();
         public string TypeNameIdentifier => Type.GetValidIdentifier();
 
+        public bool IsPrimaryConstructorParameter => false;
+
         public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
     }
 }

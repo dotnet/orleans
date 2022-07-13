@@ -40,6 +40,7 @@ namespace Orleans.CodeGenerator
         public TypeSyntax TypeSyntax => _typeSyntax ??= CreateTypeSyntax();
         public TypeSyntax OpenTypeSyntax => _openTypeSyntax ??= CreateOpenTypeSyntax();
         public bool HasComplexBaseType => BaseType is not null;
+        public bool SupportsPrimaryContstructorParameters => false;
         public INamedTypeSymbol BaseType { get; }
         public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_methodDescription.TypeParameterSubstitutions);
         public string Namespace => GeneratedNamespace;

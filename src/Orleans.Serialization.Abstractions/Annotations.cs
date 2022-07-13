@@ -9,6 +9,11 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum)]
     public sealed class GenerateSerializerAttribute : Attribute
     {
+        /// <summary>
+        /// Get or sets if primary constructor parameters should automatically be included as Serializable fields.
+        /// Defaults to <see langword="true"/> for record types.
+        /// </summary>
+        public bool IncludePrimaryConstructorParameters { get; init; } = true;
     }
 
     /// <summary>

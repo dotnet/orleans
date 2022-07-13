@@ -98,7 +98,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpUnionCaseTypeDescription : SerializableTypeDescription
         {
-            public FSharpUnionCaseTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpUnionCaseTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 
@@ -197,6 +197,8 @@ namespace Orleans.CodeGenerator
                 public string TypeName => Type.ToDisplayName();
                 public string TypeNameIdentifier => Type.GetValidIdentifier();
 
+                public bool IsPrimaryConstructorParameter => false;
+
                 public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 
                 /// <summary>
@@ -259,7 +261,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpRecordTypeDescription : SerializableTypeDescription
         {
-            public FSharpRecordTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, GetRecordDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpRecordTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetRecordDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 
@@ -332,6 +334,8 @@ namespace Orleans.CodeGenerator
                 public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
                 public string TypeName => Type.ToDisplayName();
                 public string TypeNameIdentifier => Type.GetValidIdentifier();
+
+                public bool IsPrimaryConstructorParameter => false;
 
                 public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 

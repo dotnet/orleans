@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator
 {
@@ -16,7 +17,6 @@ namespace Orleans.CodeGenerator
         public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
         public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
-
         public bool GenerateFieldIds { get; set; } = false;
     }
 
@@ -206,7 +206,8 @@ namespace Orleans.CodeGenerator
                         else
                         {
                             // Regular type
-                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, GetDataMembers(symbol), LibraryTypes);
+                            var supportsPrimaryContstructorParameters = ShouldSupportPrimaryConstructorParameters(symbol);
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryContstructorParameters, GetDataMembers(symbol), LibraryTypes);
                             metadataModel.SerializableTypes.Add(typeDescription);
                         }
                     }
@@ -300,6 +301,49 @@ namespace Orleans.CodeGenerator
 
                         return false;
                     }
+
+                    bool ShouldSupportPrimaryConstructorParameters(INamedTypeSymbol t)
+                    {
+                        static bool TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
+                        {
+                            var attribute = HasAttribute(t, at);
+                            if (attribute != null)
+                            {
+                                foreach (var namedArgument in attribute.NamedArguments)
+                                {
+                                    if (namedArgument.Key == "IncludePrimaryConstructorParameters")
+                                    {
+                                        if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b && b == false)
+                                        {
+                                            return false;
+                                        }
+                                    }
+                                }
+                            }
+
+                            return true;
+                        }
+
+                        if (!t.IsRecord)
+                        {
+                            return false;
+                        }
+
+                        if (!TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute))
+                        {
+                            return false;
+                        }
+
+                        foreach (var attr in _generateSerializerAttributes)
+                        {
+                            if (!TestGenerateSerializerAttribute(t, attr))
+                            {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    }
                 }
             }
 
@@ -391,7 +435,7 @@ namespace Orleans.CodeGenerator
         // Returns descriptions of all data members (fields and properties) 
         private IEnumerable<IMemberDescription> GetDataMembers(INamedTypeSymbol symbol)
         {
-            var members = new Dictionary<ushort, IMemberDescription>();
+            var members = new Dictionary<(ushort, bool), IMemberDescription>();
             var hasAttributes = false;
             foreach (var member in symbol.GetMembers())
             {
@@ -413,6 +457,20 @@ namespace Orleans.CodeGenerator
             }
 
             var nextFieldId = (ushort)0;
+
+            ImmutableArray<IParameterSymbol> primaryConstructorParameters = ImmutableArray<IParameterSymbol>.Empty;
+            if (symbol.IsRecord)
+            {
+                // If there is a primary constructor then that will be declared before the copy constructor
+                // A record always generates a copy constructor and marks it as implicitly declared
+                // todo: find an alternative to this magic
+                var potentialPrimaryConstructor = symbol.Constructors[0];
+                if (!potentialPrimaryConstructor.IsImplicitlyDeclared)
+                {
+                    primaryConstructorParameters = potentialPrimaryConstructor.Parameters;
+                }
+            }
+
             foreach (var member in symbol.GetMembers().OrderBy(m => m.MetadataName))
             {
                 if (member.IsStatic || member.IsAbstract)
@@ -434,6 +492,7 @@ namespace Orleans.CodeGenerator
                 if (member is IPropertySymbol prop)
                 {
                     var id = GetId(prop);
+
                     if (!id.HasValue)
                     {
                         if (hasAttributes || !_options.GenerateFieldIds)
@@ -445,15 +504,17 @@ namespace Orleans.CodeGenerator
                     }
 
                     // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue(id.Value, out var existing))
+                    if (!members.TryGetValue((id.Value, false), out var existing))
                     {
-                        members[id.Value] = new PropertyDescription(id.Value, prop);
+                        members[(id.Value, false)] = new PropertyDescription(id.Value, prop);
                     }
                 }
 
                 if (member is IFieldSymbol field)
                 {
                     var id = GetId(field);
+                    var isPrimaryConstructorParameter = false;
+
                     if (!id.HasValue)
                     {
                         prop = PropertyUtility.GetMatchingProperty(field);
@@ -469,6 +530,16 @@ namespace Orleans.CodeGenerator
                         }
 
                         id = GetId(prop);
+
+                        if (!id.HasValue)
+                        {
+                            var primaryConstructorParameter = primaryConstructorParameters.FirstOrDefault(x => x.Name == prop.Name);
+                            if (primaryConstructorParameter is not null)
+                            {
+                                id = (ushort)primaryConstructorParameters.IndexOf(primaryConstructorParameter);
+                                isPrimaryConstructorParameter = true;
+                            }
+                        }
                     }
 
                     if (!id.HasValue)
@@ -482,9 +553,9 @@ namespace Orleans.CodeGenerator
                     }
 
                     // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue(id.Value, out var existing) || existing is PropertyDescription)
+                    if (!members.TryGetValue((id.Value, isPrimaryConstructorParameter), out var existing) || existing is PropertyDescription)
                     {
-                        members[id.Value] = new FieldDescription(id.Value, field);
+                        members[(id.Value, isPrimaryConstructorParameter)] = new FieldDescription(id.Value, isPrimaryConstructorParameter, field);
                         continue;
                     }
                 }
