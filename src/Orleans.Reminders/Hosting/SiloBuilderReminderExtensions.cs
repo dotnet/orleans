@@ -20,7 +20,7 @@ public static class SiloBuilderReminderExtensions
     /// Add support for reminders to this client.
     /// </summary>
     /// <param name="services">The services.</param>
-    private static void AddReminders(this IServiceCollection services)
+    public static void AddReminders(this IServiceCollection services)
     {
         if (services.Any(service => service.ServiceType.Equals(typeof(LocalReminderService))))
         {

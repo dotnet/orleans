@@ -38,7 +38,6 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
-            builder.AddReminders();
             return builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
         }
 
@@ -51,6 +50,7 @@ namespace Orleans.Hosting
         /// </remarks>
         public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
+            services.AddReminders();
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
             services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
