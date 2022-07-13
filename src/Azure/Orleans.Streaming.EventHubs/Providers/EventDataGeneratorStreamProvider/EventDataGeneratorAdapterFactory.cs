@@ -9,6 +9,7 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Statistics;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
@@ -30,9 +31,9 @@ namespace Orleans.ServiceBus.Providers.Testing
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            ITelemetryProducer telemetryProducer,
-            ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
+            ILoggerFactory loggerFactory,
+            IHostEnvironmentStatistics hostEnvironmentStatistics)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
         {
             this.ehGeneratorOptions = options;
         }
@@ -58,7 +59,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
         }
 
-        private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
+        private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger)
         {
             var streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
                 ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);

@@ -14,7 +14,7 @@ using Orleans.Internal;
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup : IWorkItem, IDisposable, IWorkItemScheduler
+    internal class WorkItemGroup : IWorkItem, IWorkItemScheduler
     {
         private enum WorkGroupStatus
         {
@@ -35,10 +35,7 @@ namespace Orleans.Runtime.Scheduler
         private Task currentTask;
         private long currentTaskStarted;
 
-        private readonly QueueTrackingStatistic queueTracking;
-        private readonly int workItemGroupStatisticsNumber;
         private readonly SchedulingOptions schedulingOptions;
-        private readonly SchedulerStatisticsGroup schedulerStatistics;
 
         internal ActivationTaskScheduler TaskScheduler { get; }
 
@@ -69,13 +66,10 @@ namespace Orleans.Runtime.Scheduler
             IGrainContext grainContext,
             ILogger<WorkItemGroup> logger,
             ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-            SchedulerStatisticsGroup schedulerStatistics,
-            IOptions<StatisticsOptions> statisticsOptions,
             IOptions<SchedulingOptions> schedulingOptions)
         {
             GrainContext = grainContext;
             this.schedulingOptions = schedulingOptions.Value;
-            this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
             workItems = new Queue<Task>();
             lockable = new object();
@@ -83,30 +77,6 @@ namespace Orleans.Runtime.Scheduler
             totalItemsProcessed = 0;
             TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
             log = logger;
-
-            if (schedulerStatistics.CollectShedulerQueuesStats)
-            {
-                queueTracking = new QueueTrackingStatistic("Scheduler." + this.Name, statisticsOptions);
-                queueTracking.OnStartExecution();
-            }
-
-            if (schedulerStatistics.CollectPerWorkItemStats)
-            {
-                workItemGroupStatisticsNumber = schedulerStatistics.RegisterWorkItemGroup(this.Name, this.GrainContext,
-                    () =>
-                    {
-                        var sb = new StringBuilder();
-                        lock (lockable)
-                        {
-
-                            sb.Append("QueueLength = " + WorkItemCount);
-                            sb.Append($", State = {state}");
-                            if (state == WorkGroupStatus.Runnable)
-                                sb.Append($"; oldest item is {(workItems.Count >= 0 ? workItems.Peek().ToString() : "null")} old");
-                        }
-                        return sb.ToString();
-                    });
-            }
         }
 
         /// <summary>
@@ -334,11 +304,6 @@ namespace Orleans.Runtime.Scheduler
         public static void ScheduleExecution(WorkItemGroup workItem)
         {
             ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
-        }
-
-        public void Dispose()
-        {
-            this.schedulerStatistics.UnregisterWorkItemGroup(workItemGroupStatisticsNumber);
         }
 
         public void QueueAction(Action action) => TaskScheduler.QueueAction(action);

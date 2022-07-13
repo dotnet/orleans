@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
+using Orleans.Statistics;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -21,6 +22,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
+        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
 
         /// <summary>
         /// Data adapter
@@ -49,7 +51,6 @@ namespace Orleans.ServiceBus.Providers
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubProducerClient client;
-        private ITelemetryProducer telemetryProducer;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -71,7 +72,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Creates a message cache for an eventhub partition.
         /// </summary>
-        protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> CacheFactory { get; set; }
+        protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> CacheFactory { get; set; }
 
         /// <summary>
         /// Creates a partition checkpointer.
@@ -92,13 +93,13 @@ namespace Orleans.ServiceBus.Providers
         /// Create a receiver monitor to report performance metrics.
         /// Factory function should return an IEventHubReceiverMonitor.
         /// </summary>
-        protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
+        protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
         /// <summary>
         /// Factory to create a IEventHubReceiver
         /// </summary>
-        protected Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> EventHubReceiverFactory;
+        protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
 
@@ -111,8 +112,8 @@ namespace Orleans.ServiceBus.Providers
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            ITelemetryProducer telemetryProducer,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IHostEnvironmentStatistics hostEnvironmentStatistics)
         {
             this.Name = name;
             this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
@@ -122,14 +123,13 @@ namespace Orleans.ServiceBus.Providers
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _hostEnvironmentStatistics = hostEnvironmentStatistics;
         }
 
         public virtual void Init()
         {
             this.receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
-            this.telemetryProducer = this.serviceProvider.GetService<ITelemetryProducer>();
 
             InitEventHubClient();
 
@@ -151,7 +151,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (this.ReceiverMonitorFactory == null)
             {
-                this.ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => new DefaultEventHubReceiverMonitor(dimensions, telemetryProducer);
+                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions);
             }
 
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.EventHubName}");
@@ -282,9 +282,14 @@ namespace Orleans.ServiceBus.Providers
             };
             if (this.checkpointerFactory == null)
                 InitCheckpointerFactory();
-            return new EventHubAdapterReceiver(config, this.CacheFactory, this.checkpointerFactory.Create, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
+            return new EventHubAdapterReceiver(
+                config,
+                this.CacheFactory,
+                this.checkpointerFactory.Create,
+                this.loggerFactory,
+                this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory),
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
-                this.telemetryProducer,
+                _hostEnvironmentStatistics,
                 this.EventHubReceiverFactory);
         }
 

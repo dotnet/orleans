@@ -227,8 +227,6 @@ namespace Orleans.Runtime
                 systemTarget,
                 sp.GetRequiredService<ILogger<WorkItemGroup>>(),
                 sp.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                sp.GetRequiredService<SchedulerStatisticsGroup>(),
-                sp.GetRequiredService<IOptions<StatisticsOptions>>(),
                 sp.GetRequiredService<IOptions<SchedulingOptions>>());
             activations.RecordNewSystemTarget(systemTarget);
         }

@@ -132,12 +132,12 @@ namespace Orleans.Runtime
 
         public void OnCreateActivation(IGrainContext grainContext)
         {
-            MiscInstruments.IncrementGrainCounts(_grainTypeName);
+            GrainInstruments.IncrementGrainCounts(_grainTypeName);
         }
 
         public void OnDestroyActivation(IGrainContext grainContext)
         {
-            MiscInstruments.DecrementGrainCounts(_grainTypeName);
+            GrainInstruments.DecrementGrainCounts(_grainTypeName);
         }
     }
 

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 
@@ -13,15 +13,9 @@ namespace Orleans.ServiceBus.Providers
         /// Constructor
         /// </summary>
         /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
-        /// <param name="telemetryProducer"></param>
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, ITelemetryProducer telemetryProducer)
-            :base(telemetryProducer)
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions)
+            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
         {
-            this.LogProperties = new Dictionary<string, string>
-            {
-                {"Path", dimensions.EventHubPath},
-                {"Partition", dimensions.EventHubPartition}
-            };
         }
     }
 

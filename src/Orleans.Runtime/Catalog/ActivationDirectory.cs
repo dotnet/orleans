@@ -11,7 +11,6 @@ namespace Orleans.Runtime
     {
         private readonly ConcurrentDictionary<GrainId, IGrainContext> activations = new();                // Activation data (app grains) only.
         private readonly ConcurrentDictionary<GrainId, SystemTarget> systemTargets = new();                // SystemTarget only.
-        private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts = new();             // simple statistics systemTargetTypeName->count
 
         public int Count => activations.Count;
 
@@ -40,7 +39,7 @@ namespace Orleans.Runtime
             systemTargets.TryAdd(target.GrainId, target);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                MiscInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
+                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 
@@ -50,7 +49,7 @@ namespace Orleans.Runtime
             systemTargets.TryRemove(target.GrainId, out _);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                MiscInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
+                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(systemTarget.GrainId.Type));
             }
         }
 

@@ -1,6 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
 
 namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
@@ -10,20 +9,12 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
     /// </summary>
     public class DefaultEventHubBlockPoolMonitor : DefaultBlockPoolMonitor
     {
-
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="dimensions"></param>
-        /// <param name="telemetryProducer"></param>
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, ITelemetryProducer telemetryProducer)
-            :base(telemetryProducer)
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) })
         {
-            this.LogProperties = new Dictionary<string, string>
-            {
-                {"Path", dimensions.EventHubPath},
-                {"ObjectPoolId", dimensions.BlockPoolId}
-            };
         }
     }
 }

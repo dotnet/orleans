@@ -17,8 +17,6 @@ namespace UnitTests.TesterInternal
             var services = new ServiceCollection();
             services.AddOptions();
             services.AddLogging();
-            services.AddSingleton<SchedulerStatisticsGroup>();
-            services.AddSingleton<StageAnalysisStatisticsGroup>();
             services.AddSingleton(loggerFactory);
             services.Configure<SchedulingOptions>(options =>
             {
@@ -33,8 +31,6 @@ namespace UnitTests.TesterInternal
                 context,
                 s.GetRequiredService<ILogger<WorkItemGroup>>(),
                 s.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                s.GetRequiredService<SchedulerStatisticsGroup>(),
-                s.GetRequiredService<IOptions<StatisticsOptions>>(),
                 s.GetRequiredService<IOptions<SchedulingOptions>>());
             return result;
         }

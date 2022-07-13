@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
@@ -34,7 +32,6 @@ namespace Orleans.Runtime
         private readonly LocalGrainDirectory localGrainDirectory;
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -88,8 +85,6 @@ namespace Orleans.Runtime
             // Temporarily still require this. Hopefuly gone when 2.0 is released.
             this.siloDetails = siloDetails;
             this.SystemStatus = SystemStatus.Creating;
-
-            var startTime = DateTime.UtcNow;
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
@@ -154,9 +149,6 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            // Performance metrics
-            siloStatistics = Services.GetRequiredService<SiloStatisticsManager>();
-
             runtimeClient = Services.GetRequiredService<InsideRuntimeClient>();
 
             // Initialize the message center
@@ -176,9 +168,6 @@ namespace Orleans.Runtime
             this.membershipService = Services.GetRequiredService<IMembershipService>();
 
             this.SystemStatus = SystemStatus.Created;
-
-            StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
-                () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
             this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
@@ -325,10 +314,6 @@ namespace Orleans.Runtime
 
             try
             {
-                StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
-                StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
-                logger.LogDebug("Silo statistics manager started successfully.");
-
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
                 async Task StartDeploymentLoadCollector()
@@ -341,7 +326,8 @@ namespace Orleans.Runtime
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
-                this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
+                var membershipOptions = Services.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+                this.platformWatchdog = new Watchdog(membershipOptions.LocalHealthDegradationMonitoringPeriod, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
                 this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo platform watchdog started successfully."); }
             }
@@ -550,8 +536,6 @@ namespace Orleans.Runtime
             {
                 this.logger.LogError(exception, "Error stopping message center");
             }
-
-            SafeExecute(siloStatistics.Stop);
 
             SystemStatus = SystemStatus.Terminated;
         }

@@ -1,6 +1,5 @@
-#define LOG_MEMORY_PERF_COUNTERS
-
 using System;
+using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -11,10 +10,11 @@ using Orleans.Runtime;
 
 namespace Orleans.Statistics
 {
-    internal class LinuxEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleParticipant<ISiloLifecycle>, ILifecycleParticipant<IClusterClientLifecycle>, ILifecycleObserver, IDisposable
+    internal class LinuxEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleObserver, IDisposable
     {
         private readonly ILogger _logger;
-
+        private readonly ObservableCounter<long> _totalPhysicalMemoryCounter;
+        private readonly ObservableCounter<long> _availableMemoryCounter;
         private const float KB = 1024f;
 
         /// <inheritdoc />
@@ -46,6 +46,8 @@ namespace Orleans.Statistics
         public LinuxEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<LinuxEnvironmentStatistics>();
+            _totalPhysicalMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHSYSICAL_MEMORY_MB, () => (long)(TotalPhysicalMemory / KB / KB), unit: "MB");
+            _availableMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(AvailableMemory / KB / KB), unit: "MB");
         }
 
         public void Dispose()
@@ -54,16 +56,6 @@ namespace Orleans.Statistics
             {
                 _cts.Cancel();
             }
-        }
-
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
-        }
-
-        public void Participate(IClusterClientLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }
 
         public async Task OnStart(CancellationToken ct)
@@ -200,35 +192,6 @@ namespace Orleans.Statistics
             AvailableMemory = availableMemInKb * 1_000;
         }
 
-        private void WriteToStatistics()
-        {
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage ?? 0f);
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB - 1.0) / KB)); // Round up
-
-#if LOG_MEMORY_PERF_COUNTERS
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (long)((TotalPhysicalMemory / KB) / KB));
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (long)((AvailableMemory / KB) / KB)); // Round up
-#endif
-
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
-            {
-                ThreadPool.GetMaxThreads(out var maXworkerThreads, out var maXcompletionPortThreads);
-
-                // GetAvailableThreads Retrieves the difference between the maximum number of thread pool threads
-                // and the number currently active.
-                // So max-Available is the actual number in use. If it goes beyond min, it means we are stressing the thread pool.
-                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
-                return maXworkerThreads - workerThreads;
-            });
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS, () =>
-            {
-                ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxCompletionPortThreads);
-
-                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
-                return maxCompletionPortThreads - completionPortThreads;
-            });
-        }
-
         private async Task Monitor(CancellationToken ct)
         {
             int i = 0;
@@ -244,9 +207,6 @@ namespace Orleans.Statistics
                         UpdateCpuUsage(i),
                         UpdateAvailableMemory()
                     );
-
-                    if (i == 1)
-                        WriteToStatistics();
 
                     var logStr = $"LinuxEnvironmentStatistics: CpuUsage={CpuUsage?.ToString("0.0")}, TotalPhysicalMemory={TotalPhysicalMemory}, AvailableMemory={AvailableMemory}";
                     _logger.LogTrace(logStr);

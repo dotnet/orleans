@@ -17,7 +17,6 @@ namespace Orleans.Runtime.Messaging
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.Enabled = loadSheddingOptions.Value.LoadSheddingEnabled;
             this.limit = loadSheddingOptions.Value.LoadSheddingLimit;
-            StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => this.Overloaded.ToString());
         }
 
         /// <summary>

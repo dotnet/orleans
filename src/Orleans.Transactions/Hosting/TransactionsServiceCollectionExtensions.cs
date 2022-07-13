@@ -11,7 +11,7 @@ namespace Orleans.Hosting
     /// </summary>
     public static class TransactionsServiceCollectionExtensions
     {
-        internal static IServiceCollection UseTransactionsWithSilo(this IServiceCollection services, bool withReporter)
+        internal static IServiceCollection UseTransactionsWithSilo(this IServiceCollection services)
         {
             services.AddTransactionsBaseline();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
@@ -21,8 +21,6 @@ namespace Orleans.Hosting
             services.TryAddTransient<ITransactionCommitterFactory, TransactionCommitterFactory>();
             services.TryAddTransient<INamedTransactionalStateStorageFactory, NamedTransactionalStateStorageFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
-            if (withReporter)
-                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
             return services;
         }
 

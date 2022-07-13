@@ -87,11 +87,6 @@ namespace Orleans.Runtime.GrainDirectory
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
-
-            Func<SiloAddress, string> siloAddressPrint = addr => $"{addr}/{addr.GetConsistentHashCode():X}";
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING, () => Utils.EnumerableToString(directoryMembership.MembershipRingList, siloAddressPrint));
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_PREDECESSORS, () => FindPredecessor(MyAddress) is { } s ? siloAddressPrint(s) : null);
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_SUCCESSORS, () => FindSuccessor(MyAddress) is { } s ? siloAddressPrint(s) : null);
         }
 
         public void Start()
