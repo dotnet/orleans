@@ -277,14 +277,7 @@ namespace Orleans
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
 
-            // ignore duplicate requests
-            if (response.Result == Message.ResponseTypes.Rejection
-                && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
-                 || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
-            {
-                return;
-            }
-            else if (response.Result == Message.ResponseTypes.Status)
+            if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject;
                 callbacks.TryGetValue(response.Id, out var callback);

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
@@ -125,7 +124,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
-                msg.RetryCount = msg.RetryCount + 1;
+                ++msg.RetryCount;
                 this.messageCenter.SendMessage(msg);
             }
             else

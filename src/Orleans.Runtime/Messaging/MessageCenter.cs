@@ -135,7 +135,7 @@ namespace Orleans.Runtime.Messaging
         public void SendMessage(Message msg)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (IsBlockingApplicationMessages && msg.Category is Message.Categories.Application && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
+            if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
@@ -384,7 +384,7 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetGrain.IsSystemTarget())
             {
-                PrepareSystemTargetMessage(message);
+                message.IsSystemMessage = true;
                 SendMessage(message);
             }
             else if (forwardingAddress != null)
@@ -462,15 +462,10 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetGrain.IsSystemTarget())
             {
-                PrepareSystemTargetMessage(message);
+                message.IsSystemMessage = true;
             }
 
             SendMessage(message);
-        }
-
-        internal void PrepareSystemTargetMessage(Message message)
-        {
-            message.Category = Message.Categories.System;
         }
 
         public void ReceiveMessage(Message msg)
@@ -559,7 +554,7 @@ namespace Orleans.Runtime.Messaging
         {
             MessagingInstruments.OnRejectedMessage(msg);
 
-            if (msg.Direction == Message.Directions.Response && msg.Result == Message.ResponseTypes.Rejection)
+            if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingInstruments.OnDroppedSentMessage(msg);

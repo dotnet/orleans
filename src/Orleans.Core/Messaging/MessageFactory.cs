@@ -31,7 +31,6 @@ namespace Orleans.Runtime
 
             var message = new Message
             {
-                Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
@@ -50,7 +49,7 @@ namespace Orleans.Runtime
         {
             var response = new Message
             {
-                Category = request.Category,
+                IsSystemMessage = request.IsSystemMessage,
                 Direction = Message.Directions.Response,
                 Id = request.Id,
                 IsReadOnly = request.IsReadOnly,
@@ -73,9 +72,12 @@ namespace Orleans.Runtime
         {
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;
-            response.RejectionType = type;
-            response.RejectionInfo = info;
-            response.BodyObject = ex;
+            response.BodyObject = new RejectionResponse
+            {
+                RejectionType = type,
+                RejectionInfo = info,
+                Exception = ex,
+            };
             if (this.logger.IsEnabled(LogLevel.Debug))
                 this.logger.LogDebug(
                     ex,

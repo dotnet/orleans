@@ -47,7 +47,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The maximum number of times a message send attempt will be retried.
         /// </summary>
-        internal const int DEFAULT_MAX_MESSAGE_SEND_RETRIES = 1;
+        internal const short DEFAULT_MAX_MESSAGE_SEND_RETRIES = 1;
 
         /// <summary>
         /// The maximum size, in bytes, of the header for a message. The runtime will forcibly close the connection

@@ -309,6 +309,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
+            services.AddTransient<IValidateOptions<SiloMessagingOptions>, SiloMessagingOptionsValidator>();
 
             // Enable hosted client.
             services.TryAddSingleton<HostedClient>();
