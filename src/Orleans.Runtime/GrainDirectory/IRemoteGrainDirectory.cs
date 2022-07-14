@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>

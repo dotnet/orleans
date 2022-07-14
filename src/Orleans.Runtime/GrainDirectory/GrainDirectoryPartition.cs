@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -125,10 +126,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainDirectoryOptions = grainDirectoryOptions;
         }
 
-        private bool IsValidSilo(SiloAddress silo)
-        {
-            return this.siloStatusOracle.IsFunctionalDirectory(silo);
-        }
+        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
 
         internal void Clear()
         {
@@ -264,7 +262,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var pair in other.partitionData)
                 {
-                    if (partitionData.TryGetValue(pair.Key, out var existing))
+                    ref var grainInfo = ref CollectionsMarshal.GetValueRefOrAddDefault(partitionData, pair.Key, out _);
+                    if (grainInfo is { } existing)
                     {
                         if (log.IsEnabled(LogLevel.Debug))
                         {
@@ -273,20 +272,11 @@ namespace Orleans.Runtime.GrainDirectory
 
                         var activationToDrop = existing.Merge(pair.Value);
                         if (activationToDrop == null) continue;
-
-                        activationsToRemove ??= new Dictionary<SiloAddress, List<GrainAddress>>();
-                        if (activationsToRemove.TryGetValue(activationToDrop.SiloAddress, out var activations))
-                        {
-                            activations.Add(activationToDrop);
-                        }
-                        else
-                        {
-                            activationsToRemove[activationToDrop.SiloAddress] = new() { activationToDrop };
-                        }
+                        (CollectionsMarshal.GetValueRefOrAddDefault(activationsToRemove ??= new(), activationToDrop.SiloAddress!, out _) ??= new()).Add(activationToDrop);
                     }
                     else
                     {
-                        partitionData.Add(pair.Key, pair.Value);
+                        grainInfo = pair.Value;
                     }
                 }
             }

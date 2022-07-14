@@ -1,15 +1,14 @@
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization;
-using Orleans.Serialization.GeneratedCodeHelpers;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.WireProtocol;
-using Orleans.Serialization.Cloning;
-using System.Net;
 using System;
 using System.Buffers;
+using System.Net;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.WireProtocol;
 
+#nullable enable
 namespace Orleans.Runtime.Serialization
 {
     /// <summary>
@@ -25,7 +24,7 @@ namespace Orleans.Runtime.Serialization
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -52,7 +51,7 @@ namespace Orleans.Runtime.Serialization
             ReferenceCodec.MarkValueField(reader.Session);
             int id = 0;
             Field header = default;
-            IPEndPoint endpoint = default;
+            IPEndPoint? endpoint = default;
             int generation = default;
             while (true)
             {
@@ -77,7 +76,7 @@ namespace Orleans.Runtime.Serialization
                 reader.ConsumeUnknownField(header);
             }
 
-            return SiloAddress.New(endpoint, generation);
+            return SiloAddress.New(endpoint!, generation);
         }
 
         /// <inheritdoc />

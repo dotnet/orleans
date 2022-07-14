@@ -28,7 +28,7 @@ namespace Orleans.Streams
         public IStorage<PubSubGrainState> GetStorage(PubSubRendezvousGrain grain)
         {
             var logger = _loggerFactory.CreateLogger<PubSubGrainStateStorageFactory>();
-            var streamId = InternalStreamId.Parse(grain.GetGrainId().Key.ToString());
+            var streamId = InternalStreamId.Parse(grain.GetGrainId().Key);
 
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.LogDebug("Trying to find storage provider {ProviderName}", streamId.ProviderName);

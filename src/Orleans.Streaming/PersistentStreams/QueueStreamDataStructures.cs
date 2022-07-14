@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
+#nullable enable
 namespace Orleans.Streams
 {
     [Serializable]
@@ -13,7 +14,7 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
-    internal class StreamConsumerData
+    internal sealed class StreamConsumerData
     {
         [Id(1)]
         public GuidId SubscriptionId;
@@ -24,9 +25,9 @@ namespace Orleans.Streams
         [Id(4)]
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         [Id(5)]
-        public IQueueCacheCursor Cursor;
+        public IQueueCacheCursor? Cursor;
         [Id(6)]
-        public StreamHandshakeToken LastToken;
+        public StreamHandshakeToken? LastToken;
         [Id(7)]
         public string FilterData;
 
@@ -40,18 +41,24 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
-            try
-            {
-                if (Cursor != null)
-                {
-                    // kill cursor activity and ensure it does not start again on this consumer data.
-                    Utils.SafeExecute(Cursor.Dispose, logger,
-                        () => String.Format("Cursor.Dispose on stream {0}, StreamConsumer {1} has thrown exception.", StreamId, StreamConsumer));
-                }
-            }
-            finally
+            if (Cursor is { } cursor)
             {
                 Cursor = null;
+                // kill cursor activity and ensure it does not start again on this consumer data.
+                try
+                {
+                    cursor.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    string? caller = null;
+                    try
+                    {
+                        caller = $"Cursor.Dispose on stream {StreamId}, StreamConsumer {StreamConsumer} has thrown exception.";
+                    }
+                    catch { }
+                    Utils.LogIgnoredException(logger, ex, caller);
+                }
             }
         }
     }

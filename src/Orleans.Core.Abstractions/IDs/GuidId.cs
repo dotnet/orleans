@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -60,63 +61,19 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public int CompareTo(GuidId other)
-        {
-            return this.Guid.CompareTo(other.Guid);
-        }
+        public int CompareTo(GuidId? other) => other is null ? 1 : Guid.CompareTo(other.Guid);
 
         /// <inheritdoc />
-        public bool Equals(GuidId other)
-        {
-            return other != null && this.Guid.Equals(other.Guid);
-        }
+        public bool Equals(GuidId? other) => other is not null && Guid.Equals(other.Guid);
 
         /// <inheritdoc />
-        public override bool Equals(object obj)
-        {
-            return this.Equals(obj as GuidId);
-        }
+        public override bool Equals(object? obj) => Equals(obj as GuidId);
 
         /// <inheritdoc />
-        public override int GetHashCode()
-        {
-            return this.Guid.GetHashCode();
-        }
+        public override int GetHashCode() => Guid.GetHashCode();
 
         /// <inheritdoc />
-        public override string ToString()
-        {
-            return this.Guid.ToString();
-        }
-
-        /// <summary>
-        /// Returns a detailed string representation of this instance.
-        /// </summary>
-        /// <returns>A detailed string representation of this instance.</returns>
-        internal string ToDetailedString()
-        {
-            return this.Guid.ToString();
-        }
-
-        /// <summary>
-        /// Returns a string representation of this instance which can be parsed by <see cref="FromParsableString"/>
-        /// </summary>
-        /// <returns>A string representation of this instance which can be parsed by <see cref="FromParsableString"/></returns>
-        public string ToParsableString()
-        {
-            return Guid.ToString();
-        }
-
-        /// <summary>
-        /// Parses a string formatted using <see cref="ToParsableString"/> and returns the corresponding <see cref="GuidId"/>.
-        /// </summary>
-        /// <param name="guidId">A string representation of an id.</param>
-        /// <returns>A <see cref="GuidId"/> corresponding to the provided string</returns>
-        public static GuidId FromParsableString(string guidId)
-        {
-            Guid id = System.Guid.Parse(guidId);
-            return GetGuidId(id);
-        }
+        public override string ToString() => Guid.ToString();
 
         /// <summary>
         /// Compares the provided operands for equality.
@@ -124,13 +81,7 @@ namespace Orleans.Runtime
         /// <param name="left">The left operand.</param>
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator ==(GuidId left, GuidId right)
-        {
-            if (ReferenceEquals(left, right)) return true;
-            if (ReferenceEquals(left, null)) return false;
-            if (ReferenceEquals(right, null)) return false;
-            return left.Guid.Equals(right.Guid);
-        }
+        public static bool operator ==(GuidId? left, GuidId? right) => ReferenceEquals(left, right) || (left?.Equals(right) ?? false);
 
         /// <summary>
         /// Compares the provided operands for inequality.
@@ -138,10 +89,7 @@ namespace Orleans.Runtime
         /// <param name="left">The left operand.</param>
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator !=(GuidId left, GuidId right)
-        {
-            return !(left == right);
-        }
+        public static bool operator !=(GuidId? left, GuidId? right) => !(left == right);
 
         /// <inheritdoc />
         public void GetObjectData(SerializationInfo info, StreamingContext context)
@@ -151,7 +99,7 @@ namespace Orleans.Runtime
 
         private GuidId(SerializationInfo info, StreamingContext context)
         {
-            Guid = (Guid) info.GetValue("Guid", typeof(Guid));
+            Guid = (Guid)info.GetValue("Guid", typeof(Guid))!;
         }
     }
 }

@@ -214,8 +214,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (entry.Value.Activation is { } address)
                 {
                     // Include any activations from dead silos and from predecessors.
-                    var siloIsDead = dead && address.SiloAddress.Equals(silo);
-                    if (siloIsDead || address.SiloAddress.IsPredecessorOf(silo))
+                    if (dead && address.SiloAddress!.Equals(silo) || address.SiloAddress!.IsPredecessorOf(silo))
                     {
                         activationsToRemove.Add((entry.Key, address.ActivationId));
                     }
@@ -254,7 +253,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // 1) remove entries that point to activations located on the removed silo
                 // For dead silos, remove any activation registered to that silo or one of its predecessors.
                 // For new silos, remove any activation registered to one of its predecessors.
-                if (activationAddress.SiloAddress.IsPredecessorOf(silo) || (activationAddress.SiloAddress.Equals(silo) && dead))
+                if (activationAddress.SiloAddress!.IsPredecessorOf(silo) || dead && activationAddress.SiloAddress.Equals(silo))
                 {
                     DirectoryCache.Remove(activationAddress.GrainId);
                 }
@@ -311,10 +310,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private bool IsValidSilo(SiloAddress silo)
-        {
-            return this.siloStatusOracle.IsFunctionalDirectory(silo);
-        }
+        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
 
         /// <summary>
         /// Finds the silo that owns the directory information for the given grain ID.

@@ -4,11 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
-using Orleans.Statistics;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
+    internal sealed class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly GrainDirectoryPartition partition;
@@ -22,11 +22,11 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
-        public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
             DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
 
-            return await router.RegisterAsync(address, hopCount);
+            return router.RegisterAsync(address, hopCount);
         }
 
         public Task RegisterMany(List<GrainAddress> addresses)
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
             return router.UnregisterManyAsync(addresses, cause, hopCount);
         }
 
-        public  Task DeleteGrainAsync(GrainId grainId, int hopCount)
+        public Task DeleteGrainAsync(GrainId grainId, int hopCount)
         {
             return router.DeleteGrainAsync(grainId, hopCount);
         }

@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -120,7 +120,7 @@ namespace Orleans.Runtime
         public bool Equals(ObserverGrainId other) => this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is ObserverGrainId observer && this.Equals(observer);
+        public override bool Equals(object? obj) => obj is ObserverGrainId observer && this.Equals(observer);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainId.GetHashCode();
@@ -128,9 +128,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>

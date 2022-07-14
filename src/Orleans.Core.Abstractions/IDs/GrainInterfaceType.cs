@@ -1,5 +1,6 @@
 using System;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -41,7 +42,7 @@ namespace Orleans.Runtime
         public static GrainInterfaceType Create(string value) => new GrainInterfaceType(value);
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is GrainInterfaceType id && this.Equals(id);
+        public override bool Equals(object? obj) => obj is GrainInterfaceType id && Equals(id);
 
         /// <inheritdoc />
         public bool Equals(GrainInterfaceType other) => _value.Equals(other._value);
@@ -53,11 +54,11 @@ namespace Orleans.Runtime
         /// Returns a UTF8 interpretation of the current instance.
         /// </summary>
         /// <returns></returns>
-        public override string ToString() => _value.ToString();
+        public override string? ToString() => _value.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => _value.TryFormat(destination, out charsWritten);
 
         /// <summary>

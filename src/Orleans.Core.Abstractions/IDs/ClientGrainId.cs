@@ -1,5 +1,6 @@
 using System;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -56,7 +57,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is ClientGrainId clientId && this.GrainId.Equals(clientId.GrainId);
+        public override bool Equals(object? obj) => obj is ClientGrainId clientId && GrainId.Equals(clientId.GrainId);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainId.GetHashCode();
@@ -64,9 +65,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>

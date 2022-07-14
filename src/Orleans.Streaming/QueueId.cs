@@ -1,6 +1,7 @@
 using System;
 using Orleans.Runtime;
 
+#nullable enable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -72,8 +73,11 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public int CompareTo(QueueId other)
+        public int CompareTo(QueueId? other)
         {
+            if (other is null)
+                return 1;
+
             if (queueId != other.queueId)
                 return queueId.CompareTo(other.queueId);
 
@@ -84,7 +88,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public bool Equals(QueueId other)
+        public bool Equals(QueueId? other)
         {
             return other != null 
                 && queueId == other.queueId 
@@ -93,10 +97,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public override bool Equals(object obj)
-        {
-            return this.Equals(obj as QueueId);
-        }
+        public override bool Equals(object? obj) => Equals(obj as QueueId);
 
         /// <inheritdoc/>
         public override int GetHashCode()
@@ -107,9 +108,9 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public override string ToString() => $"{this}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
             var len = queueNamePrefix.AsSpan().ToLowerInvariant(destination);
             if (len >= 0 && destination[len..].TryWrite($"-{queueId}", out var len2))

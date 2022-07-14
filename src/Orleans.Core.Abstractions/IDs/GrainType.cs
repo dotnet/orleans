@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -42,7 +42,7 @@ namespace Orleans.Runtime
         /// </param>
         private GrainType(SerializationInfo info, StreamingContext context)
         {
-            Value = IdSpan.UnsafeCreate((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
+            Value = IdSpan.UnsafeCreate((byte[]?)info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace Orleans.Runtime
         public bool IsDefault => Value.IsDefault;
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is GrainType kind && this.Equals(kind);
+        public override bool Equals(object? obj) => obj is GrainType kind && Equals(kind);
 
         /// <inheritdoc/>
         public bool Equals(GrainType obj) => Value.Equals(obj.Value);
@@ -114,7 +114,7 @@ namespace Orleans.Runtime
         /// <remarks>
         /// The returned array must not be modified.
         /// </remarks>
-        public static byte[] UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
+        public static byte[]? UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
 
         /// <inheritdoc/>
         public int CompareTo(GrainType other) => Value.CompareTo(other.Value);
@@ -132,11 +132,11 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="string"/> representation of this instance.
         /// </returns>
-        public override string ToString() => Value.ToString();
+        public override string? ToString() => Value.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => Value.TryFormat(destination, out charsWritten);
 
         /// <summary>
@@ -145,10 +145,7 @@ namespace Orleans.Runtime
         /// <param name="left">The left operand.</param>
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator ==(GrainType left, GrainType right)
-        {
-            return left.Equals(right);
-        }
+        public static bool operator ==(GrainType left, GrainType right) => left.Equals(right);
 
         /// <summary>
         /// Compares the provided operands for inequality.
@@ -156,9 +153,6 @@ namespace Orleans.Runtime
         /// <param name="left">The left operand.</param>
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator !=(GrainType left, GrainType right)
-        {
-            return !(left == right);
-        }
+        public static bool operator !=(GrainType left, GrainType right) => !(left == right);
     }
 }

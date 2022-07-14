@@ -1,5 +1,6 @@
 using System;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     [Serializable]
@@ -18,7 +19,7 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() => id.GetHashCode();
 
-        public override bool Equals(object obj) => obj is CorrelationId correlationId && Equals(correlationId);
+        public override bool Equals(object? obj) => obj is CorrelationId correlationId && Equals(correlationId);
 
         public bool Equals(CorrelationId other) => id == other.id;
 
@@ -30,9 +31,9 @@ namespace Orleans.Runtime
 
         public override string ToString() => id.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => id.ToString(format, formatProvider);
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => id.ToString(format, formatProvider);
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => id.TryFormat(destination, out charsWritten, format, provider);
 
         internal long ToInt64() => id;

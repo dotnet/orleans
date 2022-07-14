@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
@@ -25,7 +26,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
-        private readonly Queue<(string name, Func<Task> action)> pendingOperations = new Queue<(string name, Func<Task> action)>();
+        private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
@@ -111,9 +112,8 @@ namespace Orleans.Runtime.GrainDirectory
                         return s != null && !localDirectory.MyAddress.Equals(s);
                     });
 
-                EnqueueOperation(
-                    $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
-                    () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle));
+                EnqueueOperation($"{nameof(ProcessSiloAddEvent)}({addedSilo})", addedSilo,
+                    (t, state) => t.ProcessAddedSiloAsync((SiloAddress)state, splitPartListSingle));
 
                 // remove partition of one of the old successors that we do not need to now
                 foreach (var pair in directoryPartitionsMap)
@@ -167,9 +167,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal void AcceptExistingRegistrations(List<GrainAddress> singleActivations)
         {
-            this.EnqueueOperation(
-                nameof(AcceptExistingRegistrations),
-                () => AcceptExistingRegistrationsAsync(singleActivations));
+            if (singleActivations.Count == 0) return;
+            EnqueueOperation(nameof(AcceptExistingRegistrations), singleActivations,
+                (t, state) => t.AcceptExistingRegistrationsAsync((List<GrainAddress>)state));
         }
 
         private async Task AcceptExistingRegistrationsAsync(List<GrainAddress> singleActivations)
@@ -178,51 +178,42 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations?.Count ?? 0);
+                this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations.Count);
             }
 
-            if (singleActivations != null && singleActivations.Count > 0)
+            var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, 1)).ToArray();
+            try
             {
-                var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, 1)).ToArray();
-                try
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception exception)
+            {
+                if (this.logger.IsEnabled(LogLevel.Warning))
+                    this.logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
+                throw;
+            }
+            finally
+            {
+                Dictionary<SiloAddress, List<GrainAddress>>? duplicates = null;
+                for (var i = tasks.Length - 1; i >= 0; i--)
                 {
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception exception)
-                {
-                    if (this.logger.IsEnabled(LogLevel.Warning))
-                        this.logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
-                    throw;
-                }
-                finally
-                {
-                    Dictionary<SiloAddress, List<GrainAddress>> duplicates = new Dictionary<SiloAddress, List<GrainAddress>>();
-                    for (var i = tasks.Length - 1; i >= 0; i--)
+                    // Retry failed tasks next time.
+                    if (!tasks[i].IsCompletedSuccessfully) continue;
+
+                    // Record the applications which lost the registration race (duplicate activations).
+                    var winner = tasks[i].Result;
+                    if (!winner.Address.Equals(singleActivations[i]))
                     {
-                        // Retry failed tasks next time.
-                        if (tasks[i].Status != TaskStatus.RanToCompletion) continue;
-
-                        // Record the applications which lost the registration race (duplicate activations).
-                        var winner = await tasks[i];
-                        if (!winner.Address.Equals(singleActivations[i]))
-                        {
-                            var duplicate = singleActivations[i];
-
-                            if (!duplicates.TryGetValue(duplicate.SiloAddress, out var activations))
-                            {
-                                activations = duplicates[duplicate.SiloAddress] = new List<GrainAddress>(1);
-                            }
-
-                            activations.Add(duplicate);
-                        }
-
-                        // Remove tasks which completed.
-                        singleActivations.RemoveAt(i);
+                        var duplicate = singleActivations[i];
+                        (CollectionsMarshal.GetValueRefOrAddDefault(duplicates ??= new(), duplicate.SiloAddress!, out _) ??= new()).Add(duplicate);
                     }
 
-                    // Destroy any duplicate activations.
-                    DestroyDuplicateActivations(duplicates);
+                    // Remove tasks which completed.
+                    singleActivations.RemoveAt(i);
                 }
+
+                // Destroy any duplicate activations.
+                DestroyDuplicateActivations(duplicates);
             }
         }
 
@@ -290,9 +281,8 @@ namespace Orleans.Runtime.GrainDirectory
         private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>>? duplicates)
         {
             if (duplicates == null || duplicates.Count == 0) return;
-            this.EnqueueOperation(
-                nameof(DestroyDuplicateActivations),
-                () => DestroyDuplicateActivationsAsync(duplicates));
+            EnqueueOperation(nameof(DestroyDuplicateActivations), duplicates,
+                (t, state) => t.DestroyDuplicateActivationsAsync((Dictionary<SiloAddress, List<GrainAddress>>)state));
         }
 
         private async Task DestroyDuplicateActivationsAsync(Dictionary<SiloAddress, List<GrainAddress>> duplicates)
@@ -319,11 +309,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private void EnqueueOperation(string name, Func<Task> action)
+        private void EnqueueOperation(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)
         {
             lock (this)
             {
-                this.pendingOperations.Enqueue((name, action));
+                this.pendingOperations.Enqueue((name, state, action));
                 if (this.pendingOperations.Count <= 2)
                 {
                     this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
@@ -339,7 +329,7 @@ namespace Orleans.Runtime.GrainDirectory
                 while (true)
                 {
                     // Get the next operation, or exit if there are none.
-                    (string Name, Func<Task> Action) op;
+                    (string Name, object State, Func<GrainDirectoryHandoffManager, object, Task> Action) op;
                     lock (this)
                     {
                         if (this.pendingOperations.Count == 0) break;
@@ -351,7 +341,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     try
                     {
-                        await op.Action();
+                        await op.Action(this, op.State);
                         // Success, reset the dequeue count
                         dequeueCount = 0;
                     }

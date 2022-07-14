@@ -162,7 +162,7 @@ namespace Orleans.Runtime.ConsistentRing
             {
                 if (!bucketsMap.ContainsValue(silo)) return; // we have already removed this silo
 
-                List<uint> hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
+                var hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
                 foreach (var hash in hashes)
                 {
                     if (bucketsMap.Remove(hash, out var removedSilo) && !removedSilo.Equals(silo))

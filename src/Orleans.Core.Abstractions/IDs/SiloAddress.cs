@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -12,6 +13,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -21,7 +23,7 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable, ISpanFormattable
+    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, ISpanFormattable
     {
         [NonSerialized]
         private int hashCode = 0;
@@ -30,7 +32,7 @@ namespace Orleans.Runtime
         private bool hashCodeSet = false;
 
         [NonSerialized]
-        private List<uint> uniformHashCache;
+        private uint[]? uniformHashCache;
 
         /// <summary>
         /// Gets the endpoint.
@@ -45,7 +47,7 @@ namespace Orleans.Runtime
         public int Generation { get; private set; }
 
         [NonSerialized]
-        private byte[] utf8;
+        private byte[]? utf8;
 
         private const char SEPARATOR = '@';
 
@@ -205,6 +207,7 @@ namespace Orleans.Runtime
             return New(new IPEndPoint(host, port), generation);
         }
 
+        [DoesNotReturn]
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
             => throw new FormatException("Invalid string SiloAddress: " + Encoding.UTF8.GetString(addr));
 
@@ -234,9 +237,9 @@ namespace Orleans.Runtime
         /// <returns>String representation of this SiloAddress.</returns>
         public override string ToString() => $"{this}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"{(IsClient ? 'C' : 'S')}{new SpanFormattableIPEndPoint(Endpoint)}:{Generation}", out charsWritten);
 
         /// <summary>
@@ -249,7 +252,7 @@ namespace Orleans.Runtime
         public string ToStringWithHashCode() => $"{this}/x{GetConsistentHashCode():X8}";
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => Equals(obj as SiloAddress);
+        public override bool Equals(object? obj) => Equals(obj as SiloAddress);
 
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
@@ -288,15 +291,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="numHashes">The number of hash codes to return.</param>
         /// <returns>A collection of uniform hash codes variants for this instance.</returns>
-        public List<uint> GetUniformHashCodes(int numHashes)
-        {
-            if (uniformHashCache != null) return uniformHashCache;
+        public uint[] GetUniformHashCodes(int numHashes) => uniformHashCache ??= GetUniformHashCodesImpl(numHashes);
 
-            uniformHashCache = GetUniformHashCodesImpl(numHashes);
-            return uniformHashCache;
-        }
-
-        private List<uint> GetUniformHashCodesImpl(int numHashes)
+        private uint[] GetUniformHashCodesImpl(int numHashes)
         {
             Span<byte> bytes = stackalloc byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
 
@@ -322,11 +319,11 @@ namespace Orleans.Runtime
             BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Generation);
             offset += sizeof(int);
 
-            var hashes = new List<uint>(numHashes);
+            var hashes = new uint[numHashes];
             for (int extraBit = 0; extraBit < numHashes; extraBit++)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
-                hashes.Add(JenkinsHash.ComputeHash(bytes));
+                hashes[extraBit] = JenkinsHash.ComputeHash(bytes);
             }
             return hashes;
         }
@@ -336,17 +333,15 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other"> The other SiloAddress to compare this one with. </param>
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
-        internal bool Matches(SiloAddress other)
+        internal bool Matches([NotNullWhen(true)] SiloAddress? other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && (Endpoint.Port == other.Endpoint.Port) &&
-                ((Generation == other.Generation) || (Generation == 0) || (other.Generation == 0));
+            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
+                (Generation == other.Generation || Generation == 0 || other.Generation == 0);
         }
 
         /// <inheritdoc/>
-        public bool Equals(SiloAddress other)
-        {
-            return other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
-        }
+        public bool Equals([NotNullWhen(true)] SiloAddress? other)
+            => other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
@@ -357,10 +352,8 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
-        internal bool IsSameLogicalSilo(SiloAddress other)
-        {
-            return other != null && this.Endpoint.Address.Equals(other.Endpoint.Address) && this.Endpoint.Port == other.Endpoint.Port;
-        }
+        internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
+            => other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
@@ -371,10 +364,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsSuccessorOf(SiloAddress other)
-        {
-            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation > other.Generation;
-        }
+        public bool IsSuccessorOf(SiloAddress other) => IsSameLogicalSilo(other) && other.Generation > 0 && Generation > other.Generation;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
@@ -385,19 +375,10 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsPredecessorOf(SiloAddress other)
-        {
-            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation < other.Generation;
-        }
+        public bool IsPredecessorOf(SiloAddress other) => IsSameLogicalSilo(other) && Generation > 0 && Generation < other.Generation;
 
         /// <inheritdoc/>
-        public int CompareTo(object obj)
-        {
-            return CompareTo((SiloAddress)obj);
-        }
-
-        /// <inheritdoc/>
-        public int CompareTo(SiloAddress other)
+        public int CompareTo(SiloAddress? other)
         {
             if (other == null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
@@ -451,7 +432,7 @@ namespace Orleans.Runtime
     public sealed class SiloAddressConverter : JsonConverter<SiloAddress>
     {
         /// <inheritdoc />
-        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString());
+        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
