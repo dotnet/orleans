@@ -111,7 +111,7 @@ namespace UnitTests.General
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
 
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, null));
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, (string)null));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
 
