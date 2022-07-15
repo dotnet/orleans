@@ -52,7 +52,7 @@ namespace Orleans.Storage
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
 
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
                 "Reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
@@ -146,7 +146,7 @@ namespace Orleans.Storage
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
 
             try
             {
@@ -192,7 +192,7 @@ namespace Orleans.Storage
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
 
             try
             {
@@ -245,7 +245,7 @@ namespace Orleans.Storage
 
         private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
         {
-            var container = this.blobContainerFactory.BuildContainerClient(grainType, grainId);
+            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
 
             try
             {

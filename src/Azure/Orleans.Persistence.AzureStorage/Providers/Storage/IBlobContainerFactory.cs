@@ -17,10 +17,9 @@ public interface IBlobContainerFactory
     /// <summary>
     /// Build a container for the specific grain type and grain id
     /// </summary>
-    /// <param name="grainType">The grain type</param>
     /// <param name="grainId">The grain id</param>
     /// <returns>A configured blob client</returns>
-    public BlobContainerClient BuildContainerClient(string grainType, GrainReference grainId);
+    public BlobContainerClient BuildContainerClient(GrainId grainId);
 
     /// <summary>
     /// Initialize any required dependencies using the provided client and options
@@ -48,7 +47,7 @@ internal class DefaultBlobContainerFactory : IBlobContainerFactory
     }
 
     /// <inheritdoc/>
-    public BlobContainerClient BuildContainerClient(string grainType, GrainReference grainId)
+    public BlobContainerClient BuildContainerClient(GrainId grainId)
         => _defaultContainer;
 
     /// <inheritdoc/>
