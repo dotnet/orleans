@@ -23,7 +23,7 @@ public interface IBlobContainerFactory
     public BlobContainerClient BuildContainerClient(string grainType, GrainReference grainId);
 
     /// <summary>
-    /// Initialize any required dependenceis using the provided client and options
+    /// Initialize any required dependencies using the provided client and options
     /// </summary>
     /// <param name="client">The connected blob client</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
