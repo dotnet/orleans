@@ -172,14 +172,14 @@ namespace Orleans.BroadcastChannel
             var len = Encoding.UTF8.GetCharCount(fullKey);
             if (keyIndex == 0)
             {
-                if (destination.Length > len + 5)
+                if (destination.Length >= len + 5)
                 {
                     "null/".CopyTo(destination);
                     charsWritten = Encoding.UTF8.GetChars(fullKey, destination[5..]) + 5;
                     return true;
                 }
             }
-            else if (destination.Length > len + 1)
+            else if (destination.Length > len)
             {
                 len = Encoding.UTF8.GetChars(fullKey.AsSpan(0, keyIndex), destination);
                 destination[len++] = '/';
