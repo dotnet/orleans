@@ -46,10 +46,8 @@ namespace Orleans.Runtime
         public static ActivationId GetDeterministic(GrainId grain)
         {
             Span<byte> temp = stackalloc byte[16];
-            var a = (ulong)grain.Type.GetUniformHashCode();
-            var b = (ulong)grain.Key.GetUniformHashCode();
-            BinaryPrimitives.WriteUInt64LittleEndian(temp, a);
-            BinaryPrimitives.WriteUInt64LittleEndian(temp[8..], b);
+            BinaryPrimitives.WriteUInt64LittleEndian(temp, grain.Type.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt64LittleEndian(temp[8..], grain.Key.GetUniformHashCode());
             var key = new Guid(temp);
             return new ActivationId(key);
         }

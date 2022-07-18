@@ -1,14 +1,13 @@
 using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,10 +25,10 @@ namespace Orleans.Runtime
     public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, ISpanFormattable
     {
         [NonSerialized]
-        private int hashCode = 0;
+        private int hashCode;
 
         [NonSerialized]
-        private bool hashCodeSet = false;
+        private bool hashCodeSet;
 
         [NonSerialized]
         private uint[]? uniformHashCache;
@@ -240,7 +239,20 @@ namespace Orleans.Runtime
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => destination.TryWrite($"{(IsClient ? 'C' : 'S')}{new SpanFormattableIPEndPoint(Endpoint)}:{Generation}", out charsWritten);
+        {
+            if (!destination.TryWrite($"{(IsClient ? 'C' : 'S')}{new SpanFormattableIPEndPoint(Endpoint)}:{Generation}", out charsWritten))
+                return false;
+
+            if (format.Length == 1 && format[0] == 'H')
+            {
+                if (!destination[charsWritten..].TryWrite($"/x{GetConsistentHashCode():X8}", out var len))
+                    return false;
+
+                charsWritten += len;
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Return a long string representation of this SiloAddress, including it's consistent hash value.
@@ -249,7 +261,7 @@ namespace Orleans.Runtime
         /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
         /// </remarks>
         /// <returns>String representation of this SiloAddress.</returns>
-        public string ToStringWithHashCode() => $"{this}/x{GetConsistentHashCode():X8}";
+        public string ToStringWithHashCode() => $"{this:H}";
 
         /// <inheritdoc />
         public override bool Equals(object? obj) => Equals(obj as SiloAddress);
@@ -259,11 +271,32 @@ namespace Orleans.Runtime
 
         /// <summary>Returns a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
-        public int GetConsistentHashCode()
-        {
-            if (hashCodeSet) return hashCode;
+        public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
 
-            hashCode = CalculateIdHash($"{new SpanFormattableIPEndPoint(Endpoint)}{Generation}");
+        private int CalculateConsistentHashCode()
+        {
+            ulong u1, u2, u3;
+            var address = Endpoint.Address;
+            if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                Unsafe.SkipInit(out Guid tmp);
+                var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
+                address.TryWriteBytes(buf, out var len);
+                Debug.Assert(len == buf.Length);
+                u1 = BinaryPrimitives.ReadUInt64LittleEndian(buf);
+                u2 = BinaryPrimitives.ReadUInt64LittleEndian(buf[8..]);
+            }
+            else
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                u1 = (ulong)address.Address;
+#pragma warning restore CS0618
+                u2 = 0;
+            }
+
+            u3 = ((ulong)(uint)Endpoint.Port << 32) | (uint)Generation;
+
+            hashCode = (int)JenkinsHash.ComputeHash(u1, u2, u3);
             hashCodeSet = true;
             return hashCode;
         }
@@ -272,18 +305,6 @@ namespace Orleans.Runtime
         {
             this.hashCode = hashCode;
             this.hashCodeSet = true;
-        }
-
-        internal static int CalculateIdHash(string text)
-        {
-            var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
-
-            Span<int> result = stackalloc int[256 / 8 / sizeof(int)];
-            SHA256.HashData(input, MemoryMarshal.AsBytes(result));
-
-            var hash = 0;
-            for (var i = 0; i < result.Length; i++) hash ^= result[i];
-            return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
         }
 
         /// <summary>

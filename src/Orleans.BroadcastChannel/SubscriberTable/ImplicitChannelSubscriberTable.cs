@@ -1,8 +1,10 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -58,7 +60,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
                 foreach (var grainBinding in binding.Bindings)
                 {
                     if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.BindingTypeKey, out var type)
-                        || !string.Equals(type, WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue, StringComparison.Ordinal))
+                        || type != WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue)
                     {
                         continue;
                     }
@@ -105,26 +107,27 @@ namespace Orleans.BroadcastChannel.SubscriberTable
         /// <returns>A set of references to implicitly subscribed grains. They are expected to support the broadcast channel consumer extension.</returns>
         /// <exception cref="ArgumentException">The channel ID doesn't have an associated namespace.</exception>
         /// <exception cref="InvalidOperationException">Internal invariant violation.</exception>
-        internal IDictionary<Guid, IBroadcastChannelConsumerExtension> GetImplicitSubscribers(InternalChannelId channelId, IGrainFactory grainFactory)
+        internal Dictionary<Guid, IBroadcastChannelConsumerExtension> GetImplicitSubscribers(InternalChannelId channelId, IGrainFactory grainFactory)
         {
-            if (!IsImplicitSubscribeEligibleNameSpace(channelId.GetNamespace()))
+            var channelNamespace = channelId.GetNamespace();
+            if (string.IsNullOrWhiteSpace(channelNamespace))
             {
                 throw new ArgumentException("The channel ID doesn't have an associated namespace.", nameof(channelId));
             }
 
-            var entries = GetOrAddImplicitSubscribers(channelId.GetNamespace());
+            var entries = GetOrAddImplicitSubscribers(channelNamespace);
 
             var result = new Dictionary<Guid, IBroadcastChannelConsumerExtension>();
             foreach (var entry in entries)
             {
                 var consumer = MakeConsumerReference(grainFactory, channelId, entry);
                 var subscriptionGuid = MakeSubscriptionGuid(entry.GrainType, channelId);
-                if (result.ContainsKey(subscriptionGuid))
+                CollectionsMarshal.GetValueRefOrAddDefault(result, subscriptionGuid, out var duplicate) = consumer;
+                if (duplicate)
                 {
                     throw new InvalidOperationException(
                         $"Internal invariant violation: generated duplicate subscriber reference: {consumer}, subscriptionId: {subscriptionGuid}");
                 }
-                result.Add(subscriptionGuid, consumer);
             }
             return result;
         }
@@ -137,41 +140,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
                 return result;
             }
 
-            return cache.Namespaces[channelNamespace] = FindImplicitSubscribers(channelNamespace, cache.Predicates);
-        }
-
-        /// <summary>
-        /// Determines whether the specified grain is an implicit subscriber of a given channel.
-        /// </summary>
-        /// <param name="grainId">The grain identifier.</param>
-        /// <param name="channelId">The channel identifier.</param>
-        /// <returns>true if the grain id describes an implicit subscriber of the channel described by the channel id.</returns>
-        internal bool IsImplicitSubscriber(GrainId grainId, InternalChannelId channelId)
-        {
-            return HasImplicitSubscription(channelId.GetNamespace(), grainId.Type);
-        }
-
-        /// <summary>
-        /// Try to get the implicit subscriptionId.
-        /// If an implicit subscription exists, return a subscription Id that is unique per grain type, grainId, namespace combination.
-        /// </summary>
-        /// <param name="grainId"></param>
-        /// <param name="channelId"></param>
-        /// <param name="subscriptionId"></param>
-        /// <returns></returns>
-        internal bool TryGetImplicitSubscriptionGuid(GrainId grainId, InternalChannelId channelId, out Guid subscriptionId)
-        {
-            subscriptionId = Guid.Empty;
-
-            if (!IsImplicitSubscriber(grainId, channelId))
-            {
-                return false;
-            }
-
-            // make subscriptionId
-            subscriptionId = MakeSubscriptionGuid(grainId.Type, channelId);
-
-            return true;
+            return cache.Namespaces.GetOrAdd(channelNamespace, FindImplicitSubscribers(channelNamespace, cache.Predicates));
         }
 
         /// <summary>
@@ -179,46 +148,13 @@ namespace Orleans.BroadcastChannel.SubscriberTable
         /// </summary>
         private Guid MakeSubscriptionGuid(GrainType grainType, InternalChannelId channelId)
         {
-            // next 2 shorts inc guid are from namespace hash
-            var namespaceHash = JenkinsHash.ComputeHash(channelId.GetNamespace());
-            var namespaceHashByes = BitConverter.GetBytes(namespaceHash);
-            var s1 = BitConverter.ToInt16(namespaceHashByes, 0);
-            var s2 = BitConverter.ToInt16(namespaceHashByes, 2);
-
-            // Tailing 8 bytes of the guid are from the hash of the channelId Guid and a hash of the provider name.
-            // get channelId guid hash code
-            var channelIdGuidHash = JenkinsHash.ComputeHash(channelId.ChannelId.Key.Span);
-            // get provider name hash code
-            var providerHash = JenkinsHash.ComputeHash(channelId.ProviderName);
-
-            // build guid tailing 8 bytes from grainIdHash and the hash of the provider name.
-            var tail = new List<byte>();
-            tail.AddRange(BitConverter.GetBytes(channelIdGuidHash));
-            tail.AddRange(BitConverter.GetBytes(providerHash));
-
-            // make guid.
-            // - First int is grain type
-            // - Two shorts from namespace hash
-            // - 8 byte tail from channelId Guid and provider name hash.
-            var id = new Guid((int)JenkinsHash.ComputeHash(grainType.ToString()), s1, s2, tail.ToArray());
-            var result = MarkSubscriptionGuid(id, isImplicitSubscription: true);
-            return result;
-        }
-
-        internal static bool IsImplicitSubscribeEligibleNameSpace(string channelNameSpace)
-        {
-            return !string.IsNullOrWhiteSpace(channelNameSpace);
-        }
-
-        private bool HasImplicitSubscription(string channelNamespace, GrainType grainType)
-        {
-            if (!IsImplicitSubscribeEligibleNameSpace(channelNamespace))
-            {
-                return false;
-            }
-
-            var entry = GetOrAddImplicitSubscribers(channelNamespace);
-            return entry.Any(e => e.GrainType == grainType);
+            Span<byte> bytes = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes, grainType.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], channelId.ChannelId.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], channelId.ChannelId.GetKeyIndex());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], JenkinsHash.ComputeHash(channelId.ProviderName));
+            bytes[15] |= 0x80; // set high bit of last byte (implicit subscription)
+            return new(bytes);
         }
 
         /// <summary>
@@ -236,23 +172,6 @@ namespace Orleans.BroadcastChannel.SubscriberTable
             }
 
             return result;
-        }
-
-        private static Guid MarkSubscriptionGuid(Guid subscriptionGuid, bool isImplicitSubscription)
-        {
-            byte[] guidBytes = subscriptionGuid.ToByteArray();
-            if (isImplicitSubscription)
-            {
-                // set high bit of last byte
-                guidBytes[guidBytes.Length - 1] = (byte)(guidBytes[guidBytes.Length - 1] | 0x80);
-            }
-            else
-            {
-                // clear high bit of last byte
-                guidBytes[guidBytes.Length - 1] = (byte)(guidBytes[guidBytes.Length - 1] & 0x7f);
-            }
-
-            return new Guid(guidBytes);
         }
 
         /// <summary>
@@ -283,7 +202,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
             public IChannelNamespacePredicate Predicate { get; }
         }
 
-        private class BroadcastChannelSubscriber
+        private sealed class BroadcastChannelSubscriber : IEquatable<BroadcastChannelSubscriber>
         {
             public BroadcastChannelSubscriber(GrainBindings grainBindings, IChannelIdMapper channelIdMapper)
             {
@@ -297,11 +216,9 @@ namespace Orleans.BroadcastChannel.SubscriberTable
 
             private IChannelIdMapper channelIdMapper { get; }
 
-            public override bool Equals(object obj)
-            {
-                return obj is BroadcastChannelSubscriber subscriber &&
-                       GrainType.Equals(subscriber.GrainType);
-            }
+            public override bool Equals(object obj) => Equals(obj as BroadcastChannelSubscriber);
+
+            public bool Equals(BroadcastChannelSubscriber other) => other != null && GrainType.Equals(other.GrainType);
 
             public override int GetHashCode() => GrainType.GetHashCode();
 

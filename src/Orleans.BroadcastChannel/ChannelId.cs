@@ -194,6 +194,10 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc/>
         public override int GetHashCode() => this.hash;
 
+        internal uint GetUniformHashCode() => (uint)hash;
+
+        internal uint GetKeyIndex() => keyIndex;
+
         /// <summary>
         /// Returns the <see cref="Key"/> component of this instance as a string.
         /// </summary>

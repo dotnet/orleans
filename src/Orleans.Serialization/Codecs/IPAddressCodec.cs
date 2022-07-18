@@ -1,8 +1,11 @@
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -83,23 +86,15 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
-#if NET5_0_OR_GREATER
-            Span<byte> buffer = stackalloc byte[64];
-            if (value.TryWriteBytes(buffer, out var length))
-            {
-                var writable = writer.WritableSpan;
-                if (writable.Length > length)
-                {
-                    writer.WriteVarUInt32((uint)length);
-                    buffer.Slice(0, length).CopyTo(writable.Slice(1));
-                    writer.AdvanceSpan(length);
-                    return;
-                }
-            }
-#endif
-            var bytes = value.GetAddressBytes();
-            writer.WriteVarUInt32((uint)bytes.Length);
-            writer.Write(bytes);
+
+            Unsafe.SkipInit(out Guid tmp);
+            var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
+            value.TryWriteBytes(buffer, out var length);
+            Debug.Assert(length > 0);
+            buffer = buffer[..length];
+
+            writer.WriteVarUInt32((uint)buffer.Length);
+            writer.Write(buffer);
         }
     }
 

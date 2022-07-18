@@ -1,9 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -59,10 +58,13 @@ namespace Orleans.Runtime.Messaging
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
-            string stringToHash = $"{clientId}{new SpanFormattableIPEndPoint(siloAddress.Endpoint)}{siloAddress.Generation}";
-            Guid hash = Utils.CalculateGuidHash(stringToHash);
-            var activationId = new ActivationId(hash);
-            return GrainAddress.GetAddress(siloAddress, clientId, activationId);
+
+            Span<byte> bytes = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes, clientId.Type.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], clientId.Key.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], (uint)siloAddress.GetConsistentHashCode());
+            var activationId = new Guid(bytes);
+            return GrainAddress.GetAddress(siloAddress, clientId, new(activationId));
         }
 
         private async Task PerformGatewayMaintenance()
@@ -296,7 +298,7 @@ namespace Orleans.Runtime.Messaging
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
-               RunContinuationsAsynchronously = true
+                RunContinuationsAsynchronously = true
             };
 
             private GatewayInboundConnection _connection;

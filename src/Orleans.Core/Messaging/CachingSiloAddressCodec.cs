@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -103,7 +104,7 @@ namespace Orleans.Runtime.Messaging
         private static SiloAddress ReadSiloAddressInner<TInput>(ref Reader<TInput> reader)
         {
             IPAddress ip;
-            var length = reader.ReadVarInt32();
+            var length = (int)reader.ReadVarUInt32();
             if (reader.TryReadBytes(length, out var bytes))
             {
                 ip = new IPAddress(bytes);
@@ -114,7 +115,7 @@ namespace Orleans.Runtime.Messaging
                 ip = new IPAddress(addressBytes);
             }
             var port = (int)reader.ReadVarUInt32();
-            var generation = reader.ReadInt32();
+            var generation = reader.ReadVarInt32();
 
             return SiloAddress.New(new IPEndPoint(ip, port), generation);
         }
@@ -169,37 +170,21 @@ namespace Orleans.Runtime.Messaging
         private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
         {
             var ep = value.Endpoint;
-            Span<byte> buffer = stackalloc byte[64];
-            if (ep.Address.TryWriteBytes(buffer, out var length))
-            {
-                var writable = writer.WritableSpan;
-                if (writable.Length > length)
-                {
-                    // IP
-                    writer.WriteVarInt32(length);
-                    buffer.Slice(0, length).CopyTo(writable[1..]);
-                    writer.AdvanceSpan(length);
-
-                    // Port
-                    writer.WriteVarUInt32((uint)ep.Port);
-
-                    // Generation
-                    writer.WriteInt32(value.Generation);
-
-                    return;
-                }
-            }
+            Unsafe.SkipInit(out Guid tmp);
+            var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
+            ep.Address.TryWriteBytes(buffer, out var length);
+            Debug.Assert(length > 0);
 
             // IP
-            var bytes = ep.Address.GetAddressBytes();
-            writer.WriteVarInt32(bytes.Length);
+            var bytes = buffer[..length];
+            writer.WriteVarUInt32((uint)bytes.Length);
             writer.Write(bytes);
 
             // Port
             writer.WriteVarUInt32((uint)ep.Port);
 
             // Generation
-            writer.WriteInt32(value.Generation);
+            writer.WriteVarInt32(value.Generation);
         }
     }
 }

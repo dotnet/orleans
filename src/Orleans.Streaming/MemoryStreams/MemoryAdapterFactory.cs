@@ -1,15 +1,15 @@
-
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.Configuration;
 
 namespace Orleans.Providers
 {
@@ -66,7 +66,7 @@ namespace Orleans.Providers
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
         protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
-        
+
         public MemoryAdapterFactory(
             string providerName,
             StreamCacheEvictionOptions cacheOptions,
@@ -181,25 +181,11 @@ namespace Orleans.Providers
         /// </summary>
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
-            // provider name hash code
-            int providerNameGuidHash = (int)JenkinsHash.ComputeHash(this.Name);
-
-            // get queueId hash code
-            uint queueIdHash = queueId.GetUniformHashCode();
-            byte[] queIdHashByes = BitConverter.GetBytes(queueIdHash);
-            short s1 = BitConverter.ToInt16(queIdHashByes, 0);
-            short s2 = BitConverter.ToInt16(queIdHashByes, 2);
-
-            // build guid tailing 8 bytes from providerNameGuidHash and queIdHashByes.
-            var tail = new List<byte>();
-            tail.AddRange(BitConverter.GetBytes(providerNameGuidHash));
-            tail.AddRange(queIdHashByes);
-
-            // make guid.
-            // - First int is provider name hash
-            // - Two shorts from queue Id hash
-            // - 8 byte tail from provider name hash and queue Id hash.
-            return new Guid(providerNameGuidHash, s1, s2, tail.ToArray());
+            Span<byte> bytes = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes, JenkinsHash.ComputeHash(Name));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], queueId.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], queueId.GetNumericId());
+            return new(bytes);
         }
 
         /// <summary>

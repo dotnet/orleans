@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
@@ -158,30 +156,6 @@ namespace Orleans.Runtime
         /// <param name="address">The input silo address</param>
         /// <returns></returns>
         public static Uri ToGatewayUri(this SiloAddress address) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(address.Endpoint)}/{address.Generation}");
-
-        /// <summary>
-        /// Calculates an integer hash value based on the consistent identity hash of a string.
-        /// </summary>
-        /// <param name="text">The string to hash.</param>
-        /// <returns>An integer hash for the string.</returns>
-        public static int CalculateIdHash(string text) => SiloAddress.CalculateIdHash(text);
-
-        /// <summary>
-        /// Calculates a Guid hash value based on the consistent identity a string.
-        /// </summary>
-        /// <param name="text">The string to hash.</param>
-        /// <returns>An integer hash for the string.</returns>
-        internal static Guid CalculateGuidHash(string text)
-        {
-            var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
-
-            Span<byte> result = stackalloc byte[256 / 8];
-            SHA256.HashData(input, result);
-
-            MemoryMarshal.AsRef<long>(result) ^= MemoryMarshal.Read<long>(result.Slice(16));
-            MemoryMarshal.AsRef<long>(result.Slice(8)) ^= MemoryMarshal.Read<long>(result.Slice(24));
-            return BitConverter.IsLittleEndian ? MemoryMarshal.Read<Guid>(result) : new Guid(result.Slice(0, 16));
-        }
 
         public static void SafeExecute(Action action)
         {
