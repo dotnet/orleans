@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// The underlying value.
         /// </summary>
         [Id(1)]
-        private readonly byte[] _value;
+        private readonly byte[]? _value;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="IdSpan"/> struct.
@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         public IdSpan(byte[] value)
         {
             _value = value;
-            _hashCode = GetHashCode(value);
+            _hashCode = (int)JenkinsHash.ComputeHash(value);
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         /// <param name="hashCode">
         /// The hash code of the value.
         /// </param>
-        private IdSpan(byte[] value, int hashCode)
+        private IdSpan(byte[]? value, int hashCode)
         {
             _value = value;
             _hashCode = hashCode;
@@ -65,7 +65,7 @@ namespace Orleans.Runtime
         /// </param>
         private IdSpan(SerializationInfo info, StreamingContext context)
         {
-            _value = (byte[])info.GetValue("v", typeof(byte[]));
+            _value = (byte[]?)info.GetValue("v", typeof(byte[]));
             _hashCode = info.GetInt32("h");
         }
 
@@ -85,7 +85,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A new <see cref="IdSpan"/> corresponding to the provided id.
         /// </returns>
-        public static IdSpan Create(string id) => id is string idString ? new IdSpan(Encoding.UTF8.GetBytes(idString)) : default;
+        public static IdSpan Create(string? id) => id is string idString ? new IdSpan(Encoding.UTF8.GetBytes(idString)) : default;
 
         /// <summary>
         /// Returns a span representation of this instance.
@@ -96,27 +96,10 @@ namespace Orleans.Runtime
         public ReadOnlySpan<byte> AsSpan() => _value;
 
         /// <inheritdoc/>
-        public override bool Equals(object obj)
-        {
-            return obj is IdSpan kind && this.Equals(kind);
-        }
+        public override bool Equals(object? obj) => obj is IdSpan kind && Equals(kind);
 
         /// <inheritdoc/>
-        public bool Equals(IdSpan obj)
-        {
-            if (object.ReferenceEquals(_value, obj._value)) return true;
-            if (_value is null || obj._value is null)
-            {
-                if (_value is { Length: 0 } || obj._value is { Length: 0 })
-                {
-                    return true;
-                }
-
-                return false;
-            }
-
-            return _value.AsSpan().SequenceEqual(obj._value);
-        }
+        public bool Equals(IdSpan obj) => _value == obj._value || _value.AsSpan().SequenceEqual(obj._value);
 
         /// <inheritdoc/>
         public override int GetHashCode() => _hashCode;
@@ -151,14 +134,14 @@ namespace Orleans.Runtime
         /// <returns>
         /// An <see cref="IdSpan"/> instance.
         /// </returns>
-        public static IdSpan UnsafeCreate(byte[] value, int hashCode) => new IdSpan(value, hashCode);
+        public static IdSpan UnsafeCreate(byte[]? value, int hashCode) => new(value, hashCode);
 
         /// <summary>
         /// Gets the underlying array from this instance.
         /// </summary>
         /// <param name="id">The id span.</param>
         /// <returns>The underlying array from this instance.</returns>
-        public static byte[] UnsafeGetArray(IdSpan id) => id._value;
+        public static byte[]? UnsafeGetArray(IdSpan id) => id._value;
 
         /// <inheritdoc/>
         public int CompareTo(IdSpan other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
@@ -169,7 +152,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A string representation fo this instance.
         /// </returns>
-        public override string ToString() => _value is null ? null : Encoding.UTF8.GetString(_value);
+        public override string? ToString() => _value is null ? null : Encoding.UTF8.GetString(_value);
 
         public bool TryFormat(Span<char> destination, out int charsWritten)
         {
@@ -190,9 +173,9 @@ namespace Orleans.Runtime
             return true;
         }
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider) => TryFormat(destination, out charsWritten);
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) => TryFormat(destination, out charsWritten);
 
         /// <summary>
         /// Compares the provided operands for equality.
@@ -209,12 +192,5 @@ namespace Orleans.Runtime
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(IdSpan left, IdSpan right) => !left.Equals(right);
-
-        /// <summary>
-        /// Gets a hashed representation of the provided value.
-        /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns>A hashed representation of the provided value.</returns>
-        private static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
     }
 }

@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -54,7 +55,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is ActivationId other && Key.Equals(other.Key);
+        public override bool Equals(object? obj) => obj is ActivationId other && Key.Equals(other.Key);
 
         /// <inheritdoc />
         public bool Equals(ActivationId other) => Key.Equals(other.Key);
@@ -65,9 +66,9 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override string ToString() => $"@{Key:N}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"@{Key:N}", out charsWritten);
 
         /// <summary>
@@ -110,7 +111,7 @@ namespace Orleans.Runtime
     public sealed class ActivationIdConverter : JsonConverter<ActivationId>
     {
         /// <inheritdoc />
-        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString());
+        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)

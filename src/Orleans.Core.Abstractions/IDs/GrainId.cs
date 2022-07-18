@@ -1,11 +1,11 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -32,8 +32,8 @@ namespace Orleans.Runtime
         /// </summary>
         private GrainId(SerializationInfo info, StreamingContext context)
         {
-            Type = new GrainType(IdSpan.UnsafeCreate((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
-            Key = IdSpan.UnsafeCreate((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+            Type = new GrainType(IdSpan.UnsafeCreate((byte[]?)info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
+            Key = IdSpan.UnsafeCreate((byte[]?)info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
 
         /// <summary>
@@ -81,10 +81,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public static bool TryParse(string value, out GrainId grainId)
+        public static bool TryParse(string? value, out GrainId grainId)
         {
-            var i = value?.IndexOf('/') ?? -1;
-            if (i < 0)
+            int i;
+            if (value is null || (i = value.IndexOf('/')) < 0)
             {
                 grainId = default;
                 return false;
@@ -100,13 +100,13 @@ namespace Orleans.Runtime
         public bool IsDefault => Type.IsDefault && Key.IsDefault;
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
+        public override bool Equals(object? obj) => obj is GrainId id && Equals(id);
 
         /// <inheritdoc/>
-        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this.Key.Equals(other.Key);
+        public bool Equals(GrainId other) => Type.Equals(other.Type) && Key.Equals(other.Key);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Key);
+        public override int GetHashCode() => HashCode.Combine(Type, Key);
 
         /// <summary>
         /// Generates a uniform, stable hash code for a grain id.
@@ -161,9 +161,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => $"{Type}/{Key}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"{Type}/{Key}", out charsWritten);
     }
 
@@ -173,7 +173,7 @@ namespace Orleans.Runtime
     public sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
         /// <inheritdoc />
-        public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString());
+        public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString()!);
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)

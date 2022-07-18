@@ -1,12 +1,11 @@
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
 
+#nullable enable
 namespace Orleans.Runtime;
 
 /// <summary>
@@ -26,11 +25,9 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
-        var hashCode = value.GetHashCode();
-        var bytes = IdSpan.UnsafeGetArray(value);
-        var bytesLength = value.IsDefault ? 0 : bytes.Length;
-        writer.WriteVarUInt32((uint)(sizeof(int) + bytesLength));
-        writer.WriteInt32(hashCode);
+        var bytes = value.AsSpan();
+        writer.WriteVarUInt32((uint)(sizeof(int) + bytes.Length));
+        writer.WriteInt32(value.GetHashCode());
         writer.Write(bytes);
     }
 
@@ -45,11 +42,9 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
         IdSpan value)
         where TBufferWriter : IBufferWriter<byte>
     {
-        var hashCode = value.GetHashCode();
-        var bytes = IdSpan.UnsafeGetArray(value);
-        writer.WriteInt32(hashCode);
-        var bytesLength = value.IsDefault ? 0 : bytes.Length;
-        writer.WriteVarUInt32((uint)bytesLength);
+        writer.WriteInt32(value.GetHashCode());
+        var bytes = value.AsSpan();
+        writer.WriteVarUInt32((uint)bytes.Length);
         writer.Write(bytes);
     }
 

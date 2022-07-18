@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 
+#nullable enable
 namespace Orleans
 {
     /// <summary>
@@ -20,20 +21,6 @@ namespace Orleans
             a -= b; a -= c; a ^= (c >> 3);
             b -= c; b -= a; b ^= (a << 10);
             c -= a; c -= b; c ^= (b >> 15);
-        }
-
-        /// <summary>
-        /// Computes a hash digest of the input.
-        /// </summary>
-        /// <param name="data">
-        /// The input data.
-        /// </param>
-        /// <returns>
-        /// A hash digest of the input.
-        /// </returns>
-        public static uint ComputeHash(byte[] data)
-        {
-            return ComputeHash(data.AsSpan());
         }
 
         /// <summary>

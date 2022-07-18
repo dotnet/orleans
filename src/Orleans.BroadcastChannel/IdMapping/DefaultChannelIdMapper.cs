@@ -1,15 +1,15 @@
 using System;
 using System.Buffers.Text;
-using System.Runtime.InteropServices;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
+#nullable enable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>
     /// The default <see cref="IChannelIdMapper"/> implementation.
     /// </summary>
-    public class DefaultChannelIdMapper : IChannelIdMapper
+    public sealed class DefaultChannelIdMapper : IChannelIdMapper
     {
         /// <summary>
         /// The name of this stream identity mapper.
@@ -19,7 +19,7 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc />
         public IdSpan GetGrainKeyId(GrainBindings grainBindings, ChannelId streamId)
         {
-            string keyType = null;
+            string? keyType = null;
             bool includeNamespaceInGrainId = false;
 
             foreach (var grainBinding in grainBindings.Bindings)
@@ -44,7 +44,7 @@ namespace Orleans.BroadcastChannel
             {
                 nameof(Guid) => GetGuidKey(streamId, includeNamespaceInGrainId),
                 nameof(Int64) => GetIntegerKey(streamId, includeNamespaceInGrainId),
-                _ => GetKey(streamId), // null or string
+                _ => streamId.GetKeyIdSpan(), // null or string
             };
         }
 
@@ -53,9 +53,11 @@ namespace Orleans.BroadcastChannel
             var key = streamId.Key.Span;
             if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException(nameof(streamId));
 
-            return includeNamespaceInGrainId
-                ? GrainIdKeyExtensions.CreateGuidKey(guidKey, streamId.GetNamespace())
-                : GrainIdKeyExtensions.CreateGuidKey(guidKey);
+            if (!includeNamespaceInGrainId)
+                return streamId.GetKeyIdSpan();
+
+            var ns = streamId.Namespace.Span;
+            return ns.IsEmpty ? streamId.GetKeyIdSpan() : GrainIdKeyExtensions.CreateGuidKey(guidKey, ns);
         }
 
         private static IdSpan GetIntegerKey(ChannelId streamId, bool includeNamespaceInGrainId)
@@ -64,16 +66,8 @@ namespace Orleans.BroadcastChannel
             if (!Utf8Parser.TryParse(key, out int intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
 
             return includeNamespaceInGrainId
-                ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.GetNamespace())
+                ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.Namespace.Span)
                 : GrainIdKeyExtensions.CreateIntegerKey(intKey);
-        }
-
-        private static IdSpan GetKey(ChannelId streamId)
-        {
-            var key = streamId.Key;
-            return MemoryMarshal.TryGetArray(key, out var seg) && seg.Offset == 0 && seg.Count == seg.Array.Length
-                ? new IdSpan(seg.Array)
-                : new IdSpan(key.ToArray());
         }
     }
 }

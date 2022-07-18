@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -23,7 +24,7 @@ namespace Orleans.Runtime
         /// <param name="putInBrackets">Puts elements within brackets</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// elements with square brackets and separating them with commas.</returns>
-        public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null,
+        public static string EnumerableToString<T>(IEnumerable<T>? collection, Func<T, string>? toString = null,
                                                         string separator = ", ", bool putInBrackets = true)
         {
             if (collection == null)
@@ -41,7 +42,7 @@ namespace Orleans.Runtime
             {
                 return putInBrackets
                     ? toString != null ? $"[{toString(firstValue)}]" : firstValue == null ? "[null]" : $"[{firstValue}]"
-                    : toString != null ? toString(firstValue) : firstValue == null ? "null" : firstValue.ToString();
+                    : toString != null ? toString(firstValue) : firstValue == null ? "null" : (firstValue.ToString() ?? "");
             }
 
             var sb = new StringBuilder();
@@ -78,7 +79,7 @@ namespace Orleans.Runtime
         /// Each key-value pair is represented as the string description of the key followed by
         /// the string description of the value,
         /// separated by " -> ", and enclosed in curly brackets.</returns>
-        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = null)
+        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string?>? toString = null, string? separator = null)
         {
             if (dict == null || dict.Count == 0)
             {
@@ -98,7 +99,7 @@ namespace Orleans.Runtime
                 sb.Append(pair.Key);
                 sb.Append(" -> ");
 
-                string val;
+                string? val;
                 if (toString != null)
                     val = toString(pair.Value);
                 else
@@ -128,30 +129,21 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="uri">The input Uri</param>
         /// <returns></returns>
-        public static System.Net.IPEndPoint ToIPEndPoint(this Uri uri)
+        public static System.Net.IPEndPoint? ToIPEndPoint(this Uri uri) => uri.Scheme switch
         {
-            switch (uri.Scheme)
-            {
-                case "gwy.tcp":
-                    return new System.Net.IPEndPoint(System.Net.IPAddress.Parse(uri.Host), uri.Port);
-            }
-            return null;
-        }
+            "gwy.tcp" => new System.Net.IPEndPoint(System.Net.IPAddress.Parse(uri.Host), uri.Port),
+            _ => null,
+        };
 
         /// <summary>
         /// Parse a Uri as a Silo address, excluding the generation identifier.
         /// </summary>
         /// <param name="uri">The input Uri</param>
-        public static SiloAddress ToGatewayAddress(this Uri uri)
+        public static SiloAddress? ToGatewayAddress(this Uri uri) => uri.Scheme switch
         {
-            switch (uri.Scheme)
-            {
-                case "gwy.tcp":
-                    return SiloAddress.New(uri.ToIPEndPoint(), 0);
-            }
-
-            return null;
-        }
+            "gwy.tcp" => SiloAddress.New(uri.ToIPEndPoint()!, 0),
+            _ => null,
+        };
 
         /// <summary>
         /// Represent an IP end point in the gateway URI format..
@@ -191,16 +183,16 @@ namespace Orleans.Runtime
             return BitConverter.IsLittleEndian ? MemoryMarshal.Read<Guid>(result) : new Guid(result.Slice(0, 16));
         }
 
-        public static void SafeExecute(Action action, ILogger logger = null, string caller = null)
+        public static void SafeExecute(Action action)
         {
-            SafeExecute(action, logger, (object)caller);
+            try
+            {
+                action();
+            }
+            catch { }
         }
 
-        // a function to safely execute an action without any exception being thrown.
-        // callerGetter function is called only in faulty case (now string is generated in the success case).
-        public static void SafeExecute(Action action, ILogger logger, Func<string> callerGetter) => SafeExecute(action, logger, (object)callerGetter);
-
-        private static void SafeExecute(Action action, ILogger logger, object callerGetter)
+        public static void SafeExecute(Action action, ILogger? logger = null, string? caller = null)
         {
             try
             {
@@ -209,58 +201,28 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 if (logger != null)
-                {
-                    try
-                    {
-                        string caller = null;
-                        switch (callerGetter)
-                        {
-                            case string value:
-                                caller = value;
-                                break;
-                            case Func<string> func:
-                                try
-                                {
-                                    caller = func();
-                                }
-                                catch
-                                {
-                                }
-
-                                break;
-                        }
-
-                        foreach (var e in exc.FlattenAggregate())
-                        {
-                            logger.LogWarning(
-                                (int)ErrorCode.Runtime_Error_100325,
-                                exc,
-                                "Ignoring {ExceptionType} exception thrown from an action called by {Caller}.",
-                                e.GetType().FullName,
-                                caller ?? string.Empty);
-                        }
-                    }
-                    catch
-                    {
-                        // now really, really ignore.
-                    }
-                }
+                    LogIgnoredException(logger, exc, caller);
             }
         }
 
-        public static TimeSpan Since(DateTime start)
+        internal static void LogIgnoredException(ILogger logger, Exception exc, string? caller)
         {
-            return DateTime.UtcNow.Subtract(start);
-        }
+            try
+            {
+                if (exc is AggregateException { InnerExceptions.Count: 1 })
+                    exc = exc.InnerException!;
 
-        public static List<Exception> FlattenAggregate(this Exception exc)
-        {
-            var result = new List<Exception>();
-            if (exc is AggregateException)
-                result.AddRange(exc.InnerException.FlattenAggregate());
-            else
-                result.Add(exc);
-            return result;
+                logger.LogWarning(
+                    (int)ErrorCode.Runtime_Error_100325,
+                    exc,
+                    "Ignoring {ExceptionType} exception thrown from an action called by {Caller}.",
+                    exc.GetType().FullName,
+                    caller ?? string.Empty);
+            }
+            catch
+            {
+                // now really, really ignore.
+            }
         }
 
         public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)

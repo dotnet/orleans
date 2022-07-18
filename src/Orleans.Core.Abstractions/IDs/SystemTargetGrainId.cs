@@ -1,10 +1,10 @@
 using System;
 using System.Buffers;
 using System.Buffers.Text;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -60,7 +60,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="SystemTargetGrainId"/>.
         /// </returns>
-        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address, string extraIdentifier)
+        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address, string? extraIdentifier)
         {
             var addr = address.ToUtf8String();
             if (extraIdentifier is not null)
@@ -181,7 +181,7 @@ namespace Orleans.Runtime
         /// The system id.
         /// </param>
         /// <returns>A grain id for a grain service instance.</returns>
-        internal static GrainType CreateGrainServiceGrainType(int typeCode, string grainSystemId)
+        internal static GrainType CreateGrainServiceGrainType(int typeCode, string? grainSystemId)
         {
             var extraLen = grainSystemId is null ? 0 : Encoding.UTF8.GetByteCount(grainSystemId);
             var buf = new byte[GrainTypePrefix.GrainServicePrefix.Length + 8 + extraLen];
@@ -220,7 +220,7 @@ namespace Orleans.Runtime
         public bool Equals(SystemTargetGrainId other) => this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is SystemTargetGrainId observer && this.Equals(observer);
+        public override bool Equals(object? obj) => obj is SystemTargetGrainId observer && this.Equals(observer);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainId.GetHashCode();
@@ -228,9 +228,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
