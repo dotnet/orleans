@@ -54,7 +54,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task ChangeStorageFormatFromBinaryToJson_WriteRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetPlain<long>.GetTestData(testNum);
-            await this.Relational_ChangeStorageFormatFromBinaryToJsonInMemory_WriteRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.Relational_ChangeStorageFormatFromBinaryToJsonInMemory_WriteRead(grainType, getGrain, grainState);
         }
 
         [SkippableFact]
@@ -76,7 +76,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetPlain_IntegerKey_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetPlain<long>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<Guid>))]
@@ -84,7 +84,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetPlain_GuidKey_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetPlain<Guid>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<string>))]
@@ -92,7 +92,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task PersistenceStorage_StorageDataSetPlain_StringKey_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetPlain<string>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]
@@ -100,7 +100,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task DataSet2_Cyrillic_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSet2CyrillicIdsAndGrainNames<string>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<long, string>))]
@@ -108,7 +108,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGeneric_IntegerKey_Generic_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<long, string>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<Guid, string>))]
@@ -116,7 +116,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGeneric_GuidKey_Generic_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<Guid, string>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
@@ -124,7 +124,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGeneric_StringKey_Generic_WriteClearRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<string, string>.GetTestData(testNum);
-            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.PersistenceStorageTests.Store_WriteClearRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
@@ -132,7 +132,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGeneric_Json_WriteRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<string, string>.GetTestData(testNum);
-            await this.Relational_Json_WriteRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.Relational_Json_WriteRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
@@ -140,7 +140,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGenericHuge_Json_WriteReadStreaming(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGenericHuge<string, string>.GetTestData(testNum);
-            await this.Relational_Json_WriteReadStreaming(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.Relational_Json_WriteReadStreaming(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
@@ -148,7 +148,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGeneric_Xml_WriteRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<string, string>.GetTestData(testNum);
-            await this.Relational_Xml_WriteRead(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.Relational_Xml_WriteRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
@@ -156,7 +156,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task StorageDataSetGenericHuge_Xml_WriteReadStreaming(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGenericHuge<string, string>.GetTestData(testNum);
-            await this.Relational_Xml_WriteReadStreaming(grainType, getGrain(this.Fixture.InternalGrainFactory), grainState);
+            await this.Relational_Xml_WriteReadStreaming(grainType, getGrain, grainState);
         }
     }
 }

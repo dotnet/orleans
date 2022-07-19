@@ -154,8 +154,8 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
-        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
@@ -230,8 +230,8 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainReference, IGrainState{T})"/>.
-        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>.
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -386,7 +386,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -540,12 +540,10 @@ namespace Orleans.Storage
         /// <summary>
         /// Extracts a grain ID as a string and appends the key extension with '#' infix is present.
         /// </summary>
-        /// <param name="grainReference">The reference from which to extract the ID.</param>
         /// <returns>The grain ID as a string.</returns>
         /// <remarks>This likely should exist in Orleans core in more optimized form.</remarks>
-        private static AdoGrainKey GrainIdAndExtensionAsString(GrainReference grainReference)
+        private static AdoGrainKey GrainIdAndExtensionAsString(GrainId grainId)
         {
-            var grainId = grainReference.GrainId;
             string keyExt;
             if (grainId.TryGetGuidKey(out var guid, out keyExt))
             {

@@ -35,15 +35,6 @@ namespace Orleans.Runtime
             var id = new GrainId(type, key);
             return _activator.CreateReference(id, default);
         }
-
-        /// <summary>
-        /// Converts the provided <see cref="GrainReference"/> to a string which can be parsed by <see cref="GrainReferenceKeyStringConverter"/>.
-        /// </summary>
-        /// <param name="grainReference">
-        /// The grain reference.
-        /// </param>
-        /// <returns>The key string.</returns>
-        public string ToKeyString(GrainReference grainReference) => grainReference.ToKeyString();
     }
 
     /// <summary>

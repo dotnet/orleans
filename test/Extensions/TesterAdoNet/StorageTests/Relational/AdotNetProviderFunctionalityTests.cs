@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests.Relational
             Parallel.For(0, 1000000, i =>
             {
                 //These parameters can be null in this test.
-                int grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, null, null, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
+                int grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, null, default, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
                 Assert.Equal(TestGrainHash, grainTypeHash);
             });
         }

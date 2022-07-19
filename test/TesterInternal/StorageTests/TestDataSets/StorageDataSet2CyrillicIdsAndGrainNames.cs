@@ -25,13 +25,11 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// </summary>
         private const long StringLength = 15L;
         
-        public record TestData(string GrainType, Func<IInternalGrainFactory, GrainReference> GrainGetter, GrainState<TestStateGeneric1<TStateData>> GrainState);
-
-        public static TestData GetTestData(int testNum) => testNum switch
+        public static (string, GrainId, GrainState<TestStateGeneric1<TStateData>>) GetTestData(int testNum) => testNum switch
         {
-            0 => new TestData(
+            0 => (
                 GrainTypeGenerator.GetGrainType<string>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, keyExtension: false),
+                RandomUtilities.GetRandomGrainId<string, int>(Symbols, StringLength),
                 new GrainState<TestStateGeneric1<TStateData>>
                 {
                     State = new TestStateGeneric1<TStateData>
@@ -42,9 +40,9 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
                         C = 4
                     }
                 }),
-            1 => new TestData(
+            1 => (
                 GrainTypeGenerator.GetGrainType<string>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, true),
+                RandomUtilities.GetRandomGrainId<string, int>(Symbols, StringLength),
                 new GrainState<TestStateGeneric1<TStateData>>
                 {
                     State = new TestStateGeneric1<TStateData>
@@ -55,9 +53,9 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
                         C = 5
                     }
                 }),
-            2 => new TestData(
+            2 => (
                 GrainTypeGenerator.GetGrainType<string>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, true),
+                RandomUtilities.GetRandomGrainId<string, int>(Symbols, StringLength),
                 new GrainState<TestStateGeneric1<TStateData>>
                 {
                     State = new TestStateGeneric1<TStateData>

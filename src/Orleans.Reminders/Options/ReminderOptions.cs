@@ -65,7 +65,7 @@ internal class ReminderOptionsValidator : IConfigurationValidator
 
         if (options.Value.MinimumReminderPeriod.TotalMinutes < ReminderOptionsDefaults.MinimumReminderPeriodMinutes)
         {
-            logger.Warn(RSErrorCode.RS_FastReminderInterval,
+            logger.LogWarning((int)RSErrorCode.RS_FastReminderInterval,
                     $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} is {options.Value.MinimumReminderPeriod:g} (default {ReminderOptionsDefaults.MinimumReminderPeriodMinutes:g}. High-Frequency reminders are unsuitable for production use.");
         }
     }

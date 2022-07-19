@@ -79,7 +79,7 @@ namespace Orleans.Storage
                 return;
 
             // if current state and new state have matching etags, or we're to ignore the ETag, we're good
-            if (receivedEtag == currentETag || receivedEtag == StorageProviderUtils.ANY_ETAG)
+            if (receivedEtag == currentETag || receivedEtag == "*")
                 return;
 
             // else we have an etag mismatch

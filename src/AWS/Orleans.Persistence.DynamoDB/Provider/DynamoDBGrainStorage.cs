@@ -37,7 +37,6 @@ namespace Orleans.Storage
         private readonly Serializer serializer;
         private readonly ILogger logger;
         private readonly IServiceProvider serviceProvider;
-        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly string name;
 
         private DynamoDBStorage storage;
@@ -51,7 +50,6 @@ namespace Orleans.Storage
             DynamoDBStorageOptions options,
             Serializer serializer,
             IServiceProvider serviceProvider,
-            GrainReferenceKeyStringConverter grainReferenceConverter,
             ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
@@ -59,7 +57,6 @@ namespace Orleans.Storage
             this.options = options;
             this.serializer = serializer;
             this.serviceProvider = serviceProvider;
-            this.grainReferenceConverter = grainReferenceConverter;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -127,18 +124,18 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainReference);
+            string partitionKey = GetKeyString(grainId);
             if (this.logger.IsEnabled(LogLevel.Trace))
                 this.logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
                     "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}",
                     grainType,
                     partitionKey,
-                    grainReference?.GrainId,
+                    grainId,
                     this.options.TableName);
 
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
@@ -174,11 +171,11 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainReference);
+            string partitionKey = GetKeyString(grainId);
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
             var record = new GrainStateRecord { GrainReference = partitionKey, GrainType = rowKey };
@@ -199,7 +196,7 @@ namespace Orleans.Storage
                     exc,
                     "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
-                    grainReference,
+                    grainId,
                     grainState.ETag,
                     this.options.TableName);
                 throw;
@@ -283,11 +280,11 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainReference);
+            string partitionKey = GetKeyString(grainId);
             if (this.logger.IsEnabled(LogLevel.Trace))
             {
                 this.logger.LogTrace(
@@ -295,7 +292,7 @@ namespace Orleans.Storage
                     "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
                     grainType,
                     partitionKey,
-                    grainReference?.GrainId,
+                    grainId,
                     grainState.ETag,
                     this.options.DeleteStateOnClear,
                     this.options.TableName);
@@ -329,7 +326,7 @@ namespace Orleans.Storage
                     "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
                     operation,
                     grainType,
-                    grainReference,
+                    grainId,
                     grainState.ETag,
                     this.options.TableName);
                 throw;
@@ -345,9 +342,9 @@ namespace Orleans.Storage
             public int ETag { get; set; }
         }
 
-        private string GetKeyString(GrainReference grainReference)
+        private string GetKeyString(GrainId grainId)
         {
-            var key = string.Format("{0}_{1}", this.options.ServiceId, this.grainReferenceConverter.ToKeyString(grainReference));
+            var key = $"{options.ServiceId}_{grainId}";
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 

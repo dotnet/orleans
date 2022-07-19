@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using System.Text;
 
 #nullable enable
 namespace Orleans.Runtime
@@ -55,19 +54,6 @@ namespace Orleans.Runtime
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"{ProviderName}/{StreamId}", out charsWritten);
-
-        public static InternalStreamId Parse(IdSpan value)
-        {
-            var span = value.AsSpan();
-            var i = span.IndexOf((byte)'/');
-            if (i < 0)
-            {
-                throw new ArgumentException($"Unable to parse \"{value}\" as a stream id");
-            }
-
-            return new(Encoding.UTF8.GetString(span[..i]), StreamId.Parse(span[(i + 1)..]));
-        }
-
 
         internal string? GetNamespace() => StreamId.GetNamespace();
     }

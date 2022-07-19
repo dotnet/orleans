@@ -47,7 +47,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
@@ -135,14 +135,11 @@ namespace Orleans.Storage
             }
         }
 
-        private static string GetBlobName(string grainType, GrainReference grainId)
-        {
-            return string.Format("{0}-{1}.json", grainType, grainId.ToKeyString());
-        }
+        private static string GetBlobName(string grainType, GrainId grainId) => $"{grainType}-{grainId}.json";
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try
@@ -186,7 +183,7 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainReference grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
             try
@@ -238,7 +235,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainReference grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
         {
             try
             {

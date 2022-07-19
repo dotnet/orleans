@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using Orleans.Runtime;
 using Orleans.Storage;
 using TestExtensions;
@@ -210,6 +211,37 @@ namespace UnitTests.StorageTests
             return state.GetType().GetProperties()
                 .Select(v => new KeyValuePair<string, object>(v.Name, v.GetValue(state)))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
+        }
+    }
+
+    internal static class StorageProviderUtils
+    {
+        public static string PrintKeys(IEnumerable<Tuple<string, string>> keys)
+        {
+            return Utils.EnumerableToString(keys,
+                keyTuple => string.Format("Key:{0}={1}", keyTuple.Item1, keyTuple.Item2 ?? "null"));
+        }
+
+        public static string PrintData(object data)
+        {
+            if (data == null)
+            {
+                return "[ ]";
+            }
+
+            return data.ToString();
+        }
+
+        public static string PrintOneWrite(
+            IEnumerable<Tuple<string, string>> keys,
+            object data,
+            string eTag)
+        {
+            var sb = new StringBuilder();
+            sb.Append("Keys=").Append(PrintKeys(keys));
+            sb.Append(" Data=").Append(PrintData(data));
+            sb.Append(" Etag=").Append(eTag ?? "null");
+            return sb.ToString();
         }
     }
 }

@@ -111,7 +111,7 @@ namespace Orleans
     [Serializable]
     [Immutable]
     [GenerateSerializer]
-    public sealed class TableVersion
+    public sealed class TableVersion : ISpanFormattable
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
@@ -137,6 +137,10 @@ namespace Orleans
         }
 
         public override string ToString() => $"<{Version}, {VersionEtag}>";
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"<{Version}, {VersionEtag}>", out charsWritten);
     }
 
     [Serializable]

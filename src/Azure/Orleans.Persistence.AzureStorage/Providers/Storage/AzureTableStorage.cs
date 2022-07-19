@@ -62,16 +62,16 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData,
                 "Reading: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} from Table={TableName}",
                 grainType,
                 pk,
-                grainReference,
+                grainId,
                 this.options.TableName);
             string partitionKey = pk;
             string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
@@ -88,17 +88,17 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                     "Writing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
                     pk,
-                    grainReference,
+                    grainId,
                     grainState.ETag,
                     this.options.TableName);
 
@@ -110,7 +110,7 @@ namespace Orleans.Storage
             ConvertToStorageFormat(grainState.State, entity);
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
@@ -119,7 +119,7 @@ namespace Orleans.Storage
                 logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_WriteError, exc,
                     "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
-                    grainReference.GrainId,
+                    grainId,
                     grainState.ETag,
                     this.options.TableName);
                 throw;
@@ -133,16 +133,16 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                 "Clearing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
                 grainType,
                 pk,
-                grainReference,
+                grainId,
                 grainState.ETag,
                 this.options.DeleteStateOnClear,
                 this.options.TableName);
@@ -157,11 +157,11 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -174,7 +174,7 @@ namespace Orleans.Storage
                     "Error {Operation}: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from Table={TableName}",
                     operation,
                     grainType,
-                    grainReference,
+                    grainId,
                     grainState.ETag,
                     this.options.TableName);
                 throw;
@@ -373,9 +373,9 @@ namespace Orleans.Storage
             return dataValue;
         }
 
-        private string GetKeyString(GrainReference grainReference)
+        private string GetKeyString(GrainId grainId)
         {
-            var key = String.Format("{0}_{1}", this.clusterOptions.ServiceId, grainReference.ToKeyString());
+            var key = $"{clusterOptions.ServiceId}_{grainId}";
             return AzureTableUtils.SanitizeTableProperty(key);
         }
 
