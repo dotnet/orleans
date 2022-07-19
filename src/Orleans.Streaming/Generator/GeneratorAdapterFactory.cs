@@ -205,7 +205,7 @@ namespace Orleans.Providers.Streams.Generator
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(ThreadSafeRandom.Next(1,MaxDelayMs));
+                await Task.Delay(Random.Shared.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {

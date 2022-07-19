@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Internal;
@@ -23,9 +24,9 @@ namespace Orleans.Runtime.Placement
             }
 
             // otherwise, place somewhere else
-            return Task.FromResult(compatibleSilos[ThreadSafeRandom.Next(compatibleSilos.Length)]);
+            return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
         }
 
-        internal static IGrainContext PickRandom(List<IGrainContext> local) => local[local.Count == 1 ? 0 : ThreadSafeRandom.Next(local.Count)];
+        internal static IGrainContext PickRandom(List<IGrainContext> local) => local[local.Count == 1 ? 0 : Random.Shared.Next(local.Count)];
     }
 }

@@ -94,7 +94,7 @@ namespace Orleans.Transactions.TestKit
             Task<bool> succeeding = RunWhileSucceeding(transactionGroups, getIndex, endOnCommand);
             await Task.Delay(TimeSpan.FromSeconds(2));
 
-            var siloToTerminate = this.testCluster.Silos[ThreadSafeRandom.Next(this.testCluster.Silos.Count)];
+            var siloToTerminate = this.testCluster.Silos[Random.Shared.Next(this.testCluster.Silos.Count)];
             this.Log($"Warmup transaction succeeded. {(gracefulShutdown ? "Stopping" : "Killing")} silo {siloToTerminate.SiloAddress} ({siloToTerminate.Name}) and continuing");
 
             if (gracefulShutdown)

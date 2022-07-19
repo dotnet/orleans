@@ -143,7 +143,7 @@ namespace Orleans.Streams
 
             // Setup a reader for a new receiver.
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
-            var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
+            var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));

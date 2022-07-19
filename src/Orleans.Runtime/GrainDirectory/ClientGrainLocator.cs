@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                unadjustedResult = results[ThreadSafeRandom.Next(results.Count)];
+                unadjustedResult = results[Random.Shared.Next(results.Count)];
             }
 
             if (unadjustedResult is not null)

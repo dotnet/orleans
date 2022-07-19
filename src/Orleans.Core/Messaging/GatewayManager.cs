@@ -81,7 +81,7 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : ThreadSafeRandom.Next(knownGateways.Count);
+            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;

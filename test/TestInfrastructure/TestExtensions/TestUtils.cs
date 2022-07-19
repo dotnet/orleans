@@ -13,7 +13,7 @@ namespace Tester
 {
     public class TestUtils
     {
-        public static readonly Random Random = new Random();
+        public static Random Random => Random.Shared;
 
         public static long GetRandomGrainId()
         {

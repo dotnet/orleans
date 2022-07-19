@@ -73,7 +73,7 @@ namespace Orleans
             if (typeof(TKey) != typeof(TValue))
             {
                 var period = TimeSpan.FromMinutes(10);
-                var dueTime = period + TimeSpan.FromTicks(new Random().Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter
+                var dueTime = period + TimeSpan.FromTicks(Random.Shared.Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter
                 cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, dueTime, period);
             }
         }
