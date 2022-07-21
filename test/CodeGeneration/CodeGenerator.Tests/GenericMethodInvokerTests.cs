@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
@@ -26,6 +27,18 @@ namespace CodeGenerator.Tests
     {
     }
 
+    public class CatComparer : IEqualityComparer<IAnimal>
+    {
+        public bool Equals(IAnimal x, IAnimal y) => throw new NotImplementedException();
+        public int GetHashCode(IAnimal obj) => throw new NotImplementedException();
+    }
+
+    public class CarComparer : IEqualityComparer<ICar>
+    {
+        public bool Equals(ICar x, ICar y) => throw new NotImplementedException();
+        public int GetHashCode(ICar obj) => throw new NotImplementedException();
+    }
+
     public interface IDummyGrain : IGrainWithGuidKey
     {
         Task<int> Method<T>(int x);
@@ -39,6 +52,7 @@ namespace CodeGenerator.Tests
         ValueTask<object> Method<T>(int x, int y);
         Task<int> ConstrainedMethod<T>(int a) where T : IAnimal;
         Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar, ICommodity;
+        Task<int> ConstrainedMethodWithGenericConstraintAndParameter<T>(T comparer) where T : IEqualityComparer<IAnimal>;
     }
 
     public class FooGrain : IDummyGrain
@@ -64,6 +78,8 @@ namespace CodeGenerator.Tests
         public Task<int> ConstrainedMethod<T>(int a) where T : IAnimal => Task.FromResult(1);
 
         public Task<int> ConstrainedMethod<T>(int a, string b) where T : ICar, ICommodity => Task.FromResult(2);
+
+        public Task<int> ConstrainedMethodWithGenericConstraintAndParameter<T>(T comparer) where T : IEqualityComparer<IAnimal> => Task.FromResult(3);
     }
 
     public interface IDummyGrain<T1> : IGrainWithGuidKey
@@ -105,6 +121,20 @@ namespace CodeGenerator.Tests
         }
 
         [Fact]
+        public async Task Constraint_Compliant_Generic_Comparer_Argument()
+        {
+
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), nameof(IDummyGrain.ConstrainedMethodWithGenericConstraintAndParameter), 1);
+            var mock = new FooGrain();
+
+            // Act<IEqualityComparer<IAnimal>>(new CatComparer())
+            var result = await invoker.Invoke(mock,
+                new object[] { typeof(IEqualityComparer<IAnimal>), typeof(CatComparer), new CatComparer() });
+
+            Assert.Equal(3, result);
+        }
+
+        [Fact]
         public async Task Constraint_Animal_Wrong_Type_Parameter_Type()
         {
 
@@ -127,6 +157,19 @@ namespace CodeGenerator.Tests
             await Assert.ThrowsAsync<ArgumentException>(async () =>
                 await invoker.Invoke(mock,
                     new object[] { typeof(Cat), typeof(string), "c" }));
+        }
+
+        [Fact]
+        public async Task Constraint_Wrong_Generic_Comparer_Type()
+        {
+
+            var invoker = new GenericMethodInvoker(typeof(IDummyGrain), nameof(IDummyGrain.ConstrainedMethodWithGenericConstraintAndParameter), 1);
+            var mock = new FooGrain();
+
+            // Act<IEqualityComparer<IAnimal>>(new CarComparer())
+            await Assert.ThrowsAsync<ArgumentException>(async () =>
+                await invoker.Invoke(mock,
+                    new object[] { typeof(IEqualityComparer<IAnimal>), typeof(CarComparer), new CarComparer() }));
         }
 
         [Fact]
