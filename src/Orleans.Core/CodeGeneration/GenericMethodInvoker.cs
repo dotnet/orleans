@@ -295,7 +295,8 @@ namespace Orleans.CodeGeneration
                         var constraint = constrain.IsGenericParameter
                             ? typeGenericArgs[constrain.GenericParameterPosition]
                             : constrain;
-                        if (!constraint.IsAssignableFrom(typeParameter))
+                        if (!constraint.IsAssignableFrom(typeParameter)
+                            && !(constraint.IsGenericType && constraint.GetGenericTypeDefinition() == typeParameter.GetGenericTypeDefinition()))
                         {
                             constraintViolated = true;
                             break;
