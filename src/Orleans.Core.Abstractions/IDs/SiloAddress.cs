@@ -279,7 +279,7 @@ namespace Orleans.Runtime
             var address = Endpoint.Address;
             if (address.AddressFamily == AddressFamily.InterNetworkV6)
             {
-                Unsafe.SkipInit(out Guid tmp);
+                Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
                 var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
                 address.TryWriteBytes(buf, out var len);
                 Debug.Assert(len == buf.Length);

@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -87,10 +86,9 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
 
-            Unsafe.SkipInit(out Guid tmp);
+            Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
             var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
-            value.TryWriteBytes(buffer, out var length);
-            Debug.Assert(length > 0);
+            if (!value.TryWriteBytes(buffer, out var length)) throw new NotSupportedException();
             buffer = buffer[..length];
 
             writer.WriteVarUInt32((uint)buffer.Length);

@@ -14,7 +14,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class Gateway : IConnectedClientCollection
+    internal sealed class Gateway : IConnectedClientCollection
     {
         // clients is the main authorative collection of all connected clients.
         // Any client currently in the system appears in this collection.
@@ -62,9 +62,10 @@ namespace Orleans.Runtime.Messaging
             Span<byte> bytes = stackalloc byte[16];
             BinaryPrimitives.WriteUInt32LittleEndian(bytes, clientId.Type.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], clientId.Key.GetUniformHashCode());
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], (uint)siloAddress.GetConsistentHashCode());
-            var activationId = new Guid(bytes);
-            return GrainAddress.GetAddress(siloAddress, clientId, new(activationId));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], (uint)siloAddress.GetConsistentHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], (uint)siloAddress.Generation);
+            var activationId = new ActivationId(new Guid(bytes));
+            return GrainAddress.GetAddress(siloAddress, clientId, activationId);
         }
 
         private async Task PerformGatewayMaintenance()

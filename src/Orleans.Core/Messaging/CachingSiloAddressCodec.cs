@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -115,7 +114,7 @@ namespace Orleans.Runtime.Messaging
                 ip = new IPAddress(addressBytes);
             }
             var port = (int)reader.ReadVarUInt32();
-            var generation = reader.ReadVarInt32();
+            var generation = reader.ReadInt32();
 
             return SiloAddress.New(new IPEndPoint(ip, port), generation);
         }
@@ -170,10 +169,9 @@ namespace Orleans.Runtime.Messaging
         private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
         {
             var ep = value.Endpoint;
-            Unsafe.SkipInit(out Guid tmp);
+            Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
             var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
-            ep.Address.TryWriteBytes(buffer, out var length);
-            Debug.Assert(length > 0);
+            if (!ep.Address.TryWriteBytes(buffer, out var length)) throw new NotSupportedException();
 
             // IP
             var bytes = buffer[..length];
@@ -184,7 +182,7 @@ namespace Orleans.Runtime.Messaging
             writer.WriteVarUInt32((uint)ep.Port);
 
             // Generation
-            writer.WriteVarInt32(value.Generation);
+            writer.WriteInt32(value.Generation);
         }
     }
 }
