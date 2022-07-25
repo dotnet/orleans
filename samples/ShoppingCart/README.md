@@ -45,7 +45,7 @@ The app is architected as follows:
 
 ### Acknowledgements
 
-The Orleans.ShoppingCart.Sile project uses the following open3rd party-source projects:
+The Orleans.ShoppingCart.Silo project uses the following open3rd party-source projects:
 
 - [MudBlazor](https://github.com/MudBlazor/MudBlazor): Blazor Component Library based on Material design.
 - [Bogus](https://github.com/bchavez/Bogus): A simple fake data generator for C#, F#, and VB.NET.
