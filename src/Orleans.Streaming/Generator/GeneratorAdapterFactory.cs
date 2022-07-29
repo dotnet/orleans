@@ -156,9 +156,12 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
-            var receiver = receivers.GetOrAdd(queueId, new Receiver(receiverMonitor));
+            if (!receivers.TryGetValue(queueId, out var receiver))
+            {
+                var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
+                var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
+                receiver = receivers.GetOrAdd(queueId, new Receiver(receiverMonitor));
+            }
             SetGeneratorOnReceiver(receiver);
             return receiver;
         }

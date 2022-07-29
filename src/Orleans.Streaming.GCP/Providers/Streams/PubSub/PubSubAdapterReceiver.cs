@@ -24,7 +24,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         public static IQueueAdapterReceiver Create(ILoggerFactory loggerFactory, QueueId queueId, string projectId, string topicId,
             string serviceId, IPubSubDataAdapter dataAdapter, TimeSpan? deadline = null, string customEndpoint = "")
         {
-            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
 
             var pubSub = new PubSubDataManager(loggerFactory, projectId, topicId, queueId.ToString(), serviceId, deadline, customEndpoint);
@@ -33,7 +33,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         private PubSubAdapterReceiver(ILoggerFactory loggerFactory, QueueId queueId, string topicId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
         {
-            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
             Id = queueId;
             if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
             _pubSub = pubSub;

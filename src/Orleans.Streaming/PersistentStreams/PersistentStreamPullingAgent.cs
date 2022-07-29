@@ -38,7 +38,7 @@ namespace Orleans.Streams
 
         private Task receiverInitTask;
         private bool IsShutdown => timer == null;
-        private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
+        private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
         internal PersistentStreamPullingAgent(
             SystemTargetGrainId id,
@@ -132,7 +132,7 @@ namespace Orleans.Streams
             try
             {
                 receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(this.options.InitQueueTimeout))
-                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId.ToStringWithHashCode()} failed to Initialize.");
+                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
                 receiverInitTask.Ignore();
             }
             catch

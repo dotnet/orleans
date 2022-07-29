@@ -2,17 +2,16 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Serialization;
-using Orleans.Streams;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Statistics;
+using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -37,17 +36,17 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Framework service provider
         /// </summary>
-        protected IServiceProvider serviceProvider;
+        protected readonly IServiceProvider serviceProvider;
 
         /// <summary>
         /// Stream provider settings
         /// </summary>
-        private EventHubOptions ehOptions;
-        private EventHubStreamCachePressureOptions cacheOptions;
-        private EventHubReceiverOptions receiverOptions;
-        private StreamStatisticOptions statisticOptions;
-        private StreamCacheEvictionOptions cacheEvictionOptions;
-        private IEventHubQueueMapper streamQueueMapper;
+        private readonly EventHubOptions ehOptions;
+        private readonly EventHubStreamCachePressureOptions cacheOptions;
+        private readonly EventHubReceiverOptions receiverOptions;
+        private readonly StreamStatisticOptions statisticOptions;
+        private readonly StreamCacheEvictionOptions cacheEvictionOptions;
+        private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubProducerClient client;
@@ -87,7 +86,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Create a queue mapper to map EventHub partitions to queues
         /// </summary>
-        protected Func<string[], IEventHubQueueMapper> QueueMapperFactory { get; set; }
+        protected Func<string[], HashRingBasedPartitionedStreamQueueMapper> QueueMapperFactory { get; set; }
 
         /// <summary>
         /// Create a receiver monitor to report performance metrics.
@@ -100,8 +99,8 @@ namespace Orleans.ServiceBus.Providers
         /// Factory to create a IEventHubReceiver
         /// </summary>
         protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory;
-        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
-        internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
+        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers;
+        internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper => streamQueueMapper;
 
         public EventHubAdapterFactory(
             string name,
@@ -146,7 +145,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (this.QueueMapperFactory == null)
             {
-                this.QueueMapperFactory = partitions => new EventHubQueueMapper(partitions, this.Name);
+                this.QueueMapperFactory = partitions => new(partitions, this.Name);
             }
 
             if (this.ReceiverMonitorFactory == null)
