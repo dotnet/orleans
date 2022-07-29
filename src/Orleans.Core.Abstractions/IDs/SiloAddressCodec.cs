@@ -33,8 +33,9 @@ namespace Orleans.Runtime.Serialization
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
             IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Endpoint.Address);
-            UInt16Codec.WriteField(ref writer, 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
-            Int32Codec.WriteField(ref writer, 2, Int32Codec.CodecFieldType, value.Generation);
+            uint delta = 2;
+            if (value.Endpoint.Port != 0) UInt16Codec.WriteField(ref writer, delta = 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
+            if (value.Generation != 0) Int32Codec.WriteField(ref writer, delta, Int32Codec.CodecFieldType, value.Generation);
             writer.WriteEndObject();
         }
 
@@ -48,35 +49,33 @@ namespace Orleans.Runtime.Serialization
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
-            int id = 0;
             Field header = default;
+            int port = 0, generation = 0;
 
-            id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-            if (id != 0) goto invalidData;
+            var id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, 0);
+            if (id != 0) throw new RequiredFieldMissingException("Serialized SiloAddress is missing its address field.");
             var address = IPAddressCodec.ReadValue(ref reader, header);
 
             id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-            if (id != 1) goto invalidData;
-            var port = UInt16Codec.ReadValue(ref reader, header);
-
-            id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-            if (id != 2) goto invalidData;
-            var generation = Int32Codec.ReadValue(ref reader, header);
-
-            while (true)
+            if (id == 1)
             {
-                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
-                if (id == -1)
-                {
-                    break;
-                }
+                port = UInt16Codec.ReadValue(ref reader, header);
+                id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
+            }
 
+            if (id == 2)
+            {
+                generation = Int32Codec.ReadValue(ref reader, header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
+
+            while (id >= 0)
+            {
                 reader.ConsumeUnknownField(header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
             }
 
             return SiloAddress.New(address, port, generation);
-
-invalidData: throw new RequiredFieldMissingException("Serialized SiloAddress is missing a required field.");
         }
 
         /// <inheritdoc />

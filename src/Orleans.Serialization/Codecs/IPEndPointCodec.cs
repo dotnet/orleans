@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Net;
 
+#nullable enable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -39,33 +40,24 @@ namespace Orleans.Serialization.Codecs
             }
 
             var referencePlaceholder = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            IPAddress address = default;
-            ushort port = 0;
-            int id = 0;
             Field header = default;
-            while (true)
+            var port = 0;
+
+            var id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, 0);
+            if (id != 0) throw new RequiredFieldMissingException("Serialized IPEndPoint is missing its address field.");
+            var address = IPAddressCodec.ReadValue(ref reader, header);
+
+            id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
+            if (id == 1)
             {
-                id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                if (id == 1)
-                {
-                    address = IPAddressCodec.ReadValue(ref reader, header);
-                    id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                }
+                port = UInt16Codec.ReadValue(ref reader, header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
 
-                if (id == 2)
-                {
-                    port = UInt16Codec.ReadValue(ref reader, header);
-                    id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
-                }
-
-                if (id != -1)
-                {
-                    reader.ConsumeUnknownField(header);
-                }
-                else
-                {
-                    break;
-                }
+            while (id >= 0)
+            {
+                reader.ConsumeUnknownField(header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
             }
 
             var result = new IPEndPoint(address, port);
@@ -89,8 +81,8 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.TagDelimited);
-            IPAddressCodec.WriteField(ref writer, 1, IPAddressCodec.CodecFieldType, value.Address);
-            UInt16Codec.WriteField(ref writer, 1, UInt16Codec.CodecFieldType, (ushort)value.Port);
+            IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Address);
+            if (value.Port != 0) UInt16Codec.WriteField(ref writer, 1, UInt16Codec.CodecFieldType, (ushort)value.Port);
             writer.WriteEndObject();
         }
     }
