@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -11,9 +12,9 @@ namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
     [KeepAlive]
-    internal class ReminderTableGrain : Grain, IReminderTableGrain
+    internal sealed class ReminderTableGrain : Grain, IReminderTableGrain
     {
-        private readonly Dictionary<GrainReference, Dictionary<string, ReminderEntry>> reminderTable = new Dictionary<GrainReference, Dictionary<string, ReminderEntry>>();
+        private readonly Dictionary<GrainId, Dictionary<string, ReminderEntry>> reminderTable = new();
         private readonly ILogger logger;
 
         public ReminderTableGrain(ILogger<ReminderTableGrain> logger)
@@ -41,11 +42,9 @@ namespace Orleans.Runtime.ReminderService
             return Task.CompletedTask;
         }
 
-        public Task<ReminderTableData> ReadRows(GrainReference grainRef)
+        public Task<ReminderTableData> ReadRows(GrainId grainId)
         {
-            Dictionary<string, ReminderEntry> reminders;
-            reminderTable.TryGetValue(grainRef, out reminders);
-            var result = reminders == null ? new ReminderTableData() : new ReminderTableData(reminders.Values.ToList());
+            var result = reminderTable.TryGetValue(grainId, out var reminders) ? new ReminderTableData(reminders.Values) : new();
             return Task.FromResult(result);
         }
 
@@ -53,7 +52,10 @@ namespace Orleans.Runtime.ReminderService
         {
             var range = RangeFactory.CreateRange(begin, end);
 
-            var list = reminderTable.Where(e => range.InRange(e.Key)).SelectMany(e => e.Value.Values).ToList();
+            var list = new List<ReminderEntry>();
+            foreach (var e in reminderTable)
+                if (range.InRange(e.Key))
+                    list.AddRange(e.Value.Values);
 
             if (logger.IsEnabled(LogLevel.Trace))
             {
@@ -74,11 +76,10 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
+        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
             ReminderEntry result = null;
-            Dictionary<string, ReminderEntry> reminders;
-            if (reminderTable.TryGetValue(grainRef, out reminders))
+            if (reminderTable.TryGetValue(grainId, out var reminders))
             {
                 reminders.TryGetValue(reminderName, out result);
             }
@@ -87,11 +88,11 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (result is null)
                 {
-                    logger.LogTrace("Reminder not found for grain {Grain} reminder {ReminderName} ", grainRef, reminderName);
+                    logger.LogTrace("Reminder not found for grain {Grain} reminder {ReminderName} ", grainId, reminderName);
                 }
                 else
                 {
-                    logger.LogTrace("Read for grain {Grain} reminder {ReminderName} row {Reminder}", grainRef, reminderName, result.ToString());
+                    logger.LogTrace("Read for grain {Grain} reminder {ReminderName} row {Reminder}", grainId, reminderName, result.ToString());
                 }
             }
 
@@ -101,17 +102,11 @@ namespace Orleans.Runtime.ReminderService
         public Task<string> UpsertRow(ReminderEntry entry)
         {
             entry.ETag = Guid.NewGuid().ToString();
-            Dictionary<string, ReminderEntry> d;
-            if (!reminderTable.TryGetValue(entry.GrainRef, out d))
-            {
-                d = new Dictionary<string, ReminderEntry>();
-                reminderTable.Add(entry.GrainRef, d);
-            }
+            var d = CollectionsMarshal.GetValueRefOrAddDefault(reminderTable, entry.GrainId, out _) ??= new();
+            ref var entryRef = ref CollectionsMarshal.GetValueRefOrAddDefault(d, entry.ReminderName, out _);
 
-            ReminderEntry old; // tracing purposes only
-            d.TryGetValue(entry.ReminderName, out old); // tracing purposes only
-                                                        // add or over-write
-            d[entry.ReminderName] = entry;
+            var old = entryRef; // tracing purposes only
+            entryRef = entry;
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Upserted entry {Updated}, replaced {Replaced}", entry, old);
@@ -120,14 +115,14 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(entry.ETag);
         }
 
-        public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.LogDebug("RemoveRow Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}", grainRef, reminderName, eTag);
+                logger.LogDebug("RemoveRow Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}", grainId, reminderName, eTag);
             }
 
-            if (reminderTable.TryGetValue(grainRef, out var data)
+            if (reminderTable.TryGetValue(grainId, out var data)
                 && data.TryGetValue(reminderName, out var e)
                 && e.ETag == eTag)
             {
@@ -137,7 +132,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 else
                 {
-                    reminderTable.Remove(grainRef);
+                    reminderTable.Remove(grainId);
                 }
 
                 return Task.FromResult(true);
@@ -146,7 +141,7 @@ namespace Orleans.Runtime.ReminderService
             logger.LogWarning(
                 (int)RSErrorCode.RS_Table_Remove,
                 "RemoveRow failed for Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}. Table now is: {NewValues}",
-                grainRef,
+                grainId,
                 reminderName,
                 eTag,
                 Utils.EnumerableToString(reminderTable.Values.SelectMany(x => x.Values)));

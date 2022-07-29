@@ -39,7 +39,6 @@ namespace UnitTests.RemindersTest
                 ConnectionString = this.connectionStringFixture.ConnectionString
             };
             return new AdoNetReminderTable(
-                this.ClusterFixture.Services,
                 this.clusterOptions,
                 Options.Create(options));
         }

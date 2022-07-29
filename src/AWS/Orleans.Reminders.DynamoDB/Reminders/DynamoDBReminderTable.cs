@@ -13,7 +13,7 @@ namespace Orleans.Reminders.DynamoDB
     /// <summary>
     /// Implementation for IReminderTable using DynamoDB as underlying storage.
     /// </summary>
-    internal class DynamoDBReminderTable : IReminderTable
+    internal sealed class DynamoDBReminderTable : IReminderTable
     {
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
         private const string REMINDER_NAME_PROPERTY_NAME = "ReminderName";
@@ -28,24 +28,20 @@ namespace Orleans.Reminders.DynamoDB
         private const string SERVICE_ID_GRAIN_REFERENCE_INDEX = "ServiceIdGrainReferenceIndex";
 
         private readonly ILogger logger;
-        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
 
         private DynamoDBStorage storage;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
-        /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="clusterOptions"></param>
         /// <param name="storageOptions"></param>
         public DynamoDBReminderTable(
-            GrainReferenceKeyStringConverter grainReferenceConverter,
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
         {
-            this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
             this.serviceId = clusterOptions.Value.ServiceId;
             this.options = storageOptions.Value;
@@ -111,17 +107,17 @@ namespace Orleans.Reminders.DynamoDB
         /// Reads a reminder for a grain reference by reminder name.
         /// Read a row from the reminder table
         /// </summary>
-        /// <param name="grainRef"> grain ref to locate the row </param>
+        /// <param name="grainId"> grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
+        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
-            var reminderId = ConstructReminderId(this.serviceId, grainRef, reminderName);
+            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
                     { $"{REMINDER_ID_PROPERTY_NAME}", new AttributeValue(reminderId) },
-                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainRef.GetUniformHashCode().ToString() } }
+                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainId.GetUniformHashCode().ToString() } }
                 };
 
             try
@@ -143,14 +139,14 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>
         /// Read one row from the reminder table
         /// </summary>
-        /// <param name="grainRef">grain ref to locate the row </param>
+        /// <param name="grainId">grain ref to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(GrainReference grainRef)
+        public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
                     { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
-                    { $":{GRAIN_REFERENCE_PROPERTY_NAME}", new AttributeValue(grainRef.ToKeyString()) }
+                    { $":{GRAIN_REFERENCE_PROPERTY_NAME}", new AttributeValue(grainId.ToString()) }
                 };
 
             try
@@ -237,7 +233,7 @@ namespace Orleans.Reminders.DynamoDB
             return new ReminderEntry
             {
                 ETag = item[ETAG_PROPERTY_NAME].N,
-                GrainRef = this.grainReferenceConverter.FromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
+                GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
                 StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)
@@ -247,18 +243,18 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>
         /// Remove one row from the reminder table
         /// </summary>
-        /// <param name="grainRef"> specific grain ref to locate the row </param>
+        /// <param name="grainId"> specific grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <param name="eTag"> e tag </param>
         /// <returns> Return true if the row was removed </returns>
-        public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            var reminderId = ConstructReminderId(this.serviceId, grainRef, reminderName);
+            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
                     { $"{REMINDER_ID_PROPERTY_NAME}", new AttributeValue(reminderId) },
-                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainRef.GetUniformHashCode().ToString() } }
+                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainId.GetUniformHashCode().ToString() } }
                 };
 
             try
@@ -329,14 +325,14 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            var reminderId = ConstructReminderId(this.serviceId, entry.GrainRef, entry.ReminderName);
+            var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
             var fields = new Dictionary<string, AttributeValue>
                 {
                     { REMINDER_ID_PROPERTY_NAME, new AttributeValue(reminderId) },
-                    { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainRef.GetUniformHashCode().ToString() } },
+                    { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainId.GetUniformHashCode().ToString() } },
                     { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId) },
-                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainRef.ToKeyString()) },
+                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainId.ToString()) },
                     { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
                     { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
                     { REMINDER_NAME_PROPERTY_NAME, new AttributeValue(entry.ReminderName) },
@@ -364,9 +360,6 @@ namespace Orleans.Reminders.DynamoDB
             }
         }
 
-        private static string ConstructReminderId(string serviceId, GrainReference grainRef, string reminderName)
-        {
-            return $"{serviceId}_{grainRef.ToKeyString()}_{reminderName}";
-        }
+        private static string ConstructReminderId(string serviceId, GrainId grainId, string reminderName) => $"{serviceId}_{grainId}_{reminderName}";
     }
 }

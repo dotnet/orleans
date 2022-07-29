@@ -9,7 +9,7 @@ namespace Orleans.Hosting;
 /// <summary>
 /// Options for the reminder service.
 /// </summary>
-public class ReminderOptions
+public sealed class ReminderOptions
 {
     /// <summary>
     /// Gets or sets the minimum period for reminders.
@@ -35,7 +35,7 @@ public class ReminderOptions
 /// <summary>
 /// Validator for <see cref="ReminderOptions"/>.
 /// </summary>
-internal class ReminderOptionsValidator : IConfigurationValidator
+internal sealed class ReminderOptionsValidator : IConfigurationValidator
 {
     private readonly ILogger<ReminderOptionsValidator> logger;
     private readonly IOptions<ReminderOptions> options;

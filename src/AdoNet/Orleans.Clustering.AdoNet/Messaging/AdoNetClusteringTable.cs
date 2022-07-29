@@ -34,11 +34,9 @@ namespace Orleans.Runtime.MembershipService
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
-            var grainReferenceConverter = this.serviceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
             orleansQueries = await RelationalOrleansQueries.CreateInstance(
                 clusteringTableOptions.Invariant,
-                clusteringTableOptions.ConnectionString,
-                grainReferenceConverter);
+                clusteringTableOptions.ConnectionString);
             
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,

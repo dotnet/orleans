@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
     {
         internal const long ReminderTableGrainId = 12345;
         private readonly IReminderTableGrain reminderTableGrain;
@@ -17,16 +17,16 @@ namespace Orleans.Runtime.ReminderService
 
         public Task Init() => Task.CompletedTask;
 
-        public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
+        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
             this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRow(grainRef, reminderName);
+            return this.reminderTableGrain.ReadRow(grainId, reminderName);
         }
 
-        public Task<ReminderTableData> ReadRows(GrainReference key)
+        public Task<ReminderTableData> ReadRows(GrainId grainId)
         {
             this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRows(key);
+            return this.reminderTableGrain.ReadRows(grainId);
         }
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
@@ -34,10 +34,10 @@ namespace Orleans.Runtime.ReminderService
             return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
         }
 
-        public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
             this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.RemoveRow(grainRef, reminderName, eTag);
+            return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
         }
 
         public Task TestOnlyClearTable()

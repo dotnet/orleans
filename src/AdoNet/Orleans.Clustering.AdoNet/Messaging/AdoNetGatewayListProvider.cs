@@ -45,8 +45,7 @@ namespace Orleans.Runtime.Membership
         public async Task InitializeGatewayListProvider()
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
-            var grainReferenceConverter = serviceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString, grainReferenceConverter);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString);
         }
 
         public async Task<IList<Uri>> GetGateways()

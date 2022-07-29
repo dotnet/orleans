@@ -431,19 +431,13 @@ namespace UnitTests.Grains
     }
 
 
-    internal class UnvalidatedReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
+    internal sealed class UnvalidatedReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
     {
-        private readonly IGrainFactory grainFactory;
-
-        public UnvalidatedReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
-        {
-            this.grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
-        }
+        public UnvalidatedReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
-            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainReference, reminderName, dueTime, period);
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
@@ -451,14 +445,12 @@ namespace UnitTests.Grains
 
         public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
         {
-            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
-            return GetGrainService(callingGrainId).GetReminder(callingGrainReference, reminderName);
+            return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
         }
 
         public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
-            var callingGrainReference = grainFactory.GetGrain(callingGrainId).AsReference();
-            return GetGrainService(callingGrainId).GetReminders(callingGrainReference);
+            return GetGrainService(callingGrainId).GetReminders(callingGrainId);
         }
     }
 }

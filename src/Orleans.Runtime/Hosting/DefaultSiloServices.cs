@@ -104,7 +104,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
             services.AddSingleton<IConfigureGrainTypeComponents, ReentrantSharedComponentsConfigurator>();
             services.TryAddSingleton<RpcProvider>();
-            services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.AddSingleton<GrainVersionManifest>();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<GrainTypeSharedContextResolver>();
