@@ -211,7 +211,7 @@ namespace Orleans.Tests.SqlUtils
                 int port = record.GetInt32(portName);
                 int generation = record.GetInt32(nameof(Columns.Generation));
                 string address = record.GetValue<string>(nameof(Columns.Address));
-                var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(address), port), generation);
+                var siloAddress = SiloAddress.New(IPAddress.Parse(address), port, generation);
                 return siloAddress;
             }
 

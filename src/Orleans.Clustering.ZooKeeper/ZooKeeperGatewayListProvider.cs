@@ -53,8 +53,7 @@ namespace Orleans.Runtime.Membership
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>
                 {
-                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
-                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+                    var gatewayAddress = SiloAddress.New(m.SiloAddress.Endpoint.Address, m.ProxyPort, m.SiloAddress.Generation);
                     return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }

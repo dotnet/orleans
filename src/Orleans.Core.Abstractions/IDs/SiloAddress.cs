@@ -50,12 +50,12 @@ namespace Orleans.Runtime
 
         private const char SEPARATOR = '@';
 
-        private static readonly long epoch = new DateTime(2010, 1, 1).Ticks;
+        private static readonly long epoch = new DateTime(2022, 1, 1).Ticks;
 
-        private static readonly Interner<Key, SiloAddress> siloAddressInterningCache = new Interner<Key, SiloAddress>(InternerConstants.SIZE_MEDIUM);
+        private static readonly Interner<(IPAddress Address, int Port, int Generation), SiloAddress> siloAddressInterningCache = new(InternerConstants.SIZE_MEDIUM);
 
         /// <summary>Gets the special constant value which indicate an empty <see cref="SiloAddress"/>.</summary>
-        public static SiloAddress Zero { get; } = New(new IPEndPoint(0, 0), 0);
+        public static SiloAddress Zero { get; } = New(new IPAddress(0), 0, 0);
 
         /// <summary>
         /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
@@ -65,7 +65,23 @@ namespace Orleans.Runtime
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
-            return siloAddressInterningCache.FindOrCreate(new Key(ep, gen), k => new SiloAddress(k.Endpoint, k.Generation));
+            return siloAddressInterningCache.FindOrCreate((ep.Address, ep.Port, gen),
+                // Normalize endpoints
+                (k, ep) => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(ep, k.Generation), ep);
+        }
+
+        /// <summary>
+        /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
+        /// </summary>
+        /// <param name="address">IP address of the silo.</param>
+        /// <param name="port">Port number</param>
+        /// <param name="generation">Generation number of the silo.</param>
+        /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
+        public static SiloAddress New(IPAddress address, int port, int generation)
+        {
+            return siloAddressInterningCache.FindOrCreate((address, port, generation),
+                // Normalize endpoints
+                k => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(new(k.Address, k.Port), k.Generation));
         }
 
         /// <summary>
@@ -75,12 +91,6 @@ namespace Orleans.Runtime
         /// <param name="generation">The generation.</param>
         private SiloAddress(IPEndPoint endpoint, int generation)
         {
-            // Normalize endpoints
-            if (endpoint.Address.IsIPv4MappedToIPv6)
-            {
-                endpoint = new IPEndPoint(endpoint.Address.MapToIPv4(), endpoint.Port);
-            }
-
             Endpoint = endpoint;
             Generation = generation;
         }
@@ -165,7 +175,7 @@ namespace Orleans.Runtime
             var host = IPAddress.Parse(addr.AsSpan(0, lastColon));
             int port = int.Parse(addr.AsSpan(lastColon + 1, atSign - lastColon - 1), NumberStyles.None);
             var gen = int.Parse(addr.AsSpan(atSign + 1), NumberStyles.None);
-            return New(new IPEndPoint(host, port), gen);
+            return New(host, port, gen);
         }
 
         /// <summary>
@@ -203,29 +213,12 @@ namespace Orleans.Runtime
             if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
                 ThrowInvalidUtf8SiloAddress(addr);
 
-            return New(new IPEndPoint(host, port), generation);
+            return New(host, port, generation);
         }
 
         [DoesNotReturn]
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
             => throw new FormatException("Invalid string SiloAddress: " + Encoding.UTF8.GetString(addr));
-
-        [Immutable]
-        private readonly struct Key : IEquatable<Key>
-        {
-            public readonly IPEndPoint Endpoint;
-            public readonly int Generation;
-
-            public Key(IPEndPoint endpoint, int generation)
-            {
-                Endpoint = endpoint;
-                Generation = generation;
-            }
-
-            public override int GetHashCode() => HashCode.Combine(Endpoint, Generation);
-
-            public bool Equals(Key other) => Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
-        }
 
         /// <summary>
         /// Return a long string representation of this SiloAddress.

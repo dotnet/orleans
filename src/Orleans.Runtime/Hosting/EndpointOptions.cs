@@ -1,8 +1,6 @@
 using System.Net;
-using System.Net.Sockets;
 
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
@@ -87,5 +85,18 @@ namespace Orleans.Configuration
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
         public IPEndPoint GatewayListeningEndpoint { get; set; }
+
+
+        internal IPEndPoint GetPublicSiloEndpoint() => new(AdvertisedIPAddress, SiloPort);
+
+        internal IPEndPoint GetPublicProxyEndpoint()
+        {
+            var gatewayPort = GatewayPort != 0 ? GatewayPort : GatewayListeningEndpoint?.Port ?? 0;
+            return gatewayPort != 0 ? new(AdvertisedIPAddress, gatewayPort) : null;
+        }
+
+        internal IPEndPoint GetListeningSiloEndpoint() => SiloListeningEndpoint ?? GetPublicSiloEndpoint();
+
+        internal IPEndPoint GetListeningProxyEndpoint() => GatewayListeningEndpoint ?? GetPublicProxyEndpoint();
     }
 }

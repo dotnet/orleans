@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Messaging
             var port = (int)reader.ReadVarUInt32();
             var generation = reader.ReadInt32();
 
-            return SiloAddress.New(new IPEndPoint(ip, port), generation);
+            return SiloAddress.New(ip, port, generation);
         }
 
         public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>

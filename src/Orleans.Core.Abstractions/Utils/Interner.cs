@@ -108,6 +108,36 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
+        /// </summary>
+        /// <param name="key">key to find</param>
+        /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
+        /// <param name="state">State to be passed to <paramref name="creatorFunc"/>.</param>
+        /// <returns>Object with specified key - either previous cached copy or newly created</returns>
+        public TValue FindOrCreate<TState>(TKey key, Func<TKey, TState, TValue> creatorFunc, TState state)
+        {
+            // Attempt to get the existing value from cache.
+            // If no cache entry exists, create and insert a new one using the creator function.
+            if (!internCache.TryGetValue(key, out var cacheEntry))
+            {
+                var obj = creatorFunc(key, state);
+                internCache[key] = new WeakReference<TValue>(obj);
+                return obj;
+            }
+
+            // If a cache entry did exist, determine if it still holds a valid value.
+            if (!cacheEntry.TryGetTarget(out var result))
+            {
+                // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                var obj = creatorFunc(key, state);
+                cacheEntry.SetTarget(obj);
+                return obj;
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Find cached copy of object with specified key, otherwise store the supplied one. 
         /// </summary>
         /// <param name="key">key to find</param>

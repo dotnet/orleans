@@ -491,7 +491,7 @@ namespace Orleans.Clustering.DynamoDB
 
             parse.ProxyPort = tableEntry.ProxyPort;
 
-            parse.SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), tableEntry.Port), tableEntry.Generation);
+            parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address), tableEntry.Port, tableEntry.Generation);
 
             if (!string.IsNullOrEmpty(tableEntry.SiloName))
             {
