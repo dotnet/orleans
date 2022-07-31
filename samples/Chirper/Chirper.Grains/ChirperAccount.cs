@@ -198,9 +198,9 @@ public class ChirperAccount : Grain, IChirperAccount
         _state.State.RecentReceivedMessages.Enqueue(chirp);
 
         // only relevant when not using fixed queue
-        while (_state.State.MyPublishedMessages.Count > PublishedMessagesCacheSize) // to keep not more than the max number of messages
+        while (_state.State.RecentReceivedMessages.Count > ReceivedMessagesCacheSize) // to keep not more than the max number of messages
         {
-            _state.State.MyPublishedMessages.Dequeue();
+            _state.State.RecentReceivedMessages.Dequeue();
         }
 
         await WriteStateAsync();
