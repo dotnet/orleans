@@ -14,6 +14,10 @@ namespace Orleans.Runtime
             get
             {
                 Assembly thisProg = typeof(RuntimeVersion).Assembly;
+                if (string.IsNullOrWhiteSpace(thisProg.Location))
+                {
+                    return ApiVersion;
+                }
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
                 bool isDebug = IsAssemblyDebugBuild(thisProg);
                 string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
@@ -41,6 +45,10 @@ namespace Orleans.Runtime
             get
             {
                 Assembly thisProg = typeof(RuntimeVersion).Assembly;
+                if (string.IsNullOrWhiteSpace(thisProg.Location))
+                {
+                    return ApiVersion;
+                }
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
                 string fileVersion = progVersionInfo.FileVersion;
                 return string.IsNullOrEmpty(fileVersion) ? ApiVersion : fileVersion;
