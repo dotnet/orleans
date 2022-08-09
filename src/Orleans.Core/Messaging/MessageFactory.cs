@@ -106,7 +106,7 @@ namespace Orleans.Runtime
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
 
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
 
             return response;
         }
