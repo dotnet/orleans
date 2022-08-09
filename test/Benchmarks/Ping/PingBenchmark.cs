@@ -51,7 +51,7 @@ namespace Benchmarks.Ping
                 this.hosts.Add(host);
             }
 
-            if (grainsOnSecondariesOnly) Thread.Sleep(4000);
+            if (grainsOnSecondariesOnly) Task.Delay(4000);
 
             if (startClient)
             {

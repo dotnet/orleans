@@ -36,13 +36,13 @@ namespace DefaultCluster.Tests
 
         public Task LongMethod(int waitTime)
         {
-            Thread.Sleep(waitTime);
+            Task.Delay(waitTime);
             return Task.CompletedTask;
         }
 
         public async Task LongMethodWithError(int waitTime)
         {
-            Thread.Sleep(waitTime);
+            await Task.Delay(waitTime);
             await Task.CompletedTask;
             throw new Exception("LongMethodWithError(" + waitTime + ")");
         }

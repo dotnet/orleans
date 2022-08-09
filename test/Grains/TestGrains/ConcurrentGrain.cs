@@ -58,7 +58,7 @@ namespace UnitTests.Grains
         public Task<int> B(int number)
         {
             logger.LogInformation("B({Index}) call {Number}", index, number);
-            Thread.Sleep(100);
+            Task.Delay(100);
             logger.LogInformation("B({Index}) call {Number} after sleep", index, number);
             return Task.FromResult(1);
         }
@@ -90,7 +90,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        // start a long tail call on the 1st grain by calling into the 2nd grain 
+        // start a long tail call on the 1st grain by calling into the 2nd grain
         public async Task<int> TailCall_Caller(IConcurrentReentrantGrain another, bool doCW)
         {
             logger.LogInformation("TailCall_Caller");

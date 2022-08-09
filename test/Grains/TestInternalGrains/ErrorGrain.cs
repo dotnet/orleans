@@ -56,13 +56,13 @@ namespace UnitTests.Grains
 
         public Task LongMethod(int waitTime)
         {
-            Thread.Sleep(waitTime);
+            Task.Delay(waitTime);
             return Task.CompletedTask;
         }
 
         public Task LongMethodWithError(int waitTime)
         {
-            Thread.Sleep(waitTime);
+            Task.Delay(waitTime);
             throw new Exception("LongMethodWithError");
         }
 
@@ -109,7 +109,7 @@ namespace UnitTests.Grains
             {
                 if (!doThrow)
                     return 0;
-                Thread.Sleep(100);
+                Task.Delay(100);
                 logger.LogInformation("About to throw 1.5.");
                 throw new ArgumentException("ErrorGrain left Delayed Unobserved Error 1.5.");
             });

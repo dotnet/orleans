@@ -130,7 +130,7 @@ namespace UnitTests.Grains
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeout Delay={Delay}", delay);
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            Thread.Sleep(delay);
+            Task.Delay(delay);
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeout Awoke from sleep after {ElapsedDuration}", sw.Elapsed);
             throw new InvalidOperationException("Timeout should have been returned to caller before " + delay);
         }

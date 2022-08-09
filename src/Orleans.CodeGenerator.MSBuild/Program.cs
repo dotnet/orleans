@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -52,7 +53,7 @@ namespace Orleans.CodeGenerator.MSBuild
                                     Console.WriteLine("Waiting for debugger to attach.");
                                 }
 
-                                Thread.Sleep(100);
+                                Task.Delay(100);
                             }
                             break;
                         case nameof(cmd.ProjectGuid):
@@ -102,7 +103,7 @@ namespace Orleans.CodeGenerator.MSBuild
                 }
 
                 var serviceProvider = new ServiceCollection().AddLogging(logging => logging.AddConsole().SetMinimumLevel(logLevel)).BuildServiceProvider();
-                
+
                 cmd.Log = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Orleans.CodeGenerator");
                 var stopwatch = Stopwatch.StartNew();
                 var ok = cmd.Execute(CancellationToken.None).GetAwaiter().GetResult();
