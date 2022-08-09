@@ -62,7 +62,7 @@ namespace UnitTests.General
                     msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
                 });
                 flag.Set();
-                await Task.Delay(1);
+                Thread.Sleep(1);
                 RequestContext.Remove(key);
             }
             await Task.WhenAll(promises);

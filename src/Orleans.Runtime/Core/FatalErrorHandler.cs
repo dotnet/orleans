@@ -4,7 +4,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -40,7 +39,7 @@ namespace Orleans.Runtime
             Console.Error.WriteLine(msg);
 
             // Allow some time for loggers to flush.
-            Task.Delay(2000);
+            Thread.Sleep(2000);
 
             if (Debugger.IsAttached) Debugger.Break();
 

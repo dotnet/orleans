@@ -72,7 +72,7 @@ namespace UnitTests.Grains
 
         public Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>> GetCallStats()
         {
-            Task.Delay(200);
+            Thread.Sleep(200);
             string silo = RuntimeIdentity;
             List<Guid> ids;
             lock (allActivationIds)

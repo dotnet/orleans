@@ -116,7 +116,7 @@ namespace UnitTestGrains
         public Task LongWait(TimeSpan time)
         {
             ThrowIfDeactivating();
-            Task.Delay(time);
+            Thread.Sleep(time);
             return Task.CompletedTask;
         }
 
@@ -235,7 +235,7 @@ namespace UnitTestGrains
 
         private void CheckRuntimeContext(string what)
         {
-            if (RuntimeContext.Current == null
+            if (RuntimeContext.Current == null 
                 || !RuntimeContext.Current.Equals(context))
             {
                 throw new InvalidOperationException(
