@@ -35,6 +35,56 @@ public class GrainDirectoryPartitionTests
         _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
+        var firstGrainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
+
+        // Insert valid entry, pointing to valid silo
+        var firstRegister = _target.AddSingleActivation(firstGrainAddress);
+        Assert.Equal(firstGrainAddress, firstRegister.Address);
+
+        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
+
+        // Previous entry is now pointing to a dead silo, it should be possible to override it now
+        var secondGrainAddress = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
+        var secondRegister = _target.AddSingleActivation(secondGrainAddress);
+        Assert.Equal(secondGrainAddress, secondRegister.Address);
+    }
+
+    [Fact]
+    public void DotNotInsertInvalidEntryTest()
+    {
+        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
+
+        var grainId = GrainId.Create("testGrain", "myKey");
+        var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
+
+        // Insert invalid entry, pointing to dead silo
+       Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress));
+    }
+
+    [Fact]
+    public void DotNotOverrideValidEntryTest()
+    {
+        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+
+        var grainId = GrainId.Create("testGrain", "myKey");
+        var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
+
+        // Insert valid entry, pointing to valid silo
+        var register = _target.AddSingleActivation(grainAddress);
+        Assert.Equal(grainAddress, register.Address);
+
+        // Previous entry is still valid, it should not be possible to override it
+        var newGrainAddress = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
+        var newRegister = _target.AddSingleActivation(newGrainAddress);
+        Assert.Equal(grainAddress, newRegister.Address);
+    }
+
+    [Fact]
+    public void DotNotReturnInvalidEntryTest()
+    {
+        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+
+        var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress1 = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert valid entry, pointing to valid silo
@@ -43,10 +93,9 @@ public class GrainDirectoryPartitionTests
 
         _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
 
-        // Previous entry is now pointing to a dead silo, it should be possible to override it now
-        var grainAddress2 = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
-        var register2 = _target.AddSingleActivation(grainAddress2);
-        Assert.Equal(grainAddress2, register2.Address);
+        // Previous entry is no longer still valid, it should not be returned
+        var lookup = _target.LookUpActivation(grainId);
+        Assert.Null(lookup.Address);
     }
 
     private class MockSiloStatusOracle : ISiloStatusOracle
