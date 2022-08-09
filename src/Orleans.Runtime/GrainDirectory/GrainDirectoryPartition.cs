@@ -321,6 +321,16 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     partitionData[grain] = grainInfo = new GrainInfo();
                 }
+                else
+                {
+                    var instance = grainInfo.Instances.FirstOrDefault();
+                    var siloAddress = instance.Value?.SiloAddress;
+                    // If there is an existing entry pointing to an invalid silo then remove it 
+                    if (siloAddress != null && !IsValidSilo(siloAddress))
+                    {
+                        partitionData[grain] = grainInfo = new GrainInfo();
+                    }
+                }
 
                 result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
                 result.VersionTag = grainInfo.VersionTag;
