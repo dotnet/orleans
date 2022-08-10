@@ -292,8 +292,6 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 // the call order is important
-                HandoffManager.ProcessSiloRemoveEvent(silo);
-
                 this.directoryMembership = new DirectoryMembership(
                     existing.MembershipRingList.Remove(silo),
                     existing.MembershipCache.Remove(silo));
@@ -931,17 +929,14 @@ namespace Orleans.Runtime.GrainDirectory
         public List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary)
         {
             var primary = CalculateGrainDirectoryPartition(grain);
-            List<ActivationAddress> backupData = HandoffManager.GetHandedOffInfo(grain);
             if (MyAddress.Equals(primary))
             {
-                log.Assert(ErrorCode.DirectoryBothPrimaryAndBackupForGrain, backupData == null,
-                    "Silo contains both primary and backup directory data for grain " + grain);
                 isPrimary = true;
                 return GetLocalDirectoryData(grain).Addresses;
             }
 
             isPrimary = false;
-            return backupData;
+            return null;
         }
 
         public override string ToString()
