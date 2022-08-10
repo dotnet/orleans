@@ -673,7 +673,7 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
 
                     //Stop LocalGrainDirectory
-                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
+                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(), localGrainDirectory.CacheValidator)
                         .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
 
