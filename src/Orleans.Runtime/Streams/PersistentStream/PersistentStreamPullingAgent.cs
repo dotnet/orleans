@@ -347,9 +347,6 @@ namespace Orleans.Streams
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed && logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
-
-            if (streamData.Count == 0)
-                pubSubCache.Remove(streamId);
         }
 
         private async Task AsyncTimerCallback(object state)
@@ -420,7 +417,7 @@ namespace Orleans.Streams
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
                 lastTimeCleanedPubSubCache = now;
-                CleanupPubSubCache(now);
+                await CleanupPubSubCache(now);
             }
 
             if (queueCache != null)
@@ -490,16 +487,41 @@ namespace Orleans.Streams
             return true;
         }
 
-        private void CleanupPubSubCache(DateTime now)
+        private async Task CleanupPubSubCache(DateTime now)
         {
             if (pubSubCache.Count == 0) return;
-            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, this.options.StreamInactivityPeriod))
-                         .ToList();
-            toRemove.ForEach(tuple =>
+
+            var toRemove = pubSubCache
+                .Where(pair => pair.Value.IsInactive(now, this.options.StreamInactivityPeriod))
+                .ToList();
+
+            if (toRemove.Count == 0) return;
+
+            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
+            var unregisterTasks = new List<Task>();
+
+            foreach (var kvp in toRemove)
             {
-                pubSubCache.Remove(tuple.Key);
-                tuple.Value.DisposeAll(logger);
-            });
+                unregisterTasks.Add(RemoveStream(kvp.Key, kvp.Value));
+            }
+
+            await Task.WhenAll(unregisterTasks);
+
+            async Task RemoveStream(StreamId streamId, StreamConsumerCollection consumerCollection)
+            {
+                try
+                {
+                    await pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                    pubSubCache.Remove(streamId);
+                    consumerCollection.DisposeAll(logger);
+                }
+                catch (Exception exc)
+                {
+                    logger.Warn(
+                        ErrorCode.PersistentStreamPullingAgent_08,
+                        $"Failed to unregister myself as stream producer to {streamId} that used to be in my responsibility.", exc);
+                }
+            }
         }
 
         private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
