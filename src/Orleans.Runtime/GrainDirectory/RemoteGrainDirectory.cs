@@ -98,12 +98,6 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.FromResult(result);
         }
 
-        public Task RemoveHandoffPartition(SiloAddress source)
-        {
-            router.HandoffManager.RemoveHandoffPartition(source);
-            return Task.CompletedTask;
-        }
-
         public Task AcceptSplitPartition(List<GrainAddress> singleActivations)
         {
             router.HandoffManager.AcceptExistingRegistrations(singleActivations);

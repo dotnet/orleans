@@ -188,9 +188,6 @@ namespace Orleans.Runtime.GrainDirectory
                     return;
                 }
 
-                // the call order is important
-                HandoffManager.ProcessSiloRemoveEvent(silo);
-
                 this.directoryMembership = new DirectoryMembership(
                     existing.MembershipRingList.Remove(silo),
                     existing.MembershipCache.Remove(silo));
