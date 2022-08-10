@@ -1,8 +1,9 @@
 using Orleans;
 using Orleans.Hosting;
 using VotingData;
+var builder = WebApplication.CreateBuilder(args);
 
-await Host.CreateDefaultBuilder(args)
+builder.Host
     .UseOrleans((ctx, builder) =>
     {
         if (ctx.HostingEnvironment.IsDevelopment())
@@ -26,9 +27,15 @@ await Host.CreateDefaultBuilder(args)
             options.Port = 8888;
         })
         .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(VoteGrain).Assembly));
-    })
-    .ConfigureWebHostDefaults(webBuilder =>
-    {
-        webBuilder.UseStartup<Startup>();
-    })
-    .RunConsoleAsync();
+    });
+builder.Services.AddControllersWithViews();
+
+var app = builder.Build();
+
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.MapDefaultControllerRoute();
+
+app.Run();
