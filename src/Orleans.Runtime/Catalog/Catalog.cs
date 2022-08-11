@@ -528,10 +528,12 @@ namespace Orleans.Runtime
                             {
                                 logger.LogDebug(
                                     (int)ErrorCode.Catalog_DuplicateActivation,
-                                    "Trying to create too many {GrainType} activations on this silo. Redirecting to activation {RedirectActivation}",
-                                    result.Name,
-                                    redirect.ActivationId);
+                                    "Trying to create too many {GrainType} activations on this silo while requesting grain {GrainId}. Redirecting to activation {RedirectActivation}",
+                                    grainType,
+                                    address.Grain,
+                                    redirect?.ActivationId?.ToString());
                             }
+
                             return redirect;
                         }
                         // The newly created StatelessWorker will be registered in RegisterMessageTarget()
