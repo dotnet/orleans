@@ -22,23 +22,25 @@ namespace Orleans.Streams
 
         internal static bool IsImplicitSubscription(Guid subscriptionGuid)
         {
-            byte[] guidBytes = subscriptionGuid.ToByteArray();
+            Span<byte> guidBytes = stackalloc byte[16];
+            subscriptionGuid.TryWriteBytes(guidBytes);
             // return true if high bit of last byte is set
-            return guidBytes[guidBytes.Length - 1] == (byte)(guidBytes[guidBytes.Length - 1] | 0x80);
+            return (guidBytes[15] & 0x80) != 0;
         }
 
         private static Guid MarkSubscriptionGuid(Guid subscriptionGuid, bool isImplicitSubscription)
         {
-            byte[] guidBytes = subscriptionGuid.ToByteArray();
+            Span<byte> guidBytes = stackalloc byte[16];
+            subscriptionGuid.TryWriteBytes(guidBytes);
             if (isImplicitSubscription)
             {
                 // set high bit of last byte
-                guidBytes[guidBytes.Length - 1] = (byte)(guidBytes[guidBytes.Length - 1] | 0x80);
+                guidBytes[15] |= 0x80;
             }
             else
             {
                 // clear high bit of last byte
-                guidBytes[guidBytes.Length - 1] = (byte)(guidBytes[guidBytes.Length - 1] & 0x7f);
+                guidBytes[15] &= 0x7f;
             }
 
             return new Guid(guidBytes);

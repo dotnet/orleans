@@ -120,7 +120,7 @@ namespace Orleans.Runtime.ConsistentRing
             lock (membershipRingList)
             {
                 if (membershipRingList.Count == 1)
-                    return $"[{membershipRingList[0].ToStringWithHashCode()} -> {RangeFactory.CreateFullRange()}]";
+                    return $"[{membershipRingList[0]:H} -> {RangeFactory.CreateFullRange()}]";
 
                 var sb = new StringBuilder().Append('[');
                 for (int i = 0; i < membershipRingList.Count; i++)
@@ -128,7 +128,7 @@ namespace Orleans.Runtime.ConsistentRing
                     SiloAddress curr = membershipRingList[i];
                     SiloAddress next = membershipRingList[(i + 1) % membershipRingList.Count];
                     IRingRange range = RangeFactory.CreateRange(unchecked((uint)curr.GetConsistentHashCode()), unchecked((uint)next.GetConsistentHashCode()));
-                    sb.Append($"{curr.ToStringWithHashCode()} -> {range},  ");
+                    sb.Append($"{curr:H} -> {range},  ");
                 }
                 return sb.Append(']').ToString();
             }

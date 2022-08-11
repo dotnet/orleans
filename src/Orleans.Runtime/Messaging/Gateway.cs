@@ -1,9 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -15,7 +14,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class Gateway : IConnectedClientCollection
+    internal sealed class Gateway : IConnectedClientCollection
     {
         // clients is the main authorative collection of all connected clients.
         // Any client currently in the system appears in this collection.
@@ -59,9 +58,13 @@ namespace Orleans.Runtime.Messaging
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
-            string stringToHash = $"{clientId}{new SpanFormattableIPEndPoint(siloAddress.Endpoint)}{siloAddress.Generation}";
-            Guid hash = Utils.CalculateGuidHash(stringToHash);
-            var activationId = new ActivationId(hash);
+
+            Span<byte> bytes = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes, clientId.Type.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], clientId.Key.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], (uint)siloAddress.GetConsistentHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], (uint)siloAddress.Generation);
+            var activationId = new ActivationId(new Guid(bytes));
             return GrainAddress.GetAddress(siloAddress, clientId, activationId);
         }
 
@@ -296,7 +299,7 @@ namespace Orleans.Runtime.Messaging
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
-               RunContinuationsAsynchronously = true
+                RunContinuationsAsynchronously = true
             };
 
             private GatewayInboundConnection _connection;

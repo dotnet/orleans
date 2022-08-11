@@ -113,9 +113,10 @@ namespace Orleans.ServiceBus.Providers
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializer);
-            var payload = queueMessage.Body;
+            var payload = queueMessage.Body.Span;
+            var offset = queueMessage.Offset.ToString();
             // get size of namespace, offset, partitionkey, properties, and payload
-            int size = SegmentBuilder.CalculateAppendSize(queueMessage.Offset.ToString()) +
+            int size = SegmentBuilder.CalculateAppendSize(offset) +
                 SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +
                 SegmentBuilder.CalculateAppendSize(propertiesBytes) +
                 SegmentBuilder.CalculateAppendSize(payload);
@@ -125,7 +126,7 @@ namespace Orleans.ServiceBus.Providers
 
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset.ToString());
+            SegmentBuilder.Append(segment, ref writeOffset, offset);
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey);
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);

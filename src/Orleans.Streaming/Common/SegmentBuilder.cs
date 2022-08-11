@@ -12,44 +12,14 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
-        public static int CalculateAppendSize(byte[] bytes)
-        {
-            return (bytes == null || bytes.Length == 0)
-                ? sizeof(int)
-                : bytes.Length + sizeof(int);
-        }
-
-        /// <summary>
-        /// Calculates how much space will be needed to append the provided bytes into the segment.
-        /// </summary>
-        public static int CalculateAppendSize(ReadOnlyMemory<byte> memory)
-        {
-            return (memory.Length == 0)
-                ? sizeof(int)
-                : memory.Length + sizeof(int);
-        }
-
-        /// <summary>
-        /// Calculates how much space will be needed to append the provided bytes into the segment.
-        /// </summary>
-        public static int CalculateAppendSize(ArraySegment<byte> segment)
-        {
-            return (segment.Count == 0)
-                ? sizeof(int)
-                : segment.Count + sizeof(int);
-        }
+        public static int CalculateAppendSize(ReadOnlySpan<byte> memory) => memory.Length + sizeof(int);
 
         /// <summary>
         /// Calculates how much space will be needed to append the provided string into the segment.
         /// </summary>
         /// <param name="str"></param>
         /// <returns></returns>
-        public static int CalculateAppendSize(string str)
-        {
-            return (string.IsNullOrEmpty(str))
-                ? sizeof(int)
-                : str.Length * sizeof(char) + sizeof(int);
-        }
+        public static int CalculateAppendSize(string str) => str is null ? sizeof(int) : str.Length * sizeof(char) + sizeof(int);
 
         /// <summary>
         /// Appends a <see cref="ReadOnlyMemory{T}"/> of bytes to the end of the segment
@@ -57,7 +27,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="writerOffset"></param>
         /// <param name="bytes"></param>
         /// <param name="segment"></param>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ReadOnlyMemory<byte> bytes)
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ReadOnlySpan<byte> bytes)
         {
             if (segment.Array == null)
             {
@@ -70,53 +40,8 @@ namespace Orleans.Providers.Streams.Common
 
             if (bytes.Length > 0)
             {
-                bytes.CopyTo(segment.AsMemory(writerOffset));
+                bytes.CopyTo(segment.AsSpan(writerOffset));
                 writerOffset += bytes.Length;
-            }
-        }
-
-        /// <summary>
-        /// Appends an array of bytes to the end of the segment
-        /// </summary>
-        /// <param name="writerOffset"></param>
-        /// <param name="bytes"></param>
-        /// <param name="segment"></param>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, byte[] bytes)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException(nameof(segment));
-            }
-            if (bytes == null)
-            {
-                throw new ArgumentNullException(nameof(bytes));
-            }
-
-            Array.Copy(BitConverter.GetBytes(bytes.Length), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-            writerOffset += sizeof(int);
-            if (bytes.Length != 0)
-            {
-                Array.Copy(bytes, 0, segment.Array, segment.Offset + writerOffset, bytes.Length);
-                writerOffset += bytes.Length;
-            }
-        }
-
-        /// <summary>
-        /// Appends an array of bytes to the end of the segment
-        /// </summary>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ArraySegment<byte> append)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException(nameof(segment));
-            }
-
-            Array.Copy(BitConverter.GetBytes(append.Count), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-            writerOffset += sizeof(int);
-            if (append.Count != 0)
-            {
-                Array.Copy(append.Array, append.Offset, segment.Array, segment.Offset + writerOffset, append.Count);
-                writerOffset += append.Count;
             }
         }
 
@@ -134,19 +59,13 @@ namespace Orleans.Providers.Streams.Common
             }
             if (str == null)
             {
-                Array.Copy(BitConverter.GetBytes(-1), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-                writerOffset += sizeof(int);
-            }
-            else if (string.IsNullOrEmpty(str))
-            {
-                Array.Copy(BitConverter.GetBytes(0), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
+                var length = -1;
+                MemoryMarshal.Write(segment.AsSpan(writerOffset), ref length);
                 writerOffset += sizeof(int);
             }
             else
             {
-                var bytes = new byte[str.Length * sizeof(char)];
-                Buffer.BlockCopy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
-                Append(segment, ref writerOffset, bytes);
+                Append(segment, ref writerOffset, MemoryMarshal.AsBytes(str.AsSpan()));
             }
         }
 
@@ -187,10 +106,9 @@ namespace Orleans.Providers.Streams.Common
             {
                 return string.Empty;
             }
-            var chars = new char[size / sizeof(char)];
-            Buffer.BlockCopy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
+            var chars = segment.AsSpan(readerOffset, size);
             readerOffset += size;
-            return new string(chars);
+            return new string(MemoryMarshal.Cast<byte, char>(chars));
         }
     }
 }
