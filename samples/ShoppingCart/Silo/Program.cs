@@ -1,9 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT License.
-var builder = WebApplication.CreateBuilder(args);
 
-
-builder.Host
+await Host.CreateDefaultBuilder(args)
     .UseOrleans(
         (context, builder) =>
         {
@@ -33,45 +31,13 @@ builder.Host
                         {
                             options.ClusterId = "ShoppingCartCluster";
                             options.ServiceId = nameof(ShoppingCartService);
-                        }).UseAzureStorageClustering(
+                        }).UseAzureStorageClustering(                    
                     options => options.ConfigureTableServiceClient(connectionString));
                 builder.AddAzureTableGrainStorage(
-                    "shopping-cart",
+                    "shopping-cart",                    
                     options => options.ConfigureTableServiceClient(connectionString));
             }
-        });
-
-builder.Services.AddMudServices();
-builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddSingleton<ShoppingCartService>();
-builder.Services.AddSingleton<InventoryService>();
-builder.Services.AddSingleton<ProductService>();
-builder.Services.AddScoped<ComponentStateChangedObserver>();
-builder.Services.AddSingleton<ToastService>();
-builder.Services.AddLocalStorageServices();
-
-
-var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-}
-else
-{
-    app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
-
-app.Run();
+        })
+    .ConfigureWebHostDefaults(
+        webBuilder => webBuilder.UseStartup<Startup>())
+    .RunConsoleAsync();
