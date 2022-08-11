@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
+using Orleans.Timers.Internal;
 
 namespace Orleans.TestingHost
 {
@@ -15,49 +16,49 @@ namespace Orleans.TestingHost
     public class StorageFaultGrain : Grain, IStorageFaultGrain
     {
         private ILogger logger;
-        private Dictionary<GrainReference, Exception> readFaults;
-        private Dictionary<GrainReference, Exception> writeFaults;
-        private Dictionary<GrainReference, Exception> clearfaults;
+        private Dictionary<GrainId, Exception> readFaults;
+        private Dictionary<GrainId, Exception> writeFaults;
+        private Dictionary<GrainId, Exception> clearfaults;
 
         /// <inheritdoc />
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
             logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
-            readFaults = new Dictionary<GrainReference, Exception>();
-            writeFaults = new Dictionary<GrainReference, Exception>();
-            clearfaults = new Dictionary<GrainReference, Exception>();
+            readFaults = new();
+            writeFaults = new();
+            clearfaults = new();
             logger.LogInformation("Activate.");
         }
 
         /// <inheritdoc />
-        public Task AddFaultOnRead(GrainReference grainReference, Exception exception)
+        public Task AddFaultOnRead(GrainId grainId, Exception exception)
         {
-            readFaults.Add(grainReference, exception);
+            readFaults.Add(grainId, exception);
             logger.LogInformation("Added ReadState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        public Task AddFaultOnWrite(GrainReference grainReference, Exception exception)
+        public Task AddFaultOnWrite(GrainId grainId, Exception exception)
         {
-            writeFaults.Add(grainReference, exception);
+            writeFaults.Add(grainId, exception);
             logger.LogInformation("Added WriteState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        public Task AddFaultOnClear(GrainReference grainReference, Exception exception)
+        public Task AddFaultOnClear(GrainId grainId, Exception exception)
         {
-            clearfaults.Add(grainReference, exception);
+            clearfaults.Add(grainId, exception);
             logger.LogInformation("Added ClearState fault for {GrainId}.", GrainId);
             return Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        public Task OnRead(GrainReference grainReference)
+        public Task OnRead(GrainId grainId)
         {
-            if (readFaults.Remove(grainReference, out var exception))
+            if (readFaults.Remove(grainId, out var exception))
             {
                 throw exception;
             }
@@ -65,9 +66,9 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public Task OnWrite(GrainReference grainReference)
+        public Task OnWrite(GrainId grainId)
         {
-            if (writeFaults.Remove(grainReference, out var exception))
+            if (writeFaults.Remove(grainId, out var exception))
             {
                 throw exception;
             }
@@ -75,9 +76,9 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public Task OnClear(GrainReference grainReference)
+        public Task OnClear(GrainId grainId)
         {
-            if (clearfaults.Remove(grainReference, out var exception))
+            if (clearfaults.Remove(grainId, out var exception))
             {
                 throw exception;
             }

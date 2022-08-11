@@ -13,27 +13,27 @@ namespace Orleans.Storage
     {
         /// <summary>Read data function for this storage instance.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">State data object to be populated for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Write data function for this storage instance.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">State data object to be written for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Delete / Clear data function for this storage instance.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
     }
 
     /// <summary>
@@ -51,50 +51,6 @@ namespace Orleans.Storage
         /// <param name="getExtendedErrors">Whether or not to extract REST error code.</param>
         /// <returns>A value indicating whether the exception was decoded.</returns>
         bool DecodeException(Exception exception, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false);
-    }
-
-    /// <summary>
-    /// Exception thrown whenever a grain call is attempted with a bad / missing storage configuration settings for that grain.
-    /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class BadGrainStorageConfigException : BadProviderConfigException
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
-        /// </summary>
-        public BadGrainStorageConfigException()
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
-        /// </summary>
-        /// <param name="message">The message.</param>
-        public BadGrainStorageConfigException(string message)
-            : base(message)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
-        /// </summary>
-        /// <param name="message">The message.</param>
-        /// <param name="innerException">The inner exception.</param>
-        public BadGrainStorageConfigException(string message, Exception innerException)
-            : base(message, innerException)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BadGrainStorageConfigException"/> class.
-        /// </summary>
-        /// <param name="info">The serialization info.</param>
-        /// <param name="context">The context.</param>
-        protected BadGrainStorageConfigException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
     }
 
     /// <summary>

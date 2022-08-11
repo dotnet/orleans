@@ -12,9 +12,9 @@ namespace Orleans.EventSourcing
     public interface ILogConsistencyProtocolServices
     {
         /// <summary>
-        /// The untyped reference for this grain.
+        /// The ID for this grain.
         /// </summary>
-        GrainReference GrainReference { get;  }
+        GrainId GrainId { get;  }
 
         /// <summary>
         /// Copies the provided argument.

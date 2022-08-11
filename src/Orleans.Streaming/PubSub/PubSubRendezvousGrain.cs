@@ -2,19 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Statistics;
 using Orleans.Storage;
 using Orleans.Streams.Core;
 
+#nullable enable
 namespace Orleans.Streams
 {
-    internal class PubSubGrainStateStorageFactory
+    internal sealed class PubSubGrainStateStorageFactory
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILoggerFactory _loggerFactory;
@@ -25,15 +26,20 @@ namespace Orleans.Streams
             _loggerFactory = loggerFactory;
         }
 
-        public IStorage<PubSubGrainState> GetStorage(PubSubRendezvousGrain grain)
+        public StateStorageBridge<PubSubGrainState> GetStorage(PubSubRendezvousGrain grain)
         {
             var logger = _loggerFactory.CreateLogger<PubSubGrainStateStorageFactory>();
-            var streamId = InternalStreamId.Parse(grain.GetGrainId().Key);
+            var grainId = grain.GrainId;
+
+            var span = grainId.Key.AsSpan();
+            var i = span.IndexOf((byte)'/');
+            if (i < 0) throw new ArgumentException($"Unable to parse \"{grainId.Key}\" as a stream id");
+            var providerName = Encoding.UTF8.GetString(span[..i]);
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug("Trying to find storage provider {ProviderName}", streamId.ProviderName);
+                logger.LogDebug("Trying to find storage provider {ProviderName}", providerName);
 
-            var storage = _serviceProvider.GetServiceByName<IGrainStorage>(streamId.ProviderName);
+            var storage = _serviceProvider.GetServiceByName<IGrainStorage>(providerName);
             if (storage == null)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -41,13 +47,13 @@ namespace Orleans.Streams
 
                 storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
-            return new StateStorageBridge<PubSubGrainState>(typeof(PubSubRendezvousGrain).FullName, grain.GrainReference, storage, _loggerFactory);
+            return new(nameof(PubSubRendezvousGrain), grain.GrainId, storage, _loggerFactory);
         }
     }
 
     [Serializable]
     [GenerateSerializer]
-    internal class PubSubGrainState
+    internal sealed class PubSubGrainState
     {
         [Id(1)]
         public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
@@ -56,13 +62,13 @@ namespace Orleans.Streams
     }
 
     [GrainType("pubsubrendezvous")]
-    internal class PubSubRendezvousGrain : Grain, IPubSubRendezvousGrain
+    internal sealed class PubSubRendezvousGrain : Grain, IPubSubRendezvousGrain
     {
         private readonly ILogger logger;
         private const bool DEBUG_PUB_SUB = false;
 
         private readonly PubSubGrainStateStorageFactory _storageFactory;
-        private IStorage<PubSubGrainState> _storage;
+        private StateStorageBridge<PubSubGrainState> _storage;
 
         private PubSubGrainState State => _storage.State;
 
@@ -70,13 +76,14 @@ namespace Orleans.Streams
         {
             _storageFactory = storageFactory;
             this.logger = logger;
+            _storage = null!;
         }
 
-        public override async Task OnActivateAsync(CancellationToken cancellationToken)
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             LogPubSubCounts("OnActivateAsync");
             _storage = _storageFactory.GetStorage(this);
-            await ReadStateAsync();
+            return ReadStateAsync();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -156,7 +163,7 @@ namespace Orleans.Streams
             string filterData)
         {
             StreamInstruments.PubSubConsumersAdded.Add(1);
-            PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             if (pubSubState != null && pubSubState.IsFaulted)
                 throw new FaultedSubscriptionException(subscriptionId, streamId);
             try
@@ -183,7 +190,7 @@ namespace Orleans.Streams
                     streamId,
                     subscriptionId,
                     streamConsumer);
-                
+
                 // Corrupted state, deactivate grain.
                 DeactivateOnIdle();
                 throw;
@@ -208,7 +215,7 @@ namespace Orleans.Streams
                     tasks.Add(ExecuteProducerTask(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
                 }
 
-                Exception exception = null;
+                Exception? exception = null;
                 try
                 {
                     await Task.WhenAll(tasks);
@@ -395,7 +402,7 @@ namespace Orleans.Streams
 
         public async Task FaultSubscription(GuidId subscriptionId)
         {
-            PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             if (pubSubState == null)
             {
                 return;

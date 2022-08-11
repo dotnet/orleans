@@ -12,21 +12,19 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         private const int NumCases = 3;
         private static Range<long> CountOfCharacters { get; } = new Range<long>(1000000, 1000000);
 
-        public record TestData(string GrainType, Func<IInternalGrainFactory, GrainReference> GrainGetter, GrainState<TestStateGeneric1<TStateData>> GrainState);
-
-        public static TestData GetTestData(int testNum) => testNum switch
+        public static (string, GrainId, GrainState<TestStateGeneric1<TStateData>>) GetTestData(int testNum) => testNum switch
         {
-            0 => new TestData(
+            0 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(),
                 new GrainState<TestStateGeneric1<TStateData>> { State = new TestStateGeneric1<TStateData> { SomeData = RandomUtilities.GetRandom<TStateData>(CountOfCharacters), A = "Data1", B = 1, C = 4 } }),
-            1 => new TestData(
+            1 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(),
                 new GrainState<TestStateGeneric1<TStateData>> { State = new TestStateGeneric1<TStateData> { SomeData = RandomUtilities.GetRandom<TStateData>(CountOfCharacters), A = "Data2", B = 2, C = 5 } }),
-            2 => new TestData(
+            2 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(),
                 new GrainState<TestStateGeneric1<TStateData>> { State = new TestStateGeneric1<TStateData> { SomeData = RandomUtilities.GetRandom<TStateData>(CountOfCharacters), A = "Data3", B = 3, C = 6 } }),
             _ => throw new IndexOutOfRangeException(),
         };

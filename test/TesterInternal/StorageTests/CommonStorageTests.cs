@@ -1,10 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -24,18 +20,7 @@ namespace UnitTests.StorageTests.Relational
     /// </remarks>
     internal class CommonStorageTests
     {
-        private readonly IInternalGrainFactory _grainFactory;
-
-        /// <summary>
-        /// The default constructor.
-        /// </summary>
-        /// <param name="grainFactory"></param>
-        /// <param name="storage"></param>
-        public CommonStorageTests(IInternalGrainFactory grainFactory, IGrainStorage storage)
-        {
-            _grainFactory = grainFactory;
-            Storage = storage;
-        }
+        public CommonStorageTests(IGrainStorage storage) => Storage = storage;
 
         /// <summary>
         /// The storage provider under test.
@@ -49,11 +34,11 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
-        internal (GrainReference GrainReference, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string version)
+        internal (GrainId GrainId, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string version)
         {
-            var grainReference = (GrainReference)_grainFactory.GetGrain(GrainId.Create("my-grain-type", grainId.ToString("X")));
+            var id = GrainId.Create(GrainType.Create("my-grain-type"), GrainIdKeyExtensions.CreateIntegerKey(grainId));
             var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };
-            return (grainReference, grainState);
+            return (id, grainState);
         }
 
         /// <summary>
@@ -62,11 +47,11 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="grainId">The grain ID.</param>
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
-        internal (GrainReference GrainReference, GrainState<TestState1> GrainState) GetTestReferenceAndState(string grainId, string version)
+        internal (GrainId GrainId, GrainState<TestState1> GrainState) GetTestReferenceAndState(string grainId, string version)
         {
-            var grainReference = (GrainReference)_grainFactory.GetGrain(GrainId.Create("my-grain-type", grainId));
+            var id = GrainId.Create("my-grain-type", grainId);
             var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };
-            return (grainReference, grainState);
+            return (id, grainState);
         }
 
         /// <summary>
@@ -78,9 +63,9 @@ namespace UnitTests.StorageTests.Relational
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             var grainReference = this.GetTestReferenceAndState(0, null);
             var grainState = grainReference.GrainState;
-            await Storage.WriteStateAsync(grainTypeName, grainReference.GrainReference, grainState).ConfigureAwait(false);
+            await Storage.WriteStateAsync(grainTypeName, grainReference.GrainId, grainState).ConfigureAwait(false);
             var storedGrainState = new GrainState<TestState1> { State = new TestState1() };
-            await Storage.ReadStateAsync(grainTypeName, grainReference.GrainReference, storedGrainState).ConfigureAwait(false);
+            await Storage.ReadStateAsync(grainTypeName, grainReference.GrainId, storedGrainState).ConfigureAwait(false);
 
             Assert.Equal(grainState.ETag, storedGrainState.ETag);
             Assert.Equal(grainState.State, storedGrainState.State);
@@ -99,13 +84,11 @@ namespace UnitTests.StorageTests.Relational
             //A grain with a random ID will be arranged to the database. Then its state is set to null to simulate the fact
             //it is like a second activation after a one that has succeeded to write.
             string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
-            var inconsistentState = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), null);
-            var grainReference = inconsistentState.GrainReference;
-            var grainState = inconsistentState.GrainState;
+            var (grainId, grainState) = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), null);
 
-            await Store_WriteRead(grainTypeName, inconsistentState.GrainReference, inconsistentState.GrainState).ConfigureAwait(false);
+            await Store_WriteRead(grainTypeName, grainId, grainState).ConfigureAwait(false);
             grainState.ETag = null;
-            var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, grainReference, grainState)).ConfigureAwait(false);
+            var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, grainId, grainState)).ConfigureAwait(false);
 
             Assert.NotNull(exception);
             Assert.IsType<InconsistentStateException>(exception);
@@ -127,7 +110,7 @@ namespace UnitTests.StorageTests.Relational
 
             var inconsistentState = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), inconsistentStateVersion);
             string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
-            var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, inconsistentState.GrainReference, inconsistentState.GrainState)).ConfigureAwait(false);
+            var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, inconsistentState.GrainId, inconsistentState.GrainState)).ConfigureAwait(false);
 
             Assert.NotNull(exception);
             Assert.IsType<InconsistentStateException>(exception);
@@ -158,7 +141,7 @@ namespace UnitTests.StorageTests.Relational
                 var firstVersion = grainData.GrainState.ETag;
                 Assert.Null(firstVersion);
 
-                await Store_WriteRead(grainTypeName, grainData.GrainReference, grainData.GrainState).ConfigureAwait(false);
+                await Store_WriteRead(grainTypeName, grainData.GrainId, grainData.GrainState).ConfigureAwait(false);
                 var secondVersion = grainData.GrainState.ETag;
                 Assert.NotEqual(firstVersion, secondVersion);
             };
@@ -170,7 +153,7 @@ namespace UnitTests.StorageTests.Relational
             // starving and growing the thread pool (which is very slow) if a few threads coupled
             // with parallelization via tasks can force most concurrency scenarios.
 
-            await ParallelForEachAsync(grainStates, new ParallelOptions { MaxDegreeOfParallelism = MaxNumberOfThreads }, async (grainData, ct) =>
+            await Parallel.ForEachAsync(grainStates, new ParallelOptions { MaxDegreeOfParallelism = MaxNumberOfThreads }, async (grainData, ct) =>
             {
                 // This loop writes the state consecutive times to the database to make sure its
                 // version is updated appropriately.
@@ -179,7 +162,7 @@ namespace UnitTests.StorageTests.Relational
                     var versionBefore = grainData.GrainState.ETag;
                     await RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
-                        await Store_WriteRead(grainTypeName, grainData.GrainReference, grainData.GrainState);
+                        await Store_WriteRead(grainTypeName, grainData.GrainId, grainData.GrainState);
                         return 0;
                     });
 
@@ -187,48 +170,6 @@ namespace UnitTests.StorageTests.Relational
                     Assert.NotEqual(versionBefore, versionAfter);
                 }
             });
-        }
-
-        private static async ValueTask ParallelForEachAsync<TSource>(
-            ICollection<TSource> source,
-            ParallelOptions options,
-            Func<TSource, CancellationToken, ValueTask> func)
-        {
-#if NET6_0_OR_GREATER
-            await Parallel.ForEachAsync(source, options, func);
-#else
-            var cancellationToken = CancellationToken.None;
-            var tcs = new TaskCompletionSource<int>();
-            var workers = new List<Task>();
-            var channel = Channel.CreateUnbounded<TSource>();
-            foreach (var item in source)
-            {
-                await channel.Writer.WriteAsync(item);
-            }
-
-            channel.Writer.Complete();
-
-            for (var i = 0; i < options.MaxDegreeOfParallelism; i++)
-            {
-                workers.Add(Task.Run(async () =>
-                {
-                    try
-                    {
-                        var reader = channel.Reader;
-                        await foreach (var item in reader.ReadAllAsync(cancellationToken))
-                        {
-                            await func(item, cancellationToken);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        tcs.TrySetException(ex);
-                    }
-                }));
-            }
-
-            await Task.WhenAll(workers);
-#endif
         }
 
         /// <summary>
@@ -239,20 +180,20 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="grainReference">The grain reference as would be given by Orleans.</param>
         /// <param name="grainState">The grain state the grain would hold and Orleans pass.</param>
         /// <returns></returns>
-        internal async Task Store_WriteClearRead<T>(string grainTypeName, GrainReference grainReference, GrainState<T> grainState) where T : new()
+        internal async Task Store_WriteClearRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState) where T : new()
         {
             //A legal situation for clearing has to be arranged by writing a state to the storage before
             //clearing it. Writing and clearing both change the ETag, so they should differ.
-            await Storage.WriteStateAsync(grainTypeName, grainReference, grainState);
+            await Storage.WriteStateAsync(grainTypeName, grainId, grainState);
             var writtenStateVersion = grainState.ETag;
             var recordExitsAfterWriting = grainState.RecordExists;
 
-            await Storage.ClearStateAsync(grainTypeName, grainReference, grainState).ConfigureAwait(false);
+            await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
             var clearedStateVersion = grainState.ETag;
             var recordExitsAfterClearing = grainState.RecordExists;
 
             var storedGrainState = new GrainState<T> { State = new T() };
-            await Storage.ReadStateAsync(grainTypeName, grainReference, storedGrainState).ConfigureAwait(false);
+            await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
 
             Assert.NotEqual(writtenStateVersion, clearedStateVersion);
             Assert.Equal(storedGrainState.State, Activator.CreateInstance<T>());
@@ -269,11 +210,11 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="grainReference">The grain reference as would be given by Orleans.</param>
         /// <param name="grainState">The grain state the grain would hold and Orleans pass.</param>
         /// <returns></returns>
-        internal async Task Store_WriteRead<T>(string grainTypeName, GrainReference grainReference, GrainState<T> grainState) where T : new()
+        internal async Task Store_WriteRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState) where T : new()
         {
-            await Storage.WriteStateAsync(grainTypeName, grainReference, grainState).ConfigureAwait(false);
+            await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
             var storedGrainState = new GrainState<T> { State = new T() };
-            await Storage.ReadStateAsync(grainTypeName, grainReference, storedGrainState).ConfigureAwait(false);
+            await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
 
             Assert.Equal(grainState.ETag, storedGrainState.ETag);
             Assert.Equal(grainState.State, storedGrainState.State);

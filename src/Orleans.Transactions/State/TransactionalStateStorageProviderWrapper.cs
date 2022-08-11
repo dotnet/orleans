@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Storage;
-using Orleans.Utilities;
-using Orleans.Transactions.Abstractions;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Storage;
+using Orleans.Transactions.Abstractions;
 
+#nullable enable
 namespace Orleans.Transactions
 {
-    internal class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>
+    internal sealed class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()
     {
         private readonly IGrainStorage grainStorage;
@@ -19,9 +20,9 @@ namespace Orleans.Transactions
         private readonly ILoggerFactory loggerFactory;
         private readonly string stateName;
 
-        private IStorage<TransactionalStateRecord<TState>> stateStorage;
-        private IStorage<TransactionalStateRecord<TState>> StateStorage => stateStorage ?? (stateStorage = GetStateStorage());
-
+        private StateStorageBridge<TransactionalStateRecord<TState>>? stateStorage;
+        [MemberNotNull(nameof(stateStorage))]
+        private StateStorageBridge<TransactionalStateRecord<TState>> StateStorage => stateStorage ??= GetStateStorage();
 
         public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainContext context, ILoggerFactory loggerFactory)
         {
@@ -34,16 +35,18 @@ namespace Orleans.Transactions
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             await this.StateStorage.ReadStateAsync();
-            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
+            var state = stateStorage.State;
+            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
         }
 
         public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            stateStorage.State.Metadata = metadata;
+            var state = stateStorage.State;
+            state.Metadata = metadata;
 
-            var pendinglist = stateStorage.State.PendingStates;
+            var pendinglist = state.PendingStates;
 
             // abort
             if (abortAfter.HasValue && pendinglist.Count != 0)
@@ -77,14 +80,14 @@ namespace Orleans.Transactions
             }
 
             // commit
-            if (commitUpTo.HasValue && commitUpTo.Value > stateStorage.State.CommittedSequenceId)
+            if (commitUpTo.HasValue && commitUpTo.Value > state.CommittedSequenceId)
             {
                 var pos = pendinglist.FindIndex(t => t.SequenceId == commitUpTo.Value);
                 if (pos != -1)
                 {
-                    var committedState = pendinglist[pos];            
-                    stateStorage.State.CommittedSequenceId = committedState.SequenceId;
-                    stateStorage.State.CommittedState = committedState.State;
+                    var committedState = pendinglist[pos];
+                    state.CommittedSequenceId = committedState.SequenceId;
+                    state.CommittedState = committedState.State;
                     pendinglist.RemoveRange(0, pos + 1);
                 }
                 else
@@ -97,17 +100,17 @@ namespace Orleans.Transactions
             return stateStorage.Etag;
         }
 
-        private IStorage<TransactionalStateRecord<TState>> GetStateStorage()
+        private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
         {
             string formattedTypeName = RuntimeTypeNameFormatter.Format(this.context.GrainInstance.GetType());
             string fullStateName = $"{formattedTypeName}-{this.stateName}";
-            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainReference, grainStorage, this.loggerFactory);
+            return new(fullStateName, context.GrainId, grainStorage, loggerFactory);
         }
     }
 
     [Serializable]
     [GenerateSerializer]
-    public class TransactionalStateRecord<TState>
+    public sealed class TransactionalStateRecord<TState>
         where TState : class, new()
     {
         [Id(0)]

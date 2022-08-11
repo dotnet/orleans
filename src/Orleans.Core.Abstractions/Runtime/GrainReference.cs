@@ -404,7 +404,7 @@ namespace Orleans.Runtime
         public virtual string InterfaceName => InterfaceType.ToString();
 
         /// <inheritdoc/>
-        public override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
+        public sealed override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
 
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
 

@@ -98,7 +98,7 @@ namespace Orleans.EventSourcing
             if (attr != null && defaultFactory == null)
             {
                 var errMsg = $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}";
-                throw new BadGrainStorageConfigException(errMsg);
+                throw new BadProviderConfigException(errMsg);
             }
 
             // use default if none found
@@ -106,7 +106,7 @@ namespace Orleans.EventSourcing
             if (defaultFactory == null)
             {
                 var errMsg = $"No log consistency provider found loading grain type {this.GetType().FullName}";
-                throw new BadGrainStorageConfigException(errMsg);
+                throw new BadProviderConfigException(errMsg);
             };
 
             return defaultFactory;

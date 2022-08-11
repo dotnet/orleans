@@ -15,14 +15,13 @@ namespace Orleans.Storage
 
         private long lastETagCounter = 1;
         [NonSerialized]
-        private readonly Dictionary<string, IDictionary<string, object>> dataTable;
+        private readonly Dictionary<string, Dictionary<string, object>> dataTable = new();
         private readonly int numKeyLayers;
         private readonly object lockable = new object();
 
         public HierarchicalKeyStore(int keyLayers)
         {
             numKeyLayers = keyLayers;
-            dataTable = new Dictionary<string, IDictionary<string, object>>();
         }
 
         public string WriteRow(IList<Tuple<string, string>> keys, IDictionary<string, object> data, string eTag)
@@ -42,13 +41,6 @@ namespace Orleans.Storage
                     storedData[kv.Key] = kv.Value;
 
                 Etag = NewEtag();
-#if DEBUG
-                var storeContents = DumpData(false);
-                Trace.TraceInformation("WriteRow: Keys={0} Data={1} Store contents after = {2} New Etag = {3}",
-                        StorageProviderUtils.PrintKeys(keys),
-                        StorageProviderUtils.PrintData(data),
-                        storeContents, Etag);
-#endif
                 return Etag;
             }
         }
@@ -64,13 +56,7 @@ namespace Orleans.Storage
 
             lock (lockable)
             {
-                IDictionary<string, object> data = GetDataStore(keys);
-
-#if DEBUG
-                Trace.TraceInformation("ReadMultiRow: Keys={0} returning Data={1}",
-                    StorageProviderUtils.PrintKeys(keys), StorageProviderUtils.PrintData(data));
-#endif
-                return data;
+                return GetDataStore(keys);
             }
         }
 
@@ -84,12 +70,7 @@ namespace Orleans.Storage
 
             lock (lockable)
             {
-                IList<IDictionary<string, object>> results = FindDataStores(keys);
-#if DEBUG
-                Trace.TraceInformation("ReadMultiRow: Keys={0} returning Results={1}",
-                    StorageProviderUtils.PrintKeys(keys), StorageProviderUtils.PrintResults(results));
-#endif
-                return results;
+                return FindDataStores(keys);
             }
         }
 
@@ -106,22 +87,12 @@ namespace Orleans.Storage
             lock (lockable)
             {
                 // No change to Etag
-#if DEBUG
-                var removedEntry = dataTable.TryGetValue(keyStr, out var data);
-                Trace.TraceInformation("DeleteRow: Keys={0} Removed={2} Data={1} Etag={3}",
-                    StorageProviderUtils.PrintKeys(keys),
-                    StorageProviderUtils.PrintData(data),
-                    removedEntry, Etag);
-#endif
                 return dataTable.Remove(keyStr);
             }
         }
 
         public void Clear()
         {
-#if DEBUG
-            Trace.TraceInformation("Clear Table");
-#endif
             lock (lockable)
             {
                 dataTable.Clear();
@@ -135,19 +106,17 @@ namespace Orleans.Storage
             {
                 foreach (var kv in dataTable)
                 {
-                    sb.AppendFormat("{0} => {1}", kv.Key, StorageProviderUtils.PrintData(kv.Value)).AppendLine();
+                    sb.AppendFormat("{0} => {1}", kv.Key, kv.Value).AppendLine();
                 }
             }
-#if !DEBUG
             if (printDump)
-#endif
             {
                 Trace.TraceInformation("Dump {0} Etag={1} Data= {2}", GetType(), Etag, sb);
             }
             return sb.ToString();
         }
 
-        private IDictionary<string, object> GetDataStore(IList<Tuple<string, string>> keys)
+        private Dictionary<string, object> GetDataStore(IList<Tuple<string, string>> keys)
         {
             string keyStr = MakeStoreKey(keys);
 
@@ -158,9 +127,6 @@ namespace Orleans.Storage
                     data = new Dictionary<string, object>(); // Empty data set
                     dataTable[keyStr] = data;
                 }
-#if DEBUG
-                Trace.TraceInformation("Read: {0}", StorageProviderUtils.PrintOneWrite(keys, data, null));
-#endif
                 return data;
             }
         }

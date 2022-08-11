@@ -1,10 +1,10 @@
+using System;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
-using System;
-using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 
+#nullable enable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -23,8 +23,9 @@ namespace Orleans.Storage
         public static IGrainStorage GetGrainStorage(Type grainType, IServiceProvider services)
         {
             if (grainType is null) throw new ArgumentNullException(nameof(grainType));
-            var attr = grainType.GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
-            IGrainStorage storageProvider = attr != null
+            var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
+            var attr = attrs.Length > 0 ? (StorageProviderAttribute)attrs[0] : null;
+            var storageProvider = attr != null
                 ? services.GetServiceByName<IGrainStorage>(attr.ProviderName)
                 : services.GetService<IGrainStorage>();
             if (storageProvider == null)
@@ -35,13 +36,14 @@ namespace Orleans.Storage
             return storageProvider;
         }
 
-        private static void ThrowMissingProviderException(Type grainType, string name)
+        [DoesNotReturn]
+        private static void ThrowMissingProviderException(Type grainType, string? name)
         {
             var grainTypeName = grainType.FullName;
             var errMsg = string.IsNullOrEmpty(name)
                 ? $"No default storage provider found loading grain type {grainTypeName}."
                 : $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";
-            throw new BadGrainStorageConfigException(errMsg);
+            throw new BadProviderConfigException(errMsg);
         }
     }
 }
