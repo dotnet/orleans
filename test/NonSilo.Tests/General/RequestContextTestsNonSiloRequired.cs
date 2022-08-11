@@ -47,7 +47,7 @@ namespace UnitTests.General
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
-            string id = "key" + ThreadSafeRandom.Next();
+            string id = "key" + Random.Shared.Next();
 
             Message msg = new Message();
             Task[] promises = new Task[NumLoops];
@@ -189,7 +189,7 @@ namespace UnitTests.General
         {
             const int NumLoops = 1000;
 
-            string name1 = "Name" + ThreadSafeRandom.Next();
+            string name1 = "Name" + Random.Shared.Next();
             string data1 = "Main";
 
             RequestContext.Set(name1, data1);

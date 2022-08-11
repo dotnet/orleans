@@ -92,7 +92,7 @@ namespace UnitTests.General
 
             static async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -125,7 +125,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -159,7 +159,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(ThreadSafeRandom.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 

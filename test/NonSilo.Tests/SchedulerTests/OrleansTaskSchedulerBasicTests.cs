@@ -293,7 +293,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_RequestContext_StartNew_ContinueWith()
         {
             const string key = "A";
-            int val = ThreadSafeRandom.Next();
+            int val = Random.Shared.Next();
             RequestContext.Set(key, val);
 
             this.output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1}",

@@ -217,7 +217,7 @@ namespace UnitTests.General
             var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             for (int i = 0; i < iteration; i++)
             {
-                double next = ThreadSafeRandom.NextDouble();
+                double next = Random.Shared.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
                 SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
@@ -245,7 +245,7 @@ namespace UnitTests.General
             // some random keys
             for (int i = 0; i < 3; i++)
             {
-                VerifyKey((uint)ThreadSafeRandom.Next(), silos);
+                VerifyKey((uint)Random.Shared.Next(), silos);
             }
             // lowest key
             uint lowest = (uint)(silos.First().GetConsistentHashCode() - 1);
@@ -341,10 +341,10 @@ namespace UnitTests.General
                 default:
                     while (count++ < numOfFailures)
                     {
-                        SiloHandle r = ids.Values[ThreadSafeRandom.Next(ids.Count)];
+                        SiloHandle r = ids.Values[Random.Shared.Next(ids.Count)];
                         while (failures.Contains(r))
                         {
-                            r = ids.Values[ThreadSafeRandom.Next(ids.Count)];
+                            r = ids.Values[Random.Shared.Next(ids.Count)];
                         }
                         failures.Add(r);
                     }

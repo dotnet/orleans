@@ -13,12 +13,7 @@ namespace Tester
 {
     public class TestUtils
     {
-        public static Random Random => Random.Shared;
-
-        public static long GetRandomGrainId()
-        {
-            return Random.Next();
-        }
+        public static long GetRandomGrainId() => Random.Shared.Next();
 
         public static void CheckForAzureStorage()
         {

@@ -108,7 +108,7 @@ namespace UnitTests.Management
             string grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(ThreadSafeRandom.Next());
+            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);

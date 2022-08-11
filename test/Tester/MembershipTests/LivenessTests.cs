@@ -146,7 +146,7 @@ namespace UnitTests.MembershipTests
             // new random grains
             for (int i = 0; i < numGrains; i++)
             {
-                await SendTraffic(ThreadSafeRandom.Next(10000));
+                await SendTraffic(Random.Shared.Next(10000));
             }
         }
 
