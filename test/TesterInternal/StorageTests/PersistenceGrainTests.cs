@@ -1116,7 +1116,7 @@ namespace UnitTests.StorageTests
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < loops; i++)
             {
-                int idx = ThreadSafeRandom.Next(num);
+                int idx = Random.Shared.Next(num);
                 tasks.Add(Task.Run(() => { var copy = this.HostedCluster.DeepCopy(states[idx]); }));
                 tasks.Add(Task.Run(() => { var other = this.HostedCluster.RoundTripSerializationForTesting(states[idx]); }));
             }

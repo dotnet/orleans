@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using System.Linq;
 using TestGrainInterfaces;
@@ -48,7 +49,7 @@ namespace Tester.EventSourcingTests
         }
 
         private static string[] keys = { "a", "b", "c", "d", "e", "f", "g", "h" };
-        private string RandomKey() { return keys[ThreadSafeRandom.Next(keys.Length)]; }
+        private string RandomKey() { return keys[Random.Shared.Next(keys.Length)]; }
 
 
         private async Task ConcurrentIncrementsRunner(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)

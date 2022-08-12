@@ -194,9 +194,9 @@ namespace Tester.AzureUtils.Streaming
             {
                 if (i % 2 == 0)
                 {
-                    return ThreadSafeRandom.Next(int.MaxValue) as object;
+                    return Random.Shared.Next(int.MaxValue) as object;
                 }
-                return ThreadSafeRandom.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
+                return Random.Shared.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
             }).ToList();
         }
 

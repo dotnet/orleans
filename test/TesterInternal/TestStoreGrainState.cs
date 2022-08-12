@@ -23,10 +23,10 @@ namespace UnitTests.Persistence
                 State = new TestStoreGrainState
                 {
                     A = aPropertyLength == null
-                        ? ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture)
+                        ? Random.Shared.Next().ToString(CultureInfo.InvariantCulture)
                         : GenerateRandomDigitString(aPropertyLength.Value),
-                    B = ThreadSafeRandom.Next(),
-                    C = ThreadSafeRandom.Next()
+                    B = Random.Shared.Next(),
+                    C = Random.Shared.Next()
                 }
             };
         }
@@ -36,7 +36,7 @@ namespace UnitTests.Persistence
             var characters = new char[stringLength];
             for (var i = 0; i < stringLength; ++i)
             {
-                characters[i] = (char)ThreadSafeRandom.Next('0', '9' + 1);
+                characters[i] = (char)Random.Shared.Next('0', '9' + 1);
             }
             return new string(characters);
         }

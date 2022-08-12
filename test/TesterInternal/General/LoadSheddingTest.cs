@@ -49,7 +49,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingBasic()
         {
-            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(ThreadSafeRandom.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             var latchPeriod = TimeSpan.FromSeconds(1);
             await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
@@ -63,7 +63,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingComplex()
         {
-            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(ThreadSafeRandom.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             this.fixture.Logger.LogInformation("Acquired grain reference");
 

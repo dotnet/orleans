@@ -90,7 +90,7 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_LongKey_AWSStore_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
+            long id = Random.Shared.Next();
             IAWSStorageTestGrain_LongKey grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongKey>(id);
 
             int val = await grain.GetValue();
@@ -112,8 +112,8 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_LongKeyExtended_AWSStore_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
-            string extKey = ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture);
+            long id = Random.Shared.Next();
+            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
             IAWSStorageTestGrain_LongExtendedKey
                 grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongExtendedKey>(id, extKey, null);
@@ -143,7 +143,7 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_GuidKeyExtended_AWSStore_Read_Write()
         {
             var id = Guid.NewGuid();
-            string extKey = ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture);
+            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
             IAWSStorageTestGrain_GuidExtendedKey
                 grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_GuidExtendedKey>(id, extKey, null);
@@ -172,7 +172,7 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_Generic_AWSStore_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
+            long id = Random.Shared.Next();
 
             IAWSStorageGenericGrain<int> grain = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id);
 
@@ -195,7 +195,7 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_Generic_AWSStore_DiffTypes()
         {
-            long id1 = ThreadSafeRandom.Next();
+            long id1 = Random.Shared.Next();
             long id2 = id1;
             long id3 = id1;
 

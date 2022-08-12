@@ -25,7 +25,7 @@ namespace UnitTests.General
         // 1) Allowed reentrancy A, A
         public async Task CallChainReentrancy_1()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;
@@ -42,7 +42,7 @@ namespace UnitTests.General
         // 2) Allowed reentrancy on non-reentrant grains A, B, A
         public async Task CallChainReentrancy_2()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;
@@ -60,7 +60,7 @@ namespace UnitTests.General
         // 3) Allowed reentrancy X, A, X, A
         public async Task CallChainReentrancy_3()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;
@@ -79,7 +79,7 @@ namespace UnitTests.General
         // 4) No Deadlock X, X
         public async Task CallChainReentrancy_4()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;
@@ -97,7 +97,7 @@ namespace UnitTests.General
         // 5) No Deadlock X, A, X
         public async Task CallChainReentrancy_5()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;
@@ -116,7 +116,7 @@ namespace UnitTests.General
         // 6) Allowed reentrancy on non-reentrant grains only when using full chain reentrancy A, B, C, A
         public async Task CallChainReentrancy_6()
         {
-            long baseGrainId = ThreadSafeRandom.Next();
+            long baseGrainId = Random.Shared.Next();
             for (var i = 0; i < NumIterations; i++)
             {
                 var grainId = baseGrainId + i;

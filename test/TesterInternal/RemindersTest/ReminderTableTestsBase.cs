@@ -134,8 +134,12 @@ namespace UnitTests.RemindersTest
             var remindersHashes = rows.Reminders.Select(r => r.GrainRef.GetUniformHashCode()).ToArray();
 
             await Task.WhenAll(Enumerable.Range(0, iterations).Select(i =>
-                TestRemindersHashInterval(remindersTable, (uint)ThreadSafeRandom.Next(int.MinValue, int.MaxValue), (uint)ThreadSafeRandom.Next(int.MinValue, int.MaxValue),
-                    remindersHashes)));
+            {
+                return TestRemindersHashInterval(remindersTable,
+                    (uint)Random.Shared.Next(int.MinValue, int.MaxValue),
+                    (uint)Random.Shared.Next(int.MinValue, int.MaxValue),
+                    remindersHashes);
+            }));
         }
 
         private async Task TestRemindersHashInterval(IReminderTable reminderTable, uint beginHash, uint endHash,

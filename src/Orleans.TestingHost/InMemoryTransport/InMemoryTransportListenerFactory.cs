@@ -178,7 +178,7 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
         _hub = hub;
         _loggerFactory = loggerFactory;
         _memoryPool = memoryPool;
-        _localEndpoint = new IPEndPoint(IPAddress.Loopback, ThreadSafeRandom.Next(1024, ushort.MaxValue - 1024));
+        _localEndpoint = new IPEndPoint(IPAddress.Loopback, Random.Shared.Next(1024, ushort.MaxValue - 1024));
     }
 
     public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken = default)

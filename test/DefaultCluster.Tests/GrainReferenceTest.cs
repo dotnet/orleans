@@ -46,8 +46,8 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
-            ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(ThreadSafeRandom.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
-            ISimpleGrain ref2 = this.GrainFactory.GetGrain<ISimpleGrain>(ThreadSafeRandom.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain ref2 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
             Assert.True(ref1 != ref2);
             Assert.True(ref2 != ref1);
             Assert.False(ref1 == ref2);
@@ -103,7 +103,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization()
         {
-            int id = ThreadSafeRandom.Next();
+            int id = Random.Shared.Next();
             TestGrainReferenceSerialization(id, true);
         }
 
@@ -139,7 +139,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
-            int id = ThreadSafeRandom.Next();
+            int id = Random.Shared.Next();
             TestGrainReferenceSerialization(id, false);
         }
 
@@ -162,7 +162,7 @@ namespace DefaultCluster.Tests.General
         private void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize)
         {
             // Make sure grain references serialize well through .NET serializer.
-            var grain = this.GrainFactory.GetGrain<ISimpleGrain>(ThreadSafeRandom.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            var grain = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
 
             if (resolveBeforeSerialize)
             {

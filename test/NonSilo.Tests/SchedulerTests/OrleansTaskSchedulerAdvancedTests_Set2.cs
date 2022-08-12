@@ -327,7 +327,7 @@ namespace UnitTests.SchedulerTests
                     int num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
-                        num1 = ThreadSafeRandom.Next();
+                        num1 = Random.Shared.Next();
                     }
                     this.output.WriteLine("Task-1 Done");
                     return num1;
@@ -339,7 +339,7 @@ namespace UnitTests.SchedulerTests
                     int num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
-                        num2 = ThreadSafeRandom.Next();
+                        num2 = Random.Shared.Next();
                     }
                     this.output.WriteLine("Task-2 Done");
                     return num2;
@@ -553,7 +553,7 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < NumChains; i++)
             {
                 int chainNum = i; // Capture
-                int sleepTime = ThreadSafeRandom.Next(100);
+                int sleepTime = Random.Shared.Next(100);
                 resultHandles[i] = new TaskCompletionSource<bool>();
                 taskChains[i] = new Task(() =>
                 {

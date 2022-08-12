@@ -63,7 +63,7 @@ namespace DefaultCluster.Tests.StorageTests
         [Fact, TestCategory("BVT")]
         public async Task MemoryStorageGrainEnforcesEtagsTest()
         {
-            var memoryStorageGrain = this.GrainFactory.GetGrain<IMemoryStorageGrain>(ThreadSafeRandom.Next());
+            var memoryStorageGrain = this.GrainFactory.GetGrain<IMemoryStorageGrain>(Random.Shared.Next());
 
             // Delete grain state from empty grain, should be safe.
             await memoryStorageGrain.DeleteStateAsync<object>("grainStoreKey", "eTag");
@@ -120,8 +120,8 @@ namespace DefaultCluster.Tests.StorageTests
             {
                 return new TestGrainState
                 {
-                    State = ThreadSafeRandom.Next(),
-                    ETag = ThreadSafeRandom.Next().ToString()
+                    State = Random.Shared.Next(),
+                    ETag = Random.Shared.Next().ToString()
                 };
             }
 
@@ -129,7 +129,7 @@ namespace DefaultCluster.Tests.StorageTests
             {
                 return new TestGrainState
                 {
-                    State = ThreadSafeRandom.Next(),
+                    State = Random.Shared.Next(),
                     ETag = eTag
                 };
             }

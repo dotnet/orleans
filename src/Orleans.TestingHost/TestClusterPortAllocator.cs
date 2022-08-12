@@ -83,7 +83,7 @@ namespace Orleans.TestingHost
 
             for (int attempts = 0; attempts < MaxAttempts; attempts++)
             {
-                int basePort = ThreadSafeRandom.Next(portStartRange, portEndRange);
+                int basePort = Random.Shared.Next(portStartRange, portEndRange);
 
                 // get ports in buckets, so we don't interfere with parallel runs of this same function
                 basePort = basePort - (basePort % consecutivePortsToCheck);

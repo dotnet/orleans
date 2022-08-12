@@ -20,11 +20,11 @@ namespace Orleans.Transactions.TestKit
 
         public void BeforeStore()
         {
-            if (ThreadSafeRandom.NextDouble() < conflictProbability)
+            if (Random.Shared.NextDouble() < conflictProbability)
             {
                 throw new RandomlyInjectedInconsistentStateException();
             }
-            if (ThreadSafeRandom.NextDouble() < beforeProbability)
+            if (Random.Shared.NextDouble() < beforeProbability)
             {
                 throw new RandomlyInjectedStorageException();
             }
@@ -32,7 +32,7 @@ namespace Orleans.Transactions.TestKit
 
         public void AfterStore()
         {
-            if (ThreadSafeRandom.NextDouble() < afterProbability)
+            if (Random.Shared.NextDouble() < afterProbability)
             {
                 throw new RandomlyInjectedStorageException();
             }

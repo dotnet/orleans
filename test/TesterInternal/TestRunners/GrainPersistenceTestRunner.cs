@@ -88,7 +88,7 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_LongKey_GrainStorage_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
+            long id = Random.Shared.Next();
             IGrainStorageTestGrain_LongKey grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongKey>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
@@ -111,8 +111,8 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_LongKeyExtended_GrainStorage_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
-            string extKey = ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture);
+            long id = Random.Shared.Next();
+            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
             IGrainStorageTestGrain_LongExtendedKey
                 grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongExtendedKey>(id, extKey, this.grainNamespace);
@@ -143,7 +143,7 @@ namespace TestExtensions.Runners
         public async Task Grain_GuidKeyExtended_GrainStorage_Read_Write()
         {
             var id = Guid.NewGuid();
-            string extKey = ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture);
+            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
             IGrainStorageTestGrain_GuidExtendedKey
                 grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_GuidExtendedKey>(id, extKey, this.grainNamespace);
@@ -173,7 +173,7 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_Generic_GrainStorage_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
+            long id = Random.Shared.Next();
 
             IGrainStorageGenericGrain<int> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<int>>(id, this.grainNamespace);
 
@@ -197,7 +197,7 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_NestedGeneric_GrainStorage_Read_Write()
         {
-            long id = ThreadSafeRandom.Next();
+            long id = Random.Shared.Next();
 
             IGrainStorageGenericGrain<List<int>> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<List<int>>>(id, this.grainNamespace);
 
@@ -221,7 +221,7 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_Generic_GrainStorage_DiffTypes()
         {
-            long id1 = ThreadSafeRandom.Next();
+            long id1 = Random.Shared.Next();
             long id2 = id1;
             long id3 = id1;
 

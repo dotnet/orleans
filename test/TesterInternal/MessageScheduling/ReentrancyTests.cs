@@ -245,7 +245,7 @@ namespace UnitTests
         private async Task Do_FanOut_Task_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = ThreadSafeRandom.Next();
+            int id = Random.Shared.Next();
             if (doNonReentrant)
             {
                 IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
@@ -275,7 +275,7 @@ namespace UnitTests
         private async Task Do_FanOut_AC_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = ThreadSafeRandom.Next();
+            int id = Random.Shared.Next();
             if (doNonReentrant)
             {
                 IFanOutACGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);

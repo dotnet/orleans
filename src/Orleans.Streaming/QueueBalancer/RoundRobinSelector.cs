@@ -16,8 +16,8 @@ namespace Orleans.Streams
         public RoundRobinSelector(IEnumerable<T> resources)
         {
             // distinct randomly ordered readonly collection
-            this.resources = resources.Distinct().OrderBy(_ => ThreadSafeRandom.Next()).ToList();
-            this.lastSelection = ThreadSafeRandom.Next(this.resources.Count);
+            this.resources = resources.Distinct().OrderBy(_ => Random.Shared.Next()).ToList();
+            this.lastSelection = Random.Shared.Next(this.resources.Count);
         }
 
         public int Count => this.resources.Count;

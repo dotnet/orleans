@@ -15,7 +15,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture environment;
-        private static readonly Random random = new Random();
+        private static Random random => Random.Shared;
 
         class A { }
         class B : A { }
