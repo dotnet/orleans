@@ -80,7 +80,7 @@ namespace Orleans.Messaging
             GatewayManager gatewayManager)
         {
             this.connectionManager = connectionManager;
-            MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
+            MyAddress = SiloAddress.New(localAddress, 0, gen);
             ClientId = clientId;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;

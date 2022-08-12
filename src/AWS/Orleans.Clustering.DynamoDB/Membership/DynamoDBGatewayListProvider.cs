@@ -79,9 +79,8 @@ namespace Orleans.Clustering.DynamoDB
                 expression, gateway =>
                 {
                     return SiloAddress.New(
-                        new IPEndPoint(
                             IPAddress.Parse(gateway[SiloInstanceRecord.ADDRESS_PROPERTY_NAME].S),
-                            int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N)),
+                            int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N),
                             int.Parse(gateway[SiloInstanceRecord.GENERATION_PROPERTY_NAME].N)).ToGatewayUri();
                 });
 

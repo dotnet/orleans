@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             this.DnsHostName = Dns.GetHostName();
 
             var endpointOptions = siloEndpointOptions.Value;
-            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(endpointOptions.GetPublicSiloEndpoint(), SiloAddress.AllocateNewGeneration()));
+            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(endpointOptions.AdvertisedIPAddress, endpointOptions.SiloPort, SiloAddress.AllocateNewGeneration()));
             this.gatewayAddressLazy = new Lazy<SiloAddress>(() =>
             {
                 var publicProxyEndpoint = endpointOptions.GetPublicProxyEndpoint();

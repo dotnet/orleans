@@ -139,7 +139,7 @@ namespace Orleans.Runtime
         /// <param name="uri">The input Uri</param>
         public static SiloAddress? ToGatewayAddress(this Uri uri) => uri.Scheme switch
         {
-            "gwy.tcp" => SiloAddress.New(uri.ToIPEndPoint()!, 0),
+            "gwy.tcp" => SiloAddress.New(System.Net.IPAddress.Parse(uri.Host), uri.Port, 0),
             _ => null,
         };
 

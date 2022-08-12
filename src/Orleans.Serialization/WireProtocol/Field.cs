@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Orleans.Serialization.WireProtocol
 {
@@ -221,38 +220,42 @@ namespace Orleans.Serialization.WireProtocol
         public bool IsEndBaseOrEndObject
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Tag.HasExtendedWireType &&
-                   (Tag.ExtendedWireType == ExtendedWireType.EndTagDelimited ||
-                    Tag.ExtendedWireType == ExtendedWireType.EndBaseFields);
+            get => Tag.HasExtendedWireType && Tag.ExtendedWireType <= ExtendedWireType.EndBaseFields;
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            var builder = new StringBuilder();
-            _ = builder.Append('[').Append((string)WireType.ToString());
+            var builder = new DefaultInterpolatedStringHandler(0, 0);
+            builder.AppendLiteral("[");
+            builder.AppendFormatted(WireType);
+
             if (HasFieldId)
             {
-                _ = builder.Append($", IdDelta:{FieldIdDelta}");
+                builder.AppendLiteral(", IdDelta:");
+                builder.AppendFormatted(FieldIdDelta);
             }
 
             if (IsSchemaTypeValid)
             {
-                _ = builder.Append($", SchemaType:{SchemaType}");
+                builder.AppendLiteral(", SchemaType:");
+                builder.AppendFormatted(SchemaType);
             }
 
             if (HasExtendedSchemaType)
             {
-                _ = builder.Append($", RuntimeType:{FieldType}");
+                builder.AppendLiteral(", RuntimeType:");
+                builder.AppendFormatted(FieldType);
             }
 
             if (WireType == WireType.Extended)
             {
-                _ = builder.Append($": {ExtendedWireType}");
+                builder.AppendLiteral(": ");
+                builder.AppendFormatted(ExtendedWireType);
             }
 
-            _ = builder.Append(']');
-            return builder.ToString();
+            builder.AppendLiteral("]");
+            return builder.ToStringAndClear();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]

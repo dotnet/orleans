@@ -106,7 +106,7 @@ namespace Orleans.AzureUtils
             if (!string.IsNullOrEmpty(gateway.Generation))
                 int.TryParse(gateway.Generation, out gen);
 
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
+            SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address), proxyPort, gen);
             return address.ToGatewayUri();
         }
 
