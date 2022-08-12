@@ -27,7 +27,7 @@ namespace Orleans.Streams
         /// <param name="hash">The hash.</param>
         private QueueId(string queuePrefix, uint id, uint hash)
         {
-            queueNamePrefix = queuePrefix;
+            queueNamePrefix = queuePrefix ?? throw new ArgumentNullException(nameof(queuePrefix));
             queueId = id;
             uniformHashCache = hash;
         }
