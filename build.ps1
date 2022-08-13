@@ -21,11 +21,11 @@ if ($null -eq $env:BuildConfiguration)
 # misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
 $Platform = $null
 
-# Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
- $DOTNET_MULTILEVEL_LOOKUP = 0 
+# Disable multilevel lookup https://github.com/dotnet/core-setup/blob/main/Documentation/design-docs/multilevel-sharedfx-lookup.md
+ $DOTNET_MULTILEVEL_LOOKUP = 0
 
  # Set DateTime suffix for debug builds
- if ($BuildConfiguration -eq "Debug")
+ if ($env:BuildConfiguration -eq "Debug")
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
     $AdditionalConfigurationProperties=";VersionDateSuffix=$dateSuffix"
@@ -38,11 +38,11 @@ Install-Dotnet
 if ($args[0] -ne "Pack")
 {
     Write-Output "Build $env:BuildConfiguration =============================="
-    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
-    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
+    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
 }
 
 Write-Output "Package $env:BuildConfiguration ============================"
-Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} $solution"
+Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
 
 Write-Output "===== Build succeeded for $solution ====="

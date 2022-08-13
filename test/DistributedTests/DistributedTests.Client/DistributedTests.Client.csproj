@@ -23,6 +23,7 @@
     <PackageReference Include="Microsoft.Crank.EventSources" Version="$(CrankVersion)" />
     <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="$(SystemSecurityCryptographyCngVersion)" />
   </ItemGroup>
 
 </Project>
