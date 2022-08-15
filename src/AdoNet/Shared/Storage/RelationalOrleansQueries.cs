@@ -45,19 +45,15 @@ namespace Orleans.Tests.SqlUtils
     /// </summary>
     private readonly DbStoredQueries dbStoredQueries;
 
-        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
-
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="storage">the underlying relational storage</param>
         /// <param name="dbStoredQueries">Orleans functional queries</param>
-        /// <param name="grainReferenceConverter"></param>
-        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries, GrainReferenceKeyStringConverter grainReferenceConverter)
+        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries)
         {
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
-            this.grainReferenceConverter = grainReferenceConverter;
         }
 
         /// <summary>
@@ -66,14 +62,13 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        /// <param name="grainReferenceConverter"></param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString, GrainReferenceKeyStringConverter grainReferenceConverter)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString)
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 
             var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
 
-            return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)), grainReferenceConverter);
+            return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
         }
 
         private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider)
@@ -96,12 +91,12 @@ namespace Orleans.Tests.SqlUtils
         /// Reads Orleans reminder data from the tables.
         /// </summary>
         /// <param name="serviceId">The service ID.</param>
-        /// <param name="grainRef">The grain reference (ID).</param>
+        /// <param name="grainId">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainReference grainRef)
+        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
-                new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainRef.ToKeyString() },
+            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
+                new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
                 ret => new ReminderTableData(ret.ToList()));
         }
 
@@ -117,7 +112,7 @@ namespace Orleans.Tests.SqlUtils
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
+            return ReadAsync(query, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -129,7 +124,7 @@ namespace Orleans.Tests.SqlUtils
                 record.GetValue<string>("QueryText"));
         }
 
-        internal static ReminderEntry GetReminderEntry(IDataRecord record, GrainReferenceKeyStringConverter grainReferenceConverter)
+        internal static ReminderEntry GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
             string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
@@ -137,7 +132,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 return new ReminderEntry
                 {
-                    GrainRef = grainReferenceConverter.FromKeyString(grainId),
+                    GrainId = GrainId.Parse(grainId),
                     ReminderName = record.GetValue<string>(nameof(DbStoredQueries.Columns.ReminderName)),
                     StartAt = record.GetDateTimeValue(nameof(DbStoredQueries.Columns.StartTime)),
 
@@ -153,17 +148,17 @@ namespace Orleans.Tests.SqlUtils
         /// Reads one row of reminder data.
         /// </summary>
         /// <param name="serviceId">Service ID.</param>
-        /// <param name="grainRef">The grain reference (ID).</param>
+        /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainReference grainRef,
+        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowKey, record => GetReminderEntry(record, this.grainReferenceConverter), command =>
+            return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
-                    GrainId = grainRef.ToKeyString(),
+                    GrainId = grainId.ToString(),
                     ReminderName = reminderName
                 }, ret => ret.FirstOrDefault());
         }
@@ -172,20 +167,20 @@ namespace Orleans.Tests.SqlUtils
         /// Either inserts or updates a reminder row.
         /// </summary>
         /// <param name="serviceId">The service ID.</param>
-        /// <param name="grainRef">The grain reference (ID).</param>
+        /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainReference grainRef,
+        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName, DateTime startTime, TimeSpan period)
         {
             return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
-                    GrainHash = grainRef.GetUniformHashCode(),
-                    GrainId = grainRef.ToKeyString(),
+                    GrainHash = grainId.GetUniformHashCode(),
+                    GrainId = grainId.ToString(),
                     ReminderName = reminderName,
                     StartTime = startTime,
                     Period = period
@@ -196,18 +191,18 @@ namespace Orleans.Tests.SqlUtils
         /// Deletes a reminder
         /// </summary>
         /// <param name="serviceId">Service ID.</param>
-        /// <param name="grainRef"></param>
+        /// <param name="grainId"></param>
         /// <param name="reminderName"></param>
         /// <param name="etag"></param>
         /// <returns></returns>
-        internal Task<bool> DeleteReminderRowAsync(string serviceId, GrainReference grainRef, string reminderName,
+        internal Task<bool> DeleteReminderRowAsync(string serviceId, GrainId grainId, string reminderName,
             string etag)
         {
             return ReadAsync(dbStoredQueries.DeleteReminderRowKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
-                    GrainId = grainRef.ToKeyString(),
+                    GrainId = grainId.ToString(),
                     ReminderName = reminderName,
                     Version = etag
                 }, ret => ret.First());

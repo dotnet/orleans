@@ -32,7 +32,6 @@ namespace AWSUtils.Tests.RemindersTest
             options.ParseConnectionString(this.connectionStringFixture.ConnectionString);
 
             return new DynamoDBReminderTable(
-                this.ClusterFixture.Services.GetRequiredService<GrainReferenceKeyStringConverter>(),
                 this.loggerFactory,
                 this.clusterOptions,
                 Options.Create(options));

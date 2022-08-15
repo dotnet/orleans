@@ -22,12 +22,12 @@ namespace Orleans
         /// <summary>
         /// Reads the reminder table entries associated with the specified grain.
         /// </summary>
-        /// <param name="key">The grain.</param>
+        /// <param name="grainId">The grain ID.</param>
         /// <returns>The reminder table entries associated with the specified grain.</returns>
-        Task<ReminderTableData> ReadRows(GrainReference key);
+        Task<ReminderTableData> ReadRows(GrainId grainId);
 
         /// <summary>
-        /// Return all rows that have their GrainReference's.GetUniformHashCode() in the range (start, end]
+        /// Return all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (start, end]
         /// </summary>
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
@@ -37,10 +37,10 @@ namespace Orleans
         /// <summary>
         /// Reads a specifie entry.
         /// </summary>
-        /// <param name="grainRef">The grain reference.</param>
+        /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
         /// <returns>The reminder table entry.</returns>
-        Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName);
+        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
 
         /// <summary>
         /// Upserts the specified entry.
@@ -52,11 +52,11 @@ namespace Orleans
         /// <summary>
         /// Removes a row from the table.
         /// </summary>
-        /// <param name="grainRef">The grain reference.</param>
+        /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">The reminder name.</param>
         /// /// <param name="eTag">The ETag.</param>
-        /// <returns>true if a row with <paramref name="grainRef"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
-        Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag);
+        /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
         /// <summary>
         /// Clears the table.
@@ -71,15 +71,15 @@ namespace Orleans
     [Unordered]
     internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
-        Task<ReminderTableData> ReadRows(GrainReference key);
+        Task<ReminderTableData> ReadRows(GrainId grainId);
 
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
-        Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName);
+        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
 
         Task<string> UpsertRow(ReminderEntry entry);
 
-        Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag);
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
         Task TestOnlyClearTable();
     }
@@ -106,7 +106,7 @@ namespace Orleans
         /// <param name="entry">The entry.</param>
         public ReminderTableData(ReminderEntry entry)
         {
-            Reminders = new List<ReminderEntry> {entry};
+            Reminders = new[] { entry };
         }
 
         /// <summary>
@@ -114,7 +114,7 @@ namespace Orleans
         /// </summary>
         public ReminderTableData()
         {
-            Reminders = new List<ReminderEntry>();
+            Reminders = Array.Empty<ReminderEntry>();
         }
 
         /// <summary>
@@ -139,15 +139,15 @@ namespace Orleans
     public sealed class ReminderEntry
     {
         /// <summary>
-        /// Gets or sets the grain reference of the grain that created the reminder. Forms the reminder
+        /// Gets or sets the grain ID of the grain that created the reminder. Forms the reminder
         /// primary key together with <see cref="ReminderName"/>.
         /// </summary>
         [Id(1)]
-        public GrainReference GrainRef { get; set; }
+        public GrainId GrainId { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the reminder. Forms the reminder primary key together with 
-        /// <see cref="GrainRef"/>.
+        /// <see cref="GrainId"/>.
         /// </summary>
         [Id(2)]
         public string ReminderName { get; set; }
@@ -172,16 +172,13 @@ namespace Orleans
         public string ETag { get; set; }
 
         /// <inheritdoc/>
-        public override string ToString() => $"<GrainRef={GrainRef} ReminderName={ReminderName} Period={Period}>";
+        public override string ToString() => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period}>";
 
         /// <summary>
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
         /// </summary>
         /// <returns>The <see cref="IGrainReminder"/>.</returns>
-        internal IGrainReminder ToIGrainReminder()
-        {
-            return new ReminderData(GrainRef, ReminderName, ETag);
-        }
+        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag);
     }
 
     [Serializable]
@@ -189,19 +186,19 @@ namespace Orleans
     internal sealed class ReminderData : IGrainReminder
     {
         [Id(1)]
-        public GrainReference GrainRef { get; private set; }
+        public GrainId GrainId { get; private set; }
         [Id(2)]
         public string ReminderName { get; private set; }
         [Id(3)]
         public string ETag { get; private set; }
 
-        internal ReminderData(GrainReference grainRef, string reminderName, string eTag)
+        internal ReminderData(GrainId grainId, string reminderName, string eTag)
         {
-            GrainRef = grainRef;
+            GrainId = grainId;
             ReminderName = reminderName;
             ETag = eTag;
         }
 
-        public override string ToString() => $"<IOrleansReminder: GrainRef={GrainRef} ReminderName={ReminderName} ETag={ETag}>";
+        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag}>";
     }
 }

@@ -284,11 +284,11 @@ namespace UnitTests.General
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
             var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(InMemoryReminderTable.ReminderTableGrainId);
+            var tableGrainId = ((GrainReference)tableGrain).GrainId;
 
             // Ping the grain to make sure it is active.
-            await tableGrain.ReadRows((GrainReference)tableGrain);
+            await tableGrain.ReadRows(tableGrainId);
 
-            var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
             var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;

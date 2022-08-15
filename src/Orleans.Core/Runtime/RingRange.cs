@@ -20,13 +20,11 @@ namespace Orleans.Runtime
         bool InRange(uint value);
 
         /// <summary>
-        /// Returns a value indicating whether <paramref name="grainReference"/> is within this ring range.
+        /// Returns a value indicating whether <paramref name="grainId"/> is within this ring range.
         /// </summary>
-        /// <param name="grainReference">
-        /// The value to check.
-        /// </param>
+        /// <param name="grainId">The value to check.</param>
         /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
-        bool InRange(GrainReference grainReference);
+        public sealed bool InRange(GrainId grainId) => InRange(grainId.GetUniformHashCode());
     }
 
     // This is the internal interface to be used only by the different range implementations.
@@ -75,11 +73,6 @@ namespace Orleans.Runtime
         {
             this.begin = begin;
             this.end = end;
-        }
-
-        public bool InRange(GrainReference grainReference)
-        {
-            return InRange(grainReference.GetUniformHashCode());
         }
 
         /// <summary>
@@ -301,11 +294,6 @@ namespace Orleans.Runtime
                 if (s.InRange(n)) return true;
             }
             return false;
-        }
-
-        public bool InRange(GrainReference grainReference)
-        {
-            return InRange(grainReference.GetUniformHashCode());
         }
 
         public double RangePercentage() => rangeSize * (100.0 / RangeFactory.RING_SIZE);
