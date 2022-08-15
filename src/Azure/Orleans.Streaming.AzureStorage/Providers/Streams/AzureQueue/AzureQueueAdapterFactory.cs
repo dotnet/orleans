@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -18,10 +17,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         private readonly string providerName;
         private readonly AzureQueueOptions options;
         private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
-        private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
-        private IAzureStreamQueueMapper streamQueueMapper;
-        private IQueueAdapterCache adapterCache;
+        private readonly HashRingBasedPartitionedStreamQueueMapper streamQueueMapper;
+        private readonly SimpleQueueAdapterCache adapterCache;
 
         /// <summary>
         /// Application level failure handler override.
@@ -33,15 +31,13 @@ namespace Orleans.Providers.Streams.AzureQueue
             AzureQueueOptions options,
             SimpleQueueCacheOptions cacheOptions,
             IQueueDataAdapter<string, IBatchContainer> dataAdapter,
-            IOptions<ClusterOptions> clusterOptions,
             ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter)); ;
-            this.clusterOptions = clusterOptions.Value;
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.streamQueueMapper = new AzureStreamQueueMapper(options.QueueNames, providerName);
+            this.streamQueueMapper = new(options.QueueNames, providerName);
             this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
         }
 
@@ -60,7 +56,6 @@ namespace Orleans.Providers.Streams.AzureQueue
                 this.streamQueueMapper,
                 this.loggerFactory,
                 this.options,
-                this.clusterOptions.ServiceId,
                 this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
