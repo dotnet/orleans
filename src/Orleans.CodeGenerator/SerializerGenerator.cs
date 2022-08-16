@@ -2,12 +2,12 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
@@ -1241,6 +1241,11 @@ namespace Orleans.CodeGenerator
             private string SetterFieldName => "setField" + _ordinal;
 
             /// <summary>
+            /// Gets a value indicating if the member is a property.
+            /// </summary>
+            private bool IsProperty => Member.Symbol is IPropertySymbol;
+
+            /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field. 
             /// </summary>
             private bool IsGettableField => Field is { } field && _model.IsAccessible(0, field) && !IsObsolete;
@@ -1266,7 +1271,6 @@ namespace Orleans.CodeGenerator
             public TypeSyntax TypeSyntax => Member.Type.TypeKind == TypeKind.Dynamic
                 ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
                 : _member.GetTypeSyntax(Member.Type);
-
 
             /// <summary>
             /// Gets the <see cref="Property"/> which this field is the backing property for, or
@@ -1336,6 +1340,20 @@ namespace Orleans.CodeGenerator
                         value);
                 }
 
+                // If the symbol itself is a property but is not settable, then error out, since we do not know how to set it value
+                if (IsProperty)
+                {
+                    Location location = default;
+                    if (Member.Symbol is IPropertySymbol prop && prop.SetMethod is { } setMethod)
+                    {
+                        location = setMethod.Locations.FirstOrDefault();
+                    }
+
+                    location ??= Member.Symbol.Locations.FirstOrDefault();
+
+                    throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSetterDiagnostic.CreateDiagnostic(location, Member.Symbol?.ToDisplayString() ?? $"{ContainingType.ToDisplayString()}.{MemberName}"));
+                }
+
                 var instanceArg = Argument(instance);
                 if (ContainingType != null && ContainingType.IsValueType)
                 {
@@ -1367,7 +1385,7 @@ namespace Orleans.CodeGenerator
 
             public SetterFieldDescription GetSetterFieldDescription()
             {
-                if (IsSettableField || IsSettableProperty) return null;
+                if (IsSettableField || IsProperty) return null;
 
                 TypeSyntax fieldType;
                 if (ContainingType != null && ContainingType.IsValueType)
