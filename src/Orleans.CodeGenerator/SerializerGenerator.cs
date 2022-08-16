@@ -326,8 +326,6 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
-
-
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerializing"));
 
             // Order members according to their FieldId, since fields must be serialized in order and FieldIds are serialized as deltas.
@@ -345,10 +343,7 @@ namespace Orleans.CodeGenerator
             if (type.SupportsPrimaryContstructorParameters)
             {
                 body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
-                if (members.Any(m => !m.IsPrimaryConstructorParameter))
-                {
-                    body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
-                }
+                body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
             body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
@@ -499,7 +494,7 @@ namespace Orleans.CodeGenerator
                 body.Add(
                     IfStatement(
                         IdentifierName(headerVar.Identifier).Member("IsEndBaseFields"),
-                        WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter))))));
+                        Block(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter)))))));
             }
             else
             {
