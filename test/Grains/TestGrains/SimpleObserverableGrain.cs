@@ -3,12 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Runtime;
+using Orleans.Utilities;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-
     public class SimpleObserverableGrain : Grain, ISimpleObserverableGrain
     {
         private ILogger logger;
@@ -21,7 +20,7 @@ namespace UnitTests.Grains
         {
             EventDelay = 1000;
             logger = loggerFactory.CreateLogger( $"{nameof(SimpleObserverableGrain)}-{base.IdentityString}-{base.RuntimeIdentity}");
-            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger, "observers");
+            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger);
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

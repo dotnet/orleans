@@ -2,16 +2,28 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans.Runtime;
 using System.Linq;
 
-namespace UnitTests.Grains
+namespace Orleans.Utilities
 {
+    /// <summary>
+    /// Maintains a collection of observers.
+    /// </summary>
+    /// <typeparam name="TObserver">
+    /// The observer type.
+    /// </typeparam>
     public class ObserverManager<TObserver> : ObserverManager<IAddressable, TObserver>
     {
-        public ObserverManager(TimeSpan expiration, ILogger log, string logPrefix) : base(expiration, log, logPrefix)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ObserverManager{TObserver}"/> class. 
+        /// </summary>
+        /// <param name="expiration">
+        /// The expiration.
+        /// </param>
+        /// <param name="log">The log.</param>
+        public ObserverManager(TimeSpan expiration, ILogger log) : base(expiration, log)
         {
         }
     }
@@ -19,43 +31,36 @@ namespace UnitTests.Grains
     /// <summary>
     /// Maintains a collection of observers.
     /// </summary>
-    /// <typeparam name="TAddress">
-    /// The address type.
+    /// <typeparam name="TIdentity">
+    /// The address type, used to identify observers.
     /// </typeparam>
     /// <typeparam name="TObserver">
     /// The observer type.
     /// </typeparam>
-    public class ObserverManager<TAddress, TObserver> : IEnumerable<TObserver>
+    public class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserver>
     {
-        /// <summary>
-        /// The log prefix.
-        /// </summary>
-        private readonly string logPrefix;
-
         /// <summary>
         /// The observers.
         /// </summary>
-        private readonly ConcurrentDictionary<TAddress, ObserverEntry> observers = new ConcurrentDictionary<TAddress, ObserverEntry>();
+        private readonly Dictionary<TIdentity, ObserverEntry> _observers = new();
 
         /// <summary>
         /// The log.
         /// </summary>
-        private readonly ILogger log;
+        private readonly ILogger _log;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ObserverManager{TAddress,TObserver}"/> class. 
+        /// Initializes a new instance of the <see cref="ObserverManager{TIdentity,TObserver}"/> class. 
         /// </summary>
         /// <param name="expiration">
         /// The expiration.
         /// </param>
         /// <param name="log">The log.</param>
-        /// <param name="logPrefix">The prefix to use when logging.</param>
-        public ObserverManager(TimeSpan expiration, ILogger log, string logPrefix)
+        public ObserverManager(TimeSpan expiration, ILogger log)
         {
-            this.ExpirationDuration = expiration;
-            this.log = log;
-            this.logPrefix = logPrefix;
-            this.GetDateTime = () => DateTime.UtcNow;
+            ExpirationDuration = expiration;
+            _log = log;
+            GetDateTime = () => DateTime.UtcNow;
         }
 
         /// <summary>
@@ -71,71 +76,68 @@ namespace UnitTests.Grains
         /// <summary>
         /// Gets the number of observers.
         /// </summary>
-        public int Count => this.observers.Count;
+        public int Count => _observers.Count;
 
         /// <summary>
         /// Gets a copy of the observers.
         /// </summary>
-        public IDictionary<TAddress, TObserver> Observers
+        public IDictionary<TIdentity, TObserver> Observers
         {
             get
             {
-                return this.observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
+                return _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
             }
         }
 
         /// <summary>
         /// Removes all observers.
         /// </summary>
-        public void Clear()
-        {
-            this.observers.Clear();
-        }
+        public void Clear() => _observers.Clear();
 
         /// <summary>
         /// Ensures that the provided <paramref name="observer"/> is subscribed, renewing its subscription.
         /// </summary>
-        /// <param name="address">
-        /// The subscriber's address
+        /// <param name="id">
+        /// The observer's identity.
         /// </param>
         /// <param name="observer">
         /// The observer.
         /// </param>
         /// <exception cref="Exception">A delegate callback throws an exception.</exception>
-        public void Subscribe(TAddress address, TObserver observer)
+        public void Subscribe(TIdentity id, TObserver observer)
         {
             // Add or update the subscription.
-            var now = this.GetDateTime();
+            var now = GetDateTime();
             ObserverEntry entry;
-            if (this.observers.TryGetValue(address, out entry))
+            if (_observers.TryGetValue(id, out entry))
             {
                 entry.LastSeen = now;
                 entry.Observer = observer;
-                if (this.log.IsEnabled(LogLevel.Debug))
+                if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.LogDebug(this.logPrefix + ": Updating entry for {0}/{1}. {2} total subscribers.", address, observer, this.observers.Count);
+                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, _observers.Count);
                 }
             }
             else
             {
-                this.observers[address] = new ObserverEntry { LastSeen = now, Observer = observer };
-                if (this.log.IsEnabled(LogLevel.Debug))
+                _observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
+                if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.LogDebug(this.logPrefix + ": Adding entry for {0}/{1}. {2} total subscribers after add.", address, observer, this.observers.Count);
+                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, _observers.Count);
                 }
             }
         }
 
         /// <summary>
-        /// Ensures that the provided <paramref name="subscriber"/> is unsubscribed.
+        /// Ensures that the provided <paramref name="id"/> is unsubscribed.
         /// </summary>
-        /// <param name="subscriber">
+        /// <param name="id">
         /// The observer.
         /// </param>
-        public void Unsubscribe(TAddress subscriber)
+        public void Unsubscribe(TIdentity id)
         {
-            this.log.LogDebug(this.logPrefix + ": Removed entry for {0}. {1} total subscribers after remove.", subscriber, this.observers.Count);
-            this.observers.TryRemove(subscriber, out _);
+            _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
+            _observers.Remove(id, out _);
         }
 
         /// <summary>
@@ -152,14 +154,14 @@ namespace UnitTests.Grains
         /// </returns>
         public async Task Notify(Func<TObserver, Task> notification, Func<TObserver, bool> predicate = null)
         {
-            var now = this.GetDateTime();
-            var defunct = default(List<TAddress>);
-            foreach (var observer in this.observers)
+            var now = GetDateTime();
+            var defunct = default(List<TIdentity>);
+            foreach (var observer in _observers)
             {
-                if (observer.Value.LastSeen + this.ExpirationDuration < now)
+                if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct = defunct ?? new List<TAddress>();
+                    defunct ??= new List<TIdentity>();
                     defunct.Add(observer.Key);
                     continue;
                 }
@@ -177,20 +179,20 @@ namespace UnitTests.Grains
                 catch (Exception)
                 {
                     // Failing observers are considered defunct and will be removed..
-                    defunct = defunct ?? new List<TAddress>();
+                    defunct ??= new List<TIdentity>();
                     defunct.Add(observer.Key);
                 }
             }
 
             // Remove defunct observers.
-            if (defunct != default(List<TAddress>))
+            if (defunct != default(List<TIdentity>))
             {
                 foreach (var observer in defunct)
                 {
-                    this.observers.TryRemove(observer, out _);
-                    if (this.log.IsEnabled(LogLevel.Debug))
+                    _observers.Remove(observer, out _);
+                    if (_log.IsEnabled(LogLevel.Debug))
                     {
-                        this.log.LogDebug(this.logPrefix + ": Removing defunct entry for {0}. {1} total subscribers after remove.", observer, this.observers.Count);
+                        _log.LogDebug("Removing defunct entry for {0}. {1} total observers after remove.", observer, _observers.Count);
                     }
                 }
             }
@@ -207,14 +209,14 @@ namespace UnitTests.Grains
         /// </param>
         public void Notify(Action<TObserver> notification, Func<TObserver, bool> predicate = null)
         {
-            var now = this.GetDateTime();
-            var defunct = default(List<TAddress>);
-            foreach (var observer in this.observers)
+            var now = GetDateTime();
+            var defunct = default(List<TIdentity>);
+            foreach (var observer in _observers)
             {
-                if (observer.Value.LastSeen + this.ExpirationDuration < now)
+                if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct = defunct ?? new List<TAddress>();
+                    defunct ??= new List<TIdentity>();
                     defunct.Add(observer.Key);
                     continue;
                 }
@@ -232,20 +234,20 @@ namespace UnitTests.Grains
                 catch (Exception)
                 {
                     // Failing observers are considered defunct and will be removed..
-                    defunct = defunct ?? new List<TAddress>();
+                    defunct ??= new List<TIdentity>();
                     defunct.Add(observer.Key);
                 }
             }
 
             // Remove defunct observers.
-            if (defunct != default(List<TAddress>))
+            if (defunct != default(List<TIdentity>))
             {
                 foreach (var observer in defunct)
                 {
-                    this.observers.TryRemove(observer, out _);
-                    if (this.log.IsEnabled(LogLevel.Debug))
+                    _observers.Remove(observer, out _);
+                    if (_log.IsEnabled(LogLevel.Debug))
                     {
-                        this.log.LogDebug(this.logPrefix + ": Removing defunct entry for {0}. {1} total subscribers after remove.", observer, this.observers.Count);
+                        _log.LogDebug("Removing defunct entry for {Observer}. {Count} total observers after remove.", observer, _observers.Count);
                     }
                 }
             }
@@ -256,14 +258,14 @@ namespace UnitTests.Grains
         /// </summary>
         public void ClearExpired()
         {
-            var now = this.GetDateTime();
-            var defunct = default(List<TAddress>);
-            foreach (var observer in this.observers)
+            var now = GetDateTime();
+            var defunct = default(List<TIdentity>);
+            foreach (var observer in _observers)
             {
-                if (observer.Value.LastSeen + this.ExpirationDuration < now)
+                if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct = defunct ?? new List<TAddress>();
+                    defunct ??= new List<TIdentity>();
                     defunct.Add(observer.Key);
                 }
             }
@@ -271,10 +273,10 @@ namespace UnitTests.Grains
             // Remove defunct observers.
             if (defunct is { Count: > 0 })
             {
-                this.log.LogInformation("{LogPrefix}: Removing {Count} defunct observers entries.", logPrefix, defunct.Count);
+                _log.LogInformation("Removing {Count} defunct observers entries.", defunct.Count);
                 foreach (var observer in defunct)
                 {
-                    this.observers.TryRemove(observer, out _);
+                    _observers.Remove(observer, out _);
                 }
             }
         }
@@ -285,10 +287,7 @@ namespace UnitTests.Grains
         /// <returns>
         /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
         /// </returns>
-        public IEnumerator<TObserver> GetEnumerator()
-        {
-            return this.observers.Select(observer => observer.Value.Observer).GetEnumerator();
-        }
+        public IEnumerator<TObserver> GetEnumerator() => _observers.Select(observer => observer.Value.Observer).GetEnumerator();
 
         /// <summary>
         /// Returns an enumerator that iterates through a collection.
@@ -296,10 +295,7 @@ namespace UnitTests.Grains
         /// <returns>
         /// An <see cref="T:System.Collections.IEnumerator"/> object that can be used to iterate through the collection.
         /// </returns>
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return this.GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <summary>
         /// An observer entry.
@@ -317,4 +313,5 @@ namespace UnitTests.Grains
             public DateTime LastSeen { get; set; }
         }
     }
+
 }
