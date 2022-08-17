@@ -257,7 +257,7 @@ namespace Orleans.Tests.SqlUtils
         internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId)
         {
             return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.DateTime, Status = SiloStatus.Dead });
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime });
         }
 
         /// <summary>
