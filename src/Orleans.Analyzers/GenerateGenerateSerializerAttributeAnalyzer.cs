@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -8,9 +8,9 @@ using System.Linq;
 namespace Orleans.Analyzers
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
-    public class GenerateSerializationAttributesAnalyzer : DiagnosticAnalyzer
+    public class GenerateGenerateSerializerAttributeAnalyzer : DiagnosticAnalyzer
     {
-        public const string RuleId = "ORLEANS0004";
+        public const string RuleId = "ORLEANS0005";
         private const string Category = "Usage";
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AddSerializationAttributesTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AddSerializationAttributesMessageFormat), Resources.ResourceManager, typeof(Resources));
@@ -31,13 +31,9 @@ namespace Orleans.Analyzers
         {
             if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
             {
-                if (declaration.TryGetAttribute(Constants.GenerateSerializerAttributeName, out var attribute))
+                if (declaration.TryGetAttribute(Constants.SerializableAttributeName, out var attribute) && !declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
                 {
-                    var (serializableMembers, _, nextId) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
-                    if (serializableMembers.Count > 0)
-                    {
-                        context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
-                    }
+                    context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
                 }
             }
         }

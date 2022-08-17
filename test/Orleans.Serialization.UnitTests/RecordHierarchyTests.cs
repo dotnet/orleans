@@ -105,4 +105,38 @@ public class RecordSerializationTests
 
         Assert.Equal(expected, result);
     }
+
+    // TODO: This type should cause a build error because "Bar" is an init-only non-auto property but has an [Id(...)] attribute.
+    // It is suited for an diagnostic analyzer test, but the current implementation
+    // of the source generator does not support execution as an analyzer.
+    /*
+    [GenerateSerializer]
+    public record RecordWithInitOnlyManualProperty
+    {
+        private string _bar;
+
+        [Id(0)]
+        public string Bar
+        {
+            get => _bar;
+            init
+            {
+                _bar = value;
+                OnSetBar(_bar);
+            }
+        }
+
+        public RecordWithInitOnlyManualProperty(string bar)
+        {
+            _bar = bar;
+            OnSetBar(_bar);
+        }
+
+        private void OnSetBar(string bar)
+        {
+            // Ignore
+            _ = bar;
+        }
+    }
+    */
 }
