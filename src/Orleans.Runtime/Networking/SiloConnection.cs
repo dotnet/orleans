@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (messageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application))
+            if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage)
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request)
@@ -303,7 +303,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
-                msg.RetryCount = msg.RetryCount + 1;
+                ++msg.RetryCount;
                 this.messageCenter.SendMessage(msg);
             }
             else

@@ -14,6 +14,18 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>A new, running stopwatch.</returns>
         public static CoarseStopwatch StartNew() => new(GetTimestamp());
+
+        /// <summary>
+        /// Starts a new instance with the specified duration already elapsed.
+        /// </summary>
+        /// <returns>A new, running stopwatch.</returns>
+        public static CoarseStopwatch StartNew(long elapsedMs) => new(GetTimestamp() - elapsedMs);
+
+        /// <summary>
+        /// Creates a new instance with the specified timestamp.
+        /// </summary>
+        /// <returns>A new stopwatch.</returns>
+        public static CoarseStopwatch FromTimestamp(long timestamp) => new(timestamp);
         
         private CoarseStopwatch(long timestamp)
         {
@@ -34,6 +46,11 @@ namespace Orleans.Runtime
         /// Returns the elapsed time.
         /// </summary>
         public TimeSpan Elapsed => TimeSpan.FromMilliseconds(ElapsedMilliseconds);
+
+        /// <summary>
+        /// Returns a value indicating whether this instance has the default value.
+        /// </summary>
+        public bool IsDefault => _value == 0;
 
         /// <summary>
         /// Returns the elapsed ticks.

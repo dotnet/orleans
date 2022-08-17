@@ -144,8 +144,7 @@ namespace Orleans.Runtime
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.Category = targetGrainId.Type.Equals(Constants.MembershipServiceType) ?
-                    Message.Categories.Ping : Message.Categories.System;
+                message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
             }
             else
@@ -421,7 +420,7 @@ namespace Orleans.Runtime
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
-            if (message.Result == Message.ResponseTypes.Rejection)
+            if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
@@ -432,18 +431,15 @@ namespace Orleans.Runtime
                 }
 
                 if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {Message}", message);
-                switch (message.RejectionType)
+                var rejection = (RejectionResponse)message.BodyObject;
+                switch (rejection.RejectionType)
                 {
-                    case Message.RejectionTypes.DuplicateRequest:
-                        // try to remove from callbackData, just in case it is still there.
-                        break;
                     case Message.RejectionTypes.Overloaded:
                         break;
-
                     case Message.RejectionTypes.Unrecoverable:
-                    // fall through & reroute
+                    // Fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (message.CacheInvalidationHeader == null)
+                        if (message.CacheInvalidationHeader is null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability.
@@ -451,7 +447,6 @@ namespace Orleans.Runtime
                             this.GrainLocator.InvalidateCache(message.SendingGrain);
                         }
                         break;
-
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
                         return;
@@ -459,7 +454,7 @@ namespace Orleans.Runtime
                         this.logger.LogError(
                             (int)ErrorCode.Dispatcher_InvalidEnum_RejectionType,
                             "Unsupported rejection type: {RejectionType}",
-                            message.RejectionType);
+                            rejection.RejectionType);
                         break;
                 }
             }
