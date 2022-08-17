@@ -24,11 +24,13 @@ $Platform = $null
 # Disable multilevel lookup https://github.com/dotnet/core-setup/blob/main/Documentation/design-docs/multilevel-sharedfx-lookup.md
  $DOTNET_MULTILEVEL_LOOKUP = 0
 
+$BuildProperties = "/p:Configuration=$env:BuildConfiguration";
+
  # Set DateTime suffix for debug builds
  if ($env:BuildConfiguration -eq "Debug")
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
-    $AdditionalConfigurationProperties=";VersionDateSuffix=$dateSuffix"
+    $BuildProperties = $BuildProperties + " /p:VersionDateSuffix=$dateSuffix"
  }
 
 Write-Output "===== Building $solution ====="
@@ -38,11 +40,11 @@ Install-Dotnet
 if ($args[0] -ne "Pack")
 {
     Write-Output "Build $env:BuildConfiguration =============================="
-    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
-    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
+    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog ${BuildProperties} `"$solution`""
+    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog ${BuildProperties} `"$solution`""
 }
 
 Write-Output "Package $env:BuildConfiguration ============================"
-Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog /p:Configuration=${env:BuildConfiguration}${AdditionalConfigurationProperties} `"$solution`""
+Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog ${BuildProperties} `"$solution`""
 
 Write-Output "===== Build succeeded for $solution ====="
