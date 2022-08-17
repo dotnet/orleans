@@ -86,5 +86,32 @@ namespace Orleans.CodeGenerator {
                 return ResourceManager.GetString("InaccessibleSetterTitle", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The return type of a grain method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;..
+        /// </summary>
+        internal static string InvalidGrainMethodReturnTypeDescription {
+            get {
+                return ResourceManager.GetString("InvalidGrainMethodReturnTypeDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The type {0} for the grain interface method {1} cannot be used as a grain method return type. Grain methods must return one of the following types: {2}..
+        /// </summary>
+        internal static string InvalidGrainMethodReturnTypeMessageFormat {
+            get {
+                return ResourceManager.GetString("InvalidGrainMethodReturnTypeMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid return type for grain interface method..
+        /// </summary>
+        internal static string InvalidGrainMethodReturnTypeTitle {
+            get {
+                return ResourceManager.GetString("InvalidGrainMethodReturnTypeTitle", resourceCulture);
+            }
+        }
     }
 }
