@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -14,7 +15,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
@@ -33,7 +33,6 @@ namespace UnitTests.MembershipTests
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
         private readonly TestEnvironmentFixture environment;
-        protected readonly ITestOutputHelper output;
         private static readonly string hostName = Dns.GetHostName();
         private readonly ILogger logger;
         private readonly IMembershipTable membershipTable;
@@ -43,15 +42,14 @@ namespace UnitTests.MembershipTests
         protected ILoggerFactory loggerFactory;
         protected IOptions<SiloOptions> siloOptions;
         protected IOptions<ClusterOptions> clusterOptions;
-        protected const string testDatabaseName = "OrleansMembershipTest"; //for relational storage
+        protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> gatewayOptions;
 
         private static int generation;
 
-        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters, ITestOutputHelper output)
+        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
-            this.output = output;
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             logger = loggerFactory.CreateLogger(this.GetType().FullName);
 

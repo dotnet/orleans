@@ -15,7 +15,6 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
-using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -26,8 +25,6 @@ namespace UnitTests.StorageTests.Relational
     /// </summary>
     public class CommonFixture : TestEnvironmentFixture
     {
-        private readonly ITestOutputHelper output;
-
         /// <summary>
         /// Caches storage provider for multiple uses using a unique, back-end specific key.
         /// The value will be <em>null</em> if environment invariants have failed to hold upon
@@ -48,7 +45,7 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The environment contract and its invariants.
         /// </summary>
-        private TestEnvironmentInvariant Invariants { get; }
+        private TestEnvironmentInvariant Invariants { get; } = new TestEnvironmentInvariant();
 
         /// <summary>
         /// The underlying relational storage connection if used.
@@ -58,15 +55,13 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// Constructor.
         /// </summary>
-        public CommonFixture(ITestOutputHelper output)
+        public CommonFixture()
         {
             _ = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
             DefaultProviderRuntime = new ClientProviderRuntime(
                 this.InternalGrainFactory,
                 this.Services,
                 this.Services.GetRequiredService<ClientGrainContext>());
-            this.output = output;
-            this.Invariants = new TestEnvironmentInvariant(this.output);
         }
 
         /// <summary>

@@ -15,7 +15,7 @@ namespace TestExtensions.Runners
 {
     public class GrainPersistenceTestsRunner : OrleansTestingBase
     {
-        protected readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper output;
         private readonly string grainNamespace;
         private readonly BaseTestClusterFixture fixture;
         protected readonly ILogger logger;

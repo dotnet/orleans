@@ -20,7 +20,7 @@ namespace UnitTests.MembershipTests
 {
     public class LivenessTestsBase : TestClusterPerTest
     {
-        protected readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper output;
         private const int numAdditionalSilos = 1;
         private const int numGrains = 20;
 

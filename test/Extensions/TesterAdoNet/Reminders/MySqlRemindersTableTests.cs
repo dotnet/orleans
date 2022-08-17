@@ -11,7 +11,6 @@ using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.RemindersTest
 {
@@ -21,7 +20,7 @@ namespace UnitTests.RemindersTest
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("MySql")]
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
-        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
+        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 
@@ -51,7 +50,7 @@ namespace UnitTests.RemindersTest
 
         protected override async Task<string> GetConnectionString()
         {
-            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName, this.output);
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
             return instance.CurrentConnectionString;
         }
 

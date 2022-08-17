@@ -10,7 +10,6 @@ using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -20,7 +19,7 @@ namespace AWSUtils.Tests.MembershipTests
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
+        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 

@@ -1,15 +1,17 @@
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Reminders.DynamoDB;
+using Orleans.Runtime;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.RemindersTest
 {
@@ -17,7 +19,7 @@ namespace AWSUtils.Tests.RemindersTest
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, new LoggerFilterOptions(), output)
+        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, new LoggerFilterOptions())
         {
         }
 

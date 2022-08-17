@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests.AdoNet
 {
@@ -19,19 +18,15 @@ namespace UnitTests.StorageTests.AdoNet
 
         public class Fixture
         {
-            private readonly ITestOutputHelper output;
-
-            public Fixture(ITestOutputHelper output)
+            public Fixture()
             {
-                this.output = output;
-
                 try
                 {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName, this.output).GetAwaiter().GetResult();
+                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
-                    this.output.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
+                    Console.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
                 }
             }
 

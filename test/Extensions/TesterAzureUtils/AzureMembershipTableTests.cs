@@ -10,7 +10,6 @@ using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
@@ -20,7 +19,7 @@ namespace Tester.AzureUtils
     [TestCategory("Membership"), TestCategory("AzureStorage")]
     public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
-        public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
+        public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 

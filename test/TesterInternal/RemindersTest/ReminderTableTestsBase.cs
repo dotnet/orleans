@@ -12,7 +12,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using Xunit.Abstractions;
 
 namespace UnitTests.RemindersTest
 {
@@ -20,7 +19,6 @@ namespace UnitTests.RemindersTest
     public abstract class ReminderTableTestsBase : IAsyncLifetime, IClassFixture<ConnectionStringFixture>
     {
         protected readonly TestEnvironmentFixture ClusterFixture;
-        protected readonly ITestOutputHelper output;
         private readonly ILogger logger;
 
         private readonly IReminderTable remindersTable;
@@ -31,13 +29,12 @@ namespace UnitTests.RemindersTest
 
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
 
-        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters, ITestOutputHelper output)
+        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
             this.connectionStringFixture = fixture;
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
-            this.output = output;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid().ToString() + "/foo";
             var clusterId = "test-" + serviceId + "/foo2";

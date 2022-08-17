@@ -10,14 +10,13 @@ using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
     [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {
-        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
+        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 
@@ -55,7 +54,7 @@ namespace UnitTests.MembershipTests
 
         protected override async Task<string> GetConnectionString()
         {
-            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName, this.output);
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
             return instance.CurrentConnectionString;
         }
 
