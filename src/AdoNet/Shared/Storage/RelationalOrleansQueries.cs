@@ -20,7 +20,7 @@ namespace Orleans.Tests.SqlUtils
 {
     /// <summary>
     /// A class for all relational storages that support all systems stores : membership, reminders and statistics
-    /// </summary>    
+    /// </summary>
     internal class RelationalOrleansQueries
     {
         /// <summary>
@@ -38,10 +38,10 @@ namespace Orleans.Tests.SqlUtils
             DbStoredQueries.Columns.Statistic
         };
 
-    /// <summary>
-    /// the orleans functional queries
-    /// </summary>
-    private readonly DbStoredQueries dbStoredQueries;
+        /// <summary>
+        /// the orleans functional queries
+        /// </summary>
+        private readonly DbStoredQueries dbStoredQueries;
 
         private readonly IGrainReferenceConverter grainReferenceConverter;
 
@@ -59,7 +59,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Creates an instance of a database of type <see cref="RelationalOrleansQueries"/> and Initializes Orleans queries from the database. 
+        /// Creates an instance of a database of type <see cref="RelationalOrleansQueries"/> and Initializes Orleans queries from the database.
         /// Orleans uses only these queries and the variables therein, nothing more.
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
@@ -87,7 +87,7 @@ namespace Orleans.Tests.SqlUtils
             var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command));
             return aggregator(ret);
         }
-        
+
 #if REMINDERS_ADONET || TESTER_SQLUTILS
 
         /// <summary>
@@ -245,6 +245,19 @@ namespace Orleans.Tests.SqlUtils
         {
             return ExecuteAsync(dbStoredQueries.DeleteMembershipTableEntriesKey, command =>
                 new DbStoredQueries.Columns(command) { DeploymentId = deploymentId });
+        }
+
+        /// <summary>
+        /// deletes all membership entries for inactive silos where the IAmAliveTime is before the beforeDate parameter
+        /// and the silo status is <seealso cref="SiloStatus.Dead"/>.
+        /// </summary>
+        /// <param name="beforeDate"></param>
+        /// <param name="deploymentId"></param>
+        /// <returns></returns>
+        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId)
+        {
+            return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.DateTime, Status = SiloStatus.Dead });
         }
 
         /// <summary>
