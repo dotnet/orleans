@@ -126,4 +126,13 @@
   <data name="InaccessibleSetterTitle" xml:space="preserve">
     <value>Serializable properties with bodies must be settable.</value>
   </data>
+  <data name="InvalidGrainMethodReturnTypeDescription" xml:space="preserve">
+    <value>The return type of a grain method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;.</value>
+  </data>
+  <data name="InvalidGrainMethodReturnTypeMessageFormat" xml:space="preserve">
+    <value>The type {0} for the grain interface method {1} cannot be used as a grain method return type. Grain methods must return one of the following types: {2}.</value>
+  </data>
+  <data name="InvalidGrainMethodReturnTypeTitle" xml:space="preserve">
+    <value>Invalid return type for grain interface method.</value>
+  </data>
 </root>
