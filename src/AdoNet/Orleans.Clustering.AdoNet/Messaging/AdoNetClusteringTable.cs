@@ -7,8 +7,8 @@ using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
-{ 
-    public class AdoNetClusteringTable: IMembershipTable
+{
+    public class AdoNetClusteringTable : IMembershipTable
     {
         private string clusterId;
         private readonly IServiceProvider serviceProvider;
@@ -18,8 +18,8 @@ namespace Orleans.Runtime.MembershipService
 
         public AdoNetClusteringTable(
             IServiceProvider serviceProvider,
-            IOptions<ClusterOptions> clusterOptions, 
-            IOptions<AdoNetClusteringSiloOptions> clusteringOptions, 
+            IOptions<ClusterOptions> clusterOptions,
+            IOptions<AdoNetClusteringSiloOptions> clusteringOptions,
             ILogger<AdoNetClusteringTable> logger)
         {
             this.serviceProvider = serviceProvider;
@@ -37,14 +37,14 @@ namespace Orleans.Runtime.MembershipService
             orleansQueries = await RelationalOrleansQueries.CreateInstance(
                 clusteringTableOptions.Invariant,
                 clusteringTableOptions.ConnectionString);
-            
+
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
             // so we always have a first table version row, before this silo starts working.
-            if(tryInitTableVersion)
+            if (tryInitTableVersion)
             {
                 var wasCreated = await InitTableAsync();
-                if(wasCreated)
+                if (wasCreated)
                 {
                     logger.LogInformation("Created new table version row.");
                 }
@@ -58,9 +58,9 @@ namespace Orleans.Runtime.MembershipService
                 logger.LogTrace("AdoNetClusteringTable.ReadRow called with key: {Key}.", key);
             try
             {
-                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);                
+                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.ReadRow failed");
                 throw;
@@ -73,9 +73,9 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.ReadAll called.");
             try
             {
-                return await orleansQueries.MembershipReadAllAsync(this.clusterId);                
+                return await orleansQueries.MembershipReadAllAsync(this.clusterId);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.ReadAll failed");
                 throw;
@@ -111,11 +111,11 @@ namespace Orleans.Runtime.MembershipService
             {
                 return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.InsertRow failed");
                 throw;
-            }            
+            }
         }
 
 
@@ -141,9 +141,9 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);                                
+                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.UpdateRow failed");
                 throw;
@@ -164,7 +164,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 await orleansQueries.UpdateIAmAliveTimeAsync(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug(ex, "AdoNetClusteringTable.UpdateIAmAlive failed");
@@ -181,31 +181,41 @@ namespace Orleans.Runtime.MembershipService
             {
                 await orleansQueries.DeleteMembershipTableEntriesAsync(clusterId);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug(ex, "AdoNetClusteringTable.DeleteMembershipTableEntries failed");
                 throw;
             }
         }
-               
-        
+
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace("IMembershipTable.CleanupDefunctSiloEntries called with beforeDate {beforeDate} and clusterId {ClusterId}.", beforeDate, clusterId);
+            try
+            {
+                await orleansQueries.CleanupDefunctSiloEntriesAsync(beforeDate, this.clusterId);
+            }
+            catch (Exception ex)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug(ex, "AdoNetClusteringTable.CleanupDefunctSiloEntries failed");
+                throw;
+            }
+        }
+
         private async Task<bool> InitTableAsync()
         {
             try
             {
                 return await orleansQueries.InsertMembershipVersionRowAsync(this.clusterId);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(ex, "Insert silo membership version failed");
                 throw;
             }
-        }
-
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
         }
     }
 }

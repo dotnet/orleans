@@ -13,7 +13,7 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
-    [TestCategory("Membership"), TestCategory("PostgreSql")]
+    [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {
         public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
@@ -109,6 +109,12 @@ namespace UnitTests.MembershipTests
         public async Task MembershipTable_PostgreSql_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
+        }
+
+        [SkippableFact]
+        public async Task MembershipTablePostgreSql_CleanupDefunctSiloEntries()
+        {
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }
