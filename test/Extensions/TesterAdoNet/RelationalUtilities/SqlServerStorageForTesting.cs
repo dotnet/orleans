@@ -8,6 +8,8 @@ namespace UnitTests.General
 {
     public class SqlServerStorageForTesting : RelationalStorageForTesting
     {
+        protected override string ProviderMoniker => "SQLServer";
+
         public SqlServerStorageForTesting(string connectionString)
             : base(AdoNetInvariants.InvariantNameSqlServer, connectionString)
         {
@@ -18,17 +20,6 @@ namespace UnitTests.General
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);"; } }
-
-        protected override string[] SetupSqlScriptFileNames
-        {
-            get { return new[] {
-                    "SQLServer-Main.sql",
-                    "SQLServer-Clustering.sql",
-                    "SQLServer-Persistence.sql",
-                    "SQLServer-Reminders.sql"
-                };
-            }
-        }
 
         protected override string CreateDatabaseTemplate
         {

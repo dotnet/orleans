@@ -7,7 +7,7 @@ VALUES
     WHERE DeploymentId = :DeploymentId
         AND :DeploymentId IS NOT NULL
         AND IAmAliveTime < :IAmAliveTime
-        AND Status = 6;
+        AND Status != 3;
   END;
 ');
 /
