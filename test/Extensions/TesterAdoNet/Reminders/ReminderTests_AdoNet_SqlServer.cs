@@ -14,6 +14,7 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Internal;
 using Xunit;
 using Microsoft.Extensions.Hosting;
+using Xunit.Abstractions;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -29,9 +30,16 @@ namespace Tester.AdoNet.Reminders
 
         public class Fixture : BaseTestClusterFixture
         {
+            private readonly ITestOutputHelper output;
+
+            public Fixture(ITestOutputHelper output)
+            {
+                this.output = output;
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName, output)
                     .Result.CurrentConnectionString;
                 builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string>
                 {

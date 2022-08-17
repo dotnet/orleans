@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -84,7 +85,7 @@ namespace UnitTests.General
         /// <param name="databaseName">the name of the database</param>
         protected abstract IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName);
 
-        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string connectionString = null)
+        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, ITestOutputHelper output, string connectionString = null)
         {
             if (string.IsNullOrWhiteSpace(invariantName))
             {
@@ -96,7 +97,7 @@ namespace UnitTests.General
                 throw new ArgumentException("database string must contain characters", "testDatabaseName");
             }
 
-            Console.WriteLine("Initializing relational databases...");
+            output.WriteLine("Initializing relational databases...");
 
             RelationalStorageForTesting testStorage;
             if (connectionString == null)
@@ -108,7 +109,7 @@ namespace UnitTests.General
                 testStorage = CreateTestInstance(invariantName, connectionString);
             }
 
-            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, connectionString ?? testStorage.DefaultConnectionString);
+            output.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, connectionString ?? testStorage.DefaultConnectionString);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -120,14 +121,14 @@ namespace UnitTests.General
             //The old storage instance has the previous connection string, time have a new handle with a new connection string...
             testStorage = testStorage.CopyInstance(testDatabaseName);
 
-            Console.WriteLine("Creating database tables...");
+            output.WriteLine("Creating database tables...");
 
             var setupScript = String.Empty;
 
             // Concatenate scripts
             foreach (var fileName in testStorage.SetupSqlScriptFileNames)
             {
-                Console.WriteLine($"Processing {fileName}");
+                output.WriteLine($"Processing {fileName}");
 
                 setupScript += File.ReadAllText(fileName);
 
@@ -137,7 +138,7 @@ namespace UnitTests.General
 
             await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);
 
-            Console.WriteLine("Initializing relational databases done.");
+            output.WriteLine("Initializing relational databases done.");
 
             return testStorage;
         }

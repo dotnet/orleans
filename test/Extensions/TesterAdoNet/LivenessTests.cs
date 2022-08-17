@@ -19,7 +19,7 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName, this.output).Result;
             builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -80,7 +80,7 @@ namespace UnitTests.MembershipTests
         }
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName, this.output).Result;
             builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -143,7 +143,7 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName, this.output).Result;
             builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }

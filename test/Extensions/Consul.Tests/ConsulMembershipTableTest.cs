@@ -10,6 +10,8 @@ using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
+using Microsoft.VisualStudio.TestPlatform.Utilities;
+using Xunit.Abstractions;
 
 namespace Consul.Tests
 {
@@ -19,7 +21,7 @@ namespace Consul.Tests
     [TestCategory("Membership"), TestCategory("Consul")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
-        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
         { 
         }
 

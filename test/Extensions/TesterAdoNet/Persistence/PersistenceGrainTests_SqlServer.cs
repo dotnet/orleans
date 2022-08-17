@@ -22,11 +22,17 @@ namespace Tester.AdoNet.Persistence
         public static string ConnectionStringKey = "AdoNetConnectionString";
         public class Fixture : BaseTestClusterFixture
         {
+            private readonly ITestOutputHelper output;
+
+            public Fixture(ITestOutputHelper output)
+            {
+                this.output = output;
+            }
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
-                var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
+                var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName, this.output).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string>
                     {

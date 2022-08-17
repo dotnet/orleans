@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Tester.ZooKeeperUtils;
+using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
@@ -18,8 +19,8 @@ namespace UnitTests.MembershipTests
     [TestCategory("Membership"), TestCategory("ZooKeeper")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
-        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
-            : base(fixture, environment, CreateFilters())
+        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output)
+            : base(fixture, environment, CreateFilters(), output)
         {
         }
 
@@ -34,7 +35,7 @@ namespace UnitTests.MembershipTests
         {
             var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
-           
+
             return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.clusterOptions);
         }
 

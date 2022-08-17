@@ -10,6 +10,7 @@ using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
@@ -19,7 +20,7 @@ namespace UnitTests.MembershipTests
     [TestCategory("Membership"), TestCategory("SQLServer"), TestCategory("Functional")]
     public class SqlServerMembershipTableTests : MembershipTableTestsBase
     {
-        public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
         {
         }
 
@@ -56,7 +57,7 @@ namespace UnitTests.MembershipTests
 
         protected override async Task<string> GetConnectionString()
         {
-            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName, this.output);
             return instance.CurrentConnectionString;
         }
 

@@ -10,6 +10,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
 using Tester.AzureUtils;
+using Xunit.Abstractions;
 
 namespace UnitTests.RemindersTest
 {
@@ -19,7 +20,7 @@ namespace UnitTests.RemindersTest
     [TestCategory("Reminders"), TestCategory("AzureStorage")]
     public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
-        public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters(), output)
         {
         }
 

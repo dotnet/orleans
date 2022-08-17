@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnitTests.General;
 using TestExtensions;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -51,6 +52,7 @@ namespace UnitTests.StorageTests.Relational
         /// A default custom settings file location if <see cref="EnvVariableForCustomSettingLocation"/> is not set.
         /// </summary>
         public const string FallBackCustomTestSettingsFileLocation = @"..\..\..\CustomTestSettings.json";
+        private readonly ITestOutputHelper output;
 
         /// <summary>
         /// The default test settings before merging with external ones.
@@ -86,9 +88,11 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The default constructor.
         /// </summary>
-        public TestEnvironmentInvariant()
+        /// <param name="output">The output helper.</param>
+        public TestEnvironmentInvariant(ITestOutputHelper output)
         {
             ActiveSettings = TryLoadAndMergeWithCustomSettings(DefaultSettings);
+            this.output = output;
         }
 
         /// <summary>
@@ -103,7 +107,7 @@ namespace UnitTests.StorageTests.Relational
             if (AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
             {
                 const string RelationalStorageTestDb = "OrleansStorageTests";
-                return RelationalStorageForTesting.SetupInstance(connection.StorageInvariant, storageName ?? RelationalStorageTestDb, connection.ConnectionString).GetAwaiter().GetResult();
+                return RelationalStorageForTesting.SetupInstance(connection.StorageInvariant, storageName ?? RelationalStorageTestDb, this.output, connection.ConnectionString).GetAwaiter().GetResult();
             }
 
             return null;
