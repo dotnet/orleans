@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using Orleans.Configuration;
@@ -15,22 +11,22 @@ namespace Orleans.Storage;
 public interface IBlobContainerFactory
 {
     /// <summary>
-    /// Build a container for the specific grain type and grain id
+    /// Gets the container which should be used for the specified grain.
     /// </summary>
     /// <param name="grainId">The grain id</param>
     /// <returns>A configured blob client</returns>
-    public BlobContainerClient BuildContainerClient(GrainId grainId);
+    public BlobContainerClient GetBlobContainerClient(GrainId grainId);
 
     /// <summary>
-    /// Initialize any required dependencies using the provided client and options
+    /// Initialize any required dependencies using the provided client and options.
     /// </summary>
     /// <param name="client">The connected blob client</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public Task Init(BlobServiceClient client);
+    public Task InitializeAsync(BlobServiceClient client);
 }
 
 /// <summary>
-/// A default blob container factory that uses the default container name
+/// A default blob container factory that uses the default container name.
 /// </summary>
 internal class DefaultBlobContainerFactory : IBlobContainerFactory
 {
@@ -47,11 +43,11 @@ internal class DefaultBlobContainerFactory : IBlobContainerFactory
     }
 
     /// <inheritdoc/>
-    public BlobContainerClient BuildContainerClient(GrainId grainId)
+    public BlobContainerClient GetBlobContainerClient(GrainId grainId)
         => _defaultContainer;
 
     /// <inheritdoc/>
-    public async Task Init(BlobServiceClient client)
+    public async Task InitializeAsync(BlobServiceClient client)
     {
         _defaultContainer = client.GetBlobContainerClient(_options.ContainerName);
         await _defaultContainer.CreateIfNotExistsAsync();

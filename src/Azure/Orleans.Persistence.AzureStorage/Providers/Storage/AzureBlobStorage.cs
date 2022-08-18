@@ -52,7 +52,7 @@ namespace Orleans.Storage
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
+            var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
                 "Reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
@@ -146,7 +146,7 @@ namespace Orleans.Storage
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
+            var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
             {
@@ -192,7 +192,7 @@ namespace Orleans.Storage
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
-            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
+            var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
             {
@@ -245,7 +245,7 @@ namespace Orleans.Storage
 
         private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
         {
-            var container = this.blobContainerFactory.BuildContainerClient(grainId.GrainId);
+            var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
             {
@@ -316,7 +316,7 @@ namespace Orleans.Storage
                 }
 
                 var client = await createClient();
-                await this.blobContainerFactory.Init(client);
+                await this.blobContainerFactory.InitializeAsync(client);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider,
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",
