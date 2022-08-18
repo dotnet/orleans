@@ -16,7 +16,7 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests for operation of Orleans Membership Table using MySQL
     /// </summary>
-    [TestCategory("Membership"), TestCategory("MySql")]
+    [TestCategory("Membership"), TestCategory("MySql"), TestCategory("Functional")]
     public class MySqlMembershipTableTests : MembershipTableTestsBase
     {
         public MySqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
@@ -109,6 +109,12 @@ namespace UnitTests.MembershipTests
         public async Task MembershipTable_MySql_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
+        }
+
+        [SkippableFact]
+        public async Task MembershipTable_MySql_CleanupDefunctSiloEntries()
+        {
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }

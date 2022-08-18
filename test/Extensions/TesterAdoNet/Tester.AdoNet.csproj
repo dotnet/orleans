@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
@@ -29,18 +29,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(SourceRoot)src\AdoNet\Shared\*.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\*.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\*.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\*.sql">
+    <None  Include="$(SourceRoot)src\AdoNet\**\*.sql"  Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
 </Project>

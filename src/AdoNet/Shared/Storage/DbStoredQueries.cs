@@ -90,6 +90,11 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         internal string DeleteMembershipTableEntriesKey => queries[nameof(DeleteMembershipTableEntriesKey)];
 
+        /// <summary>
+        /// A query template to cleanup defunct silo entries.
+        /// </summary>
+        internal string CleanupDefunctSiloEntriesKey => queries[nameof(CleanupDefunctSiloEntriesKey)];
+
 #endif
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER

@@ -271,6 +271,19 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
+        /// deletes all membership entries for inactive silos where the IAmAliveTime is before the beforeDate parameter
+        /// and the silo status is <seealso cref="SiloStatus.Dead"/>.
+        /// </summary>
+        /// <param name="beforeDate"></param>
+        /// <param name="deploymentId"></param>
+        /// <returns></returns>
+        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId)
+        {
+            return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime });
+        }
+
+        /// <summary>
         /// Updates IAmAlive for a silo
         /// </summary>
         /// <param name="deploymentId"></param>
