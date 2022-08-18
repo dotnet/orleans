@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable
     {
         private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
@@ -67,27 +67,24 @@ namespace Orleans.Runtime
         }
 
         internal SystemTarget(GrainType grainType, SiloAddress silo, ILoggerFactory loggerFactory)
-            : this(SystemTargetGrainId.Create(grainType, silo), silo, false, loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, silo), silo, loggerFactory)
         {
         }
 
-        internal SystemTarget(GrainType grainType, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
-            : this(SystemTargetGrainId.Create(grainType, silo), silo, lowPriority, loggerFactory)
-        {
-        }
-
-        internal SystemTarget(SystemTargetGrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        internal SystemTarget(SystemTargetGrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory)
         {
             this.id = grainId;
             this.Silo = silo;
             this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
-            this.IsLowPriority = lowPriority;
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             this.logger = loggerFactory.CreateLogger(this.GetType());
-        }
 
-        internal bool IsLowPriority { get; }
+            if (!Constants.IsSingletonSystemTarget(GrainId.Type))
+            {
+                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+            }
+        }
 
         internal WorkItemGroup WorkItemGroup { get; set; }
 
@@ -115,6 +112,10 @@ namespace Orleans.Runtime
             else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
+            }
+            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            {
+                result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
             }
             else
             {
@@ -195,7 +196,7 @@ namespace Orleans.Runtime
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
-            => destination.TryWrite($"[{(IsLowPriority ? "LowPriority" : null)}SystemTarget: {Silo}/{id}{ActivationId}]", out charsWritten);
+            => destination.TryWrite($"[SystemTarget: {Silo}/{id}{ActivationId}]", out charsWritten);
 
         /// <summary>Adds details about message currently being processed</summary>
         internal string ToDetailedString() => $"{this} CurrentlyExecuting={running}{(running != null ? null : "null")}";
@@ -282,14 +283,6 @@ namespace Orleans.Runtime
                         break;
                     }
 
-                case Message.Directions.Response:
-                    {
-                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
-                        var workItem = new ResponseWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
-                        break;
-                    }
-
                 default:
                     this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
                     break;
@@ -307,5 +300,13 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
+
+        public void Dispose()
+        {
+            if (!Constants.IsSingletonSystemTarget(GrainId.Type))
+            {
+                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+            }
+        }
     }
 }

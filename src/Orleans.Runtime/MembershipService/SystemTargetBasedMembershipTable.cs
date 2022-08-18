@@ -118,7 +118,7 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
             DeepCopier deepCopier)
-            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, lowPriority: false, loggerFactory)
+            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(deepCopier);

@@ -52,7 +52,7 @@ namespace Orleans.Streams
             IQueueAdapter queueAdapter,
             IQueueAdapterCache queueAdapterCache,
             IStreamFailureHandler streamFailureHandler)
-            : base(id, siloAddress, true, loggerFactory)
+            : base(id, siloAddress, loggerFactory)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
 

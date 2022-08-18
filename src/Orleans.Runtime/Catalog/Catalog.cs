@@ -228,14 +228,14 @@ namespace Orleans.Runtime
                 sp.GetRequiredService<ILogger<WorkItemGroup>>(),
                 sp.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
                 sp.GetRequiredService<IOptions<SchedulingOptions>>());
-            activations.RecordNewSystemTarget(systemTarget);
+            activations.RecordNewTarget(systemTarget);
         }
 
         public void UnregisterSystemTarget(ISystemTarget target)
         {
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            activations.RemoveSystemTarget(systemTarget);
+            activations.RemoveTarget(systemTarget);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -256,6 +256,10 @@ namespace Orleans.Runtime
             if (TryGetGrainContext(grainId, out var result))
             {
                 return result;
+            }
+            else if (grainId.IsSystemTarget())
+            {
+                return null;
             }
 
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
