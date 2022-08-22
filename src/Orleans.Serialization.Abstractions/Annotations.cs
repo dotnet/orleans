@@ -370,6 +370,32 @@ namespace Orleans
     }
 
     /// <summary>
+    /// When applied to a type, indicates that the type should be encoded as a relation from a specified type.
+    /// </summary>
+    /// <seealso cref="Attribute" />
+    [AttributeUsage(
+        AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Struct
+        | AttributeTargets.Enum)]
+    public sealed class CompoundTypeAliasAttribute : Attribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CompoundTypeAliasAttribute"/> class.
+        /// </summary>
+        /// <param name="components">The alias components, each of which must be a <see cref="Components"/> or a <see cref="string"/>.</param>
+        public CompoundTypeAliasAttribute(params object[] components)
+        {
+            Components = components;
+        }
+
+        /// <summary>
+        /// Gets the alias components.
+        /// </summary>
+        public object[] Components { get; }
+    }
+
+    /// <summary>
     /// When applied to a type, indicates that the type is a serializer and that it should be automatically registered.
     /// </summary>
     /// <seealso cref="System.Attribute" />

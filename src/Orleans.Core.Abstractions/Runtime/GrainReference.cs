@@ -251,6 +251,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// This is the base class for all grain references.
     /// </summary>
+    [WellKnownAlias("GrainRef")]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]

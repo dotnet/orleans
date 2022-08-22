@@ -10,11 +10,11 @@ namespace Orleans.CodeGenerator
     {
         private readonly InvokableInterfaceDescription _iface;
 
-        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string name, bool hasCollision)
+        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string methodId, bool hasCollision)
         {
             _iface = containingType;
             Method = method;
-            Name = name;
+            MethodId = methodId;
             HasCollision = hasCollision;
 
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -145,7 +145,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public string Name { get; }
+        public string MethodId { get; }
 
         public IMethodSymbol Method { get; }
 

@@ -52,6 +52,11 @@ namespace Orleans.CodeGenerator
                     var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(LibraryTypes, type, method);
                     metadataModel.SerializableTypes.Add(generatedInvokerDescription);
                     metadataModel.GeneratedInvokables[method] = generatedInvokerDescription;
+                    if (generatedInvokerDescription.CompoundTypeAliasArguments is { Length: > 0 } compoundTypeAliasArguments)
+                    {
+                        metadataModel.CompoundTypeAliases.Add(compoundTypeAliasArguments, generatedInvokerDescription.OpenTypeSyntax);
+                    }
+
                     AddMember(ns, invokable);
 
                     var methodSymbol = method.Method;
@@ -190,6 +195,11 @@ namespace Orleans.CodeGenerator
                     if (GetTypeAlias(symbol) is string typeAlias)
                     {
                         metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
+                    }
+
+                    if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
+                    {
+                        metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
                     }
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
@@ -514,6 +524,41 @@ namespace Orleans.CodeGenerator
 
             var value = (string)attr.ConstructorArguments.First().Value;
             return value;
+        }
+
+        private CompoundTypeAliasComponent[] GetCompoundTypeAlias(ISymbol symbol)
+        {
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.CompoundTypeAliasAttribute, attr.AttributeClass));
+            if (attr is null)
+            {
+                return null;
+            }
+
+            var allArgs = attr.ConstructorArguments;
+            if (allArgs.Length != 1 || allArgs[0].Values.Length == 0)
+            {
+                throw new ArgumentException($"Unsupported arguments in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
+            }
+
+            var args = allArgs[0].Values;
+            var result = new CompoundTypeAliasComponent[args.Length];
+            for (var i = 0; i < args.Length; i++)
+            {
+                var arg = args[i];
+                if (arg.IsNull)
+                {
+                    throw new ArgumentNullException($"Unsupported null argument in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
+                }
+
+                result[i] = arg.Value switch
+                {
+                    ITypeSymbol type => new CompoundTypeAliasComponent(type),
+                    string str => new CompoundTypeAliasComponent(str),
+                    _ => throw new ArgumentException($"Unrecognized argument type for argument {arg.ToCSharpString()} in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]"),
+                };
+            }
+
+            return result;
         }
 
         // Returns true if the type declaration has the specified attribute.

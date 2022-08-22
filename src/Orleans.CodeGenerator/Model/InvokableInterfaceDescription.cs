@@ -109,6 +109,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 foreach (var i in s.AllInterfaces)
+
                 {
                     yield return i;
                 }

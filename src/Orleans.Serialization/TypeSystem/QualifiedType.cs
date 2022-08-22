@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -19,7 +21,7 @@ namespace Orleans.Serialization.TypeSystem
         /// </summary>
         /// <param name="assembly">The assembly.</param>
         /// <param name="type">The type.</param>
-        public QualifiedType(string assembly, string type)
+        public QualifiedType(string? assembly, string type)
         {
             Assembly = assembly;
             Type = type;
@@ -29,7 +31,7 @@ namespace Orleans.Serialization.TypeSystem
         /// Gets the assembly.
         /// </summary>
         /// <value>The assembly.</value>
-        public string Assembly { get; }
+        public string? Assembly { get; }
 
         /// <summary>
         /// Gets the type.
@@ -42,14 +44,14 @@ namespace Orleans.Serialization.TypeSystem
         /// </summary>
         /// <param name="assembly">The assembly.</param>
         /// <param name="type">The type.</param>
-        public void Deconstruct(out string assembly, out string type)
+        public void Deconstruct(out string? assembly, out string type)
         {
             assembly = Assembly;
             type = Type;
         }
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is QualifiedType type && string.Equals(Assembly, type.Assembly, StringComparison.Ordinal) && string.Equals(Type, type.Type, StringComparison.Ordinal);
+        public override bool Equals(object? obj) => obj is QualifiedType type && string.Equals(Assembly, type.Assembly, StringComparison.Ordinal) && string.Equals(Type, type.Type, StringComparison.Ordinal);
 
         /// <inheritdoc/>
         public override int GetHashCode() => HashCode.Combine(Assembly, Type);

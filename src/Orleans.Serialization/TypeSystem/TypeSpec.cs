@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Linq;
 using System.Text;
@@ -129,9 +131,15 @@ namespace Orleans.Serialization.TypeSystem
         /// Initializes a new instance of the <see cref="ConstructedGenericTypeSpec"/> class.
         /// </summary>
         /// <param name="unconstructedType">The unconstructed type.</param>
+        /// <param name="arity">The expected number of type arguments.</param>
         /// <param name="arguments">The generic type arguments.</param>
-        public ConstructedGenericTypeSpec(NamedTypeSpec unconstructedType, TypeSpec[] arguments)
+        public ConstructedGenericTypeSpec(TypeSpec unconstructedType, int arity, TypeSpec[] arguments)
         {
+            if (unconstructedType is AssemblyQualifiedTypeSpec)
+            {
+                throw new InvalidOperationException();
+            }
+
             if (unconstructedType is null)
             {
                 throw new ArgumentNullException(nameof(unconstructedType));
@@ -142,9 +150,9 @@ namespace Orleans.Serialization.TypeSystem
                 throw new ArgumentNullException(nameof(arguments));
             }
 
-            if (unconstructedType.Arity != arguments.Length)
+            if (arity != arguments.Length)
             {
-                throw new ArgumentException($"Invalid number of arguments {arguments.Length} provided while constructing generic type of arity {unconstructedType.Arity}: {unconstructedType}", nameof(arguments));
+                throw new ArgumentException($"Invalid number of arguments {arguments.Length} provided while constructing generic type of arity {arity}: {unconstructedType}", nameof(arguments));
             }
 
             foreach (var arg in arguments)
@@ -162,7 +170,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Gets the unconstructed type.
         /// </summary>
-        public NamedTypeSpec UnconstructedType { get; }
+        public TypeSpec UnconstructedType { get; }
 
         /// <summary>
         /// Gets the type arguments.
@@ -217,7 +225,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Gets the containing type.
         /// </summary>
-        public NamedTypeSpec ContainingType { get; }
+        public NamedTypeSpec? ContainingType { get; }
 
         /// <summary>
         /// Gets the namespace-qualified type name, including containing types (for nested types).
@@ -258,7 +266,7 @@ namespace Orleans.Serialization.TypeSystem
         /// </summary>
         /// <param name="type">The type.</param>
         /// <param name="assembly">The assembly.</param>
-        public AssemblyQualifiedTypeSpec(TypeSpec type, string assembly)
+        public AssemblyQualifiedTypeSpec(TypeSpec type, string? assembly)
         {
             if (type is null)
             {
@@ -277,7 +285,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Gets the assembly specification.
         /// </summary>
-        public string Assembly { get; }
+        public string? Assembly { get; }
 
         /// <summary>
         /// Gets the qualified type.
@@ -288,6 +296,103 @@ namespace Orleans.Serialization.TypeSystem
         public override string Format() => ToString();
 
         /// <inheritdoc/>
-        public override string ToString() => string.IsNullOrWhiteSpace(Assembly) ? Type.ToString() : $"{Type},{Assembly}";
+        public override string ToString() => Assembly switch
+        {
+            { Length: > 0 } => $"{Type},{Assembly!}",
+            _ => $"{Type}"
+        };
+    }
+
+    /// <summary>
+    /// Represents a type function.
+    /// </summary>
+    public class TupleTypeSpec : TypeSpec
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TupleTypeSpec"/> class.
+        /// </summary>
+        /// <param name="elements">The tuple elements.</param>
+        /// <param name="arity">The number of generic type parameters which the type accepts.</param>
+        public TupleTypeSpec(TypeSpec[] elements, int arity)
+        {
+            if (elements is null)
+            {
+                throw new ArgumentNullException(nameof(elements));
+            }
+
+            if (elements is { Length: 0 })
+            {
+                throw new ArgumentNullException(nameof(elements));
+            }
+
+            if (arity < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(arity), "A type cannot have a negative arity");
+            }
+
+            Arity = arity;
+
+            Elements = elements;
+        }
+
+        /// <summary>
+        /// Gets the number of generic parameters which this type requires.
+        /// </summary>
+        public int Arity { get; }
+
+        /// <summary>
+        /// Gets the tuple elements.
+        /// </summary>
+        public TypeSpec[] Elements { get; }
+
+        /// <inheritdoc/>
+        public override string Format() => ToString();
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            var elements = string.Join(",", Elements.Select(element => element switch
+            {
+                LiteralTypeSpec => element.ToString(),
+                _ => $"[{element}]"
+            }));
+
+            return Arity switch
+            {
+                > 0 => $"({elements})`{Arity}",
+                _ => $"({elements})"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Represents a literal.
+    /// </summary>
+    public class LiteralTypeSpec : TypeSpec
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LiteralTypeSpec"/> class.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        public LiteralTypeSpec(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            Value = value;
+        }
+
+        /// <summary>
+        /// Gets the value.
+        /// </summary>
+        public string Value { get; }
+
+        /// <inheritdoc/>
+        public override string Format() => ToString();
+
+        /// <inheritdoc/>
+        public override string ToString() => $"\"{Value}\"";
     }
 }

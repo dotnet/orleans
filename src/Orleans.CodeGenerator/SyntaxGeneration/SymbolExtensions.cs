@@ -216,7 +216,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
         }
 
-        public static TypeSyntax ToOpenTypeSyntax(this INamedTypeSymbol typeSymbol)
+        public static TypeSyntax ToOpenTypeSyntax(this ITypeSymbol typeSymbol)
         {
             var displayString = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var nameSyntax = ParseName(displayString);
