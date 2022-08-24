@@ -88,8 +88,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             var dataAdapter = services.GetServiceByName<IQueueDataAdapter<string, IBatchContainer>>(name)
                 ?? services.GetService<IQueueDataAdapter<string, IBatchContainer>>();
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
-            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter, clusterOptions);
+            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter);
             factory.Init();
             return factory;
         }
