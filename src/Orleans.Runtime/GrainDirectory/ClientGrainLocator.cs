@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                unadjustedResult = results[ThreadSafeRandom.Next(results.Count)];
+                unadjustedResult = results[Random.Shared.Next(results.Count)];
             }
 
             if (unadjustedResult is not null)
@@ -64,7 +64,7 @@ namespace Orleans.Runtime.GrainDirectory
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static GrainId ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
 
-        public void CachePlacementDecision(GrainAddress address) { }
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) { }
 
         public void InvalidateCache(GrainId grainId) { }
 

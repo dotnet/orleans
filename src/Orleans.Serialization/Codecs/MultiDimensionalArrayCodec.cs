@@ -126,7 +126,7 @@ namespace Orleans.Serialization.Codecs
                         }
                     case 1:
                         {
-                            if (result is null)
+                            if (result is null || indices is null || lengths is null)
                             {
                                 return ThrowLengthsFieldMissing();
                             }

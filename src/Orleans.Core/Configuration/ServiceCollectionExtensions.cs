@@ -28,8 +28,17 @@ namespace Orleans.Configuration.Internal
         /// <param name="implementation">The implementation of <paramref name="service"/>.</param>
         public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
         {
-            var registration = services.FirstOrDefault(s => s.ServiceType == implementation);
-            if (registration == null)
+            ServiceDescriptor registration = null;
+            foreach (var descriptor in services)
+            {
+                if (descriptor.ServiceType == implementation)
+                {
+                    registration = descriptor;
+                    break;
+                }
+            }
+
+            if (registration is null)
             {
                 throw new ArgumentNullException(nameof(implementation), $"Unable to find previously registered ServiceType of '{implementation.FullName}'");
             }

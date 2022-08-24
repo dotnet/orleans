@@ -43,13 +43,13 @@ namespace UnitTests.Grains
 
         public Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
-            this.logger.Info("Inside grain {0} CallNext_1().", Id);
+            this.logger.LogInformation("Inside grain {Id} CallNext_1().", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
-            this.logger.Info("Inside grain {0} CallNext_2().", Id);
+            this.logger.LogInformation("Inside grain {Id} CallNext_2().", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }
@@ -59,17 +59,17 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         public DeadlockReentrantGrain(ILoggerFactory loggerFactory) => this.logger = loggerFactory.CreateLogger(this.Id);
-        private string Id { get { return String.Format("DeadlockReentrantGrain {0}", base.IdentityString); } }
+        private string Id => $"DeadlockReentrantGrain {base.IdentityString}";
 
         public Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
-            this.logger.Info("Inside grain {0} CallNext_1()", Id);
+            this.logger.LogInformation("Inside grain {Id} CallNext_1()", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
-            this.logger.Info("Inside grain {0} CallNext_2()", Id);
+            this.logger.LogInformation("Inside grain {Id} CallNext_2()", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }

@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Generic;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies a client-side observer object.
     /// </summary>
-    internal readonly struct ObserverGrainId : IEquatable<ObserverGrainId>, IComparable<ObserverGrainId>
+    internal readonly struct ObserverGrainId : IEquatable<ObserverGrainId>, IComparable<ObserverGrainId>, ISpanFormattable
     {
         /// <summary>
         /// The separator between the client id portion of the observer id and the client-scoped observer id portion.
@@ -120,13 +120,18 @@ namespace Orleans.Runtime
         public bool Equals(ObserverGrainId other) => this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is ObserverGrainId observer && this.Equals(observer);
+        public override bool Equals(object? obj) => obj is ObserverGrainId observer && this.Equals(observer);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainId.GetHashCode();
 
         /// <inheritdoc/>
         public override string ToString() => this.GrainId.ToString();
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
         public int CompareTo(ObserverGrainId other) => this.GrainId.CompareTo(other.GrainId);
@@ -178,25 +183,5 @@ namespace Orleans.Runtime
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.</returns>
         public static bool operator >=(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) >= 0;
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="ObserverGrainId"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<ObserverGrainId>, IComparer<ObserverGrainId>
-        {
-            /// <summary>
-            /// Gets the singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(ObserverGrainId x, ObserverGrainId y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(ObserverGrainId x, ObserverGrainId y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(ObserverGrainId obj) => obj.GetHashCode();
-        }
     }
 }

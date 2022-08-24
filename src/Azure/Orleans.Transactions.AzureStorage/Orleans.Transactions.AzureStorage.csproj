@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Transactions.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Transactions on Azure</Title>
-    <Description>Azure Transaction library of Microsoft Orleans used on the server.</Description>
+    <Title>Microsoft Orleans Azure Storage Transactions Provider</Title>
+    <Description>Microsoft Orleans transactions storage provider backed by Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Transactions</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Transactions.AzureStorage</AssemblyName>

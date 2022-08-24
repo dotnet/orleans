@@ -2,20 +2,17 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Networking.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using Orleans.Timers.Internal;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
@@ -102,7 +99,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
     {
         if (await _acceptQueue.Reader.WaitToReadAsync(cancellationToken))
         {
-            while (_acceptQueue.Reader.TryRead(out var item))
+            if (_acceptQueue.Reader.TryRead(out var item))
             {
                 var remoteConnectionContext = item.Connection;
                 var localConnectionContext = InMemoryTransportConnection.Create(
@@ -181,7 +178,7 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
         _hub = hub;
         _loggerFactory = loggerFactory;
         _memoryPool = memoryPool;
-        _localEndpoint = new IPEndPoint(IPAddress.Loopback, ThreadSafeRandom.Next(1024, ushort.MaxValue - 1024));
+        _localEndpoint = new IPEndPoint(IPAddress.Loopback, Random.Shared.Next(1024, ushort.MaxValue - 1024));
     }
 
     public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken = default)

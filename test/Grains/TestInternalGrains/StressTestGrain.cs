@@ -30,7 +30,7 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
 
             return Task.CompletedTask;
         }
@@ -124,7 +124,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
@@ -220,7 +220,7 @@ namespace UnitTests.Grains
                 Func<Task> func = (
                     async () =>
                     {
-                        await Task.Delay(ThreadSafeRandom.NextTimeSpan(delay));
+                        await Task.Delay(RandomTimeSpan.Next(delay));
                         int fileMetadata = capture;
                         if ((fileMetadata%2) == 0)
                         {
@@ -239,7 +239,7 @@ namespace UnitTests.Grains
                 int fileId = keyValuePair.Key;
                 Func<Task> func = (async () =>
                 {
-                    await Task.Delay(ThreadSafeRandom.NextTimeSpan(delay));
+                    await Task.Delay(RandomTimeSpan.Next(delay));
                     _ = fileMetadatas[fileId];
                 });
                 tagPromises.Add(func());
@@ -281,7 +281,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.Info("OnActivateAsync");
+            this.logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 

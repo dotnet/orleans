@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests.Interfaces</RootNamespace>
     <AssemblyName>TestInterfaces</AssemblyName>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>$(TestTargetFrameworks)</TargetFramework>
   </PropertyGroup>
 </Project>

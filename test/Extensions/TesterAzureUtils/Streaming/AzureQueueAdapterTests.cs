@@ -60,7 +60,6 @@ namespace Tester.AzureUtils.Streaming
             };
             options.ConfigureTestDefaults();
             var serializer = this.fixture.Services.GetService<Serializer>();
-            var clusterOptions = this.fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
             var queueCacheOptions = new SimpleQueueCacheOptions();
             var queueDataAdapter = new AzureQueueDataAdapterV2(serializer);
             var adapterFactory = new AzureQueueAdapterFactory(
@@ -68,7 +67,6 @@ namespace Tester.AzureUtils.Streaming
                 options,
                 queueCacheOptions,
                 queueDataAdapter,
-                clusterOptions,
                 loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
@@ -194,9 +192,9 @@ namespace Tester.AzureUtils.Streaming
             {
                 if (i % 2 == 0)
                 {
-                    return ThreadSafeRandom.Next(int.MaxValue) as object;
+                    return Random.Shared.Next(int.MaxValue) as object;
                 }
-                return ThreadSafeRandom.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
+                return Random.Shared.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
             }).ToList();
         }
 

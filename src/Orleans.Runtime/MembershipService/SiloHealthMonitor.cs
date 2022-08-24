@@ -1,11 +1,13 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace Orleans.Runtime.MembershipService
@@ -95,6 +97,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         public void Start()
         {
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
             lock (_lockObj)
             {
                 if (_stoppingCancellation.IsCancellationRequested)
@@ -137,7 +140,7 @@ namespace Orleans.Runtime.MembershipService
         {
             ClusterMembershipSnapshot activeMembersSnapshot = default;
             SiloAddress[] otherNodes = default;
-            TimeSpan? overrideDelay = ThreadSafeRandom.NextTimeSpan(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
+            TimeSpan? overrideDelay = RandomTimeSpan.Next(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
             while (await _pingTimer.NextTick(overrideDelay))
             {
                 ProbeResult probeResult;
@@ -168,7 +171,7 @@ namespace Orleans.Runtime.MembershipService
                     else
                     {
                         // Pick a random other node and probe the target indirectly, using the selected node as an intermediary.
-                        var intermediary = otherNodes[ThreadSafeRandom.Next(otherNodes.Length)];
+                        var intermediary = otherNodes[Random.Shared.Next(otherNodes.Length)];
 
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.
@@ -261,7 +264,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (failureException is null)
             {
-                MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                 if (_log.IsEnabled(LogLevel.Trace))
                 {
@@ -279,7 +282,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                 var failedProbes = ++_failedProbes;
                 _log.LogWarning(
@@ -346,14 +349,14 @@ namespace Orleans.Runtime.MembershipService
                             roundTripTimer.Elapsed,
                             indirectResult.ProbeResponseTime);
 
-                        MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
+                        MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                         _failedProbes = 0;
                         probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
                     }
                     else
                     {
-                        MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+                        MessagingInstruments.OnPingReplyMissed(SiloAddress);
 
                         if (indirectResult.IntermediaryHealthScore > 0)
                         {
@@ -397,6 +400,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Represents the result of probing a silo.
         /// </summary>
+        [StructLayout(LayoutKind.Auto)]
         public readonly struct ProbeResult
         {
             private ProbeResult(int failedProbeCount, ProbeResultStatus status, bool isDirectProbe, int intermediaryHealthDegradationScore)
@@ -422,7 +426,7 @@ namespace Orleans.Runtime.MembershipService
             public int IntermediaryHealthDegradationScore { get; }
         }
 
-        public enum ProbeResultStatus
+        public enum ProbeResultStatus : byte
         {
             Unknown,
             Failed,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -21,7 +23,6 @@ namespace Orleans.Runtime
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
         private readonly ActivationCollector activationCollector;
-
         private readonly GrainLocator grainLocator;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
@@ -29,12 +30,9 @@ namespace Orleans.Runtime
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly string localSiloName;
-        private readonly CounterStatistic activationsCreated;
-        private readonly CounterStatistic activationsDestroyed;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly GrainContextActivator grainActivator;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
-
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             GrainLocator grainLocator,
@@ -45,7 +43,6 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             IOptions<GrainCollectionOptions> collectionOptions,
-            RuntimeMessagingTrace messagingTrace,
             GrainContextActivator grainActivator,
             GrainPropertiesResolver grainPropertiesResolver)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
@@ -66,10 +63,8 @@ namespace Orleans.Runtime
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-            IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
-            activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
-            activationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
-            IntValueStatistic.FindOrCreate(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, () =>
+            CatalogInstruments.RegisterActivationCountObserve(() => activations.Count);
+            MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
             {
                 long counter = 0;
                 lock (activations)
@@ -100,7 +95,7 @@ namespace Orleans.Runtime
 
                     // TODO: generic type expansion
                     var grainTypeName = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    
+
                     Dictionary<GrainId, int> grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
@@ -184,7 +179,7 @@ namespace Orleans.Runtime
         public void RegisterMessageTarget(IGrainContext activation)
         {
             activations.RecordNewTarget(activation);
-            activationsCreated.Increment();
+            CatalogInstruments.ActivationsCreated.Add(1);
         }
 
         /// <summary>
@@ -206,7 +201,7 @@ namespace Orleans.Runtime
                 activationCollector.TryCancelCollection(collectibleActivation);
             }
 
-            activationsDestroyed.Increment();
+            CatalogInstruments.ActivationsDestroyed.Add(1);
         }
 
         /// <summary>
@@ -232,17 +227,15 @@ namespace Orleans.Runtime
                 systemTarget,
                 sp.GetRequiredService<ILogger<WorkItemGroup>>(),
                 sp.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                sp.GetRequiredService<SchedulerStatisticsGroup>(),
-                sp.GetRequiredService<IOptions<StatisticsOptions>>(),
                 sp.GetRequiredService<IOptions<SchedulingOptions>>());
-            activations.RecordNewSystemTarget(systemTarget);
+            activations.RecordNewTarget(systemTarget);
         }
 
         public void UnregisterSystemTarget(ISystemTarget target)
         {
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            activations.RemoveSystemTarget(systemTarget);
+            activations.RemoveTarget(systemTarget);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -253,28 +246,33 @@ namespace Orleans.Runtime
         /// Return immediately using a dummy that will queue messages.
         /// Concurrently start creating and initializing the real activation and replace it when it is ready.
         /// </summary>
-        /// <param name="address">Grain's activation address</param>
+        /// <param name="grainId">The grain identity</param>
         /// <param name="requestContextData">Request context data.</param>
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
-            GrainAddress address,
+            in GrainId grainId,
             Dictionary<string, object> requestContextData)
         {
-            if (TryGetGrainContext(address.GrainId, out var result))
+            if (TryGetGrainContext(grainId, out var result))
             {
                 return result;
+            }
+            else if (grainId.IsSystemTarget())
+            {
+                return null;
             }
 
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
             lock (activations)
             {
-                if (TryGetGrainContext(address.GrainId, out result))
+                if (TryGetGrainContext(grainId, out result))
                 {
                     return result;
                 }
 
                 if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
+                    var address = GrainAddress.GetAddress(Silo, grainId, new ActivationId(Guid.NewGuid()));
                     result = this.grainActivator.CreateInstance(address);
                     RegisterMessageTarget(result);
                 }
@@ -285,18 +283,19 @@ namespace Orleans.Runtime
                 // Did not find and did not start placing new
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation {Activation}", address.ToFullString());
+                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation for grain {GrainId}", grainId);
                 }
 
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
+                CatalogInstruments.NonExistentActivations.Add(1);
 
-                this.directory.InvalidateCacheEntry(address);
+                this.directory.InvalidateCacheEntry(grainId);
 
                 // Unregister the target activation so we don't keep getting spurious messages.
                 // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
                 // this request snuck ahead of another request, with new placement requested, for the same activation.
                 // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
                 // we want to make sure that we don't unregister the activation we just created.
+                var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
                 _ = this.UnregisterNonExistentActivation(address);
                 return null;
             }
@@ -343,7 +342,7 @@ namespace Orleans.Runtime
         {
             if (list == null || list.Count == 0) return;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
             var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             await Task.WhenAll(list.Select(activation => activation.DeactivateAsync(reason, timeoutTokenSource.Token)));
@@ -353,7 +352,7 @@ namespace Orleans.Runtime
         {
             if (list == null || list.Count == 0) return;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
             var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             foreach (var activation in list)
@@ -366,7 +365,7 @@ namespace Orleans.Runtime
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
+                logger.LogDebug((int)ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
             }
             var activationsToShutdown = new List<IGrainContext>();
             foreach (var pair in activations)

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 using Orleans;
 
 [GenerateSerializer]
@@ -11,6 +13,34 @@ public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 
     [Id(3)]
     public string StarSign { get; init; }
+}
+
+[GenerateSerializer]
+public record Person2(int Age, string Name)
+{
+    [Id(0)]
+    public string FavouriteColor { get; init; }
+
+    [Id(1)]
+    public string StarSign { get; init; }
+}
+
+[GenerateSerializer(IncludePrimaryConstructorParameters = false)]
+public record Person3(int Age, string Name)
+{
+    [Id(0)]
+    public string FavouriteColor { get; init; }
+
+    [Id(1)]
+    public string StarSign { get; init; }
+}
+
+[GenerateSerializer]
+public record Person4(int Age, string Name);
+
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+public sealed class MyJsonSerializableAttribute : Attribute
+{
 }
 
 [GenerateSerializer]
@@ -177,6 +207,50 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    public class MyNonJsonBaseClass : IEquatable<MyNonJsonBaseClass>
+    {
+        [Id(0)]
+        [JsonProperty]
+        public int IntProperty { get; set; }
+
+        public override string ToString() => $"{nameof(IntProperty)}: {IntProperty}";
+        public bool Equals(MyNonJsonBaseClass other) => other is not null && (ReferenceEquals(this, other) || other.IntProperty == IntProperty);
+        public override bool Equals(object obj) => Equals(obj as MyNonJsonBaseClass);
+        public override int GetHashCode() => HashCode.Combine(IntProperty);
+    }
+
+    [MyJsonSerializable]
+    public class MyJsonClass : MyNonJsonBaseClass, IEquatable<MyJsonClass>
+    {
+        [JsonProperty]
+        public string SubTypeProperty { get; set; }
+
+        public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
+        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal);
+        public override bool Equals(object obj) => Equals(obj as MyJsonClass);
+        public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
+    }
+
+    [GenerateSerializer]
+    public enum MyCustomEnum
+    {
+        None,
+        One,
+        Two,
+        Three
+    }
+
+    [GenerateSerializer]
+    public class RecursiveClass
+    {
+        [Id(0)]
+        public int IntProperty { get; set; }
+
+        [Id(1)]
+        public RecursiveClass RecursiveProperty { get; set; }
+    }
+
+    [GenerateSerializer]
     [WellKnownId(3201)]
     public class SomeClassWithSerializers
     {
@@ -185,8 +259,13 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1)] public int IntField;
 
+        [Id(2)]
+        public object OtherObject { get; set; }
+
+        [NonSerialized]
         public int UnmarkedField;
 
+        [field: NonSerialized]
         public int UnmarkedProperty { get; set; }
 
         public override string ToString() => $"{nameof(IntField)}: {IntField}, {nameof(IntProperty)}: {IntProperty}";

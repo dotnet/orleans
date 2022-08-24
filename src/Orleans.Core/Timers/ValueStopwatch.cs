@@ -15,13 +15,22 @@ namespace Orleans.Runtime
         /// Starts a new instance.
         /// </summary>
         /// <returns>A new, running stopwatch.</returns>
-        public static ValueStopwatch StartNew() => new ValueStopwatch(GetTimestamp());
+        public static ValueStopwatch StartNew() => new(GetTimestamp());
+
+        /// <summary>
+        /// Starts a new instance with an initial elapsed duration.
+        /// </summary>
+        /// <param name="elapsed">
+        /// The initial elapsed duration.
+        /// </param>
+        /// <returns>A new, running stopwatch.</returns>
+        public static ValueStopwatch StartNew(TimeSpan elapsed) => new(GetTimestamp() - (long)(elapsed.TotalSeconds * Stopwatch.Frequency));
         
         private ValueStopwatch(long timestamp)
         {
             this.value = timestamp;
         }
-
+        
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>

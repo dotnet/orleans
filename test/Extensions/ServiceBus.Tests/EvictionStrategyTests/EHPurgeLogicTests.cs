@@ -17,6 +17,7 @@ using Orleans.ServiceBus.Providers.Testing;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
+using Orleans.Statistics;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -31,9 +32,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private ObjectPool<FixedSizeBuffer> bufferPool;
         private TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private EventHubPartitionSettings ehSettings;
+        private NoOpHostEnvironmentStatistics _hostEnvironmentStatistics;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
-        private ITelemetryProducer telemetryProducer;
 
         public EHPurgeLogicTests()
         {
@@ -58,7 +59,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             var oneKB = 1024;
             this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB));
-            this.telemetryProducer = NullTelemetryProducer.Instance;
         }
 
         [Fact, TestCategory("BVT")]
@@ -195,6 +195,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private void InitForTesting()
         {
+            _hostEnvironmentStatistics = new NoOpHostEnvironmentStatistics();
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
             var monitorDimensions = new EventHubReceiverMonitorDimensions
@@ -204,9 +205,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
@@ -253,7 +254,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
         }
 
-        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer)
+        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory)
         {
             var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCacheForTesting)}.{partition}");
             var evictionStrategy = new EHEvictionStrategyForTesting(cacheLogger, null, null, this.purgePredicate);
@@ -267,6 +268,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;
+        }
+
+        private class NoOpHostEnvironmentStatistics : IHostEnvironmentStatistics
+        {
+            public long? TotalPhysicalMemory => null;
+
+            public float? CpuUsage => null;
+
+            public long? AvailableMemory => null;
         }
     }
 }

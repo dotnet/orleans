@@ -34,11 +34,10 @@ namespace Orleans.Streams
 
         public bool RemoveConsumer(GuidId subscriptionId, ILogger logger)
         {
-            StreamConsumerData consumer;
-            if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
+            if (!queueData.Remove(subscriptionId, out var consumer)) return false;
 
             consumer.SafeDisposeCursor(logger);
-            return queueData.Remove(subscriptionId);
+            return true;
         }
 
         public bool Contains(GuidId subscriptionId)

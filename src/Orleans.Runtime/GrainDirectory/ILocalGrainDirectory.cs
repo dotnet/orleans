@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal interface ILocalGrainDirectory : IDhtGrainDirectory
@@ -62,7 +64,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a cache entry for the given activation addrss.
         /// This method is intended to be called whenever a placement decision is made.
         /// </summary>
-        void CachePlacementDecision(GrainAddress activation);
+        void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress);
 
         /// <summary>
         /// For testing purposes only.
@@ -71,7 +73,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        SiloAddress GetPrimaryForGrain(GrainId grain);
+        SiloAddress? GetPrimaryForGrain(GrainId grain);
 
         /// <summary>
         /// Returns the directory information held in a local directory partition for the provided grain ID.
@@ -88,12 +90,12 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        GrainAddress GetLocalCacheData(GrainId grain);
+        GrainAddress? GetLocalCacheData(GrainId grain);
 
         /// <summary>
         /// Attempts to find the specified grain in the directory cache.
         /// </summary>
-        bool TryCachedLookup(GrainId grainId, out GrainAddress address);
+        bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
 
         /// <summary>
         /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not

@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using Orleans.Internal;
+using System.Reflection.Metadata;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -75,8 +76,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         this.log.LogError(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
-                            "Failed to update table entry for this silo, will retry shortly: {Exception}",
-                            exception);
+                            exception,
+                            "Failed to update table entry for this silo, will retry shortly");
 
                         // Retry quickly
                         onceOffDelay = TimeSpan.FromMilliseconds(200);
@@ -85,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError("Error updating liveness timestamp: {Exception}", exception);
+                this.log.LogError(exception, "Error updating liveness timestamp");
                 this.fatalErrorHandler.OnFatalException(this, nameof(UpdateIAmAlive), exception);
             }
             finally
@@ -113,8 +114,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogInformation(
                     (int)ErrorCode.MembershipFailedToBecomeActive,
-                    "BecomeActive failed: {Exception}",
-                    exception);
+                    exception,
+                    "BecomeActive failed");
                 throw;
             }
         }
@@ -177,7 +178,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception) when (canContinue)
                 {
-                    this.log.LogError("Failed to validate initial cluster connectivity: {Exception}", exception);
+                    this.log.LogError(exception, "Failed to validate initial cluster connectivity");
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
 
@@ -267,14 +268,17 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.LogInformation((int)ErrorCode.MembershipJoining, "Joining");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToJoin, "Error updating status to Joining", exc);
+                this.log.LogError(
+                    (int)ErrorCode.MembershipFailedToJoin,
+                    exc,
+                    "Error updating status to Joining");
                 throw;
             }
         }
@@ -283,7 +287,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                this.log.Debug(ErrorCode.MembershipShutDown, "-Shutdown");
+                this.log.LogDebug((int)ErrorCode.MembershipShutDown, "-Shutdown");
             }
             
             try
@@ -292,7 +296,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error updating status to ShuttingDown", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToShutdown, exc, "Error updating status to ShuttingDown");
                 throw;
             }
         }
@@ -301,7 +305,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                log.Debug(ErrorCode.MembershipStop, "-Stop");
+                log.LogDebug((int)ErrorCode.MembershipStop, "-Stop");
             }
 
             try
@@ -310,7 +314,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.MembershipFailedToStop, "Error updating status to Stopping", exc);
+                log.LogError((int)ErrorCode.MembershipFailedToStop, exc, "Error updating status to Stopping");
                 throw;
             }
         }
@@ -332,8 +336,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogError(
                     (int)ErrorCode.MembershipFailedToKillMyself,
-                    "Failure updating status to " + nameof(SiloStatus.Dead) + ": {Exception}",
-                    exception);
+                    exception,
+                    "Failure updating status to " + nameof(SiloStatus.Dead));
                 throw;
             }
         }

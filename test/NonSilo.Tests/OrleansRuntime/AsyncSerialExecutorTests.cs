@@ -71,7 +71,7 @@ namespace UnitTests.OrleansRuntime
         {
             if (operationsInProgress > 0) Assert.True(false, $"1: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
             operationsInProgress++;
-            var delay = ThreadSafeRandom.NextTimeSpan(TimeSpan.FromSeconds(2));
+            var delay = RandomTimeSpan.Next(TimeSpan.FromSeconds(2));
 
             output.WriteLine("Task {0} Staring", opNumber);
             await Task.Delay(delay);

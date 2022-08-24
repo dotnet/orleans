@@ -25,21 +25,19 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// </summary>
         private const long StringLength = 15L;
 
-        internal record TestData(string GrainType, Func<IInternalGrainFactory, GrainReference> GrainGetter, GrainState<TestState1> GrainState);
-
-        public static TestData GetTestData(int testNum) => testNum switch
+        public static (string, GrainId, GrainState<TestState1>) GetTestData(int testNum) => testNum switch
         {
-            0 => new TestData(
+            0 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory, extensionKey: false),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(),
                 new GrainState<TestState1> { State = new TestState1 { A = RandomUtilities.GetRandomCharacters(Symbols, StringLength), B = 1, C = 4 } }),
-            1 => new TestData(
+            1 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory, true),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(true),
                 new GrainState<TestState1> { State = new TestState1 { A = RandomUtilities.GetRandomCharacters(Symbols, StringLength), B = 2, C = 5 } }),
-            2 => new TestData(
+            2 => (
                 GrainTypeGenerator.GetGrainType<TGrainKey>(),
-                grainFactory => RandomUtilities.GetRandomGrainReference<TGrainKey>(grainFactory, true),
+                RandomUtilities.GetRandomGrainId<TGrainKey>(true),
                 new GrainState<TestState1> { State = new TestState1 { A = RandomUtilities.GetRandomCharacters(Symbols, StringLength), B = 3, C = 6 } }),
             _ => throw new IndexOutOfRangeException(),
 

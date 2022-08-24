@@ -1,6 +1,10 @@
 using System;
+using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
+#nullable enable
 namespace Orleans
 {
     /// <summary>
@@ -9,6 +13,7 @@ namespace Orleans
     /// <seealso href="https://en.wikipedia.org/wiki/Jenkins_hash_function"/>
     public static class JenkinsHash
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Mix(ref uint a, ref uint b, ref uint c)
         {
             a -= b; a -= c; a ^= (c >> 13);
@@ -31,69 +36,45 @@ namespace Orleans
         /// <returns>
         /// A hash digest of the input.
         /// </returns>
-        public static uint ComputeHash(byte[] data)
-        {
-            return ComputeHash(data.AsSpan());
-        }
-
-        /// <summary>
-        /// Computes a hash digest of the input.
-        /// </summary>
-        /// <param name="data">
-        /// The input data.
-        /// </param>
-        /// <returns>
-        /// A hash digest of the input.
-        /// </returns>
         public static uint ComputeHash(ReadOnlySpan<byte> data)
         {
             int len = data.Length;
             uint a = 0x9e3779b9;
             uint b = a;
             uint c = 0;
-            int i = 0;
+            ref var buf = ref MemoryMarshal.GetReference(data);
 
-            while (i + 12 <= len)
+            var remaining = len;
+            for (; remaining >= 12; remaining -= 12)
             {
-                a += (uint)data[i++] |
-                    ((uint)data[i++] << 8) |
-                    ((uint)data[i++] << 16) |
-                    ((uint)data[i++] << 24);
-                b += (uint)data[i++] |
-                    ((uint)data[i++] << 8) |
-                    ((uint)data[i++] << 16) |
-                    ((uint)data[i++] << 24);
-                c += (uint)data[i++] |
-                    ((uint)data[i++] << 8) |
-                    ((uint)data[i++] << 16) |
-                    ((uint)data[i++] << 24);
+                a += ReadUInt32(ref buf);
+                b += ReadUInt32(ref Unsafe.AddByteOffset(ref buf, 4));
+                c += ReadUInt32(ref Unsafe.AddByteOffset(ref buf, 8));
                 Mix(ref a, ref b, ref c);
+                buf = ref Unsafe.AddByteOffset(ref buf, 12);
             }
             c += (uint)len;
-            if (i < len)
-                a += data[i++];
-            if (i < len)
-                a += (uint)data[i++] << 8;
-            if (i < len)
-                a += (uint)data[i++] << 16;
-            if (i < len)
-                a += (uint)data[i++] << 24;
-            if (i < len)
-                b += (uint)data[i++];
-            if (i < len)
-                b += (uint)data[i++] << 8;
-            if (i < len)
-                b += (uint)data[i++] << 16;
-            if (i < len)
-                b += (uint)data[i++] << 24;
-            if (i < len)
-                c += (uint)data[i++] << 8;
-            if (i < len)
-                c += (uint)data[i++] << 16;
-            if (i < len)
-                c += (uint)data[i++] << 24;
+
+            switch (remaining)
+            {
+                case 11: c += (uint)Unsafe.AddByteOffset(ref buf, 10) << 24; goto case 10;
+                case 10: c += (uint)Unsafe.AddByteOffset(ref buf, 9) << 16; goto case 9;
+                case 9: c += (uint)Unsafe.AddByteOffset(ref buf, 8) << 8; goto case 8;
+                case 8: b += ReadUInt32(ref Unsafe.AddByteOffset(ref buf, 4)); goto case 4;
+                case 7: b += (uint)Unsafe.AddByteOffset(ref buf, 6) << 16; goto case 6;
+                case 6: b += (uint)Unsafe.AddByteOffset(ref buf, 5) << 8; goto case 5;
+                case 5: b += (uint)Unsafe.AddByteOffset(ref buf, 4); goto case 4;
+                case 4: a += ReadUInt32(ref buf); break;
+                case 3: a += (uint)Unsafe.AddByteOffset(ref buf, 2) << 16; goto case 2;
+                case 2: a += (uint)Unsafe.AddByteOffset(ref buf, 1) << 8; goto case 1;
+                case 1: a += buf; break;
+            }
+
             Mix(ref a, ref b, ref c);
             return c;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static uint ReadUInt32(ref byte buf) => BitConverter.IsLittleEndian ? Unsafe.ReadUnaligned<uint>(ref buf) : BinaryPrimitives.ReverseEndianness(Unsafe.ReadUnaligned<uint>(ref buf));
         }
 
         /// <summary>
@@ -105,11 +86,7 @@ namespace Orleans
         /// <returns>
         /// A hash digest of the input.
         /// </returns>
-        public static uint ComputeHash(string data)
-        {
-            byte[] bytesToHash = Encoding.UTF8.GetBytes(data);
-            return ComputeHash(bytesToHash);
-        }
+        public static uint ComputeHash(string data) => ComputeHash(BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(data.AsSpan()) : Encoding.Unicode.GetBytes(data));
 
         /// <summary>
         /// Computes a hash digest of the input.
@@ -138,12 +115,12 @@ namespace Orleans
             unchecked
             {
                 a += (uint)u1;
-                b += (uint)((u1 ^ (uint)u1) >> 32);
+                b += (uint)(u1 >> 32);
                 c += (uint)u2;
                 Mix(ref a, ref b, ref c);
-                a += (uint)((u2 ^ (uint)u2) >> 32);
+                a += (uint)(u2 >> 32);
                 b += (uint)u3;
-                c += (uint)((u3 ^ (uint)u3) >> 32);
+                c += (uint)(u3 >> 32);
             }
             Mix(ref a, ref b, ref c);
             c += 24;

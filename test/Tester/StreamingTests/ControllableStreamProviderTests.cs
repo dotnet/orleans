@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
@@ -42,35 +43,35 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private readonly Fixture fixture;
+        private readonly Fixture _fixture;
 
         public ControllableStreamProviderTests(Fixture fixture)
         {
-            this.fixture = fixture;
+            _fixture = fixture;
         }        
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ControllableAdapterEchoTest()
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterEchoTest *********************************");
+            _fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             const string echoArg = "blarg";
-            await this.ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterEcho, echoArg);
+            await ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterEcho, echoArg);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ControllableAdapterFactoryEchoTest()
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterFactoryEchoTest *********************************");
+            _fixture.Logger.LogInformation("************************ ControllableAdapterFactoryEchoTest *********************************");
             const string echoArg = "blarg";
-            await this.ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterFactoryEcho, echoArg);
+            await ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands.AdapterFactoryEcho, echoArg);
         }
 
         private async Task ControllableAdapterEchoTestRunner(ControllableTestStreamProviderCommands command, object echoArg)
         {
-            this.fixture.Logger.Info("************************ ControllableAdapterEchoTest *********************************");
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            _fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
+            var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
+            object[] results = await mgmt.SendControlCommandToProvider(_fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
             Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)

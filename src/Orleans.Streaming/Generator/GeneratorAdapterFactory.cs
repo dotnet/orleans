@@ -38,7 +38,6 @@ namespace Orleans.Providers.Streams.Generator
         private readonly StreamStatisticOptions statisticOptions;
         private readonly IServiceProvider serviceProvider;
         private readonly Serialization.Serializer serializer;
-        private readonly ITelemetryProducer telemetryProducer;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<GeneratorAdapterFactory> logger;
         private IStreamGeneratorConfig generatorConfig;
@@ -61,19 +60,19 @@ namespace Orleans.Providers.Streams.Generator
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, ITelemetryProducer, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory;
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, ITelemetryProducer, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory;
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
         
         public GeneratorAdapterFactory(
             string providerName,
@@ -81,7 +80,6 @@ namespace Orleans.Providers.Streams.Generator
             StreamStatisticOptions statisticOptions,
             IServiceProvider serviceProvider,
             Serialization.Serializer serializer,
-            ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
@@ -89,7 +87,6 @@ namespace Orleans.Providers.Streams.Generator
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
-            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<GeneratorAdapterFactory>();
         }
@@ -101,11 +98,11 @@ namespace Orleans.Providers.Streams.Generator
         {
             this.receivers = new ConcurrentDictionary<QueueId, Receiver>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions, telemetryProducer) => new DefaultCacheMonitor(dimensions, telemetryProducer);
+                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
+                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
+                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
@@ -120,7 +117,7 @@ namespace Orleans.Providers.Streams.Generator
                 // 1 meg block size pool
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
@@ -159,9 +156,12 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
-            var receiver = receivers.GetOrAdd(queueId, new Receiver(receiverMonitor));
+            if (!receivers.TryGetValue(queueId, out var receiver))
+            {
+                var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
+                var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
+                receiver = receivers.GetOrAdd(queueId, new Receiver(receiverMonitor));
+            }
             SetGeneratorOnReceiver(receiver);
             return receiver;
         }
@@ -208,7 +208,7 @@ namespace Orleans.Providers.Streams.Generator
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(ThreadSafeRandom.Next(1,MaxDelayMs));
+                await Task.Delay(Random.Shared.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {
@@ -260,7 +260,7 @@ namespace Orleans.Providers.Streams.Generator
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side.
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
-            var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
+            var cacheMonitor = this.CacheMonitorFactory(dimensions);
             return new GeneratorPooledCache(
                 bufferPool,
                 this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"),

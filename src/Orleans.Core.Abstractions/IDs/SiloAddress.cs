@@ -1,17 +1,18 @@
 using System;
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Buffers.Text;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -21,16 +22,16 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
+    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, ISpanFormattable
     {
         [NonSerialized]
-        private int hashCode = 0;
+        private int hashCode;
 
         [NonSerialized]
-        private bool hashCodeSet = false;
+        private bool hashCodeSet;
 
         [NonSerialized]
-        private List<uint> uniformHashCache;
+        private uint[]? uniformHashCache;
 
         /// <summary>
         /// Gets the endpoint.
@@ -45,16 +46,16 @@ namespace Orleans.Runtime
         public int Generation { get; private set; }
 
         [NonSerialized]
-        private byte[] utf8;
+        private byte[]? utf8;
 
         private const char SEPARATOR = '@';
 
-        private static readonly long epoch = new DateTime(2010, 1, 1).Ticks;
+        private static readonly long epoch = new DateTime(2022, 1, 1).Ticks;
 
-        private static readonly Interner<Key, SiloAddress> siloAddressInterningCache = new Interner<Key, SiloAddress>(InternerConstants.SIZE_MEDIUM);
+        private static readonly Interner<(IPAddress Address, int Port, int Generation), SiloAddress> siloAddressInterningCache = new(InternerConstants.SIZE_MEDIUM);
 
         /// <summary>Gets the special constant value which indicate an empty <see cref="SiloAddress"/>.</summary>
-        public static SiloAddress Zero { get; } = New(new IPEndPoint(0, 0), 0);
+        public static SiloAddress Zero { get; } = New(new IPAddress(0), 0, 0);
 
         /// <summary>
         /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
@@ -64,7 +65,23 @@ namespace Orleans.Runtime
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
-            return siloAddressInterningCache.FindOrCreate(new Key(ep, gen), k => new SiloAddress(k.Endpoint, k.Generation));
+            return siloAddressInterningCache.FindOrCreate((ep.Address, ep.Port, gen),
+                // Normalize endpoints
+                (k, ep) => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(ep, k.Generation), ep);
+        }
+
+        /// <summary>
+        /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
+        /// </summary>
+        /// <param name="address">IP address of the silo.</param>
+        /// <param name="port">Port number</param>
+        /// <param name="generation">Generation number of the silo.</param>
+        /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
+        public static SiloAddress New(IPAddress address, int port, int generation)
+        {
+            return siloAddressInterningCache.FindOrCreate((address, port, generation),
+                // Normalize endpoints
+                k => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(new(k.Address, k.Port), k.Generation));
         }
 
         /// <summary>
@@ -74,12 +91,6 @@ namespace Orleans.Runtime
         /// <param name="generation">The generation.</param>
         private SiloAddress(IPEndPoint endpoint, int generation)
         {
-            // Normalize endpoints
-            if (endpoint.Address.IsIPv4MappedToIPv6)
-            {
-                endpoint = new IPEndPoint(endpoint.Address.MapToIPv4(), endpoint.Port);
-            }
-
             Endpoint = endpoint;
             Generation = generation;
         }
@@ -106,30 +117,27 @@ namespace Orleans.Runtime
             // This must be the "inverse" of FromParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
             if (utf8 != null) return Encoding.UTF8.GetString(utf8);
-            return String.Format("{0}:{1}@{2}", Endpoint.Address, Endpoint.Port, Generation);
+            return $"{new SpanFormattableIPAddress(Endpoint.Address)}:{Endpoint.Port}@{Generation}";
         }
 
         /// <summary>
         /// Returns a UTF8-encoded representation of this instance as a byte array.
         /// </summary>
         /// <returns>A UTF8-encoded representation of this instance as a byte array.</returns>
-        internal unsafe byte[] ToUtf8String()
+        internal byte[] ToUtf8String()
         {
             if (utf8 is null)
             {
-                var addr = Endpoint.Address.ToString();
+                Span<char> chars = stackalloc char[45];
+                var addr = Endpoint.Address.TryFormat(chars, out var len) ? chars[..len] : Endpoint.Address.ToString().AsSpan();
                 var size = Encoding.UTF8.GetByteCount(addr);
 
                 // Allocate sufficient room for: address + ':' + port + '@' + generation
                 Span<byte> buf = stackalloc byte[size + 1 + 11 + 1 + 11];
-                fixed (char* src = addr)
-                fixed (byte* dst = buf)
-                {
-                    size = Encoding.UTF8.GetBytes(src, addr.Length, dst, buf.Length);
-                }
+                size = Encoding.UTF8.GetBytes(addr, buf);
 
                 buf[size++] = (byte)':';
-                var success = Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out var len);
+                var success = Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out len);
                 Debug.Assert(success);
                 Debug.Assert(len > 0);
                 Debug.Assert(len <= 11);
@@ -160,20 +168,14 @@ namespace Orleans.Runtime
 
             // First is the IPEndpoint; then '@'; then the generation
             int atSign = addr.LastIndexOf(SEPARATOR);
-            if (atSign < 0)
-            {
-                throw new FormatException("Invalid string SiloAddress: " + addr);
-            }
             // IPEndpoint is the host, then ':', then the port
             int lastColon = addr.LastIndexOf(':', atSign - 1);
-            if (lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
+            if (atSign < 0 || lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
 
-            var hostString = addr.Substring(0, lastColon);
-            var host = IPAddress.Parse(hostString);
-            var portString = addr.Substring(lastColon + 1, atSign - lastColon - 1);
-            int port = int.Parse(portString, NumberStyles.None);
-            var gen = int.Parse(addr.Substring(atSign + 1), NumberStyles.None);
-            return New(new IPEndPoint(host, port), gen);
+            var host = IPAddress.Parse(addr.AsSpan(0, lastColon));
+            int port = int.Parse(addr.AsSpan(lastColon + 1, atSign - lastColon - 1), NumberStyles.None);
+            var gen = int.Parse(addr.AsSpan(atSign + 1), NumberStyles.None);
+            return New(host, port, gen);
         }
 
         /// <summary>
@@ -195,57 +197,54 @@ namespace Orleans.Runtime
             int lastColon = endpointSlice.LastIndexOf((byte)':');
             if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
 
-            var hostString = endpointSlice.Slice(0, lastColon).GetUtf8String();
+            var ipSlice = endpointSlice[..lastColon];
+            Span<char> buf = stackalloc char[45];
+            var hostString = Encoding.UTF8.GetCharCount(ipSlice) is int len && len <= buf.Length
+                ? buf[..Encoding.UTF8.GetChars(ipSlice, buf)]
+                : Encoding.UTF8.GetString(ipSlice).AsSpan();
             if (!IPAddress.TryParse(hostString, out var host))
                 ThrowInvalidUtf8SiloAddress(addr);
 
             var portSlice = endpointSlice.Slice(lastColon + 1);
-            if (!Utf8Parser.TryParse(portSlice, out int port, out var len) || len < portSlice.Length)
+            if (!Utf8Parser.TryParse(portSlice, out int port, out len) || len < portSlice.Length)
                 ThrowInvalidUtf8SiloAddress(addr);
 
             var genSlice = addr.Slice(atSign + 1);
             if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
                 ThrowInvalidUtf8SiloAddress(addr);
 
-            return New(new IPEndPoint(host, port), generation);
+            return New(host, port, generation);
         }
 
+        [DoesNotReturn]
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
-            => throw new FormatException("Invalid string SiloAddress: " + addr.GetUtf8String());
-
-        [Immutable]
-        private readonly struct Key : IEquatable<Key>
-        {
-            public readonly IPEndPoint Endpoint;
-            public readonly int Generation;
-
-            public Key(IPEndPoint endpoint, int generation)
-            {
-                Endpoint = endpoint;
-                Generation = generation;
-            }
-
-            public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
-
-            public bool Equals(Key other) => Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
-        }
-
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            return string.Format(IsClient ? "C{0}:{1}" : "S{0}:{1}", Endpoint, Generation);
-        }
+            => throw new FormatException("Invalid string SiloAddress: " + Encoding.UTF8.GetString(addr));
 
         /// <summary>
         /// Return a long string representation of this SiloAddress.
         /// </summary>
         /// <remarks>
-        /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
+        /// Note: This string value is not comparable with the <see cref="FromParsableString"/> method -- use the <see cref="ToParsableString"/> method for that purpose.
         /// </remarks>
         /// <returns>String representation of this SiloAddress.</returns>
-        public string ToLongString()
+        public override string ToString() => $"{this}";
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
-            return ToString();
+            if (!destination.TryWrite($"{(IsClient ? 'C' : 'S')}{new SpanFormattableIPEndPoint(Endpoint)}:{Generation}", out charsWritten))
+                return false;
+
+            if (format.Length == 1 && format[0] == 'H')
+            {
+                if (!destination[charsWritten..].TryWrite($"/x{GetConsistentHashCode():X8}", out var len))
+                    return false;
+
+                charsWritten += len;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -255,49 +254,50 @@ namespace Orleans.Runtime
         /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
         /// </remarks>
         /// <returns>String representation of this SiloAddress.</returns>
-        public string ToStringWithHashCode()
-        {
-            return string.Format(IsClient ? "C{0}:{1}/x{2:X8}" : "S{0}:{1}/x{2:X8}", Endpoint, Generation, GetConsistentHashCode());
-        }
+        public string ToStringWithHashCode() => $"{this:H}";
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => Equals(obj as SiloAddress);
+        public override bool Equals(object? obj) => Equals(obj as SiloAddress);
 
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
 
         /// <summary>Returns a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
-        public int GetConsistentHashCode()
-        {
-            if (hashCodeSet) return hashCode;
+        public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
 
-            string siloAddressInfoToHash = Endpoint.ToString() + Generation.ToString(CultureInfo.InvariantCulture);
-            hashCode = CalculateIdHash(siloAddressInfoToHash);
+        private int CalculateConsistentHashCode()
+        {
+            ulong u1, u2, u3;
+            var address = Endpoint.Address;
+            if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
+                var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
+                address.TryWriteBytes(buf, out var len);
+                Debug.Assert(len == buf.Length);
+                u1 = BinaryPrimitives.ReadUInt64LittleEndian(buf);
+                u2 = BinaryPrimitives.ReadUInt64LittleEndian(buf[8..]);
+            }
+            else
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                u1 = (ulong)address.Address;
+#pragma warning restore CS0618
+                u2 = 0;
+            }
+
+            u3 = ((ulong)(uint)Endpoint.Port << 32) | (uint)Generation;
+
+            hashCode = (int)JenkinsHash.ComputeHash(u1, u2, u3);
             hashCodeSet = true;
             return hashCode;
         }
 
-        // This is the same method as Utils.CalculateIdHash
-        private static int CalculateIdHash(string text)
+        internal void InternalSetConsistentHashCode(int hashCode)
         {
-            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
-            int hash = 0;
-            try
-            {
-                byte[] data = Encoding.Unicode.GetBytes(text);
-                byte[] result = sha.ComputeHash(data);
-                for (int i = 0; i < result.Length; i += 4)
-                {
-                    int tmp = (result[i] << 24) | (result[i + 1] << 16) | (result[i + 2] << 8) | (result[i + 3]);
-                    hash = hash ^ tmp;
-                }
-            }
-            finally
-            {
-                sha.Dispose();
-            }
-            return hash;
+            this.hashCode = hashCode;
+            this.hashCodeSet = true;
         }
 
         /// <summary>
@@ -305,15 +305,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="numHashes">The number of hash codes to return.</param>
         /// <returns>A collection of uniform hash codes variants for this instance.</returns>
-        public List<uint> GetUniformHashCodes(int numHashes)
-        {
-            if (uniformHashCache != null) return uniformHashCache;
+        public uint[] GetUniformHashCodes(int numHashes) => uniformHashCache ??= GetUniformHashCodesImpl(numHashes);
 
-            uniformHashCache = GetUniformHashCodesImpl(numHashes);
-            return uniformHashCache;
-        }
-
-        private List<uint> GetUniformHashCodesImpl(int numHashes)
+        private uint[] GetUniformHashCodesImpl(int numHashes)
         {
             Span<byte> bytes = stackalloc byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
 
@@ -328,7 +322,8 @@ namespace Orleans.Runtime
             }
             else // IPv6
             {
-                address.GetAddressBytes().CopyTo(bytes);
+                address.TryWriteBytes(bytes, out var len);
+                Debug.Assert(len == 16);
             }
             var offset = 16;
             // Port
@@ -338,11 +333,11 @@ namespace Orleans.Runtime
             BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Generation);
             offset += sizeof(int);
 
-            var hashes = new List<uint>(numHashes);
+            var hashes = new uint[numHashes];
             for (int extraBit = 0; extraBit < numHashes; extraBit++)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
-                hashes.Add(JenkinsHash.ComputeHash(bytes));
+                hashes[extraBit] = JenkinsHash.ComputeHash(bytes);
             }
             return hashes;
         }
@@ -352,17 +347,15 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other"> The other SiloAddress to compare this one with. </param>
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
-        internal bool Matches(SiloAddress other)
+        internal bool Matches([NotNullWhen(true)] SiloAddress? other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && (Endpoint.Port == other.Endpoint.Port) &&
-                ((Generation == other.Generation) || (Generation == 0) || (other.Generation == 0));
+            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
+                (Generation == other.Generation || Generation == 0 || other.Generation == 0);
         }
 
         /// <inheritdoc/>
-        public bool Equals(SiloAddress other)
-        {
-            return other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
-        }
+        public bool Equals([NotNullWhen(true)] SiloAddress? other)
+            => other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
@@ -373,10 +366,8 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
-        internal bool IsSameLogicalSilo(SiloAddress other)
-        {
-            return other != null && this.Endpoint.Address.Equals(other.Endpoint.Address) && this.Endpoint.Port == other.Endpoint.Port;
-        }
+        internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
+            => other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
@@ -387,10 +378,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsSuccessorOf(SiloAddress other)
-        {
-            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation > other.Generation;
-        }
+        public bool IsSuccessorOf(SiloAddress other) => IsSameLogicalSilo(other) && other.Generation > 0 && Generation > other.Generation;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
@@ -401,19 +389,10 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsPredecessorOf(SiloAddress other)
-        {
-            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation < other.Generation;
-        }
+        public bool IsPredecessorOf(SiloAddress other) => IsSameLogicalSilo(other) && Generation > 0 && Generation < other.Generation;
 
         /// <inheritdoc/>
-        public int CompareTo(object obj)
-        {
-            return CompareTo((SiloAddress)obj);
-        }
-
-        /// <inheritdoc/>
-        public int CompareTo(SiloAddress other)
+        public int CompareTo(SiloAddress? other)
         {
             if (other == null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
@@ -449,33 +428,27 @@ namespace Orleans.Runtime
 #pragma warning restore CS0618
             }
 
-            byte[] b1 = one.GetAddressBytes();
-            byte[] b2 = two.GetAddressBytes();
+            Span<byte> b1 = stackalloc byte[16];
+            one.TryWriteBytes(b1, out var len);
+            Debug.Assert(len == 16);
 
-            for (int i = 0; i < b1.Length; i++)
-            {
-                if (b1[i] < b2[i])
-                {
-                    return -1;
-                }
-                else if (b1[i] > b2[i])
-                {
-                    return 1;
-                }
-            }
-            return 0;
+            Span<byte> b2 = stackalloc byte[16];
+            two.TryWriteBytes(b2, out len);
+            Debug.Assert(len == 16);
+
+            return b1.SequenceCompareTo(b2);
         }
     }
 
     /// <summary>
     /// Functionality for converting <see cref="SiloAddress"/> instances to and from their JSON representation.
     /// </summary>
-    public class SiloAddressConverter : JsonConverter<SiloAddress>
+    public sealed class SiloAddressConverter : JsonConverter<SiloAddress>
     {
         /// <inheritdoc />
-        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString());
+        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToParsableString());
+        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
     }
 }

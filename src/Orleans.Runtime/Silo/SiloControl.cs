@@ -89,33 +89,33 @@ namespace Orleans.Runtime
 
         public Task Ping(string message)
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.Info("ForceGarbageCollection");
+            logger.LogInformation("ForceGarbageCollection");
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.Info("ForceActivationCollection");
+            logger.LogInformation("ForceActivationCollection");
             return _activationCollector.CollectActivations(ageLimit);
         }
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ForceRuntimeStatisticsCollection");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
             return this.deploymentLoadPublisher.RefreshStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
             var activationCount = this.activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
                 activationCount,
@@ -129,26 +129,26 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.Info("GetGrainStatistics");
+            logger.LogInformation("GetGrainStatistics");
             return Task.FromResult(this.catalog.GetGrainStatistics());
         }
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetDetailedGrainStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
-            logger.Info("GetSimpleGrainStatistics");
+            logger.LogInformation("GetSimpleGrainStatistics");
             return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
-            logger.Info("DetailedGrainReport for grain id {0}", grainId);
+            logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
             return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
         }
 
@@ -162,9 +162,12 @@ namespace Orleans.Runtime
             IControllable controllable;
             if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
             {
-                string error = $"Could not find a controllable service for type {providerTypeFullName} and name {providerName}.";
-                logger.Error(ErrorCode.Provider_ProviderNotFound, error);
-                throw new ArgumentException(error);
+                logger.LogError(
+                    (int)ErrorCode.Provider_ProviderNotFound,
+                    "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.",
+                    providerTypeFullName,
+                    providerName);
+                throw new ArgumentException($"Could not find a controllable service for type {providerTypeFullName} and name {providerName}.");
             }
 
             return controllable.ExecuteCommand(command, arg);

@@ -48,7 +48,6 @@ namespace Orleans.Runtime
         private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime;
-        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -58,7 +57,6 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
-            ApplicationRequestsStatisticsGroup appRequestStatistics,
             MessagingTrace messagingTrace,
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceIdResolver,
@@ -77,7 +75,6 @@ namespace Orleans.Runtime
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
-            this.appRequestStatistics = appRequestStatistics;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
 
@@ -85,14 +82,12 @@ namespace Orleans.Runtime
                 msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.appRequestStatistics,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.appRequestStatistics,
                 this.messagingOptions.SystemResponseTimeout);
         }
 
@@ -103,7 +98,7 @@ namespace Orleans.Runtime
         private SiloAddress MySilo { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
-        
+
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private GrainLocator GrainLocator
@@ -136,11 +131,9 @@ namespace Orleans.Runtime
             {
                 var clientAddress = this.HostedClient.Address;
                 message.SendingGrain = clientAddress.GrainId;
-                message.SendingActivation = clientAddress.ActivationId;
             }
             else
             {
-                message.SendingActivation = sendingActivation.ActivationId;
                 message.SendingGrain = sendingActivation.GrainId;
             }
 
@@ -151,9 +144,7 @@ namespace Orleans.Runtime
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
-                message.Category = targetGrainId.Type.Equals(Constants.MembershipServiceType) ?
-                    Message.Categories.Ping : Message.Categories.System;
+                message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
             }
             else
@@ -164,7 +155,11 @@ namespace Orleans.Runtime
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context is null && !oneWay)
             {
-                this.logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
+                this.logger.LogWarning(
+                    (int)ErrorCode.IGC_SendRequest_NullContext,
+                    "Null context {Message}: {StackTrace}",
+                    message,
+                    Utils.GetStackTrace());
             }
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
@@ -193,7 +188,7 @@ namespace Orleans.Runtime
             // Don't process messages that have already timed out
             if (request.IsExpired)
             {
-                this.messagingTrace.OnDropExpiredMessage(request, MessagingStatisticsGroup.Phase.Respond);
+                this.messagingTrace.OnDropExpiredMessage(request, MessagingInstruments.Phase.Respond);
                 return;
             }
 
@@ -224,12 +219,12 @@ namespace Orleans.Runtime
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
                 //// We don't record sending addresses for requests, since it is not clear that this silo ever wants to send messages to the grain sending this request.
-                //// However, it is sure that this silo does send messages to the sender of a reply. 
+                //// However, it is sure that this silo does send messages to the sender of a reply.
                 //// In most cases it will already have its address cached, unless it had a wrong outdated address cached and now this is a fresher address.
                 //// It is anyway always safe to cache the replier address.
-                //// 2: 
+                //// 2:
                 //// after further thought decided not to do it.
-                //// It seems to better not bother caching the sender of a response at all, 
+                //// It seems to better not bother caching the sender of a response at all,
                 //// and instead to take a very occasional hit of a full remote look-up instead of this small but non-zero hit on every response.
                 //if (message.Direction.Equals(Message.Directions.Response) && message.Result.Equals(Message.ResponseTypes.Success))
                 //{
@@ -245,7 +240,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.IGC_SniffIncomingMessage_Exc, "SniffIncomingMessage has thrown exception. Ignoring.", exc);
+                this.logger.LogWarning((int)ErrorCode.IGC_SniffIncomingMessage_Exc, exc, "SniffIncomingMessage has thrown exception. Ignoring.");
             }
         }
 
@@ -256,7 +251,7 @@ namespace Orleans.Runtime
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
-                    this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
+                    this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
                     return;
                 }
 
@@ -295,15 +290,16 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    if (message.Direction == Message.Directions.OneWay)
+                    var isDebugLog = invokeExceptionLogger.IsEnabled(LogLevel.Debug);
+                    if (message.Direction == Message.Directions.OneWay || isDebugLog)
                     {
-                        this.invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(invocationException), invocationException);
-                    }
-                    else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(invocationException), invocationException);
+                        var logLevel = isDebugLog ? LogLevel.Debug : LogLevel.Warning;
+                        this.invokeExceptionLogger.Log(
+                            logLevel,
+                            (int)ErrorCode.GrainInvokeException,
+                            invocationException,
+                            "Exception during Grain method call of message {Message}: ",
+                            message);
                     }
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
@@ -313,8 +309,7 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        var msg = $"Deactivating {target} due to inconsistent state.";
-                        this.invokeExceptionLogger.Info(msg);
+                        this.invokeExceptionLogger.LogInformation("Deactivating {Target} due to inconsistent state.", target);
                         target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
                     }
                 }
@@ -328,7 +323,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc2)
             {
-                this.logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
+                this.logger.LogWarning((int)ErrorCode.Runtime_Error_100329, exc2, "Exception during Invoke of message {Message}", message);
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
@@ -349,15 +344,17 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.IGC_SendResponseFailed,
-                    "Exception trying to send a response: " + exc.Message, exc);
+                this.logger.LogWarning(
+                    (int)ErrorCode.IGC_SendResponseFailed,
+                    exc,
+                    "Exception trying to send a response");
                 SendResponse(message, Response.FromException(exc));
             }
         }
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-        
+
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(
@@ -404,14 +401,18 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    this.logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
-                        "Exception trying to send an exception response: " + exc1.Message, exc1);
+                    this.logger.LogWarning(
+                        (int)ErrorCode.IGC_SendExceptionResponseFailed,
+                        exc1,
+                        "Exception trying to send an exception response");
                     SendResponse(message, Response.FromException(exc1));
                 }
                 catch (Exception exc2)
                 {
-                    this.logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
-                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: " + exc2.Message, exc2);
+                    this.logger.LogWarning(
+                        (int)ErrorCode.IGC_UnhandledExceptionInInvoke,
+                        exc2,
+                        "Exception trying to send an exception. Ignoring and not trying to send again.");
                 }
             }
         }
@@ -419,43 +420,41 @@ namespace Orleans.Runtime
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
-            if (message.Result == Message.ResponseTypes.Rejection)
+            if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
-                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
+                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {Message}", message);
                     this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
-                switch (message.RejectionType)
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {Message}", message);
+                var rejection = (RejectionResponse)message.BodyObject;
+                switch (rejection.RejectionType)
                 {
-                    case Message.RejectionTypes.DuplicateRequest:
-                        // try to remove from callbackData, just in case it is still there.
-                        break;
                     case Message.RejectionTypes.Overloaded:
                         break;
-
                     case Message.RejectionTypes.Unrecoverable:
-                    // fall through & reroute
+                    // Fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (message.CacheInvalidationHeader == null)
+                        if (message.CacheInvalidationHeader is null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
+                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability.
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
-                            this.GrainLocator.InvalidateCache(message.SendingAddress);
+                            this.GrainLocator.InvalidateCache(message.SendingGrain);
                         }
                         break;
-
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
                         return;
                     default:
-                        this.logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
-                            "Missing enum in switch: " + message.RejectionType);
+                        this.logger.LogError(
+                            (int)ErrorCode.Dispatcher_InvalidEnum_RejectionType,
+                            "Unsupported rejection type: {RejectionType}",
+                            rejection.RejectionType);
                         break;
                 }
             }
@@ -490,13 +489,15 @@ namespace Orleans.Runtime
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
+                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
                 callbackData.DoCallback(message);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
-                    "No callback for response message: " + message);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    this.logger.LogDebug((int)ErrorCode.Dispatcher_NoCallbackForResp, "No callback for response message {Message}", message);
+                }
             }
         }
 
@@ -538,7 +539,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception e)
                     {
-                        this.logger.Warn(ErrorCode.IGC_DisposeError, "Exception while disposing: " + e.Message, e);
+                        this.logger.LogWarning((int)ErrorCode.IGC_DisposeError, e, $"Exception while disposing {nameof(InsideRuntimeClient)}");
                     }
                 }
             }
@@ -555,7 +556,10 @@ namespace Orleans.Runtime
             this.disposables.Add(this.callbackTimer);
 
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            this.logger.LogInformation(
+                (int)ErrorCode.SiloStartPerfMeasure,
+                "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
+                stopWatch.ElapsedMilliseconds);
             return Task.CompletedTask;
         }
 
@@ -577,7 +581,7 @@ namespace Orleans.Runtime
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
             var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {

@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Orleans.Streaming")]
-[assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Counters")]
+[assembly: InternalsVisibleTo("Orleans.Reminders")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]

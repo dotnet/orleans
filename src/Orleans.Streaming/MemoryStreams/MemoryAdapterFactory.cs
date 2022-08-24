@@ -1,15 +1,15 @@
-
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.Configuration;
 
 namespace Orleans.Providers
 {
@@ -25,7 +25,6 @@ namespace Orleans.Providers
         private readonly StreamStatisticOptions statisticOptions;
         private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
         private readonly IGrainFactory grainFactory;
-        private readonly ITelemetryProducer telemetryProducer;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly TSerializer serializer;
@@ -54,20 +53,20 @@ namespace Orleans.Providers
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, ITelemetryProducer, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory;
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, ITelemetryProducer, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory;
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
-        
+        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+
         public MemoryAdapterFactory(
             string providerName,
             StreamCacheEvictionOptions cacheOptions,
@@ -75,7 +74,6 @@ namespace Orleans.Providers
             HashRingStreamQueueMapperOptions queueMapperOptions,
             IServiceProvider serviceProvider,
             IGrainFactory grainFactory,
-            ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
@@ -83,7 +81,6 @@ namespace Orleans.Providers
             this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
-            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
@@ -96,11 +93,11 @@ namespace Orleans.Providers
         {
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions, telemetryProducer) => new DefaultCacheMonitor(dimensions, telemetryProducer);
+                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
+                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
+                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
             this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
@@ -112,7 +109,7 @@ namespace Orleans.Providers
                 // 1 meg block size pool
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
@@ -140,7 +137,7 @@ namespace Orleans.Providers
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
+            var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
         }
@@ -169,7 +166,7 @@ namespace Orleans.Providers
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
+            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId));
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
@@ -184,25 +181,11 @@ namespace Orleans.Providers
         /// </summary>
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
-            // provider name hash code
-            int providerNameGuidHash = (int)JenkinsHash.ComputeHash(this.Name);
-
-            // get queueId hash code
-            uint queueIdHash = queueId.GetUniformHashCode();
-            byte[] queIdHashByes = BitConverter.GetBytes(queueIdHash);
-            short s1 = BitConverter.ToInt16(queIdHashByes, 0);
-            short s2 = BitConverter.ToInt16(queIdHashByes, 2);
-
-            // build guid tailing 8 bytes from providerNameGuidHash and queIdHashByes.
-            var tail = new List<byte>();
-            tail.AddRange(BitConverter.GetBytes(providerNameGuidHash));
-            tail.AddRange(queIdHashByes);
-
-            // make guid.
-            // - First int is provider name hash
-            // - Two shorts from queue Id hash
-            // - 8 byte tail from provider name hash and queue Id hash.
-            return new Guid(providerNameGuidHash, s1, s2, tail.ToArray());
+            Span<byte> bytes = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes, JenkinsHash.ComputeHash(Name));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], queueId.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], queueId.GetNumericId());
+            return new(bytes);
         }
 
         /// <summary>

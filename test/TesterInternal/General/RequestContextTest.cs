@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
@@ -158,7 +159,7 @@ namespace UnitTests.General
         {
             var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
             Tuple<string, string> requestContext = await grain.TestRequestContext();
-            this.fixture.Logger.Info("Request Context is: " + requestContext);
+            this.fixture.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
             Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
             Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
         }

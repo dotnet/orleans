@@ -11,6 +11,7 @@ using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Configuration;
 using Orleans;
+using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
@@ -30,8 +31,10 @@ namespace ServiceBus.Tests.TestStreamProviders
             StreamCacheEvictionOptions evictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdatper,
-            IServiceProvider serviceProvider, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, telemetryProducer, loggerFactory)
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory,
+            IHostEnvironmentStatistics hostEnvironmentStatistics)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, loggerFactory, hostEnvironmentStatistics)
 
         {
             this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
@@ -56,8 +59,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
                 IEventHubDataAdapter dataAdapter, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
-                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
-                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
+                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
                 : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;
@@ -74,11 +77,10 @@ namespace ServiceBus.Tests.TestStreamProviders
                 IObjectPool<FixedSizeBuffer> bufferPool,
                 string blockPoolId,
                 TimePurgePredicate timePurge,
-                EventHubMonitorAggregationDimensions sharedDimensions,
-                ITelemetryProducer telemetryProducer)
+                EventHubMonitorAggregationDimensions sharedDimensions)
             {
                 var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
-                var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
+                var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory);
                 var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.name}.{partition}");
                 var evictionStrategy = new ChronologicalEvictionStrategy(cacheLogger, timePurge, cacheMonitor, options.StatisticMonitorWriteInterval);
                 //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly

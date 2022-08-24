@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -64,49 +65,49 @@ namespace ServiceBus.Tests.StreamingTests
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleParallelSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedMultipleParallelSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleLinearSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedMultipleLinearSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleSubscriptionTest_AddRemove()
         {
-            this.fixture.Logger.Info("************************ EHBatchedMultipleSubscriptionTest_AddRemove *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedResubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedResubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedResubscriptionAfterDeactivationTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedResubscriptionAfterDeactivationTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedActiveSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedActiveSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedTwoIntermitentStreamTest()
         {
-            this.fixture.Logger.Info("************************ EHBatchedTwoIntermitentStreamTest *********************************");
+            this.fixture.Logger.LogInformation("************************ EHBatchedTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
     }

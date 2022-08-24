@@ -479,7 +479,7 @@ namespace Orleans.Serialization.Buffers
             [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowInvalidPosition(long expectedPosition, long actualPosition)
             {
-                throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after {nameof(ForkFrom)}, but resulting position is {actualPosition}");
+                throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after ForkFrom, but resulting position is {actualPosition}");
             }
         }
         
@@ -517,7 +517,7 @@ namespace Orleans.Serialization.Buffers
             [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowInvalidPosition(long expectedPosition, long actualPosition)
             {
-                throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after {nameof(ResumeFrom)}, but resulting position is {actualPosition}");
+                throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after ResumeFrom, but resulting position is {actualPosition}");
             }
         }
 

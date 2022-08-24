@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     public sealed class PlacementStrategyResolver
     {
-        private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new ConcurrentDictionary<GrainType, PlacementStrategy>(GrainType.Comparer.Instance);
+        private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new();
         private readonly Func<GrainType, PlacementStrategy> _getStrategyInternal;
         private readonly IPlacementStrategyResolver[] _resolvers;
         private readonly IServiceProvider _services;

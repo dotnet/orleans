@@ -101,12 +101,12 @@ namespace UnitTests.StorageTests
         public void SetErrorInjection(ErrorInjectionBehavior errorInject)
         {
             ErrorInjection = errorInject;
-            logger.Info(0, "Set ErrorInjection to {0}", ErrorInjection);
+            logger.LogInformation("Set ErrorInjection to {ErrorInjection}", ErrorInjection);
         }
         
         public async override Task Close()
         {
-            logger.Info(0, "Close ErrorInjection={0}", ErrorInjection);
+            logger.LogInformation("Close ErrorInjection={ErrorInjection}", ErrorInjection);
             try
             {
                 SetErrorInjection(ErrorInjectionBehavior.None);
@@ -114,39 +114,39 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                logger.Error(0, "Unexpected error during Close", exc);
+                logger.LogError(exc, "Unexpected error during Close");
                 throw;
             }
         }
 
-        public async override Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async override Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.Info(0, "ReadStateAsync for {0} {1} ErrorInjection={2}", grainType, grainReference, ErrorInjection);
+            logger.LogInformation( "ReadStateAsync for {GrainType} {GrainId} ErrorInjection={ErrorInjection}", grainType, grainId, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeRead);
-                await base.ReadStateAsync(grainType, grainReference, grainState);
+                await base.ReadStateAsync(grainType, grainId, grainState);
                 ThrowIfMatches(ErrorInjectionPoint.AfterRead);
             }
             catch (Exception exc)
             {
-                logger.Warn(0, "Injected error during ReadStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.LogWarning(exc, "Injected error during ReadStateAsync for {GrainType} {GrainId}", grainType, grainId);
                 throw;
             }
         }
 
-        public async override Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async override Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.Info(0, "WriteStateAsync for {grainType} {grainReference} ErrorInjection={errorInjection}", grainType, grainReference, ErrorInjection);
+            logger.LogInformation("WriteStateAsync for {GrainType} {GrainReference} ErrorInjection={ErrorInjection}", grainType, grainId, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeWrite);
-                await base.WriteStateAsync(grainType, grainReference, grainState);
+                await base.WriteStateAsync(grainType, grainId, grainState);
                 ThrowIfMatches(ErrorInjectionPoint.AfterWrite);
             }
             catch (Exception exc)
             {
-                logger.Warn(0, "Injected error during WriteStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.LogWarning(exc, "Injected error during WriteStateAsync for {GrainType} {GrainId}", grainType, grainId);
                 throw;
             }
         }

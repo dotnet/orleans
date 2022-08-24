@@ -1,8 +1,8 @@
 using System;
-using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
@@ -15,7 +15,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture environment;
-        private static readonly Random random = new Random();
+        private static Random random => Random.Shared;
 
         class A { }
         class B : A { }
@@ -111,7 +111,7 @@ namespace UnitTests.General
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
 
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, null));
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, (string)null));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
 
@@ -352,8 +352,8 @@ namespace UnitTests.General
 
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)
         {
-            string str = input.ToKeyString();
-            GrainReference output = this.environment.Services.GetRequiredService<GrainReferenceKeyStringConverter>().FromKeyString(str);
+            string str = input.GrainId.ToString();
+            GrainReference output = this.environment.Services.GetRequiredService<GrainReferenceActivator>().CreateReference(GrainId.Parse(str), default);
             return output;
         }
     }

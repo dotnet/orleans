@@ -338,7 +338,7 @@ namespace Orleans.Streams
                     case ResponseCode.TransientFailure:
                         {
                             this.myQueues.RemoveAt(i);
-                            allRenewed &= false;
+                            allRenewed = false;
                             this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
                             break;
                         }
@@ -347,14 +347,14 @@ namespace Orleans.Streams
                     case ResponseCode.LeaseNotAvailable:
                         {
                             this.myQueues.RemoveAt(i);
-                            allRenewed &= false;
+                            allRenewed = false;
                             this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
                             break;
                         }
                     default:
                         {
                             this.myQueues.RemoveAt(i);
-                            allRenewed &= false;
+                            allRenewed = false;
                             this.Logger.LogError(result.FailureException, "Unexpected response to renew of lease {LeaseKey}.  StatusCode {StatusCode}.", result.AcquiredLease.ResourceKey, result.StatusCode);
                             break;
                         }

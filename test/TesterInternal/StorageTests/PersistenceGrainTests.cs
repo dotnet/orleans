@@ -999,7 +999,7 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_BadProvider()
         {
             IBadProviderTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IBadProviderTestGrain>(Guid.NewGuid());
-            var oex = await Assert.ThrowsAsync<BadGrainStorageConfigException>(() => grain.DoSomething());
+            var oex = await Assert.ThrowsAsync<BadProviderConfigException>(() => grain.DoSomething());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -1116,7 +1116,7 @@ namespace UnitTests.StorageTests
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < loops; i++)
             {
-                int idx = random.Next(num);
+                int idx = Random.Shared.Next(num);
                 tasks.Add(Task.Run(() => { var copy = this.HostedCluster.DeepCopy(states[idx]); }));
                 tasks.Add(Task.Run(() => { var other = this.HostedCluster.RoundTripSerializationForTesting(states[idx]); }));
             }
@@ -1206,7 +1206,7 @@ namespace UnitTests.StorageTests
                 Val = newValue,
                 Name = "Field1",
                 GrainType = grainType,
-                GrainReference = (GrainReference) grain,
+                GrainId = grain.GetGrainId(),
                 StateType = typeof(PersistenceTestGrainState)
             };
             mgmtGrain.SendControlCommandToProvider(providerTypeFullName,

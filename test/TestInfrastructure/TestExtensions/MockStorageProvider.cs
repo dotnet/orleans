@@ -98,14 +98,14 @@ namespace UnitTests.StorageTests
             this.numKeys = numKeys;
             this.copier = copier;
             this.Name = name;
-            this.logger = loggerFactory.CreateLogger(string.Format("Storage.{0}-{1}", this.GetType().Name, this._id));
+            this.logger = loggerFactory.CreateLogger($"Storage.{this.GetType().Name}-{this._id}");
 
-            logger.Info(0, "Init Name={0}", name);
+            logger.LogInformation("Init Name={Name}", name);
             Interlocked.Increment(ref initCount);
 
             StateStore = new HierarchicalKeyStore(numKeys);
 
-            logger.Info(0, "Finished Init Name={0}", name);
+            logger.LogInformation("Finished Init Name={Name}", name);
         }
 
         public StateForTest GetProviderState()
@@ -128,7 +128,7 @@ namespace UnitTests.StorageTests
             [Id(1)]
             public string GrainType { get; set; }
             [Id(2)]
-            public GrainReference GrainReference { get; set; }
+            public GrainId GrainId { get; set; }
             [Id(3)]
             public string Name { get; set; }
             [Id(4)]
@@ -138,15 +138,15 @@ namespace UnitTests.StorageTests
 
         public void SetValue(SetValueArgs args)
         {
-            SetValue(args.StateType, args.GrainType, args.GrainReference, args.Name, args.Val);
+            SetValue(args.StateType, args.GrainType, args.GrainId, args.Name, args.Val);
         }
 
-        private void SetValue(Type stateType, string grainType, GrainReference grainReference, string name, object val)
+        private void SetValue(Type stateType, string grainType, GrainId grainId, string name, object val)
         {
             lock (StateStore)
             {
-                this.logger.Info("Setting stored value {0} for {1} to {2}", name, grainReference, val);
-                var keys = MakeGrainStateKeys(grainType, grainReference);
+                this.logger.LogInformation("Setting stored value {Name} for {GrainId} to {Value}", name, grainId, val);
+                var keys = MakeGrainStateKeys(grainType, grainId);
                 var storedDict = StateStore.ReadRow(keys);
                 if (!storedDict.ContainsKey(stateStoreKey))
                 {
@@ -156,7 +156,7 @@ namespace UnitTests.StorageTests
                 var storedState = storedDict[stateStoreKey];
                 var field = storedState.GetType().GetProperty(name).GetSetMethod(true);
                 field.Invoke(storedState, new[] { val });
-                LastId = GetId(grainReference);
+                LastId = GetId(grainId);
                 LastState = storedState;
             }
         }
@@ -171,11 +171,11 @@ namespace UnitTests.StorageTests
             return (T) LastState;
         }
 
-        private object GetLastState<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        private object GetLastState<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             lock (StateStore)
             {
-                var keys = MakeGrainStateKeys(grainType, grainReference);
+                var keys = MakeGrainStateKeys(grainType, grainId);
                 var storedStateRow = StateStore.ReadRow(keys);
                 if (!storedStateRow.ContainsKey(stateStoreKey))
                 {
@@ -183,7 +183,7 @@ namespace UnitTests.StorageTests
                 }
 
                 var storedState = storedStateRow[stateStoreKey];
-                LastId = GetId(grainReference);
+                LastId = GetId(grainId);
                 LastState = storedState;
                 return storedState;
             }
@@ -191,67 +191,65 @@ namespace UnitTests.StorageTests
 
         public virtual Task Close()
         {
-            logger.Info(0, "Close");
+            logger.LogInformation("Close");
             Interlocked.Increment(ref closeCount);
             StateStore.Clear();
             return Task.CompletedTask;
         }
 
-        public virtual Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public virtual Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.Info(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation("ReadStateAsync for {GrainType} {GrainId}", grainType, grainId);
             Interlocked.Increment(ref readCount);
             lock (StateStore)
             {
-                var storedState = GetLastState(grainType, grainReference, grainState);
+                var storedState = GetLastState(grainType, grainId, grainState);
                 grainState.RecordExists = storedState != null;
                 grainState.State = (T)this.copier.Copy(storedState); // Read current state data
             }
             return Task.CompletedTask;
         }
 
-        public virtual Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public virtual Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.Info(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation("WriteStateAsync for {GrainType} {GrainId}", grainType, grainId);
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
                 var storedState = this.copier.Copy(grainState.State); // Store current state data
                 var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
-                StateStore.WriteRow(MakeGrainStateKeys(grainType, grainReference), stateStore, grainState.ETag);
+                StateStore.WriteRow(MakeGrainStateKeys(grainType, grainId), stateStore, grainState.ETag);
 
-                LastId = GetId(grainReference);
+                LastId = GetId(grainId);
                 LastState = storedState;
                 grainState.RecordExists = true;
             }
             return Task.CompletedTask;
         }
 
-        public virtual Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public virtual Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.Info(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
+            logger.LogInformation("ClearStateAsync for {GrainType} {GrainId}", grainType, grainId);
             Interlocked.Increment(ref deleteCount);
-            var keys = MakeGrainStateKeys(grainType, grainReference);
+            var keys = MakeGrainStateKeys(grainType, grainId);
             lock (StateStore)
             {
                 StateStore.DeleteRow(keys, grainState.ETag);
-                LastId = GetId(grainReference);
+                LastId = GetId(grainId);
                 LastState = null;
             }
             grainState.RecordExists = false;
             return Task.CompletedTask;
         }
 
-        private static string GetId(GrainReference grainReference)
-        {
-            return grainReference.ToKeyString();
-        }
-        private static IList<Tuple<string, string>> MakeGrainStateKeys(string grainType, GrainReference grainReference)
+        private static string GetId(GrainId grainId) => grainId.ToString();
+
+        private static IList<Tuple<string, string>> MakeGrainStateKeys(string grainType, GrainId grainId)
         {
             return new[]
             {
                 Tuple.Create("GrainType", grainType),
-                Tuple.Create("GrainId", GetId(grainReference))
+                Tuple.Create("GrainId", GetId(grainId))
             }.ToList();
         }
 

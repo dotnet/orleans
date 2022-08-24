@@ -1,10 +1,9 @@
 using System;
 using System.Buffers.Text;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Text;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -36,12 +35,40 @@ namespace Orleans.Runtime
         /// The key.
         /// </param>
         /// <param name="keyExtension">
+        /// The UTF-8 encoded key extension.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IdSpan"/> representing the provided key and key extension.
+        /// </returns>
+        public static IdSpan CreateIntegerKey(long key, ReadOnlySpan<byte> keyExtension)
+        {
+            if (keyExtension.IsEmpty)
+                return CreateIntegerKey(key);
+
+            Span<byte> tmp = stackalloc byte[sizeof(long) * 2];
+            Utf8Formatter.TryFormat(key, tmp, out var len, 'X');
+            Debug.Assert(len > 0, "Unable to format the provided value as a UTF8 string");
+
+            var buf = new byte[len + 1 + keyExtension.Length];
+            tmp[..len].CopyTo(buf);
+            buf[len] = (byte)'+';
+            keyExtension.CopyTo(buf.AsSpan(len + 1));
+            return new(buf);
+        }
+
+        /// <summary>
+        /// Creates an <see cref="IdSpan"/> representing a <see cref="long"/> key and key extension string.
+        /// </summary>
+        /// <param name="key">
+        /// The key.
+        /// </param>
+        /// <param name="keyExtension">
         /// The key extension.
         /// </param>
         /// <returns>
         /// An <see cref="IdSpan"/> representing the provided key and key extension.
         /// </returns>
-        public static IdSpan CreateIntegerKey(long key, string keyExtension)
+        public static IdSpan CreateIntegerKey(long key, string? keyExtension)
         {
             if (string.IsNullOrWhiteSpace(keyExtension))
             {
@@ -85,12 +112,37 @@ namespace Orleans.Runtime
         /// The key.
         /// </param>
         /// <param name="keyExtension">
+        /// The UTF-8 encoded key extension.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IdSpan"/> representing the provided key and key extension.
+        /// </returns>
+        public static IdSpan CreateGuidKey(Guid key, ReadOnlySpan<byte> keyExtension)
+        {
+            if (keyExtension.IsEmpty)
+                return CreateGuidKey(key);
+
+            var buf = new byte[32 + 1 + keyExtension.Length];
+            Utf8Formatter.TryFormat(key, buf, out var len, 'N');
+            Debug.Assert(len == 32, "Unable to format the provided value as a UTF8 string");
+            buf[32] = (byte)'+';
+            keyExtension.CopyTo(buf.AsSpan(len + 1));
+            return new(buf);
+        }
+
+        /// <summary>
+        /// Creates an <see cref="IdSpan"/> representing a <see cref="Guid"/> key and key extension string.
+        /// </summary>
+        /// <param name="key">
+        /// The key.
+        /// </param>
+        /// <param name="keyExtension">
         /// The key extension.
         /// </param>
         /// <returns>
         /// An <see cref="IdSpan"/> representing the provided key and key extension.
         /// </returns>
-        public static IdSpan CreateGuidKey(Guid key, string keyExtension)
+        public static IdSpan CreateGuidKey(Guid key, string? keyExtension)
         {
             if (string.IsNullOrWhiteSpace(keyExtension))
             {
@@ -122,13 +174,13 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> when the grain id was successfully parsed, <see langword="false" /> otherwise.
         /// </returns>
-        public static bool TryGetIntegerKey(this GrainId grainId, out long key, [NotNullWhen(true)] out string keyExt)
+        public static bool TryGetIntegerKey(this GrainId grainId, out long key, out string? keyExt)
         {
             keyExt = null;
             var keyString = grainId.Key.AsSpan();
             if (keyString.IndexOf((byte)'+') is int index && index >= 0)
             {
-                keyExt = keyString.Slice(index + 1).GetUtf8String();
+                keyExt = Encoding.UTF8.GetString(keyString.Slice(index + 1));
                 keyString = keyString.Slice(0, index);
             }
 
@@ -162,7 +214,7 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain id.</param>
         /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A long representing the key for this grain.</returns>
-        public static long GetIntegerKey(this GrainId grainId, out string keyExt)
+        public static long GetIntegerKey(this GrainId grainId, out string? keyExt)
         {
             if (!grainId.TryGetIntegerKey(out var result, out keyExt))
             {
@@ -202,16 +254,16 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> when the grain id was successfully parsed, <see langword="false" /> otherwise.
         /// </returns>
-        public static bool TryGetGuidKey(this GrainId grainId, out Guid key, out string keyExt)
+        public static bool TryGetGuidKey(this GrainId grainId, out Guid key, out string? keyExt)
         {
             keyExt = null;
             var keyString = grainId.Key.AsSpan();
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
             {
-                keyExt = keyString.Slice(33).GetUtf8String();
+                keyExt = Encoding.UTF8.GetString(keyString.Slice(33));
                 keyString = keyString.Slice(0, 32);
             }
-            else if(keyString.Length != 32)
+            else if (keyString.Length != 32)
             {
                 key = default;
                 return false;
@@ -254,7 +306,7 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain to find the primary key for.</param>
         /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A <see cref="Guid"/> representing the primary key for this grain.</returns>
-        public static Guid GetGuidKey(this GrainId grainId, out string keyExt)
+        public static Guid GetGuidKey(this GrainId grainId, out string? keyExt)
         {
             if (!grainId.TryGetGuidKey(out var result, out keyExt))
             {
@@ -285,7 +337,6 @@ namespace Orleans.Runtime
         /// <param name="grainId">
         /// The grain id.
         /// </param>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidGuidKeyFormat(GrainId grainId) => throw new ArgumentException($"Value \"{grainId}\" is not in the correct format for a Guid key.", nameof(grainId));
 
         /// <summary>
@@ -294,21 +345,6 @@ namespace Orleans.Runtime
         /// <param name="grainId">
         /// The grain id.
         /// </param>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidIntegerKeyFormat(GrainId grainId) => throw new ArgumentException($"Value \"{grainId}\" is not in the correct format for an Integer key.", nameof(grainId));
-
-        /// <summary>
-        /// Parses the provided value as a UTF8 string and returns the <see cref="string"/> representation of it.
-        /// </summary>
-        /// <param name="span">
-        /// The span to convert.
-        /// </param>
-        /// <returns>
-        /// The <see cref="string"/> representation of the input.
-        /// </returns>
-        internal static unsafe string GetUtf8String(this ReadOnlySpan<byte> span)
-        {
-            fixed (byte* bytes = span) return Encoding.UTF8.GetString(bytes, span.Length);
-        }
     }
 }

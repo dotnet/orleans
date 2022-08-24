@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -56,7 +57,6 @@ namespace UnitTests.General
                 public void Configure(ISiloBuilder hostBuilder) =>
                     hostBuilder
                         .AddActivityPropagation()
-                        .AddSimpleMessageStreamProvider("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
             }
@@ -65,8 +65,7 @@ namespace UnitTests.General
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) =>
                     clientBuilder
-                        .AddActivityPropagation()
-                        .AddSimpleMessageStreamProvider("SMSProvider");
+                        .AddActivityPropagation();
             }
         }
 
@@ -93,7 +92,7 @@ namespace UnitTests.General
 
             static async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -126,7 +125,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 
@@ -160,7 +159,7 @@ namespace UnitTests.General
 
             async Task Test(IGrainFactory grainFactory)
             {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
+                var grain = grainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
 
                 var result = await grain.GetActivityId();
 

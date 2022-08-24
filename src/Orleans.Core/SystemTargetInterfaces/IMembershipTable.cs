@@ -111,7 +111,7 @@ namespace Orleans
     [Serializable]
     [Immutable]
     [GenerateSerializer]
-    public class TableVersion
+    public sealed class TableVersion : ISpanFormattable
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
@@ -136,15 +136,16 @@ namespace Orleans
             return new TableVersion(Version + 1, VersionEtag);
         }
 
-        public override string ToString()
-        {
-            return string.Format("<{0}, {1}>", Version, VersionEtag);
-        }
+        public override string ToString() => $"<{Version}, {VersionEtag}>";
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"<{Version}, {VersionEtag}>", out charsWritten);
     }
 
     [Serializable]
     [GenerateSerializer]
-    public class MembershipTableData
+    public sealed class MembershipTableData
     {
         [Id(1)]
         public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
@@ -160,32 +161,31 @@ namespace Orleans
                {
                    if (x.Item1.Status == SiloStatus.Dead) return 1; // put Deads at the end
                    if (y.Item1.Status == SiloStatus.Dead) return -1; // put Deads at the end
-                   return String.Compare(x.Item1.SiloName, y.Item1.SiloName, StringComparison.Ordinal);
+                   return string.CompareOrdinal(x.Item1.SiloName, y.Item1.SiloName);
                });
-            Members = list.AsReadOnly();
+            Members = list;
             Version = version;
         }
 
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
-            Members = (new List<Tuple<MembershipEntry, string>> { tuple }).AsReadOnly();
+            Members = new[] { tuple };
             Version = version;
         }
 
         public MembershipTableData(TableVersion version)
         {
-            Members = (new List<Tuple<MembershipEntry, string>>()).AsReadOnly();
+            Members = Array.Empty<Tuple<MembershipEntry, string>>();
             Version = version;
         }
 
-        public Tuple<MembershipEntry, string> Get(SiloAddress silo)
+        public Tuple<MembershipEntry, string> TryGet(SiloAddress silo)
         {
-            return Members.First(tuple => tuple.Item1.SiloAddress.Equals(silo));
-        }
+            foreach (var item in Members)
+                if (item.Item1.SiloAddress.Equals(silo))
+                    return item;
 
-        public bool Contains(SiloAddress silo)
-        {
-            return Members.Any(tuple => tuple.Item1.SiloAddress.Equals(silo));
+            return null;
         }
 
         public override string ToString()
@@ -197,19 +197,12 @@ namespace Orleans
             int shuttingDown = Members.Count(e => e.Item1.Status == SiloStatus.ShuttingDown);
             int stopping = Members.Count(e => e.Item1.Status == SiloStatus.Stopping);
 
-            string otherCounts = String.Format("{0}{1}{2}{3}",
-                                created > 0 ? (", " + created + " are Created") : "",
-                                joining > 0 ? (", " + joining + " are Joining") : "",
-                                shuttingDown > 0 ? (", " + shuttingDown + " are ShuttingDown") : "",
-                                stopping > 0 ? (", " + stopping + " are Stopping") : "");
-
-            return string.Format("{0} silos, {1} are Active, {2} are Dead{3}, Version={4}. All silos: {5}",
-                Members.Count,
-                active,
-                dead,
-                otherCounts,
-                Version,
-                Utils.EnumerableToString(Members, tuple => tuple.Item1.ToFullString()));
+            return @$"{Members.Count} silos, {active} are Active, {dead} are Dead{
+                (created > 0 ? $", {created} are Created" : null)}{
+                (joining > 0 ? $", {joining} are Joining" : null)}{
+                (shuttingDown > 0 ? $", {shuttingDown} are ShuttingDown" : null)}{
+                (stopping > 0 ? $", {stopping} are Stopping" : null)
+                }, Version={Version}. All silos: {Utils.EnumerableToString(Members.Select(t => t.Item1))}";
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
@@ -254,7 +247,7 @@ namespace Orleans
 
     [GenerateSerializer]
     [Serializable]
-    public class MembershipEntry
+    public sealed class MembershipEntry
     {
         /// <summary>
         /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
@@ -347,33 +340,15 @@ namespace Orleans
                 SuspectTimes[indexToWrite] = newEntry;
             }
         }
-        
-        public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
-        {
-            SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
 
-            var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
-            SuspectTimes.Add(suspector);
-        }
+        public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
+            => (SuspectTimes ??= new()).Add(Tuple.Create(suspectingSilo, suspectingTime));
 
         internal MembershipEntry Copy()
         {
-            return new MembershipEntry
-            {
-                SiloAddress = this.SiloAddress,
-                Status = this.Status,
-                HostName = this.HostName,
-                ProxyPort = this.ProxyPort,
-
-                RoleName = this.RoleName,
-                SiloName = this.SiloName,
-                UpdateZone = this.UpdateZone,
-                FaultZone = this.FaultZone,
-
-                SuspectTimes = this.SuspectTimes is null ? null : new List<Tuple<SiloAddress, DateTime>>(this.SuspectTimes),
-                StartTime = this.StartTime,
-                IAmAliveTime = this.IAmAliveTime,
-            };
+            var copy = (MembershipEntry)MemberwiseClone();
+            copy.SuspectTimes = SuspectTimes is null ? null : new(SuspectTimes);
+            return copy;
         }
 
         internal MembershipEntry WithStatus(SiloStatus status)
@@ -419,41 +394,16 @@ namespace Orleans
             }
         }
 
-        public override string ToString()
-        {
-            return string.Format("SiloAddress={0} SiloName={1} Status={2}", SiloAddress.ToLongString(), SiloName, Status);
-        }
+        public override string ToString() => $"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}";
 
-        public string ToFullString(bool full = false)
+        public string ToFullString()
         {
-            if (!full)
-                return ToString();
+            var suspecters = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => tuple.Item1));
+            var suspectTimes = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => LogFormatter.PrintDate(tuple.Item2)));
 
-            List<SiloAddress> suspecters = SuspectTimes == null
-                ? null
-                : SuspectTimes.Select(tuple => tuple.Item1).ToList();
-            List<DateTime> timestamps = SuspectTimes == null
-                ? null
-                : SuspectTimes.Select(tuple => tuple.Item2).ToList();
-            return string.Format("[SiloAddress={0} SiloName={1} Status={2} HostName={3} ProxyPort={4} " +
-                                 "RoleName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
-                SiloAddress.ToLongString(),
-                SiloName,
-                Status,
-                HostName,
-                ProxyPort,
-                RoleName,
-                UpdateZone,
-                FaultZone,
-                LogFormatter.PrintDate(StartTime),
-                LogFormatter.PrintDate(IAmAliveTime),
-                suspecters == null
-                    ? ""
-                    : "Suspecters = " + Utils.EnumerableToString(suspecters, sa => sa.ToLongString()),
-                timestamps == null
-                    ? ""
-                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, LogFormatter.PrintDate)
-                );
+            return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName
+                } UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)
+                }{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
         }
     }
 }

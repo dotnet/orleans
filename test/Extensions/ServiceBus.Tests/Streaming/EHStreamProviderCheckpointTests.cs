@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -86,14 +87,14 @@ namespace ServiceBus.Tests.StreamingTests
         [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task ReloadFromCheckpointTest()
         {
-            logger.Info("************************ EHReloadFromCheckpointTest *********************************");
+            logger.LogInformation("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
         [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task RestartSiloAfterCheckpointTest()
         {
-            logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
+            logger.LogInformation("************************ EHRestartSiloAfterCheckpointTest *********************************");
             await this.RestartSiloAfterCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 8, 32);
         }
 

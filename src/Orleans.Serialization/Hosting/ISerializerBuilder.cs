@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -5,5 +7,9 @@ namespace Orleans.Serialization
     /// </summary>
     public interface ISerializerBuilder
     {
+        /// <summary>
+        /// Gets the service collection.
+        /// </summary>
+        IServiceCollection Services { get; }
     }
 }

@@ -70,12 +70,9 @@ namespace Orleans
             concurrencyLevel = Math.Min(concurrencyLevel, 1024);
             this.internCache = new ConcurrentDictionary<TKey, WeakReference<TValue>>(concurrencyLevel, initialSize);
 
-            if (typeof(TKey) != typeof(TValue))
-            {
-                var period = TimeSpan.FromMinutes(10);
-                var dueTime = period + TimeSpan.FromTicks(new Random().Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter
-                cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, dueTime, period);
-            }
+            var period = TimeSpan.FromMinutes(10);
+            var dueTime = period + TimeSpan.FromTicks(Random.Shared.Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter
+            cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, dueTime, period);
         }
 
         /// <summary>
@@ -108,17 +105,19 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Find cached copy of object with specified key, otherwise store the supplied one. 
+        /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
         /// </summary>
         /// <param name="key">key to find</param>
-        /// <param name="obj">The new object to store for this key if no cached copy exists</param>
-        /// <returns>Object with specified key - either previous cached copy or just passed in</returns>
-        public TValue Intern(TKey key, TValue obj)
+        /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
+        /// <param name="state">State to be passed to <paramref name="creatorFunc"/>.</param>
+        /// <returns>Object with specified key - either previous cached copy or newly created</returns>
+        public TValue FindOrCreate<TState>(TKey key, Func<TKey, TState, TValue> creatorFunc, TState state)
         {
             // Attempt to get the existing value from cache.
             // If no cache entry exists, create and insert a new one using the creator function.
             if (!internCache.TryGetValue(key, out var cacheEntry))
             {
+                var obj = creatorFunc(key, state);
                 internCache[key] = new WeakReference<TValue>(obj);
                 return obj;
             }
@@ -127,6 +126,7 @@ namespace Orleans
             if (!cacheEntry.TryGetTarget(out var result))
             {
                 // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                var obj = creatorFunc(key, state);
                 cacheEntry.SetTarget(obj);
                 return obj;
             }

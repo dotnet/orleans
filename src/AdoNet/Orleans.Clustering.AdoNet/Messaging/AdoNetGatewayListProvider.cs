@@ -44,21 +44,20 @@ namespace Orleans.Runtime.Membership
 
         public async Task InitializeGatewayListProvider()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
-            var grainReferenceConverter = serviceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString, grainReferenceConverter);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString);
         }
 
         public async Task<IList<Uri>> GetGateways()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetClusteringTable.GetGateways called.");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
             try
             {
                 return await orleansQueries.ActiveGatewaysAsync(this.clusterId);
             }
             catch (Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.Gateways failed {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.Gateways failed");
                 throw;
             }
         }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -33,7 +34,7 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                    hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }
@@ -42,7 +43,7 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                    clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
                 }
             }
         }
@@ -58,17 +59,9 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task SubscribeToStream_FromStatelessWorker_Fail()
         {
-            this.logger.Info($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
+            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
             var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
             await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task ProduceToStream_FromStatelessWorker_Fail()
-        {
-            this.logger.Info($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
-            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => runner.ProduceMessage(Guid.NewGuid()));
         }
     }
 

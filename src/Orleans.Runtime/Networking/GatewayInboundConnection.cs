@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
-        private readonly CounterStatistic loadSheddingCounter;
         private readonly SiloAddress myAddress;
         private readonly string myClusterId;
 
@@ -36,34 +35,43 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.messageCenter = messageCenter;
             this.connectionPreambleHelper = connectionPreambleHelper;
-            this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.myAddress = siloDetails.SiloAddress;
             this.myClusterId = siloDetails.ClusterId;
-            this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
-            this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.GatewayToClient;
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
 
+        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            GatewayInstruments.GatewayReceived.Add(1);
+        }
+
+        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            GatewayInstruments.GatewaySent.Add(1);
+        }
+
         protected override void OnReceivedMessage(Message msg)
         {
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Receive);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
                 return;
             }
 
             // Are we overloaded?
             if (this.overloadDetector.Overloaded)
             {
-                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                MessagingInstruments.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection);
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
-                loadSheddingCounter.Increment();
+                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug("Rejecting a request due to overloading: {Message}", msg.ToString());
+                GatewayInstruments.GatewayLoadShedding.Add(1);
                 return;
             }
 
@@ -73,17 +81,14 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = default;
-                msg.ClearTargetAddress();
 
                 if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
-                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
-                MessagingStatisticsGroup.OnMessageReRoute(msg);
+                MessagingInstruments.OnMessageReRoute(msg);
                 this.messageCenter.RerouteMessage(msg);
             }
             else
@@ -94,7 +99,6 @@ namespace Orleans.Runtime.Messaging
                 if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
-                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 this.messageCenter.SendMessage(msg);
@@ -141,7 +145,7 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
                 return false;
             }
 
@@ -153,18 +157,32 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+            MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                if (this.Log.IsEnabled(LogLevel.Debug))
+                    this.Log.LogDebug(
+                        (int)ErrorCode.MessagingSendingRejection,
+                        "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}",
+                        this.myAddress,
+                        msg,
+                        reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", this.myAddress, msg, reason));
+                this.messageCenter.SendRejection(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                this.Log.LogInformation(
+                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}",
+                    this.myAddress,
+                    msg,
+                    reason);
+                MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
 

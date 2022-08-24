@@ -112,7 +112,7 @@ static void PrintUsage()
     var table = new Table()
     {
         Border = TableBorder.None,
-        Expand = true, 
+        Expand = true,
     }.HideHeaders();
     table.AddColumn(new TableColumn("One"));
 
@@ -254,7 +254,7 @@ static async Task<ClientContext> LeaveChannel(ClientContext context)
                 .GetStream<ChatMsg>(streamId, "default");
 
         //unsubscribe from the channel/stream since client left, so that client won't
-        //receive furture messages from this channel/stream
+        //receive future messages from this channel/stream
         var subscriptionHandles = await stream.GetAllSubscriptionHandles();
         foreach (var handle in subscriptionHandles)
         {

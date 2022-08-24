@@ -59,12 +59,12 @@ namespace Orleans.Runtime.MembershipService
                 var period = this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
 
                 // The first cleanup should be scheduled for shortly after silo startup.
-                var delay = ThreadSafeRandom.NextTimeSpan(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10));
+                var delay = RandomTimeSpan.Next(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10));
                 while (await this.cleanupDefunctSilosTimer.NextTick(delay))
                 {
                     // Select a random time within the next window.
                     // The purpose of this is to add jitter to a process which could be affected by contention with other silos.
-                    delay = ThreadSafeRandom.NextTimeSpan(period, period + TimeSpan.FromMinutes(5));
+                    delay = RandomTimeSpan.Next(period, period + TimeSpan.FromMinutes(5));
                     try
                     {
                         var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, "Failed to clean up defunct membership table entries: {Exception}", exception);
+                        this.log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, exception, "Failed to clean up defunct membership table entries");
                     }
                 }
             }

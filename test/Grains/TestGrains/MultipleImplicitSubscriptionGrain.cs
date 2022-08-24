@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             var streamProvider = this.GetStreamProvider("SMSProvider");
             redStream = streamProvider.GetStream<int>(this.GetPrimaryKey(), "red");
@@ -34,7 +34,7 @@ namespace UnitTests.Grains
             await redStream.SubscribeAsync(
                 (e, t) =>
                 {
-                    logger.Info("Received a red event {0}", e);
+                    logger.LogInformation("Received a red event {Event}", e);
                     redCounter++;
                     return Task.CompletedTask;
                 });
@@ -42,7 +42,7 @@ namespace UnitTests.Grains
             await blueStream.SubscribeAsync(
                 (e, t) =>
                 {
-                    logger.Info("Received a blue event {0}", e);
+                    logger.LogInformation("Received a blue event {Event}", e);
                     blueCounter++;
                     return Task.CompletedTask;
                 });

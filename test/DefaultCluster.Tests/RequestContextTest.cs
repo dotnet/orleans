@@ -1,4 +1,6 @@
+using System;
 using System.Threading.Tasks;
+using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,7 +17,7 @@ namespace UnitTDefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContextCallerToCalleeFlow()
         {
-            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(Random.Shared.Next());
             // Set context to send to the grain
             RequestContext.Set("GrainInfo", 10);
             // This grain method reads the context and returns it
@@ -27,7 +29,7 @@ namespace UnitTDefaultCluster.Tests.General
         [Fact(Skip = "Was failing before (just masked as a Pass), needs fixing or removing"), TestCategory("RequestContext"), TestCategory("Functional")]
         public async Task RequestContextCalleeToCallerFlow()
         {
-            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(Random.Shared.Next());
             // This method in the grain does RequestContext.Set
             await grain.SetRequestContext(15);
             // Read the info set in the grain

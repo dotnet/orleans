@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
@@ -105,18 +106,23 @@ namespace Orleans.CodeGenerator
 
         private static INamedTypeSymbol GetBaseClassType(MethodDescription method)
         {
-            var methodReturnType = (INamedTypeSymbol)method.Method.ReturnType;
-            if (method.InvokableBaseTypes.TryGetValue(methodReturnType, out var baseClassType))
+            var methodReturnType = method.Method.ReturnType;
+            if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
+            {
+                var diagnostic = InvalidGrainMethodReturnTypeDiagnostic.CreateDiagnostic(method);
+                throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
+            }
+            if (method.InvokableBaseTypes.TryGetValue(namedMethodReturnType, out var baseClassType))
             {
                 return baseClassType;
             }
 
-            if (methodReturnType.ConstructedFrom is { } constructedFrom)
+            if (namedMethodReturnType.ConstructedFrom is { } constructedFrom)
             {
                 var unbound = constructedFrom.ConstructUnboundGenericType();
                 if (method.InvokableBaseTypes.TryGetValue(unbound, out baseClassType))
                 {
-                    return baseClassType.ConstructedFrom.Construct(methodReturnType.TypeArguments.ToArray());
+                    return baseClassType.ConstructedFrom.Construct(namedMethodReturnType.TypeArguments.ToArray());
                 }
             }
             
@@ -749,6 +755,8 @@ namespace Orleans.CodeGenerator
                     return Type.GetValidIdentifier();
                 }
             }
+
+            public bool IsPrimaryConstructorParameter => false;
 
             public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax(Method.TypeParameterSubstitutions);
         }

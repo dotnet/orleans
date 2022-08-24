@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -28,7 +29,6 @@ namespace Orleans.Runtime
         private int collectionNumber;
         private int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
-        private readonly CounterStatistic collectionCounter;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -42,7 +42,6 @@ namespace Orleans.Runtime
             ILogger<ActivationCollector> logger)
         {
             _options = options;
-            collectionCounter = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
             quantum = options.Value.CollectionQuantum;
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
@@ -77,13 +76,13 @@ namespace Orleans.Runtime
         /// <param name="ageLimit">The age limit.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
-                
+
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
-        /// </summary>        
+        /// </summary>
         /// <param name="item">
         /// The grain context.
-        /// </param>        
+        /// </param>
         /// <param name="timeout">
         /// The current idle collection time for the grain.
         /// </param>
@@ -97,7 +96,7 @@ namespace Orleans.Runtime
                 }
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
-            
+
                 if (default(DateTime) != item.CollectionTicket)
                 {
                     throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
@@ -122,7 +121,7 @@ namespace Orleans.Runtime
                 if (default(DateTime) == ticket) return false;
                 if (IsExpired(ticket)) return false;
 
-                // first, we attempt to remove the ticket. 
+                // first, we attempt to remove the ticket.
                 Bucket bucket;
                 if (!buckets.TryGetValue(ticket, out bucket) || !bucket.TryRemove(item)) return false;
             }
@@ -152,7 +151,7 @@ namespace Orleans.Runtime
         {
             // note: we expect the activation lock to be held.
             if (default == item.CollectionTicket) return false;
-            ThrowIfTicketIsInvalid(item.CollectionTicket); 
+            ThrowIfTicketIsInvalid(item.CollectionTicket);
             if (IsExpired(item.CollectionTicket)) return false;
 
             DateTime oldTicket = item.CollectionTicket;
@@ -203,11 +202,8 @@ namespace Orleans.Runtime
         {
             var now = DateTime.UtcNow;
             var all = buckets.ToList();
-            return string.Format("<#Activations={0}, #Buckets={1}, buckets={2}>",
-                    all.Sum(b => b.Value.Items.Count),
-                    all.Count,
-                    Utils.EnumerableToString(
-                        all.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.Value.Items.Count + " items"));
+            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
+            return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
         }
 
         /// <summary>
@@ -232,7 +228,7 @@ namespace Orleans.Runtime
                         {
                             // Do nothing: don't collect, don't reschedule.
                             // The activation can't be in Created or Activating, since we only ScheduleCollection after successfull activation.
-                            // If the activation is already in Deactivating or Invalid state, its already being collected or was collected 
+                            // If the activation is already in Deactivating or Invalid state, its already being collected or was collected
                             // (both mean a bug, this activation should not be in the collector)
                             // So in any state except for Valid we should just not collect and not reschedule.
                             logger.LogWarning(
@@ -483,15 +479,15 @@ namespace Orleans.Runtime
             }
 
             List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
-            collectionCounter.Increment();
+            CatalogInstruments.ActivationCollections.Add(1);
             var count = 0;
             if (list != null && list.Count > 0)
             {
                 count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
-            
+
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
 
@@ -514,8 +510,8 @@ namespace Orleans.Runtime
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
-            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
+            CatalogInstruments.ActiviationShutdownViaCollection();
 
             Action<Task> signalCompletion = task => mtcs.SetOneResult();
             var reason = GetDeactivationReason();

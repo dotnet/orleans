@@ -94,19 +94,14 @@ namespace Orleans.CodeGeneration
                 if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
                     || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
                     return false;
-                if (t == typeof (ISystemTarget))
+                if (t == typeof(ISystemTarget))
                     return false;
 
-                return typeof (IAddressable).IsAssignableFrom(t);
+                return typeof(IAddressable).IsAssignableFrom(t);
             }
         }
 
-
-        public static int GetGrainClassTypeCode(Type grainClass)
-        {
-            var fullName = RuntimeTypeNameFormatter.Format(grainClass);
-            return Utils.CalculateIdHash(fullName);
-        }
+        public static int GetGrainClassTypeCode(Type grainClass) => (int)JenkinsHash.ComputeHash(RuntimeTypeNameFormatter.Format(grainClass));
 
         private sealed class MethodInfoComparer : IEqualityComparer<MethodInfo>, IComparer<MethodInfo>
         {

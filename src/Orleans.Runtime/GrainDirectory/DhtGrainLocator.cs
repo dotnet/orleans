@@ -71,7 +71,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
             => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory);
 
-        public void CachePlacementDecision(GrainAddress address) => _localGrainDirectory.CachePlacementDecision(address);
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.CachePlacementDecision(grainId, siloAddress);
         public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryCachedLookup(grainId, out address);

@@ -46,14 +46,20 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
-            : base(SystemTargetGrainId.Create(grainId.Type, silo.SiloAddress), silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
+        internal GrainService(GrainId grainId, SiloAddress siloAddress, ILoggerFactory loggerFactory, IConsistentRingProvider ringProvider)
+            : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, loggerFactory: loggerFactory)
         {
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);
 
-            ring = silo.RingProvider;
+            ring = ringProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
+        }
+
+        /// <summary>Constructor to use for grain services</summary>
+        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
+            : this(grainId, silo.SiloAddress, loggerFactory, silo.RingProvider)
+        {
         }
 
         /// <summary>
@@ -83,7 +89,13 @@ namespace Orleans.Runtime
         public virtual Task Start()
         {
             RingRange = ring.GetMyRange();
-            Logger.Info(ErrorCode.RS_ServiceStarting, "Starting {0} grain service on: {1} x{2,8:X8}, with range {3}", this.typeName, Silo, Silo.GetConsistentHashCode(), RingRange);
+            Logger.LogInformation(
+                (int)ErrorCode.RS_ServiceStarting,
+                "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}",
+                this.typeName,
+                Silo,
+                Silo.GetConsistentHashCode().ToString("X8"),
+                RingRange);
             StartInBackground().Ignore();
 
             return Task.CompletedTask;
@@ -106,7 +118,10 @@ namespace Orleans.Runtime
         {
             StoppedCancellationTokenSource.Cancel();
 
-            Logger.Info(ErrorCode.RS_ServiceStopping, $"Stopping {this.typeName} grain service");
+            Logger.LogInformation(
+                (int)ErrorCode.RS_ServiceStopping,
+                "Stopping {TypeName} grain service",
+                typeName);
             Status = GrainServiceStatus.Stopped;
 
             return Task.CompletedTask;
@@ -127,7 +142,12 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            Logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);
+            Logger.LogInformation(
+                (int)ErrorCode.RS_RangeChanged,
+                "My range changed from {OldRange} to {NewRange} increased = {Increased}",
+                oldRange,
+                newRange,
+                increased);
             RingRange = newRange;
             RangeSerialNumber++;
 

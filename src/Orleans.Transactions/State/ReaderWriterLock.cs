@@ -113,7 +113,7 @@ namespace Orleans.Transactions.State
                     group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.Trace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
+                        logger.LogTrace("Set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
                 }
 
                 // create a new record for this transaction
@@ -130,9 +130,9 @@ namespace Orleans.Transactions.State
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
                     if (group == currentGroup)
-                        logger.Trace($"enter-lock {transactionId} fc={group.FillCount}");
+                        logger.LogTrace("Enter-lock {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
                     else
-                        logger.Trace($"enter-lock-queue {transactionId} fc={group.FillCount}");
+                        logger.LogTrace("Enter-lock-queue {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
                 }
             }
 
@@ -229,7 +229,7 @@ namespace Orleans.Transactions.State
         private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
         {
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace("Break-lock for transaction {TransactionId}", transactionId);
+                logger.LogTrace("Break-lock for transaction {TransactionId}", transactionId);
 
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
@@ -254,22 +254,18 @@ namespace Orleans.Transactions.State
                 currentGroup.Next = null;
         }
 
-        public async Task Rollback(Guid guid, bool notify)
+        public void Rollback(Guid guid) => currentGroup?.Remove(guid);
+
+        public Task Rollback(Guid guid, bool notify)
         {
             // no-op if the transaction never happened or already rolled back
-            if (currentGroup == null || !currentGroup.TryGetValue(guid, out var record))
+            if (currentGroup == null || !currentGroup.Remove(guid, out var record))
             {
-                return;
+                return Task.CompletedTask;
             }
-
-            // remove record for this transaction
-            currentGroup.Remove(guid);
 
             // notify remote listeners
-            if (notify)
-            {
-                await this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
-            }
+            return notify ? queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null) : Task.CompletedTask;
         }
 
         private async Task LockWork()
@@ -317,7 +313,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+                                    logger.LogTrace("Recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
 
                                 // check again when the group expires
                                 lockWorker.Notify(currentGroup.Deadline.Value);
@@ -342,33 +338,25 @@ namespace Orleans.Transactions.State
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the 
                             // total transaction timeout
-                            List<Guid> expiredWaiters = null;
                             foreach (var kvp in currentGroup)
                             {
                                 if (now > kvp.Value.Deadline)
                                 {
-                                    if (expiredWaiters == null)
-                                        expiredWaiters = new List<Guid>();
-                                    expiredWaiters.Add(kvp.Key);
+                                    currentGroup.Remove(kvp.Key);
 
                                     if (logger.IsEnabled(LogLevel.Trace))
-                                        logger.Trace($"expire-lock-waiter {kvp.Key}");
-                                }
-                            }
-
-                            if (expiredWaiters != null)
-                            {
-                                foreach (var guid in expiredWaiters)
-                                {
-                                    currentGroup.Remove(guid);
+                                        logger.LogTrace("Expire-lock-waiter {Key}", kvp.Key);
                                 }
                             }
 
                             if (logger.IsEnabled(LogLevel.Trace))
                             {
-                                logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                                logger.LogTrace(
+                                    "Lock group size={Count} deadline={Deadline}",
+                                    currentGroup.Count,
+                                    currentGroup.Deadline is { } deadline ? deadline.ToString("O") : "none");
                                 foreach (var kvp in currentGroup)
-                                    logger.Trace($"enter-lock {kvp.Key}");
+                                    logger.LogTrace("Enter-lock {Key}", kvp.Key);
                             }
 
                             // execute all the read and update tasks
@@ -494,7 +482,12 @@ namespace Orleans.Transactions.State
                     currentGroup.Remove(single.TransactionId);
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"exit-lock {single.TransactionId} {single.Timestamp:o}");
+                    {
+                        logger.LogDebug(
+                            "Exit-lock {TransactionId} {Timestamp}",
+                            single.TransactionId,
+                            single.Timestamp.ToString("o"));
+                    }
 
                     return true;
                 }
@@ -550,7 +543,14 @@ namespace Orleans.Transactions.State
                         currentGroup.Remove(multiple[i].TransactionId);
 
                         if (logger.IsEnabled(LogLevel.Debug))
-                            logger.Debug($"exit-lock ({i}/{multiple.Count}) {multiple[i].TransactionId} {multiple[i].Timestamp:o}");
+                        {
+                            logger.LogDebug(
+                                "Exit-lock ({Current}/{Count}) {TransactionId} {Timestamp}",
+                                i,
+                                multiple.Count,
+                                multiple[i].TransactionId,
+                                multiple[i].Timestamp.ToString("o"));
+                        }
                     }
 
                     return true;

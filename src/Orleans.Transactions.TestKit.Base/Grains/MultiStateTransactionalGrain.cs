@@ -87,9 +87,9 @@ namespace Orleans.Transactions.TestKit
             {
                 await data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation($"Setting from {state.Value} to {newValue}.");
+                    this.logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
                     state.Value = newValue;
-                    this.logger.LogInformation($"Set to {state.Value}.");
+                    this.logger.LogInformation("Set to {Value}.", state.Value);
                 });
             }
         }
@@ -101,9 +101,9 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {
-                    this.logger.LogInformation($"Adding {numberToAdd} to {state.Value}.");
+                    this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
                     state.Value += numberToAdd;
-                    this.logger.LogInformation($"Value after Adding {numberToAdd} is {state.Value}.");
+                    this.logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
                     return state.Value;
                 });
             }
@@ -117,7 +117,7 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformRead(state =>
                 {
-                    this.logger.LogInformation($"Get {state.Value}.");
+                    this.logger.LogInformation("Get {Value}.", state.Value);
                     return state.Value;
                 });
             }
@@ -127,6 +127,12 @@ namespace Orleans.Transactions.TestKit
         public async Task AddAndThrow(int numberToAdd)
         {
             await Add(numberToAdd);
+            throw new AddAndThrowException($"{GetType().Name} test exception");
+        }
+
+        public async Task SetAndThrow(int numberToSet)
+        {
+            await Set(numberToSet);
             throw new AddAndThrowException($"{GetType().Name} test exception");
         }
 

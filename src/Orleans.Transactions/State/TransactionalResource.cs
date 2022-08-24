@@ -41,7 +41,7 @@ namespace Orleans.Transactions.State
         {
             await this.queue.Ready();
             // release the lock
-            await this.queue.RWLock.Rollback(transactionId, false);
+            this.queue.RWLock.Rollback(transactionId);
 
             this.queue.RWLock.Notify();
         }

@@ -47,12 +47,11 @@ namespace Orleans.Serialization
         [SecurityCritical]
         private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TOwner, TDelegate>(Type type)
         {
-            var typeInfo = type.GetTypeInfo();
             var onDeserializing = default(TDelegate);
             var onDeserialized = default(TDelegate);
             var onSerializing = default(TDelegate);
             var onSerialized = default(TDelegate);
-            foreach (var method in typeInfo.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 var parameterInfos = method.GetParameters();
                 if (parameterInfos.Length != 1)
@@ -67,22 +66,22 @@ namespace Orleans.Serialization
 
                 if (method.GetCustomAttribute<OnDeserializingAttribute>() != null)
                 {
-                    onDeserializing = GetSerializationMethod<TOwner, TDelegate>(typeInfo, method);
+                    onDeserializing = GetSerializationMethod<TOwner, TDelegate>(type, method);
                 }
 
                 if (method.GetCustomAttribute<OnDeserializedAttribute>() != null)
                 {
-                    onDeserialized = GetSerializationMethod<TOwner, TDelegate>(typeInfo, method);
+                    onDeserialized = GetSerializationMethod<TOwner, TDelegate>(type, method);
                 }
 
                 if (method.GetCustomAttribute<OnSerializingAttribute>() != null)
                 {
-                    onSerializing = GetSerializationMethod<TOwner, TDelegate>(typeInfo, method);
+                    onSerializing = GetSerializationMethod<TOwner, TDelegate>(type, method);
                 }
 
                 if (method.GetCustomAttribute<OnSerializedAttribute>() != null)
                 {
-                    onSerialized = GetSerializationMethod<TOwner, TDelegate>(typeInfo, method);
+                    onSerialized = GetSerializationMethod<TOwner, TDelegate>(type, method);
                 }
             }
 

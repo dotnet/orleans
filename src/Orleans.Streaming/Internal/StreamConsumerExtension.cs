@@ -62,7 +62,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{Grain} AddObserver for stream {StreamId}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
@@ -71,8 +71,10 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.StreamProvider_AddObserverException,
-                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.InternalStreamId}) caugth exception.", exc);
+                logger.LogError(
+                    (int)ErrorCode.StreamProvider_AddObserverException,
+                    exc,
+                    "{Grain} StreamConsumerExtension.AddObserver({StreamId}) caught exception.", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
                 throw;
             }
         }
@@ -93,7 +95,7 @@ namespace Orleans.Streams
             {
                 var itemString = item.ToString();
                 itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
-                logger.Trace("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
+                logger.LogTrace("DeliverItem {Item} for subscription {Subscription}", itemString, subscriptionId);
             }
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -115,8 +117,12 @@ namespace Orleans.Streams
                 }
             }
 
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+            logger.LogWarning(
+                (int)ErrorCode.StreamProvider_NoStreamForItem,
+                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(),
+                subscriptionId);
+
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return default(StreamHandshakeToken);
@@ -124,7 +130,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -146,8 +152,12 @@ namespace Orleans.Streams
                 }
             }
 
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+            logger.LogWarning(
+                (int)ErrorCode.StreamProvider_NoStreamForBatch,
+                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(),
+                subscriptionId);
+
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return default(StreamHandshakeToken);
@@ -155,14 +165,18 @@ namespace Orleans.Streams
 
         public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("CompleteStream for subscription {0}", subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("CompleteStream for subscription {SubscriptionId}", subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 return observer.CompleteStream();
 
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got a Complete for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+            logger.LogWarning(
+                (int)ErrorCode.StreamProvider_NoStreamForItem,
+                "{Grain} got a Complete for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(),
+                subscriptionId);
+
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return Task.CompletedTask;
@@ -170,14 +184,19 @@ namespace Orleans.Streams
 
         public Task ErrorInStream(GuidId subscriptionId, Exception exc)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(exc, "Error in stream for subscription {Subscription}", subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 return observer.ErrorInStream(exc);
 
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an Error for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+            logger.LogWarning(
+                (int)ErrorCode.StreamProvider_NoStreamForItem,
+                exc,
+                "{Grain} got an error for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(),
+                subscriptionId);
+
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return Task.CompletedTask;

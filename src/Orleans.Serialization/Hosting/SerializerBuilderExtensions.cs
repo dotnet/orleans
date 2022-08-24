@@ -20,7 +20,11 @@ namespace Orleans.Serialization
         /// <param name="builder">The builder.</param>
         /// <param name="factory">The factory.</param>
         /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Func<IServiceProvider, IConfigureOptions<TypeManifestOptions>> factory) => ((ISerializerBuilderImplementation)builder).ConfigureServices(services => services.AddTransient(sp => factory(sp)));
+        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Func<IServiceProvider, IConfigureOptions<TypeManifestOptions>> factory)
+        {
+            builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(factory);
+            return builder;
+        }
 
         /// <summary>
         /// Configures the serialization builder.
@@ -28,7 +32,11 @@ namespace Orleans.Serialization
         /// <param name="builder">The builder.</param>
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, IConfigureOptions<TypeManifestOptions> configure) => ((ISerializerBuilderImplementation)builder).ConfigureServices(services => services.AddSingleton(configure));
+        public static ISerializerBuilder Configure(this ISerializerBuilder builder, IConfigureOptions<TypeManifestOptions> configure)
+        {
+            builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(configure);
+            return builder;
+        }
 
         /// <summary>
         /// Configures the serialization builder.
@@ -36,7 +44,11 @@ namespace Orleans.Serialization
         /// <param name="builder">The builder.</param>
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Action<TypeManifestOptions> configure) => ((ISerializerBuilderImplementation)builder).ConfigureServices(services => services.Configure(configure));
+        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Action<TypeManifestOptions> configure)
+        {
+            builder.Services.Configure(configure);
+            return builder;
+        }
 
         /// <summary>
         /// Adds an assembly to the builder.
@@ -46,29 +58,11 @@ namespace Orleans.Serialization
         /// <returns>The serialization builder</returns>
         public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, Assembly assembly)
         {
-            var builderImpl = (ISerializerBuilderImplementation)builder;
-            var properties = builderImpl.Properties;
-            HashSet<Assembly> assembliesSet;
-            if (!properties.TryGetValue(_assembliesKey, out var assembliesSetObj))
-            {
-                assembliesSet = new HashSet<Assembly>();
-                properties[_assembliesKey] = assembliesSet;
-            }
-            else
-            {
-                assembliesSet = (HashSet<Assembly>)assembliesSetObj;
-            }
-                
-            if (!assembliesSet.Add(assembly))
-            {
-                return builder;
-            }
-
             var attrs = assembly.GetCustomAttributes<TypeManifestProviderAttribute>();
 
             foreach (var attr in attrs)
             {
-                _ = builderImpl.ConfigureServices(services => services.AddSingleton(typeof(IConfigureOptions<TypeManifestOptions>), attr.ProviderType));
+                _ = builder.Services.AddSingleton(typeof(IConfigureOptions<TypeManifestOptions>), attr.ProviderType);
             }
 
             return builder;

@@ -116,7 +116,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void CachePlacementDecision(GrainAddress activation) => throw new NotImplementedException();
+        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => throw new NotImplementedException();
 
         public void InvalidateCacheEntry(GrainId grainId) => throw new NotImplementedException();
         public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => throw new NotImplementedException();

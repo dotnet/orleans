@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         public override int GetHashCode() { return this.value.GetHashCode(); }
         /// <see cref="Object.Equals(Object)"/>
         public override bool Equals(object obj) { var ss = obj as SystemStatus; return ss != null && this.Equals(ss); }
-        /// <see cref="IEquatable{T}.Equals"/>
+        /// <see cref="IEquatable{T}.Equals(T)"/>
         public bool Equals(SystemStatus other) { return (other != null) && this.value.Equals(other.value); }
     }
 }

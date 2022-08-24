@@ -39,7 +39,7 @@ namespace UnitTests.RemindersTest
             var serviceId = Guid.NewGuid().ToString() + "/foo";
             var clusterId = "test-" + serviceId + "/foo2";
 
-            logger.Info("ClusterId={0}", clusterId);
+            logger.LogInformation("ClusterId={ClusterId}", clusterId);
             this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
 
             this.remindersTable = this.CreateRemindersTable();
@@ -87,12 +87,12 @@ namespace UnitTests.RemindersTest
             var reminder = CreateReminder(MakeTestGrainReference(), "foo/bar\\#b_a_z?");
             await remindersTable.UpsertRow(reminder);
 
-            var readReminder = await remindersTable.ReadRow(reminder.GrainRef, reminder.ReminderName);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
             string etagTemp = reminder.ETag = readReminder.ETag;
 
             Assert.Equal(readReminder.ETag, reminder.ETag);
-            Assert.Equal(readReminder.GrainRef.GrainId, reminder.GrainRef.GrainId);
+            Assert.Equal(readReminder.GrainId, reminder.GrainId);
             Assert.Equal(readReminder.Period, reminder.Period);
             Assert.Equal(readReminder.ReminderName, reminder.ReminderName);
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
@@ -100,13 +100,13 @@ namespace UnitTests.RemindersTest
 
             reminder.ETag = await remindersTable.UpsertRow(reminder);
 
-            var removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, etagTemp);
+            var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp);
             Assert.False(removeRowRes, "should have failed. Etag is wrong");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, "bla", reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, "bla", reminder.ETag);
             Assert.False(removeRowRes, "should have failed. reminder name is wrong");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag);
             Assert.True(removeRowRes, "should have succeeded. Etag is right");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag);
             Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
         }
 
@@ -114,7 +114,7 @@ namespace UnitTests.RemindersTest
         {
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>
             {
-                GrainReference grainRef = MakeTestGrainReference();
+                var grainRef = MakeTestGrainReference();
 
                 await RetryHelper.RetryOnExceptionAsync(10, RetryOperation.Sigmoid, async () =>
                 {
@@ -131,11 +131,15 @@ namespace UnitTests.RemindersTest
 
             Assert.Equal(rows.Reminders.Count, iterations);
 
-            var remindersHashes = rows.Reminders.Select(r => r.GrainRef.GetUniformHashCode()).ToArray();
+            var remindersHashes = rows.Reminders.Select(r => r.GrainId.GetUniformHashCode()).ToArray();
 
             await Task.WhenAll(Enumerable.Range(0, iterations).Select(i =>
-                TestRemindersHashInterval(remindersTable, (uint)ThreadSafeRandom.Next(int.MinValue, int.MaxValue), (uint)ThreadSafeRandom.Next(int.MinValue, int.MaxValue),
-                    remindersHashes)));
+            {
+                return TestRemindersHashInterval(remindersTable,
+                    (uint)Random.Shared.Next(int.MinValue, int.MaxValue),
+                    (uint)Random.Shared.Next(int.MinValue, int.MaxValue),
+                    remindersHashes);
+            }));
         }
 
         private async Task TestRemindersHashInterval(IReminderTable reminderTable, uint beginHash, uint endHash,
@@ -147,30 +151,25 @@ namespace UnitTests.RemindersTest
                 : remindersHashes.Where(r => r > beginHash || r <= endHash);
 
             HashSet<uint> expectedSet = new HashSet<uint>(expectedHashes);
-            var returnedHashes = (await rowsTask).Reminders.Select(r => r.GrainRef.GetUniformHashCode());
+            var returnedHashes = (await rowsTask).Reminders.Select(r => r.GrainId.GetUniformHashCode());
             var returnedSet = new HashSet<uint>(returnedHashes);
 
             Assert.True(returnedSet.SetEquals(expectedSet));
         }
 
-        private static ReminderEntry CreateReminder(GrainReference grainRef, string reminderName)
+        private static ReminderEntry CreateReminder(GrainId grainId, string reminderName)
         {
             var now = DateTime.UtcNow;
             now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
             return new ReminderEntry
             {
-                GrainRef = grainRef,
+                GrainId = grainId,
                 Period = TimeSpan.FromMinutes(1),
                 StartAt = now,
                 ReminderName = reminderName
             };
         }
 
-        private GrainReference MakeTestGrainReference()
-        {
-            GrainId regularGrainId = LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
-            GrainReference grainRef = (GrainReference)this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
-            return grainRef;
-        }
+        private static GrainId MakeTestGrainReference() => LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
     }
 }

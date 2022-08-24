@@ -13,8 +13,8 @@ namespace Orleans.Runtime
 
         public NoOpHostEnvironmentStatistics(ILogger<NoOpHostEnvironmentStatistics> logger)
         {
-            logger.Warn(
-                ErrorCode.PerfCounterNotRegistered,
+            logger.LogWarning(
+                (int)ErrorCode.PerfCounterNotRegistered,
                 "No implementation of IHostEnvironmentStatistics was found. Load shedding will not work yet");
         }
     }

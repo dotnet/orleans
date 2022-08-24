@@ -135,8 +135,7 @@ namespace Orleans.Runtime.Messaging
         public void SendMessage(Message msg)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
-                && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
+            if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
@@ -155,7 +154,7 @@ namespace Orleans.Runtime.Messaging
                 // Don't process messages that have already timed out
                 if (msg.IsExpired)
                 {
-                    this.messagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
+                    this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
                     return;
                 }
 
@@ -181,7 +180,8 @@ namespace Orleans.Runtime.Messaging
                         log.LogTrace("Message has been looped back to this silo: {Message}", msg);
                     }
 
-                    MessagingStatisticsGroup.LocalMessagesSent.Increment();
+                    MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+
                     this.ReceiveMessage(msg);
                 }
                 else
@@ -200,7 +200,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
-                        // Do not try to establish 
+                        // Do not try to establish
                         this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
                         this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
                         return;
@@ -248,7 +248,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
 
-                var str = string.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
+                var str = $"{rejectInfo} {exc}";
                 var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
                 SendMessage(rejection);
             }
@@ -296,7 +296,7 @@ namespace Orleans.Runtime.Messaging
             Exception exc = null,
             bool rejectMessages = false)
         {
-            // Just use this opportunity to invalidate local Cache Entry as well. 
+            // Just use this opportunity to invalidate local Cache Entry as well.
             if (oldAddress != null)
             {
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
@@ -373,30 +373,28 @@ namespace Orleans.Runtime.Messaging
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
+            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
             ResendMessageImpl(message, forwardingAddress);
             return true;
         }
 
         private void ResendMessageImpl(Message message, GrainAddress forwardingAddress = null)
         {
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Resend {0}", message);
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
 
             if (message.TargetGrain.IsSystemTarget())
             {
-                PrepareSystemTargetMessage(message);
+                message.IsSystemMessage = true;
                 SendMessage(message);
             }
             else if (forwardingAddress != null)
             {
-                message.TargetAddress = forwardingAddress;
+                message.TargetSilo = forwardingAddress.SiloAddress;
                 SendMessage(message);
             }
             else
             {
-                message.TargetActivation = default;
                 message.TargetSilo = null;
-                message.ClearTargetAddress();
                 _ = AddressAndSendMessage(message);
             }
         }
@@ -413,7 +411,7 @@ namespace Orleans.Runtime.Messaging
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
         /// - add ordering info and maintain send order
-        /// 
+        ///
         /// </summary>
         internal Task AddressAndSendMessage(Message message)
         {
@@ -464,118 +462,105 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetGrain.IsSystemTarget())
             {
-                PrepareSystemTargetMessage(message);
+                message.IsSystemMessage = true;
             }
 
             SendMessage(message);
         }
 
-        internal void PrepareSystemTargetMessage(Message message)
+        public void ReceiveMessage(Message msg)
         {
-            message.Category = message.TargetGrain.Equals(Constants.MembershipServiceType) ?
-                Message.Categories.Ping : Message.Categories.System;
-
-            if (message.TargetSilo == null)
+            try
             {
-                message.TargetSilo = _siloAddress;
+                this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
+                if (TryDeliverToProxy(msg))
+                {
+                    return;
+                }
+                else if (msg.Direction == Message.Directions.Response)
+                {
+                    this.catalog.RuntimeClient.ReceiveResponse(msg);
+                }
+                else
+                {
+                    var targetActivation = catalog.GetOrCreateActivation(
+                        msg.TargetGrain,
+                        msg.RequestContextData);
+
+                    if (targetActivation is null)
+                    {
+                        ProcessMessageToNonExistentActivation(msg);
+                        return;
+                    }
+
+                    targetActivation.ReceiveMessage(msg);
+                }
+            }
+            catch (Exception ex)
+            {
+                HandleReceiveFailure(msg, ex);
             }
 
-            if (message.TargetActivation.IsDefault)
+            void HandleReceiveFailure(Message msg, Exception ex)
             {
-                message.TargetActivation = ActivationId.GetDeterministic(message.TargetGrain);
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
+                log.LogError(
+                    (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
+                    ex,
+                    "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}",
+                    msg.TargetGrain,
+                    msg.InterfaceType,
+                    msg);
+
+                this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
             }
         }
 
-        public void ReceiveMessage(Message msg)
+        private void ProcessMessageToNonExistentActivation(Message msg)
         {
-            this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
-
-            // Find the activation it targets; first check for a system activation, then an app activation
-            if (msg.TargetGrain.IsSystemTarget())
+            var target = msg.TargetGrain;
+            if (target.IsSystemTarget())
             {
-                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
-                if (target == null)
+                MessagingInstruments.OnRejectedMessage(msg);
+                this.log.LogWarning(
+                    (int) ErrorCode.MessagingMessageFromUnknownActivation,
+                    "Received a message {Message} for an unknown SystemTarget: {Target}",
+                     msg,
+                     msg.TargetGrain);
+
+                // Send a rejection only on a request
+                if (msg.Direction == Message.Directions.Request)
                 {
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    this.log.LogWarning(
-                        (int) ErrorCode.MessagingMessageFromUnknownActivation,
-                        "Received a message {Message} for an unknown SystemTarget: {Target}",
-                         msg, msg.TargetAddress);
+                    var response = this.messageFactory.CreateRejectionResponse(
+                        msg,
+                        Message.RejectionTypes.Unrecoverable,
+                        $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
 
-                    // Send a rejection only on a request
-                    if (msg.Direction == Message.Directions.Request)
-                    {
-                        var response = this.messageFactory.CreateRejectionResponse(
-                            msg,
-                            Message.RejectionTypes.Unrecoverable,
-                            $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
-
-                        SendMessage(response);
-                    }
-                    return;
+                    SendMessage(response);
                 }
-
-                target.ReceiveMessage(msg);
-            }
-            else if (TryDeliverToProxy(msg))
-            {
-                return;
             }
             else
             {
-                try
-                {
-                    if (msg.Direction == Message.Directions.Response)
-                    {
-                        this.catalog.RuntimeClient.ReceiveResponse(msg);
-                    }
-                    else
-                    {
-                        var targetActivation = catalog.GetOrCreateActivation(
-                            msg.TargetAddress,
-                            msg.RequestContextData);
+                // Activation does not exists and is not a new placement.
+                log.LogInformation(
+                    (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                    "Intermediate NonExistentActivation for message {Message}",
+                    msg);
 
-                        if (targetActivation is null)
-                        {
-                            // Activation does not exists and is not a new placement.
-                            log.LogInformation(
-                                (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                                "Intermediate NonExistentActivation for message {Message}",
-                                msg);
-
-                            var nonExistentActivation = msg.TargetAddress;
-                            ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
-                            return;
-                        }
-
-                        targetActivation.ReceiveMessage(msg);
-                    } 
-                }
-                catch (Exception ex)
-                {
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(msg);
-                    log.LogError(
-                        (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
-                        ex,
-                        "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}",
-                        msg.TargetGrain,
-                        msg.InterfaceType,
-                        msg);
-
-                    this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
-                }
+                var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
+                ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
             }
         }
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
+            MessagingInstruments.OnRejectedMessage(msg);
 
-            if (msg.Direction == Message.Directions.Response && msg.Result == Message.ResponseTypes.Rejection)
+            if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+                MessagingInstruments.OnDroppedSentMessage(msg);
+                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
             }
             else
             {

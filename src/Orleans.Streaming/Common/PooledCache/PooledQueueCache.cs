@@ -139,21 +139,14 @@ namespace Orleans.Providers.Streams.Common
         private void PurgeMetadata()
         {
             var now = DateTime.UtcNow;
-            var keys = new List<StreamId>();
 
             // Get all keys older than this.purgeMetadataInterval
             foreach (var kvp in this.lastPurgedToken)
             {
                 if (kvp.Value.TimeStamp + this.purgeMetadataInterval < now)
                 {
-                    keys.Add(kvp.Key);
+                    lastPurgedToken.Remove(kvp.Key);
                 }
-            }
-
-            // Remove the expired entries
-            foreach (var key in keys)
-            {
-                this.lastPurgedToken.Remove(key);
             }
         }
 

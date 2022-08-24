@@ -18,13 +18,17 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
-
         public IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
         {
             get { return Storage.ConnectionString; }
         }
+
+        /// <summary>
+        /// The name of the provider type (MySQL, SQLServer, Oracle, PostgreSQL, etc).
+        /// </summary>
+        protected abstract string ProviderMoniker { get; }
 
         /// <summary>
         /// Default connection string for testing
@@ -47,7 +51,16 @@ namespace UnitTests.General
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
         /// </summary>
-        protected abstract string[] SetupSqlScriptFileNames { get; }
+        protected string[] SetupSqlScriptFileNames => new[] {
+                                $"{this.ProviderMoniker}-Main.sql",
+                                $"{this.ProviderMoniker}-Clustering.sql",
+                                $"{this.ProviderMoniker}-Persistence.sql",
+                                $"{this.ProviderMoniker}-Reminders.sql",
+                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Clustering-*.sql")
+                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql"))
+                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Reminders-*.sql"))
+                                .Select(f => Path.GetFileName(f))
+                                .OrderBy(f => f)).ToArray();
 
         /// <summary>
         /// A query template to create a database with a given name.
@@ -86,7 +99,7 @@ namespace UnitTests.General
             Console.WriteLine("Initializing relational databases...");
 
             RelationalStorageForTesting testStorage;
-            if(connectionString == null)
+            if (connectionString == null)
             {
                 testStorage = CreateTestInstance(invariantName);
             }

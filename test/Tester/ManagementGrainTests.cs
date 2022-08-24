@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -22,7 +23,7 @@ namespace UnitTests.Management
         private readonly Fixture fixture;
         private readonly ITestOutputHelper output;
         private readonly IManagementGrain mgmtGrain;
-        
+
         public ManagementGrainTests(Fixture fixture, ITestOutputHelper output)
         {
             this.fixture = fixture;
@@ -39,7 +40,6 @@ namespace UnitTests.Management
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
                 // between silos is obtained using AppDomains.
                 builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
-;
                 builder.Properties["GrainAssembly"] = $"{typeof(SimpleGrain).Assembly}";
             }
         }
@@ -108,7 +108,7 @@ namespace UnitTests.Management
             string grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(random.Next());
+            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);

@@ -19,8 +19,7 @@ namespace Orleans.Internal
             }
             catch (Exception exc)
             {
-                _ = task.Exception; // Observe exception
-                logger.Error(errorCode, message, exc);
+                logger.LogError((int)errorCode, exc, "{Message}", message);
                 throw;
             }
         }
@@ -43,10 +42,7 @@ namespace Orleans.Internal
             }
         }
 
-        internal static string ToString(this Task t)
-        {
-            return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));
-        }
+        internal static string ToString(this Task t) => t == null ? "null" : $"[Id={t.Id}, Status={t.Status}]";
 
         public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {

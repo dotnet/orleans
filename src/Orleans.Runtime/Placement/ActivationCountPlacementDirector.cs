@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Placement
                 var chooseFromThoseSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
                 while (chooseFromThoseSilos.Count < chooseFrom)
                 {
-                    int index = ThreadSafeRandom.Next(relevantSilos.Count);
+                    int index = Random.Shared.Next(relevantSilos.Count);
                     var pickedSilo = relevantSilos[index];
                     relevantSilos.RemoveAt(index);
                     chooseFromThoseSilos.Add(pickedSilo);
@@ -105,7 +105,7 @@ namespace Orleans.Runtime.Placement
                 Utils.EnumerableToString(
                     all,
                     kvp => String.Format("SiloAddress = {0} -> {1}", kvp.Key.ToString(), kvp.Value.ToString())));
-            logger.Warn(ErrorCode.Placement_ActivationCountBasedDirector_NoSilos, debugLog);
+            logger.LogWarning((int)ErrorCode.Placement_ActivationCountBasedDirector_NoSilos, "{Message}", debugLog);
             throw new OrleansException(debugLog);
         }
 

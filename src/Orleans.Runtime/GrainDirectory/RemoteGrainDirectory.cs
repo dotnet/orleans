@@ -5,9 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
+    internal sealed class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly GrainDirectoryPartition partition;
@@ -21,11 +22,11 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
-        public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
         {
-            router.RegistrationsSingleActRemoteReceived.Increment();
-            
-            return await router.RegisterAsync(address, hopCount);
+            DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+
+            return router.RegisterAsync(address, hopCount);
         }
 
         public Task RegisterMany(List<GrainAddress> addresses)
@@ -36,7 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RegisterMany Count={0}", addresses.Count);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RegisterMany Count={Count}", addresses.Count);
 
 
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
@@ -52,7 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
             return router.UnregisterManyAsync(addresses, cause, hopCount);
         }
 
-        public  Task DeleteGrainAsync(GrainId grainId, int hopCount)
+        public Task DeleteGrainAsync(GrainId grainId, int hopCount)
         {
             return router.DeleteGrainAsync(grainId, hopCount);
         }
@@ -64,8 +65,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
-            router.CacheValidationsReceived.Increment();
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("LookUpMany for {0} entries", grainAndETagList.Count);
+            DirectoryInstruments.ValidationsCacheReceived.Add(1);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("LookUpMany for {Count} entries", grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();
 
@@ -95,12 +96,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             return Task.FromResult(result);
-        }
-
-        public Task RemoveHandoffPartition(SiloAddress source)
-        {
-            router.HandoffManager.RemoveHandoffPartition(source);
-            return Task.CompletedTask;
         }
 
         public Task AcceptSplitPartition(List<GrainAddress> singleActivations)

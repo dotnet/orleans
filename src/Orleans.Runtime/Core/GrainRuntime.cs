@@ -10,7 +10,6 @@ namespace Orleans.Runtime
     {
         private readonly ILoggerFactory loggerFactory;
         private readonly IServiceProvider serviceProvider;
-        private readonly IReminderRegistry reminderRegistry;
         private readonly ITimerRegistry timerRegistry;
         private readonly IGrainFactory grainFactory;
 
@@ -18,15 +17,13 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
-            IReminderRegistry reminderRegistry,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory)
         {
             SiloAddress = localSiloDetails.SiloAddress;
-            SiloIdentity = SiloAddress.ToLongString();
+            SiloIdentity = SiloAddress.ToString();
             this.grainFactory = grainFactory;
             this.timerRegistry = timerRegistry;
-            this.reminderRegistry = reminderRegistry;
             this.serviceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
         }
@@ -50,15 +47,6 @@ namespace Orleans.Runtime
             {
                 CheckRuntimeContext(RuntimeContext.Current);
                 return this.timerRegistry;
-            }
-        }
-
-        public IReminderRegistry ReminderRegistry
-        {
-            get
-            {
-                CheckRuntimeContext(RuntimeContext.Current);
-                return this.reminderRegistry;
             }
         }
 
@@ -94,7 +82,7 @@ namespace Orleans.Runtime
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
             IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
             string grainTypeName = grainContext.GrainInstance.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grainContext.GrainReference, grainStorage, this.loggerFactory);
+            return new StateStorageBridge<TGrainState>(grainTypeName, grainContext.GrainId, grainStorage, this.loggerFactory);
         }
 
         public static void CheckRuntimeContext(IGrainContext context)

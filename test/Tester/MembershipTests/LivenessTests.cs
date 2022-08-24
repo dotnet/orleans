@@ -7,6 +7,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -82,7 +84,7 @@ namespace UnitTests.MembershipTests
 
             SiloHandle silo2KillHandle = this.HostedCluster.Silos[silo2Kill];
 
-            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
+            logger.LogInformation("\n\n\n\nAbout to kill {Endpoint}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
                 await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
@@ -92,7 +94,7 @@ namespace UnitTests.MembershipTests
             bool didKill = !restart;
             await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
 
-            logger.Info("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
+            logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
 
             for (int i = 0; i < numGrains; i++)
             {
@@ -103,7 +105,7 @@ namespace UnitTests.MembershipTests
             {
                 await SendTraffic(i + 1);
             }
-            logger.Info("======================================================");
+            logger.LogInformation("======================================================");
         }
 
         protected async Task Do_Liveness_OracleTest_3()
@@ -113,29 +115,29 @@ namespace UnitTests.MembershipTests
 
             await TestTraffic();
 
-            logger.Info("\n\n\n\nAbout to stop a first silo.\n\n\n");
+            logger.LogInformation("\n\n\n\nAbout to stop a first silo.\n\n\n");
             var siloToStop = this.HostedCluster.SecondarySilos[0];
             await this.HostedCluster.StopSiloAsync(siloToStop);
 
             await TestTraffic();
 
-            logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
+            logger.LogInformation("\n\n\n\nAbout to re-start a first silo.\n\n\n");
             
             await this.HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
 
             await TestTraffic();
 
-            logger.Info("\n\n\n\nAbout to stop a second silo.\n\n\n");
+            logger.LogInformation("\n\n\n\nAbout to stop a second silo.\n\n\n");
             await this.HostedCluster.StopSiloAsync(moreSilos[0]);
 
             await TestTraffic();
 
-            logger.Info("======================================================");
+            logger.LogInformation("======================================================");
         }
 
         private async Task TestTraffic()
         {
-            logger.Info("\n\n\n\nAbout to start sending msg to grain again.\n\n\n");
+            logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again.\n\n\n");
             // same grains
             for (int i = 0; i < numGrains; i++)
             {
@@ -144,7 +146,7 @@ namespace UnitTests.MembershipTests
             // new random grains
             for (int i = 0; i < numGrains; i++)
             {
-                await SendTraffic(random.Next(10000));
+                await SendTraffic(Random.Shared.Next(10000));
             }
         }
 
@@ -163,14 +165,14 @@ namespace UnitTests.MembershipTests
             }
             catch (Exception exc)
             {
-                logger.Info("Exception making grain call: {0}", exc);
+                logger.LogInformation(exc, "Exception making grain call");
                 throw;
             }
         }
 
         private async Task LogGrainIdentity(ILogger logger, ILivenessTestGrain grain)
         {
-            logger.Info("Grain {0}, activation {1} on {2}",
+            logger.LogInformation("Grain {Grain}, activation {Activation} on {Host}",
                 await grain.GetGrainReference(),
                 await grain.GetUniqueId(),
                 await grain.GetRuntimeInstanceId());

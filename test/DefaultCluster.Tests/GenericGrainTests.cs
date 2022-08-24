@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using TestGrainInterfaces;
@@ -245,7 +246,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow()
         {
-            var a = random.Next(100);
+            var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
 
@@ -262,7 +263,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public void Generic_SimpleGrainControlFlow_Blocking()
         {
-            var a = random.Next(100);
+            var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
 
@@ -280,7 +281,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainDataFlow()
         {
-            var a = random.Next(100);
+            var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
 
@@ -315,7 +316,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow2_GetAB()
         {
-            var a = random.Next(100);
+            var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
 
@@ -352,8 +353,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GrainWithListFields()
         {
-            string a = random.Next(100).ToString(CultureInfo.InvariantCulture);
-            string b = random.Next(100).ToString(CultureInfo.InvariantCulture);
+            string a = Random.Shared.Next(100).ToString(CultureInfo.InvariantCulture);
+            string b = Random.Shared.Next(100).ToString(CultureInfo.InvariantCulture);
 
             var g1 =  this.GrainFactory.GetGrain<IGrainWithListFields>(grainId++);
 
@@ -371,8 +372,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_GrainWithListFields()
         {
-            int a = random.Next(100);
-            int b = random.Next(100);
+            int a = Random.Shared.Next(100);
+            int b = Random.Shared.Next(100);
 
 
             var g1 =  this.GrainFactory.GetGrain<IGenericGrainWithListFields<int>>(grainId++);
@@ -391,8 +392,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_GrainWithNoProperties_ControlFlow()
         {
-            int a = random.Next(100);
-            int b = random.Next(100);
+            int a = Random.Shared.Next(100);
+            int b = Random.Shared.Next(100);
             string expected = a + "x" + b;
 
             var g1 =  this.GrainFactory.GetGrain<IGenericGrainWithNoProperties<int>>(grainId++);
@@ -404,8 +405,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GrainWithNoProperties_ControlFlow()
         {
-            int a = random.Next(100);
-            int b = random.Next(100);
+            int a = Random.Shared.Next(100);
+            int b = Random.Shared.Next(100);
             string expected = a + "x" + b;
 
             long grainId = GetRandomGrainId();
@@ -418,7 +419,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_ReaderWriterGrain1()
         {
-            int a = random.Next(100);
+            int a = Random.Shared.Next(100);
             var g =  this.GrainFactory.GetGrain<IGenericReaderWriterGrain1<int>>(grainId++);
             await g.SetValue(a);
             var res = await g.GetValue();
@@ -428,7 +429,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_ReaderWriterGrain2()
         {
-            int a = random.Next(100);
+            int a = Random.Shared.Next(100);
             string b = "bbbbb";
 
             var g =  this.GrainFactory.GetGrain<IGenericReaderWriterGrain2<int, string>>(grainId++);
@@ -443,7 +444,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_ReaderWriterGrain3()
         {
-            int a = random.Next(100);
+            int a = Random.Shared.Next(100);
             string b = "bbbbb";
             double c = 3.145;
 

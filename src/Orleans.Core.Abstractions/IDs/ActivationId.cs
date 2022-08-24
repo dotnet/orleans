@@ -1,9 +1,12 @@
 using System;
 using System.Buffers.Binary;
+using System.Buffers.Text;
+using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -12,13 +15,8 @@ namespace Orleans.Runtime
     [Serializable, Immutable]
     [GenerateSerializer]
     [JsonConverter(typeof(ActivationIdConverter))]
-    public readonly struct ActivationId : IEquatable<ActivationId>
+    public readonly struct ActivationId : IEquatable<ActivationId>, ISpanFormattable
     {
-        /// <summary>
-        /// The default instance.
-        /// </summary>
-        public static readonly ActivationId Zero = GetActivationId(Guid.Empty);
-
         [DataMember(Order = 0)]
         [Id(0)]
         internal readonly Guid Key;
@@ -32,13 +30,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether the instance is the default instance.
         /// </summary>
-        public bool IsDefault => Equals(Zero);
+        public bool IsDefault => Key == default;
 
         /// <summary>
         /// Returns a new, random activation id.
         /// </summary>
         /// <returns>A new, random activation id.</returns>
-        public static ActivationId NewId() => GetActivationId(Guid.NewGuid());
+        public static ActivationId NewId() => new(Guid.NewGuid());
 
         /// <summary>
         /// Returns an activation id which has been computed deterministically and reproducibly from the provided grain id.
@@ -48,23 +46,14 @@ namespace Orleans.Runtime
         public static ActivationId GetDeterministic(GrainId grain)
         {
             Span<byte> temp = stackalloc byte[16];
-            var a = (ulong)grain.Type.GetUniformHashCode();
-            var b = (ulong)grain.Key.GetUniformHashCode();
-            BinaryPrimitives.WriteUInt64LittleEndian(temp, a);
-            BinaryPrimitives.WriteUInt64LittleEndian(temp[8..], b);
+            BinaryPrimitives.WriteUInt64LittleEndian(temp, grain.Type.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt64LittleEndian(temp[8..], grain.Key.GetUniformHashCode());
             var key = new Guid(temp);
             return new ActivationId(key);
         }
 
-        /// <summary>
-        /// Gets an activation id representing the provided key.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns>An activation id representing the provided key.</returns>
-        internal static ActivationId GetActivationId(Guid key) => new(key);
-
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is ActivationId other && Key.Equals(other.Key);
+        public override bool Equals(object? obj) => obj is ActivationId other && Key.Equals(other.Key);
 
         /// <inheritdoc />
         public bool Equals(ActivationId other) => Key.Equals(other.Key);
@@ -74,6 +63,11 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public override string ToString() => $"@{Key:N}";
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => destination.TryWrite($"@{Key:N}", out charsWritten);
 
         /// <summary>
         /// Returns a string representation of this activation id which can be parsed by <see cref="FromParsableString"/>.
@@ -86,7 +80,11 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="activationId">The string representation of the activation id.</param>
         /// <returns>The activation id.</returns>
-        public static ActivationId FromParsableString(string activationId) => GetActivationId(Guid.Parse(activationId.Remove(0, 1)));
+        public static ActivationId FromParsableString(string activationId)
+        {
+            var span = activationId.AsSpan();
+            return span.Length == 33 && span[0] == '@' ? new(Guid.ParseExact(span[1..], "N")) : throw new FormatException($"Invalid activation id: {activationId}");
+        }
 
         /// <summary>
         /// Compares the provided operands for equality.
@@ -108,12 +106,19 @@ namespace Orleans.Runtime
     /// <summary>
     /// Functionality for converting <see cref="ActivationId"/> instances to and from their JSON representation.
     /// </summary>
-    public class ActivationIdConverter : JsonConverter<ActivationId>
+    public sealed class ActivationIdConverter : JsonConverter<ActivationId>
     {
         /// <inheritdoc />
-        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString());
+        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToParsableString());
+        public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)
+        {
+            Span<byte> buf = stackalloc byte[33];
+            buf[0] = (byte)'@';
+            Utf8Formatter.TryFormat(value.Key, buf[1..], out var len, 'N');
+            Debug.Assert(len == 32);
+            writer.WriteStringValue(buf);
+        }
     }
 }

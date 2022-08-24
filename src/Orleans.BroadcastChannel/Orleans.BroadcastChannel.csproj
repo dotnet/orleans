@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.BroadcastChannel</PackageId>
+    <Title>Microsoft Orleans Broadcast Channel Library</Title>
+    <Description>Broadcast Channel library for Microsoft Orleans used both on the client and server.</Description>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+</Project>

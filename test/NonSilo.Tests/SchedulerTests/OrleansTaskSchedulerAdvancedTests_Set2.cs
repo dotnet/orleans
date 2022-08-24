@@ -44,7 +44,7 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             int n = 0;
@@ -67,7 +67,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_NewTask_ContinueWith_Wrapped()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             Task<Task> wrapped = new Task<Task>(() =>
@@ -100,7 +100,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SubTaskExecutionSequencing()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             LogContext("Main-task " + Task.CurrentId);
@@ -153,7 +153,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_ContinueWith_1_Test()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             var result = new TaskCompletionSource<bool>();
@@ -192,7 +192,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
@@ -249,7 +249,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Timeout()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
@@ -309,7 +309,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Busy_Timeout()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             var pause1 = new TaskCompletionSource<bool>();
@@ -327,7 +327,7 @@ namespace UnitTests.SchedulerTests
                     int num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
-                        num1 = ThreadSafeRandom.Next();
+                        num1 = Random.Shared.Next();
                     }
                     this.output.WriteLine("Task-1 Done");
                     return num1;
@@ -339,7 +339,7 @@ namespace UnitTests.SchedulerTests
                     int num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
-                        num2 = ThreadSafeRandom.Next();
+                        num2 = Random.Shared.Next();
                     }
                     this.output.WriteLine("Task-2 Done");
                     return num2;
@@ -374,7 +374,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
@@ -436,7 +436,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run_Delay()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
@@ -502,7 +502,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Delay()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             Task<Task> wrapper = new Task<Task>(async () =>
@@ -535,7 +535,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Turn_Execution_Order_Loop()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             const int NumChains = 100;
@@ -553,7 +553,7 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < NumChains; i++)
             {
                 int chainNum = i; // Capture
-                int sleepTime = ThreadSafeRandom.Next(100);
+                int sleepTime = Random.Shared.Next(100);
                 resultHandles[i] = new TaskCompletionSource<bool>();
                 taskChains[i] = new Task(() =>
                 {
@@ -650,7 +650,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, false);
@@ -659,7 +659,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1_Bounce()
         {
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, true);
@@ -669,7 +669,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
             ActivationTaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, false);
@@ -678,7 +678,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1_Bounce()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            using var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
+            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
             ActivationTaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, true);

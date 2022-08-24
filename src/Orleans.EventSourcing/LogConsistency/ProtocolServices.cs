@@ -28,7 +28,7 @@ namespace Orleans.Runtime.LogConsistency
             this.MyClusterId = siloDetails.ClusterId;
         }
 
-        public GrainReference GrainReference => grainContext.GrainReference;
+        public GrainId GrainId => grainContext.GrainId;
 
         public string MyClusterId { get; }
 
@@ -36,42 +36,44 @@ namespace Orleans.Runtime.LogConsistency
 
         public void ProtocolError(string msg, bool throwexception)
         {
-
-            log?.Error((int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
-                string.Format("{0} Protocol Error: {1}",
-                    grainContext.GrainReference,
-                    msg));
+            log.LogError(
+                (int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
+                "{GrainId} Protocol Error: {Message}",
+                grainContext.GrainId,
+                msg);
 
             if (!throwexception)
                 return;
 
-            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grainContext.GrainReference, this.MyClusterId));
+            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grainContext.GrainId, this.MyClusterId));
         }
 
         public void CaughtException(string where, Exception e)
         {
-            log?.Error((int)ErrorCode.LogConsistency_CaughtException,
-               string.Format("{0} Exception Caught at {1}",
-                   grainContext.GrainReference,
-                   where),e);
+            log.LogError(
+                (int)ErrorCode.LogConsistency_CaughtException,
+                e,
+               "{GrainId} exception caught at {Location}",
+               grainContext.GrainId,
+               where);
         }
 
         public void CaughtUserCodeException(string callback, string where, Exception e)
         {
-            log?.Warn((int)ErrorCode.LogConsistency_UserCodeException,
-                string.Format("{0} Exception caught in user code for {1}, called from {2}",
-                   grainContext.GrainReference,
-                   callback,
-                   where), e);
+            log.LogWarning(
+                (int)ErrorCode.LogConsistency_UserCodeException,
+                e,
+                "{GrainId} exception caught in user code for {Callback}, called from {Location}",
+                grainContext.GrainId,
+                callback,
+                where);
         }
 
         public void Log(LogLevel level, string format, params object[] args)
         {
             if (log != null && log.IsEnabled(level))
             {
-                var msg = string.Format("{0} {1}",
-                        grainContext.GrainReference,
-                        string.Format(format, args));
+                var msg = $"{grainContext.GrainId} {string.Format(format, args)}";
                 log.Log(level, 0, msg, null, (m, exc) => $"{m}");
             }
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.Transactions
@@ -77,8 +77,15 @@ namespace Orleans.Transactions
 
         public void RemoveFromFront(int howMany)
         {
-            if (howMany > 0 && (buffer == null || howMany > Count))
+            if (howMany <= 0)
+            {
+                throw new ArgumentException("Value must be greater than zero", nameof(howMany));
+            }
+
+            if (buffer == null || howMany > Count)
+            {
                 throw new ArgumentException("cannot remove more elements than are in the queue", nameof(howMany));
+            }
 
             // clear entries so they can ge GCd
             for (int i = 0; i < howMany; i++)

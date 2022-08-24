@@ -77,10 +77,7 @@ namespace Orleans.Runtime.MembershipService
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
         }
 
-        public override string ToString()
-        {
-            return String.Format("Table = {0}, ETagCounter={1}", ReadAll().ToString(), lastETagCounter);
-        }
+        public override string ToString() => $"Table = {ReadAll()}, ETagCounter={lastETagCounter}";
 
         private string NewETag()
         {

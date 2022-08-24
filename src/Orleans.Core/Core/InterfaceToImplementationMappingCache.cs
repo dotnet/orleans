@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.Utilities;
@@ -18,6 +22,8 @@ namespace Orleans
         {
             public Entry(MethodInfo implementationMethod, MethodInfo interfaceMethod)
             {
+                Debug.Assert(implementationMethod is not null);
+                Debug.Assert(interfaceMethod is not null);
                 ImplementationMethod = implementationMethod;
                 InterfaceMethod = interfaceMethod;
             }
@@ -31,13 +37,48 @@ namespace Orleans
             /// Gets the grain interface <see cref="MethodInfo"/>.
             /// </summary>
             public MethodInfo InterfaceMethod { get; }
+
+            public (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetConstructedGenericMethod(MethodInfo method)
+            {
+                return ConstructedGenericMethods.GetOrAdd(method.GetGenericArguments(), (key, state) =>
+                {
+                    var (entry, method) = state;
+                    var genericArgs = key;
+                    var constructedImplementationMethod = entry.ImplementationMethod.MakeGenericMethod(genericArgs);
+                    var constructedInterfaceMethod = entry.InterfaceMethod.MakeGenericMethod(genericArgs);
+                    return (constructedImplementationMethod, constructedInterfaceMethod);
+                }, (this, method));
+            }
+
+            /// <summary>
+            /// Gets the constructed generic instances of this method.
+            /// </summary>
+            public ConcurrentDictionary<Type[], (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod)> ConstructedGenericMethods { get; } = new(TypeArrayComparer.Instance);
+
+            private sealed class TypeArrayComparer : IEqualityComparer<Type[]>
+            {
+                internal static readonly TypeArrayComparer Instance = new();
+
+                public bool Equals(Type[] x, Type[] y) => ReferenceEquals(x, y) || x is null && y is null || x.Length != y.Length || x.AsSpan().SequenceEqual(y.AsSpan());
+
+                public int GetHashCode([DisallowNull] Type[] obj)
+                {
+                    HashCode result = new();
+                    result.Add(obj.Length);
+                    foreach (var value in obj)
+                    {
+                        result.Add(value);
+                    }
+
+                    return result.ToHashCode();
+                }
+            }
         }
 
         /// <summary>
         /// The map from implementation types to interface types to map of method to method infos.
         /// </summary>
-        private readonly CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings =
-            new CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>>();
+        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
 
         /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.
@@ -53,7 +94,7 @@ namespace Orleans
             if (!this.mappings.TryGetValue(implementationType, out var invokerMap))
             {
                 // Generate an the invoker mapping using the provided invoker.
-                this.mappings[implementationType] = invokerMap = CreateInterfaceToImplementationMap(implementationType);
+                invokerMap = mappings.GetOrAdd(implementationType, CreateInterfaceToImplementationMap(implementationType));
             }
 
             // Attempt to get the invoker for the provided interfaceId.
@@ -76,7 +117,6 @@ namespace Orleans
 
             // Create an invoker for every interface on the provided type.
             var result = new Dictionary<Type, Dictionary<MethodInfo, Entry>>(interfaces.Length);
-            var implementationTypeInfo = implementationType.GetTypeInfo();
             foreach (var iface in interfaces)
             {
                 var methods = GrainInterfaceUtils.GetMethods(iface);
@@ -93,13 +133,14 @@ namespace Orleans
                     // get the mapping for the interface which it does belong to.
                     if (mapping.InterfaceType != method.DeclaringType)
                     {
-                        mapping = implementationTypeInfo.GetRuntimeInterfaceMap(method.DeclaringType);
+                        mapping = implementationType.GetInterfaceMap(method.DeclaringType);
                     }
 
                     // Find the index of the interface method and then get the implementation method at that position.
                     for (var k = 0; k < mapping.InterfaceMethods.Length; k++)
                     {
                         if (mapping.InterfaceMethods[k] != method) continue;
+                        Debug.Assert(method is not null);
                         methodMap[method] = new Entry(mapping.TargetMethods[k], method);
 
                         break;

@@ -31,7 +31,6 @@ namespace Orleans.Runtime
 
             var message = new Message
             {
-                Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
@@ -50,46 +49,20 @@ namespace Orleans.Runtime
         {
             var response = new Message
             {
-                Category = request.Category,
+                IsSystemMessage = request.IsSystemMessage,
                 Direction = Message.Directions.Response,
                 Id = request.Id,
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
                 CallChainId = request.CallChainId,
+                TargetGrain = request.SendingGrain,
+                SendingSilo = request.TargetSilo,
+                SendingGrain = request.TargetGrain,
+                CacheInvalidationHeader = request.CacheInvalidationHeader,
+                TimeToLive = request.TimeToLive,
+                RequestContextData = RequestContextExtensions.Export(this.deepCopier),
             };
-
-            if (!request.SendingGrain.IsDefault)
-            {
-                response.TargetGrain = request.SendingGrain;
-                if (!request.SendingActivation.IsDefault)
-                {
-                    response.TargetActivation = request.SendingActivation;
-                }
-            }
-
-            response.SendingSilo = request.TargetSilo;
-            if (!request.TargetGrain.IsDefault)
-            {
-                response.SendingGrain = request.TargetGrain;
-                if (!request.TargetActivation.IsDefault)
-                {
-                    response.SendingActivation = request.TargetActivation;
-                }
-                else if (request.TargetGrain.IsSystemTarget())
-                {
-                    response.SendingActivation = ActivationId.GetDeterministic(request.TargetGrain);
-                }
-            }
-
-            response.CacheInvalidationHeader = request.CacheInvalidationHeader;
-            response.TimeToLive = request.TimeToLive;
-
-            var contextData = RequestContextExtensions.Export(this.deepCopier);
-            if (contextData != null)
-            {
-                response.RequestContextData = contextData;
-            }
 
             messagingTrace.OnCreateMessage(response);
             return response;
@@ -99,10 +72,19 @@ namespace Orleans.Runtime
         {
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;
-            response.RejectionType = type;
-            response.RejectionInfo = info;
-            response.BodyObject = ex;
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            response.BodyObject = new RejectionResponse
+            {
+                RejectionType = type,
+                RejectionInfo = info,
+                Exception = ex,
+            };
+            if (this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug(
+                    ex,
+                    "Creating {RejectionType} rejection with info '{Info}' at:" + Environment.NewLine + "{StackTrace}",
+                    type,
+                    info,
+                    Utils.GetStackTrace());
             return response;
         }
 
@@ -112,7 +94,7 @@ namespace Orleans.Runtime
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
 
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
 
             return response;
         }

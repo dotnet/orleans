@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.log.LogInformation("Exception while closing connections to defunct silo {SiloAddress}: {Exception}", silo, exception);
+                this.log.LogInformation(exception, "Exception while closing connections to defunct silo {SiloAddress}", silo);
             }
         }
     }

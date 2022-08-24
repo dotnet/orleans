@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.GrainDirectory.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Grain Directory Azure Storage</Title>
-    <Description>Microsoft Orleans Grain Directory implementation that uses Azure Storage</Description>
+    <Title>Microsoft Orleans Azure Storage Grain Directory Provider</Title>
+    <Description>Microsoft Orleans Grain Directory provider backed by Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Grain Directory</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.GrainDirectory.AzureStorage</AssemblyName>

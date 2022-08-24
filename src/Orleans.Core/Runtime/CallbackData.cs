@@ -1,5 +1,7 @@
 using System;
+using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -14,7 +16,7 @@ namespace Orleans.Runtime
 
         public CallbackData(
             SharedCallbackData shared,
-            IResponseCompletionSource ctx, 
+            IResponseCompletionSource ctx,
             Message msg)
         {
             this.shared = shared;
@@ -31,7 +33,7 @@ namespace Orleans.Runtime
         {
             this.lastKnownStatus = status;
         }
-        
+
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
@@ -47,26 +49,24 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
 
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                requestStatistics.OnAppRequestsTimedOut();
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
             OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
 
             var msg = this.Message; // Local working copy
 
-            string messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}Target History is: {messageHistory}.";
-            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
+            this.shared.Logger.LogWarning(
+                (int)ErrorCode.Runtime_Error_100157,
+                "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage}. About to break its promise.",
+                timeout,
+                msg,
+                statusMessage);
 
-            var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
-            ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
+            var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
+            context.Complete(Response.FromException(exception));
         }
 
         public void OnTargetSiloFail()
@@ -77,23 +77,20 @@ namespace Orleans.Runtime
             }
 
             this.shared.Unregister(this.Message);
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
-            var messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            var errorMsg =
-                $"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
-            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
-            var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
-            ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
+            this.shared.Logger.LogWarning(
+                (int)ErrorCode.Runtime_Error_100157,
+                "The target silo became unavailable for message: {Message}. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise.",
+                msg,
+                statusMessage,
+                Constants.TroubleshootingHelpLink);
+            var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
+            this.context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
@@ -105,64 +102,47 @@ namespace Orleans.Runtime
 
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
-            var requestStatistics = this.shared.RequestStatistics;
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                this.stopwatch.Stop();
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
+            this.stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public static void ResponseCallback(Message message, IResponseCompletionSource context)
         {
-            if (message.Result != Message.ResponseTypes.Rejection)
+            try
             {
-                try
+                var body = message.BodyObject;
+                if (body is Response response)
                 {
-                    var response = (Response)message.BodyObject;
                     context.Complete(response);
                 }
-                catch (Exception exc)
+                else
                 {
-                    // catch the exception and break the promise with it.
-                    context.Complete(Response.FromException(exc));
+                    HandleRejectionResponse(context, body as RejectionResponse);
                 }
             }
-            else
+            catch (Exception exc)
             {
-                OnRejection(message, context);
-            }
-        }
-
-        private static void OnRejection(Message message, IResponseCompletionSource context)
-        {
-            Exception rejection;
-            switch (message.RejectionType)
-            {
-                case Message.RejectionTypes.GatewayTooBusy:
-                    rejection = new GatewayTooBusyException();
-                    break;
-                case Message.RejectionTypes.DuplicateRequest:
-                    return; // Ignore duplicates
-
-                default:
-                    rejection = message.BodyObject as Exception;
-                    if (rejection == null)
-                    {
-                        if (string.IsNullOrEmpty(message.RejectionInfo))
-                        {
-                            message.RejectionInfo = "Unable to send request - no rejection info available";
-                        }
-                        rejection = new OrleansMessageRejectionException(message.RejectionInfo);
-                    }
-                    break;
+                // catch the exception and break the promise with it.
+                context.Complete(Response.FromException(exc));
             }
 
-            context.Complete(Response.FromException(rejection));
+            static void HandleRejectionResponse(IResponseCompletionSource context, RejectionResponse rejection)
+            {
+                Exception exception;
+                if (rejection?.RejectionType is Message.RejectionTypes.GatewayTooBusy)
+                {
+                    exception = new GatewayTooBusyException();
+                }
+                else
+                {
+                    exception = rejection?.Exception ?? new OrleansMessageRejectionException(rejection?.RejectionInfo ?? "Unable to send request - no rejection info available");
+                }
+
+                context.Complete(Response.FromException(exception));
+            }
         }
     }
 }

@@ -81,7 +81,7 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : ThreadSafeRandom.Next(knownGateways.Count);
+            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
@@ -240,7 +240,7 @@ namespace Orleans.Messaging
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.ProxyClient_GetGateways, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()", exc);
+                logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()");
             }
         }
 
@@ -299,8 +299,8 @@ namespace Orleans.Messaging
 
                 if (live.Count == 0)
                 {
-                    logger.Warn(
-                        ErrorCode.GatewayManager_AllGatewaysDead,
+                    logger.LogWarning(
+                        (int)ErrorCode.GatewayManager_AllGatewaysDead,
                         "All gateways have previously been marked as dead. Clearing the list of dead gateways to expedite reconnection.");
                     live.AddRange(knownGateways);
                     knownDead.Clear();
@@ -314,13 +314,14 @@ namespace Orleans.Messaging
                 lastRefreshTime = now;
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(ErrorCode.GatewayManager_FoundKnownGateways,
-                            "Refreshed the live gateway list. Found {0} gateways from gateway list provider: {1}. Picked only known live out of them. Now has {2} live gateways: {3}. Previous refresh time was = {4}",
-                            knownGateways.Count,
-                            Utils.EnumerableToString(knownGateways),
-                            cachedLiveGateways.Count,
-                            Utils.EnumerableToString(cachedLiveGateways),
-                            prevRefresh);
+                    logger.LogDebug(
+                        (int)ErrorCode.GatewayManager_FoundKnownGateways,
+                        "Refreshed the live gateway list. Found {KnownGatewayCount} gateways from gateway list provider: {KnownGateways}. Picked only known live out of them. Now has {LiveGatewayCount} live gateways: {LiveGateways}. Previous refresh time was = {PreviousRefreshTime}",
+                        knownGateways.Count,
+                        Utils.EnumerableToString(knownGateways),
+                        cachedLiveGateways.Count,
+                        Utils.EnumerableToString(cachedLiveGateways),
+                        prevRefresh);
                 }
 
                 // Close connections to known dead connections, but keep the "masked" ones.

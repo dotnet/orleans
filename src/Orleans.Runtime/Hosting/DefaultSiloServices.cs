@@ -4,14 +4,12 @@ using Orleans.Configuration;
 using Orleans.Configuration.Validators;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -40,6 +38,7 @@ using Orleans.Storage;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Hosting
 {
@@ -70,15 +69,17 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
             services.AddSingleton<SiloOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
-            services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>(services);
+            }
+            else
+            {
+                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            }
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
-            services.TryAddSingleton<SiloStatisticsManager>();
-            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
-            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
-            services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
@@ -86,8 +87,7 @@ namespace Orleans.Hosting
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.AddTransient<IConfigurationValidator, ReminderOptionsValidator>();
+            
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -104,7 +104,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
             services.AddSingleton<IConfigureGrainTypeComponents, ReentrantSharedComponentsConfigurator>();
             services.TryAddSingleton<RpcProvider>();
-            services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.AddSingleton<GrainVersionManifest>();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<GrainTypeSharedContextResolver>();
@@ -177,7 +176,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ClientDirectory>();
             services.AddFromExisting<ILocalClientDirectory, ClientDirectory>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientDirectory>();
-            
+
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
 
@@ -300,8 +299,6 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<GrainCollectionOptions>();
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
-            services.ConfigureFormatter<StatisticsOptions>();
-            services.ConfigureFormatter<TelemetryOptions>();
             services.ConfigureFormatter<LoadSheddingOptions>();
             services.ConfigureFormatter<EndpointOptions>();
             services.ConfigureFormatter<ClusterOptions>();
@@ -312,6 +309,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
+            services.AddTransient<IValidateOptions<SiloMessagingOptions>, SiloMessagingOptionsValidator>();
 
             // Enable hosted client.
             services.TryAddSingleton<HostedClient>();

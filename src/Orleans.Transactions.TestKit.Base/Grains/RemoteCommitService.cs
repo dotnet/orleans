@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
@@ -26,24 +26,23 @@ namespace Orleans.Transactions.TestKit
 
         public async Task<bool> Pass(Guid transactionId, string data)
         {
-            this.logger.LogInformation($"Transaction {transactionId} Passed with data: {data}");
+            this.logger.LogInformation("Transaction {TransactionId} Passed with data: {Data}", transactionId, data);
             await Task.Delay(30);
             return true;
         }
 
         public async Task<bool> Fail(Guid transactionId, string data)
         {
-            this.logger.LogInformation($"Transaction {transactionId} Failed with data: {data}");
+            this.logger.LogInformation("Transaction {TransactionId} Failed with data: {Data}", transactionId, data);
             await Task.Delay(30);
             return false;
         }
 
         public async Task<bool> Throw(Guid transactionId, string data)
         {
-            var msg = $"Transaction {transactionId} Threw with data: {data}";
-            this.logger.LogInformation(msg);
+            this.logger.LogInformation("Transaction {TransactionId} Threw with data: {Data}", transactionId, data);
             await Task.Delay(30);
-            throw new ApplicationException(msg);
+            throw new ApplicationException("Transaction {transactionId} Threw with data: {data}");
         }
     }
 

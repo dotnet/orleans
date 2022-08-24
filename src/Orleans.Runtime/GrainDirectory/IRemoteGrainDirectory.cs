@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -27,13 +28,6 @@ namespace Orleans.Runtime
         /// If the generation number of the invoker matches the number of the destination, the list is null. If the destination does not
         /// hold the information on the grain, generation counter -1 is returned (and the list of activations is null)</returns>
         Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList);
-
-        /// <summary>
-        /// Removes the handed off directory partition from source silo on the destination silo.
-        /// </summary>
-        /// <param name="source">The address of the owner of the partition.</param>
-        /// <returns></returns>
-        Task RemoveHandoffPartition(SiloAddress source);
 
         /// <summary>
         /// Registers activations from a split partition with this directory.

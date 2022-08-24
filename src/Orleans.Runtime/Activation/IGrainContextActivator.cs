@@ -28,7 +28,8 @@ namespace Orleans.Runtime
         private readonly IGrainContextActivatorProvider[] _activatorProviders;
         private readonly IConfigureGrainContextProvider[] _configuratorProviders;
         private readonly GrainPropertiesResolver _resolver;
-        private ImmutableDictionary<GrainType, ActivatorEntry> _activators = ImmutableDictionary<GrainType, ActivatorEntry>.Empty;
+        private ImmutableDictionary<GrainType, (IGrainContextActivator Activator, IConfigureGrainContext[] ConfigureActions)> _activators
+            = ImmutableDictionary<GrainType, (IGrainContextActivator, IConfigureGrainContext[])>.Empty;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainContextActivator"/> class.
@@ -68,7 +69,7 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private ActivatorEntry CreateActivator(GrainType grainType)
+        private (IGrainContextActivator, IConfigureGrainContext[]) CreateActivator(GrainType grainType)
         {
             lock (_lockObj)
             {
@@ -98,28 +99,12 @@ namespace Orleans.Runtime
                         }
                     }
 
-                    var applicableConfigureActions = configureActions.Count > 0 ? configureActions.ToArray() : Array.Empty<IConfigureGrainContext>();
-                    configuredActivator = new ActivatorEntry(unconfiguredActivator, applicableConfigureActions);
+                    configuredActivator = (unconfiguredActivator, configureActions.ToArray());
                     _activators = _activators.SetItem(grainType, configuredActivator);
                 }
 
                 return configuredActivator;
             }
-        }
-
-        private readonly struct ActivatorEntry
-        {
-            public ActivatorEntry(
-                IGrainContextActivator activator,
-                IConfigureGrainContext[] configureActions)
-            {
-                this.Activator = activator;
-                this.ConfigureActions = configureActions;
-            }
-
-            public IGrainContextActivator Activator { get; }
-
-            public IConfigureGrainContext[] ConfigureActions { get; }
         }
     }
 

@@ -1,10 +1,9 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -34,9 +33,7 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-
-            // TODO: Optimize
-            writer.WriteUInt32((uint)BitConverter.ToInt32(BitConverter.GetBytes(value), 0));
+            writer.WriteUInt32(BitConverter.SingleToUInt32Bits(value));
         }
 
         /// <inheritdoc/>
@@ -83,11 +80,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP3_1_OR_GREATER
-        public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int32BitsToSingle(reader.ReadInt32());
-#else
-        public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.ToSingle(BitConverter.GetBytes(reader.ReadInt32()), 0);
-#endif
+        public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt32BitsToSingle(reader.ReadUInt32());
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
@@ -134,9 +127,7 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
-
-            // TODO: Optimize
-            writer.WriteUInt64((ulong)BitConverter.ToInt64(BitConverter.GetBytes(value), 0));
+            writer.WriteUInt64(BitConverter.DoubleToUInt64Bits(value));
         }
 
         /// <inheritdoc/>
@@ -173,11 +164,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP3_1_OR_GREATER
-        public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int64BitsToDouble(reader.ReadInt64());
-#else
-        public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.ToDouble(BitConverter.GetBytes(reader.ReadInt64()), 0);
-#endif
+        public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt64BitsToDouble(reader.ReadUInt64());
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
@@ -219,12 +206,11 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
             writer.WriteVarUInt32(Width);
-            var holder = new DecimalConverter
-            {
-                Value = value
-            };
-            writer.WriteUInt64(holder.First);
-            writer.WriteUInt64(holder.Second);
+
+            ref var holder = ref Unsafe.As<decimal, DecimalConverter>(ref value);
+            writer.WriteUInt32(holder.Flags);
+            writer.WriteUInt32(holder.Hi32);
+            writer.WriteUInt64(holder.Lo64);
         }
 
         /// <inheritdoc/>
@@ -278,34 +264,18 @@ namespace Orleans.Serialization.Codecs
                 throw new UnexpectedLengthPrefixValueException("decimal", Width, length);
             }
 
-            var first = reader.ReadUInt64();
-            var second = reader.ReadUInt64();
-            var holder = new DecimalConverter
-            {
-                First = first,
-                Second = second,
-            };
-
-            // This could be retrieved from the Value property of the holder, but it is safer to go through the constructor to ensure that validation occurs early.
-            return new decimal(holder.Lo, holder.Mid, holder.Hi, holder.IsNegative, holder.Scale);
+            DecimalConverter holder;
+            holder.Flags = reader.ReadUInt32();
+            holder.Hi32 = reader.ReadUInt32();
+            holder.Lo64 = reader.ReadUInt64();
+            return Unsafe.As<DecimalConverter, decimal>(ref holder);
         }
 
-        [StructLayout(LayoutKind.Explicit)]
         private struct DecimalConverter
         {
-            [FieldOffset(0)] public decimal Value;
-
-            [FieldOffset(0)] public ulong First;
-            [FieldOffset(8)] public ulong Second;
-
-            [FieldOffset(0)] private int Flags;
-            [FieldOffset(4)] public int Hi;
-            [FieldOffset(8)] public int Lo;
-            [FieldOffset(12)] public int Mid;
-
-            public byte Scale => (byte)(Flags >> 16);
-
-            public bool IsNegative => (Flags & unchecked((int)0x80000000)) != 0;
+            public uint Flags;
+            public uint Hi32;
+            public ulong Lo64;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]

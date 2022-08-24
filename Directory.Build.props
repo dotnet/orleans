@@ -61,6 +61,7 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemDiagnosticsPerformanceCounterVersion>6.0.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemCollectionsImmutableVersion>6.0.0</SystemCollectionsImmutableVersion>
     <SystemDiagnosticsDiagnosticSourceVersion>6.0.0</SystemDiagnosticsDiagnosticSourceVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
@@ -69,8 +70,8 @@
     <SystemMemoryData>1.0.1</SystemMemoryData>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>17.0.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
+    <MicrosoftBuildVersion>17.2.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>4.2.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
@@ -110,11 +111,11 @@
     <!-- Test related packages -->
     <FluentAssertionsVersion>6.4.0</FluentAssertionsVersion>
     <MoqVersion>4.16.0</MoqVersion>
-    <MicrosoftTestSdkVersion>17.0.0</MicrosoftTestSdkVersion>
+    <MicrosoftTestSdkVersion>17.2.0</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.13.1</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
-    <xUnitRunnerVersion>2.4.3</xUnitRunnerVersion>
+    <xUnitRunnerVersion>2.4.5</xUnitRunnerVersion>
     <NodaTimeVersion>3.0.9</NodaTimeVersion>
     <AutofacExtensionsDependencyInjectionVersion>7.2.0</AutofacExtensionsDependencyInjectionVersion>
     <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>

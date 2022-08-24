@@ -8,6 +8,7 @@ using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans;
 using Orleans.Streams;
+using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
@@ -22,9 +23,9 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            ITelemetryProducer telemetryProducer,
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
             ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
         {
             StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<Serializer<StreamSequenceToken>>());
         }

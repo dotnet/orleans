@@ -41,7 +41,7 @@ namespace UnitTests.StreamingTests
 
         private void Heading(string testName)
         {
-            logger.Info("\n\n************************ {0} {1}_{2} ********************************* \n\n", testNumber, streamProviderName, testName);
+            logger.LogInformation("\n\n************************ {TestNumber} {StreamProviderName}_{TestName} ********************************* \n\n", testNumber, streamProviderName, testName);
         }
 
         //------------------------ One to One ----------------------//
@@ -215,7 +215,7 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_13_SameGrain_ConsumerFirstProducerLater");
             Guid streamId = Guid.NewGuid();
-            int grain1 = ThreadSafeRandom.Next();
+            int grain1 = Random.Shared.Next();
             int[] grainIds = new int[] { grain1 };
             // consumer joins first, producer later
             this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
@@ -228,7 +228,7 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_14_SameGrain_ProducerFirstConsumerLater");
             Guid streamId = Guid.NewGuid();
-            int grain1 = ThreadSafeRandom.Next();
+            int grain1 = Random.Shared.Next();
             int[] grainIds = new int[] { grain1 };
             // produce joins first, consumer later
             this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
@@ -281,7 +281,7 @@ namespace UnitTests.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(null, consumer, false), _timeout);
             await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(producer, null, false), _timeout);
 
-            logger.Info("\n\n\n*******************************************************************\n\n\n");
+            logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
@@ -318,9 +318,9 @@ namespace UnitTests.StreamingTests
             producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.client);
             this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
-            logger.Info("\n** Starting Test {0}.\n", testNumber);
+            logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
-            logger.Info("\n** Test {0} BasicTestAsync: producerCount={1}.\n", testNumber, producerCount);
+            logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
@@ -339,9 +339,9 @@ namespace UnitTests.StreamingTests
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
             this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
-            logger.Info("\n** Starting Test {0}.\n", testNumber);
+            logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
-            logger.Info("\n** Test {0} BasicTestAsync: producerCount={1}.\n", testNumber, producerCount);
+            logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
@@ -361,9 +361,9 @@ namespace UnitTests.StreamingTests
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
             this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
-            logger.Info("\n** Starting Test {0}.\n", testNumber);
+            logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
-            logger.Info("\n** Test {0} BasicTestAsync: producerCount={1}.\n", testNumber, producerCount);
+            logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
@@ -428,10 +428,14 @@ namespace UnitTests.StreamingTests
 
         public async Task BasicTestAsync(bool fullTest = true)
         {
-            logger.Info("\n** Starting Test {0} BasicTestAsync.\n", testNumber);
+            logger.LogInformation("\n** Starting Test {TestNumber} BasicTestAsync.\n", testNumber);
             var producerCount = await producer.ProducerCount;
             var consumerCount = await consumer.ConsumerCount;
-            logger.Info("\n** Test {0} BasicTestAsync: producerCount={1}, consumerCount={2}.\n", testNumber, producerCount, consumerCount);
+            logger.LogInformation(
+                "\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}, consumerCount={ConsumerCount}.\n",
+                testNumber,
+                producerCount,
+                consumerCount);
 
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout);
@@ -464,7 +468,12 @@ namespace UnitTests.StreamingTests
             var numProduced = await producer.ExpectedItemsProduced;
             var expectConsumed = numProduced * consumerCount;
             var numConsumed = await consumer.ItemsConsumed;
-            logger.Info("Test {0} CheckCounters: numProduced = {1}, expectConsumed = {2}, numConsumed = {3}", testNumber, numProduced, expectConsumed, numConsumed);
+            logger.LogInformation(
+                "Test {TestNumber} CheckCounters: numProduced = {NumProduced}, expectConsumed = {ExpectedConsumed}, numConsumed = {NumConsumed}",
+                testNumber,
+                numProduced,
+                expectConsumed,
+                numConsumed);
             if (assertAreEqual)
             {
                 Assert.Equal(expectConsumed,  numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
@@ -483,7 +492,11 @@ namespace UnitTests.StreamingTests
             {
                 var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
                 var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new InternalStreamId(providerName, streamId));
-                logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
+                logger.LogInformation(
+                    "StreamingTestRunner.AssertProducerCount: expected={ExpectedCount} actual (SMSStreamRendezvousGrain.ProducerCount)={ActualCount} streamId={StreamId}",
+                    expectedCount,
+                    actualCount,
+                    streamId);
                 Assert.Equal(expectedCount, actualCount);
             }
         }
@@ -510,8 +523,8 @@ namespace UnitTests.StreamingTests
                 activationCount = await consumer.GetNumActivations(this.client);
             }
             var expectActivationCount = 0;
-            logger.Info(
-                "Test {testNumber} CheckGrainsDeactivated: {type}ActivationCount = {activationCount}, Expected{type}ActivationCount = {expectActivationCount}", 
+            logger.LogInformation(
+                "Test {TestNumber} CheckGrainsDeactivated: {Type}ActivationCount = {ActivationCount}, Expected{Type}ActivationCount = {ExpectActivationCount}", 
                 testNumber, 
                 str, 
                 activationCount, 

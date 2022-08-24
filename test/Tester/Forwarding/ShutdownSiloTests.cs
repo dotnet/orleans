@@ -72,7 +72,7 @@ namespace Tester.Forwarding
             await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
 
             var results = await Task.WhenAll(tasks);
-            Assert.Equal(results[99], HostedCluster.Primary.SiloAddress.ToLongString());
+            Assert.Equal(results[99], HostedCluster.Primary.SiloAddress.ToString());
         }
 
         [SkippableFact, TestCategory("GracefulShutdown"), TestCategory("Functional")]

@@ -33,7 +33,7 @@ namespace DistributedTests.Client.Commands
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
             AddOption(OptionHelper.CreateOption<string>("--clusterId", isRequired: true));
             AddOption(OptionHelper.CreateOption("--secretSource", defaultValue: SecretConfiguration.SecretSource.File));
-            AddOption(OptionHelper.CreateOption<string>("--counterKey", defaultValue: StreamingConstants.DefaultCounterGrain));
+            AddOption(OptionHelper.CreateOption("--counterKey", defaultValue: StreamingConstants.DefaultCounterGrain));
             AddArgument(new Argument<List<string>>("Counters") { Arity = ArgumentArity.OneOrMore });
 
             Handler = CommandHandler.Create<Parameters>(RunAsync);
@@ -63,14 +63,14 @@ namespace DistributedTests.Client.Commands
 
             var initialWait = await counterGrain.WaitTimeForReport();
 
-            _logger.LogInformation($"Counters should be ready in {initialWait}");
+            _logger.LogInformation("Counters should be ready in {InitialWait}", initialWait);
             await Task.Delay(initialWait);
 
-            _logger.LogInformation($"Counters ready");
+            _logger.LogInformation("Counters ready");
             foreach (var counter in parameters.Counters)
             {
                 var value = await counterGrain.GetTotalCounterValue(counter);
-                _logger.LogInformation($"{counter}: {value}");
+                _logger.LogInformation("{Counter}: {Value}", counter, value);
                 BenchmarksEventSource.Register(counter, Operations.First, Operations.Sum, counter, counter, "n0");
                 BenchmarksEventSource.Measure(counter, value);
                 if (string.Equals(counter, "requests", StringComparison.InvariantCultureIgnoreCase))

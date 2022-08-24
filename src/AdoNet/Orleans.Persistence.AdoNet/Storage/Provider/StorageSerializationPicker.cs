@@ -51,9 +51,9 @@ namespace Orleans.Storage
 
         /// <summary>
         /// Picks a deserializer using the given parameters.
-        /// <see cref="IStorageSerializationPicker.PickDeserializer"/>
+        /// <see cref="IStorageSerializationPicker.PickDeserializer{T}"/>
         /// </summary>
-        public SerializationChoice PickDeserializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
+        public SerializationChoice PickDeserializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainId grainId, IGrainState<T> grainState, string tag = null)
         {
             //If the tag has been given, try to pick that one and if not found, take the first on the list. This arrangement allows one to switch storage format more easily.
             var deserializer = Deserializers.FirstOrDefault(i => i.Tag == tag);
@@ -63,9 +63,9 @@ namespace Orleans.Storage
 
         /// <summary>
         /// Picks a serializer using the given parameters.
-        /// <see cref="IStorageSerializationPicker.PickSerializer"/>
+        /// <see cref="IStorageSerializationPicker.PickSerializer{T}"/>
         /// </summary>
-        public SerializationChoice PickSerializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null)
+        public SerializationChoice PickSerializer<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainId grainId, IGrainState<T> grainState, string tag = null)
         {
             var serializer = Serializers.FirstOrDefault(i => i.Tag == tag);
             return new SerializationChoice(false, null, serializer ?? Serializers.FirstOrDefault());

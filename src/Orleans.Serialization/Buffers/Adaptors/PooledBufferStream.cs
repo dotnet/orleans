@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using Microsoft.Extensions.ObjectPool;
 
@@ -20,13 +19,13 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private long _capacity;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
+        /// Initializes a new instance of the <see cref="PooledBufferStream"/> class.
         /// </summary>
         public PooledBufferStream() : this(0)
         { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
+        /// Initializes a new instance of the <see cref="PooledBufferStream"/> class.
         /// </summary>
         /// <param name="minAllocationSize">Minimum size of the allocation.</param>
         public PooledBufferStream(int minAllocationSize = 0)
@@ -95,7 +94,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         }
 
         /// <summary>
-        /// Returns a new <see cref="ReadOnlySequence{T}"/> which must be used and returned before resetting this instance via the <see cref="ReturnReadOnlySequence(in ReadOnlySequence{byte})"/> method.
+        /// Returns a new <see cref="ReadOnlySequence{T}"/> which must be used and returned before resetting this instance via the <see cref="ReturnReadOnlySequence"/> method.
         /// </summary>
         public ReadOnlySequence<byte> RentReadOnlySequence()
         {
@@ -109,7 +108,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
                 var buffer = _segments[0];
                 return new ReadOnlySequence<byte>(buffer, 0, buffer.Length);
             }
-            
+
             var runningIndex = 0L;
             var firstSegment = default(BufferSegment);
             var previousSegment = default(BufferSegment);
@@ -142,7 +141,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             {
                 return;
             }
-            
+
             while (segment is not null)
             {
                 var next = segment.Next as BufferSegment;
@@ -343,6 +342,37 @@ namespace Orleans.Serialization.Buffers.Adaptors
             {
                 obj.Reset();
                 return true;
+            }
+        }
+
+        private sealed class BufferSegment : ReadOnlySequenceSegment<byte>
+        {
+            public static readonly ObjectPool<BufferSegment> Pool = ObjectPool.Create(new SegmentPoolPolicy());
+
+            public void Initialize(ReadOnlyMemory<byte> memory, long runningIndex)
+            {
+                Memory = memory;
+                RunningIndex = runningIndex;
+            }
+
+            public void SetNext(BufferSegment next) => Next = next;
+
+            public void Reset()
+            {
+                Memory = default;
+                RunningIndex = default;
+                Next = default;
+            }
+
+            private sealed class SegmentPoolPolicy : PooledObjectPolicy<BufferSegment>
+            {
+                public override BufferSegment Create() => new();
+
+                public override bool Return(BufferSegment obj)
+                {
+                    obj.Reset();
+                    return true;
+                }
             }
         }
     }

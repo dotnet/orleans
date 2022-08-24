@@ -20,6 +20,7 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
+using System.Runtime.InteropServices;
 
 namespace Orleans
 {
@@ -49,14 +50,17 @@ namespace Orleans
 
             services.AddSingleton<ClientOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
-            services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
-            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                LinuxEnvironmentStatisticsServices.RegisterServices<IClusterClientLifecycle>(services);
+            }
+            else
+            {
+                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            }
+
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
-            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
-            services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<OutsideRuntimeClient>();
@@ -70,7 +74,6 @@ namespace Orleans
             services.AddSingleton<IGrainReferenceActivatorProvider, GrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.TryAddSingleton<RpcProvider>();
-            services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<GrainPropertiesResolver>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -87,11 +90,10 @@ namespace Orleans
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
-            // Add default option formatter if none is configured, for options which are required to be configured 
+            // Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<ConnectionOptions>();
-            services.ConfigureFormatter<StatisticsOptions>();
 
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
@@ -164,7 +166,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A marker type used to determine 
+        /// A marker type used to determine
         /// </summary>
         private class ServicesAdded { }
     }

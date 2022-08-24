@@ -42,7 +42,6 @@ namespace NonSilo.Tests.Membership
 
         public SiloHealthMonitorTests(ITestOutputHelper output)
         {
-            MessagingStatisticsGroup.Init();
             _output = output;
             _loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(_output) });
 

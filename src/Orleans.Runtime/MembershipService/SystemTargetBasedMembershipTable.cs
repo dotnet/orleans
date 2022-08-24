@@ -40,7 +40,7 @@ namespace Orleans.Runtime.MembershipService
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
-                this.logger.Info(ErrorCode.MembershipFactory1, "Creating in-memory membership table");
+                this.logger.LogInformation((int)ErrorCode.MembershipFactory1, "Creating in-memory membership table");
                 var catalog = serviceProvider.GetRequiredService<Catalog>();
                 catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<MembershipTableSystemTarget>(serviceProvider));
             }
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     await membershipTableSystemTarget.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
-                    logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
+                    logger.LogInformation((int)ErrorCode.MembershipTableGrainInit2, "Connected to membership table provider.");
                     return;
                 }
                 catch (Exception exc)
@@ -74,14 +74,14 @@ namespace Orleans.Runtime.MembershipService
                     var type = exc.GetBaseException().GetType();
                     if (type == typeof(TimeoutException) || type == typeof(OrleansException))
                     {
-                        logger.Info(
-                            ErrorCode.MembershipTableGrainInit3,
-                            "-Waiting for membership table provider to initialize. Going to sleep for {0} and re-try to reconnect.",
+                        logger.LogInformation(
+                            (int)ErrorCode.MembershipTableGrainInit3,
+                            "Waiting for membership table provider to initialize. Going to sleep for {Duration} and re-try to reconnect.",
                             timespan);
                     }
                     else
                     {
-                        logger.Info(ErrorCode.MembershipTableGrainInit4, "-Membership table provider failed to initialize. Giving up.");
+                        logger.LogInformation((int)ErrorCode.MembershipTableGrainInit4, "Membership table provider failed to initialize. Giving up.");
                         throw;
                     }
                 }
@@ -118,11 +118,11 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
             DeepCopier deepCopier)
-            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, lowPriority: false, loggerFactory)
+            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(deepCopier);
-            logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+            logger.LogInformation((int)ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
         }
 
         private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
@@ -132,13 +132,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
+            logger.LogInformation("InitializeMembershipTable {TryInitTableVersion}.", tryInitTableVersion);
             return Task.CompletedTask;
         }
 
         public Task DeleteMembershipTableEntries(string clusterId)
         {
-            logger.Info("DeleteMembershipTableEntries {0}", clusterId);
+            logger.LogInformation("DeleteMembershipTableEntries {ClusterId}", clusterId);
             table = null;
             return Task.CompletedTask;
         }
@@ -156,31 +156,38 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {Entry}, table version = {Version}", entry.ToString(), tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
-                logger.Info(ErrorCode.MembershipGrainBasedTable2,
-                    "Insert of {0} and table version {1} failed. Table now is {2}",
-                    entry.ToFullString(), tableVersion, table.ReadAll());
+                logger.LogInformation(
+                    (int)ErrorCode.MembershipGrainBasedTable2,
+                    "Insert of {Entry} and table version {Version} failed. Table now is {Table}",
+                    entry.ToString(),
+                    tableVersion,
+                    table.ReadAll());
 
             return Task.FromResult(result);
         }
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}", entry.ToString(), etag, tableVersion);
             bool result = table.Update(entry, etag, tableVersion);
             if (result == false)
-                logger.Info(ErrorCode.MembershipGrainBasedTable3,
-                    "Update of {0}, eTag {1}, table version {2} failed. Table now is {3}",
-                    entry.ToFullString(), etag, tableVersion, table.ReadAll());
+                logger.LogInformation(
+                    (int)ErrorCode.MembershipGrainBasedTable3,
+                    "Update of {Entry}, eTag {ETag}, table version {Version} failed. Table now is {Table}",
+                    entry.ToString(),
+                    etag,
+                    tableVersion,
+                    table.ReadAll());
 
             return Task.FromResult(result);
         }
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateIAmAlive entry = {0}", entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {Entry}", entry.ToString());
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }

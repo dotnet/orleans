@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
@@ -113,10 +114,19 @@ namespace Orleans
             }
             finally
             {
-                var returnedTransactionInfo = (context.Response as TransactionResponse)?.TransactionInfo;
-                if (transactionInfo is { } && returnedTransactionInfo is { })
+                if (context.Response is TransactionResponse txResponse)
                 {
-                    transactionInfo.Join(returnedTransactionInfo);
+                    var returnedTransactionInfo = txResponse.TransactionInfo;
+
+                    if (transactionInfo is { } && returnedTransactionInfo is { })
+                    {
+                        transactionInfo.Join(returnedTransactionInfo);
+                    }
+
+                    if (txResponse.GetException() is { } exception)
+                    {
+                        ExceptionDispatchInfo.Throw(exception);
+                    }
                 }
             }
         }
@@ -203,7 +213,7 @@ namespace Orleans
                 // or if it must abort, tell participants that it aborted
                 if (startedNewTransaction)
                 {
-                    if (transactionException is not null)
+                    if (transactionException is not null || transactionInfo.TryToCommit is false)
                     {
                         await TransactionAgent.Abort(transactionInfo);
                     }
@@ -260,8 +270,38 @@ namespace Orleans
             };
         }
 
-        public override object Result { get => _response.Result; set => _response.Result = value; }
-        public override Exception Exception { get => _response.Exception; set => _response.Exception = value; }
+        public Response InnerResponse => _response;
+
+        public override object Result
+        {
+            get
+            {
+                if (_response.Exception is { } exception)
+                {
+                    ExceptionDispatchInfo.Capture(exception).Throw();
+                }
+
+                return _response.Result;
+            }
+
+            set => _response.Result = value;
+        }
+
+        public override Exception Exception
+        {
+            get
+            {
+                // Suppress any exception here, allowing ResponseCompletionSource to complete with a Response instead of an exception.
+                // This gives TransactionRequestBase a chance to inspect this instance and retrieve the TransactionInfo property first.
+                // After, it will use GetException to get and throw the exeption.
+                return null;
+            }
+
+            set => _response.Exception = value;
+        }
+
+        public Exception GetException() => _response.Exception;
+
         public override void Dispose()
         {
             TransactionInfo = null;

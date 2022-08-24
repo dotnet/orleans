@@ -8,7 +8,8 @@ using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
+using Orleans.Statistics;
+using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
@@ -18,7 +19,7 @@ namespace Orleans.ServiceBus.Providers.Testing
     ///  </summary>
     public class EventDataGeneratorAdapterFactory : EventHubAdapterFactory, IControllable
     {
-        private EventDataGeneratorStreamOptions ehGeneratorOptions;
+        private readonly EventDataGeneratorStreamOptions ehGeneratorOptions;
 
         public EventDataGeneratorAdapterFactory(
             string name,
@@ -30,9 +31,9 @@ namespace Orleans.ServiceBus.Providers.Testing
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            ITelemetryProducer telemetryProducer,
-            ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
+            ILoggerFactory loggerFactory,
+            IHostEnvironmentStatistics hostEnvironmentStatistics)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
         {
             this.ehGeneratorOptions = options;
         }
@@ -58,7 +59,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
         }
 
-        private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
+        private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger)
         {
             var streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
                 ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
@@ -70,20 +71,17 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             if (args == null)
                 return;
-            int randomNumber = args.RandomNumber;
-            StreamId streamId = args.StreamId;
-            var allQueueInTheCluster = (this.EventHubQueueMapper as EventHubQueueMapper)?.GetAllQueues().OrderBy(queueId => queueId.ToString());
 
+            var allQueueInTheCluster = EventHubQueueMapper?.GetAllQueues();
             if (allQueueInTheCluster != null)
             {
+                var allQueues = allQueueInTheCluster as QueueId[] ?? allQueueInTheCluster.ToArray();
                 //every agent receive the same random number, do a mod on queue count, get the same random queue to assign stream to.
-                int randomQueue = randomNumber % allQueueInTheCluster.Count();
-                var queueToAssign = allQueueInTheCluster.ToList()[randomQueue];
-                EventHubAdapterReceiver receiverToAssign;
-                if (this.EventHubReceivers.TryGetValue(queueToAssign, out receiverToAssign))
+                var queueToAssign = allQueues[args.RandomNumber % allQueues.Length];
+                if (EventHubReceivers.TryGetValue(queueToAssign, out var receiverToAssign))
                 {
-                    receiverToAssign.ConfigureDataGeneratorForStream(streamId);
-                    logger.LogInformation("Stream {StreamId} is assigned to queue {QueueId}", streamId, queueToAssign.ToString());
+                    receiverToAssign.ConfigureDataGeneratorForStream(args.StreamId);
+                    logger.LogInformation("Stream {StreamId} is assigned to queue {QueueId}", args.StreamId, queueToAssign);
                 }
             }
             else
@@ -103,10 +101,9 @@ namespace Orleans.ServiceBus.Providers.Testing
 
         public static string[] GenerateEventHubPartitions(int partitionCount)
         {
-            var size = partitionCount;
-            var partitions = new string[size];
-            for (int i = 0; i < size; i++)
-                partitions[i] = $"partition-{(i).ToString()}";
+            var partitions = new string[partitionCount];
+            for (int i = 0; i < partitions.Length; i++)
+                partitions[i] = $"partition-{i}";
             return partitions;
         }
 

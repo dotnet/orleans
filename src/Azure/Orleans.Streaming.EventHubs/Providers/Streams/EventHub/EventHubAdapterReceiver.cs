@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
 using Azure.Messaging.EventHubs;
+using Orleans.Statistics;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -38,19 +39,18 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionSettings settings;
-        private readonly Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
-        private readonly ITelemetryProducer telemetryProducer;
         private readonly LoadSheddingOptions loadSheddingOptions;
-
+        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
         private IEventHubQueueCache cache;
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory;
+        private Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
@@ -67,13 +67,13 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             ILoggerFactory loggerFactory,
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
-            ITelemetryProducer telemetryProducer,
-            Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory = null)
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
@@ -81,15 +81,14 @@ namespace Orleans.ServiceBus.Providers
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
-            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
-
+            _hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.EventHubName, this.settings.Partition);
+            this.logger.LogInformation("Initializing EventHub partition {EventHubName}-{Partition}.", this.settings.Hub.EventHubName, this.settings.Partition);
 
             // if receiver was already running, do nothing
             return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
@@ -113,10 +112,10 @@ namespace Orleans.ServiceBus.Providers
                     this.cache.Dispose();
                     this.cache = null;
                 }
-                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory, this.telemetryProducer);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions) };
+                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
+                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, _hostEnvironmentStatistics) };
                 string offset = await this.checkpointer.Load();
-                this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger, this.telemetryProducer);
+                this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
@@ -238,7 +237,7 @@ namespace Orleans.ServiceBus.Providers
                     return;
                 }
 
-                this.logger.Info("Stopping reading from EventHub partition {0}-{1}", this.settings.Hub.EventHubName, this.settings.Partition);
+                this.logger.LogInformation("Stopping reading from EventHub partition {EventHubName}-{Partition}", this.settings.Hub.EventHubName, this.settings.Partition);
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);
@@ -267,7 +266,7 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
+        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
             return new EventHubReceiverProxy(partitionSettings, offset, logger);
         }

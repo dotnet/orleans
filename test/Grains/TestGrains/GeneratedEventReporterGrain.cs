@@ -22,7 +22,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
             return base.OnActivateAsync(cancellationToken);
@@ -37,7 +37,13 @@ namespace TestGrains
                 counts = new Dictionary<Guid, int>();
                 reports[key] = counts;
             }
-            logger.Info("ReportResult. StreamProvider: {0}, StreamNamespace: {1}, StreamGuid: {2}, Count: {3}", streamProvider, streamNamespace, streamGuid, count);
+
+            logger.LogInformation(
+                "ReportResult. StreamProvider: {StreamProvider}, StreamNamespace: {StreamNamespace}, StreamGuid: {StreamGuid}, Count: {Count}",
+                streamProvider,
+                streamNamespace,
+                streamGuid,
+                count);
             counts[streamGuid] = count;
             return Task.CompletedTask;
         }
@@ -61,7 +67,7 @@ namespace TestGrains
 
         public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
         {
-            return Task.FromResult(RuntimeIdentity == siloAddress.ToLongString());
+            return Task.FromResult(RuntimeIdentity == siloAddress.ToString());
         }
     }
 }

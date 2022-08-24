@@ -58,69 +58,79 @@ namespace Orleans.TestingHost
         }
            
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">State data object to be populated for this grain.</param>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        public async Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();
-                await faultGrain.OnRead(grainReference);
+                await faultGrain.OnRead(grainId);
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for ReadState for grain {grainReference} of type {grainType}, ");
+                logger.LogInformation(
+                    "Fault injected for ReadState for grain {GrainId} of type {GrainType}",
+                    grainId,
+                    grainType);
                 throw;
             }
-            logger.Info($"ReadState for grain {grainReference} of type {grainType}");
-            await realStorageProvider.ReadStateAsync(grainType, grainReference, grainState);
+            logger.LogInformation(
+                "ReadState for grain {GrainId} of type {GrainType}",
+                grainId,
+                grainType);
+            await realStorageProvider.ReadStateAsync(grainType, grainId, grainState);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">State data object to be written for this grain.</param>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        public async Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();
-                await faultGrain.OnWrite(grainReference);
+                await faultGrain.OnWrite(grainId);
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for WriteState for grain {grainReference} of type {grainType}");
+                logger.LogInformation(
+                    "Fault injected for WriteState for grain {GrainId} of type {GrainType}",
+                    grainId,
+                    grainType);
                 throw;
             }
-            logger.Info($"WriteState for grain {grainReference} of type {grainType}");
-            await realStorageProvider.WriteStateAsync(grainType, grainReference, grainState);
+            logger.LogInformation(
+                "WriteState for grain {GrainId} of type {GrainType}",
+                grainId,
+                grainType);
+            await realStorageProvider.WriteStateAsync(grainType, grainId, grainState);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        public async Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();
-                await faultGrain.OnClear(grainReference);
+                await faultGrain.OnClear(grainId);
             }
             catch (Exception)
             {
-                logger.Info($"Fault injected for ClearState for grain {grainReference} of type {grainType}");
+                logger.LogInformation(
+                    "Fault injected for ClearState for grain {GrainId} of type {GrainType}",
+                    grainId,
+                    grainType);
                 throw;
             }
-            logger.Info($"ClearState for grain {grainReference} of type {grainType}");
-            await realStorageProvider.ClearStateAsync(grainType, grainReference, grainState);
+
+            logger.LogInformation(
+                "ClearState for grain {GrainId} of type {GrainType}",
+                grainId,
+                grainType);
+            await realStorageProvider.ClearStateAsync(grainType, grainId, grainState);
         }
 
         /// <inheritdoc />

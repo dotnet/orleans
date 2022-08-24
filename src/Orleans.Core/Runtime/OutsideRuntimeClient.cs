@@ -31,20 +31,15 @@ namespace Orleans
         private bool disposing;
         private bool disposed;
 
-        internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
         private readonly ClientGrainId clientId;
-        private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
-        
+
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IOptions<StatisticsOptions> statisticsOptions;
-        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
 
-        private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
         private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
         public GrainAddress CurrentActivationAddress
@@ -66,21 +61,13 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
-            ILoggerFactory loggerFactory, 
+            ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
-            IOptions<StatisticsOptions> statisticsOptions,
-            ApplicationRequestsStatisticsGroup appRequestStatistics,
-            StageAnalysisStatisticsGroup schedulerStageStatistics,
-            ClientStatisticsManager clientStatisticsManager,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
             this.ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
-            this.statisticsOptions = statisticsOptions;
-            this.appRequestStatistics = appRequestStatistics;
-            this.schedulerStageStatistics = schedulerStageStatistics;
-            this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.clientId = ClientGrainId.Create();
@@ -91,7 +78,6 @@ namespace Orleans
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
-                this.appRequestStatistics,
                 this.clientMessagingOptions.ResponseTimeout);
         }
 
@@ -126,7 +112,7 @@ namespace Orleans
                 var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-                
+
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
@@ -138,16 +124,10 @@ namespace Orleans
                 {
                     throw new InvalidOperationException("TestOnlyThrowExceptionDuringInit");
                 }
-
-                var statisticsLevel = statisticsOptions.Value.CollectionLevel;
-                if (statisticsLevel.CollectThreadTimeTrackingStats())
-                {
-                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory, this.statisticsOptions, this.schedulerStageStatistics);
-                }
             }
             catch (Exception exc)
             {
-                if (logger != null) logger.Error(ErrorCode.Runtime_Error_100319, "OutsideRuntimeClient constructor failed.", exc);
+                if (logger != null) logger.LogError((int)ErrorCode.Runtime_Error_100319, exc, "OutsideRuntimeClient constructor failed.");
                 ConstructorReset();
                 throw;
             }
@@ -165,7 +145,7 @@ namespace Orleans
 
             logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), clientId);
         }
-        
+
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(CancellationToken cancellationToken)
         {
@@ -193,8 +173,6 @@ namespace Orleans
                 async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
                 retryFilter,
                 cancellationToken);
-
-            ClientStatistics.Start(MessageCenter, clientId.GrainId);
 
             static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter retryFilter, CancellationToken cancellationToken)
             {
@@ -234,7 +212,7 @@ namespace Orleans
                         break;
                     }
                 default:
-                    logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
+                    logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}.", message);
                     break;
             }
         }
@@ -265,14 +243,12 @@ namespace Orleans
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
-            message.SendingActivation = CurrentActivationAddress.ActivationId;
             message.TargetGrain = targetGrainId;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
             }
 
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
@@ -291,7 +267,7 @@ namespace Orleans
                 context?.Complete();
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Send {Message}", message);
             MessageCenter.SendMessage(message);
         }
 
@@ -299,16 +275,9 @@ namespace Orleans
         {
             OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
 
-            // ignore duplicate requests
-            if (response.Result == Message.ResponseTypes.Rejection
-                && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
-                 || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
-            {
-                return;
-            }
-            else if (response.Result == Message.ResponseTypes.Status)
+            if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject;
                 callbacks.TryGetValue(response.Id, out var callback);
@@ -334,7 +303,7 @@ namespace Orleans
 
                 return;
             }
-            
+
             CallbackData callbackData;
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
@@ -346,7 +315,7 @@ namespace Orleans
             }
             else
             {
-                logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message {ResponseMessage}", response);
             }
         }
 
@@ -361,14 +330,9 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.Reset(): client Id {ClientId}", clientId);
                 }
             }, this.logger);
-
-            Utils.SafeExecute(() =>
-            {
-                incomingMessagesThreadTimeTracking?.OnStopExecution();
-            }, logger, "Client.incomingMessagesThreadTimeTracking.OnStopExecution");
 
             Utils.SafeExecute(() =>
                 {
@@ -377,13 +341,6 @@ namespace Orleans
                         MessageCenter.Stop();
                     }
                 }, logger, "Client.Stop-Transport");
-            Utils.SafeExecute(() =>
-            {
-                if (ClientStatistics != null)
-                {
-                    ClientStatistics.Stop();
-                }
-            }, logger, "Client.Stop-ClientStatistics");
             ConstructorReset();
         }
 
@@ -393,10 +350,10 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.ConstructorReset(): client Id {ClientId}", clientId);
                 }
             });
-            
+
             Utils.SafeExecute(() => this.Dispose());
         }
 
@@ -445,18 +402,13 @@ namespace Orleans
             }
         }
 
-        private string PrintAppDomainDetails()
-        {
-            return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
-        }
-
         public void Dispose()
         {
             if (this.disposing) return;
             this.disposing = true;
-            
+
             Utils.SafeExecute(() => this.callbackTimer?.Dispose());
-            
+
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
             this.ClusterConnectionLost = null;
@@ -476,7 +428,7 @@ namespace Orleans
                 }
             }
         }
-        
+
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost;
 
@@ -492,7 +444,7 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
             }
         }
 
@@ -505,13 +457,13 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending gateway count changed notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
             }
         }
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
@@ -520,7 +472,6 @@ namespace Orleans
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ThrowIfDisposed()
         {
             if (disposed)
@@ -528,7 +479,6 @@ namespace Orleans
                 ThrowObjectDisposedException();
             }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             void ThrowObjectDisposedException() => throw new ObjectDisposedException(nameof(OutsideRuntimeClient));
         }
     }

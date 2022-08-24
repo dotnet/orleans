@@ -11,6 +11,7 @@ using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 namespace DefaultCluster.Tests
 {
     using Microsoft.Extensions.DependencyInjection;
+    using Orleans.Internal;
 
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -25,7 +26,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyType()
         {
-            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
             GrainReference cast = (GrainReference)grain.AsReference<ISimpleGrain>();
             Assert.IsAssignableFrom(grain.GetType(), cast);
             Assert.IsAssignableFrom<ISimpleGrain>(cast);
@@ -104,7 +105,7 @@ namespace DefaultCluster.Tests
         public void CastFailInternalCastFromBadType()
         {
             var grain = this.GrainFactory.GetGrain<ISimpleGrain>(
-                random.Next(),
+                Random.Shared.Next(),
                 SimpleGrain.SimpleGrainNamePrefix);
 
             // Attempting to cast a grain to a non-grain type should fail.
@@ -114,7 +115,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastInternalCastFromMyType()
         {
-            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
             
             // This cast should be a no-op, since the interface matches the initial reference's exactly.
             IAddressable cast = grain.Cast<ISimpleGrain>();
@@ -247,7 +248,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastAsyncGrainRefCastFromSelf()
         {
-            IAddressable grain = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix); ;
+            IAddressable grain = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix); ;
             ISimpleGrain cast = grain.AsReference<ISimpleGrain>();
 
             Task<int> successfulCallPromise = cast.GetA();

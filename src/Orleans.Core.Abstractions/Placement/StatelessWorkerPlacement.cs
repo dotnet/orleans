@@ -45,10 +45,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return string.Format("StatelessWorkerPlacement(max={0})", this.MaxLocal);
-        }
+        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal})";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)

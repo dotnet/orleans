@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
@@ -25,20 +26,20 @@ namespace Orleans.Runtime
         // without having to call AddOrUpdate, which is a nuisance
         private class TimestampedValue : IEquatable<TimestampedValue>
         {
-            public readonly CoarseStopwatch Age;
             public readonly TValue Value;
+            public CoarseStopwatch Age;
             public long Generation;
 
-            public TimestampedValue(LRU<TKey, TValue> l, TValue v)
+            public TimestampedValue(TValue v, long generation)
             {
-                Generation = Interlocked.Increment(ref l.nextGeneration);
+                Generation = generation;
                 Value = v;
                 Age = CoarseStopwatch.StartNew();
             }
 
             public override bool Equals(object obj) => obj is TimestampedValue value && Equals(value);
-            public bool Equals(TimestampedValue other) => ReferenceEquals(this, other) || Age == other.Age && EqualityComparer<TValue>.Default.Equals(Value, other.Value) && Generation == other.Generation;
-            public override int GetHashCode() => HashCode.Combine(Age, Value, Generation);
+            public bool Equals(TimestampedValue other) => ReferenceEquals(this, other) || Generation == other.Generation && EqualityComparer<TValue>.Default.Equals(Value, other.Value);
+            public override int GetHashCode() => HashCode.Combine(Value, Generation);
         }
 
         private readonly ConcurrentDictionary<TKey, TimestampedValue> cache = new();
@@ -62,25 +63,39 @@ namespace Orleans.Runtime
             requiredFreshness = maxAge;
         }
 
+        public TValue GetOrAdd<TState>(TKey key, Func<TState, TKey, TValue> addFunc, TState state)
+        {
+            var generation = GetNewGeneration();
+            var storedValue = cache.AddOrUpdate(
+                key,
+                static (key, state) =>
+                {
+                    var (_, outerState, addFunc, generation) = state;
+                    return new TimestampedValue(addFunc(outerState, key), generation);
+                },
+                static (key, existing, state) =>
+                {
+                    var (self, _, _, _) = state;
+                    existing.Age.Restart();
+                    existing.Generation = self.GetNewGeneration();
+                    return existing;
+                },
+                (Self: this, State: state, AddFunc: addFunc, Generation: generation));
+
+            var result = storedValue.Value;
+
+            if (storedValue.Generation == generation)
+            {
+                Interlocked.Increment(ref count);
+                AdjustSize();
+            }
+
+            return result;
+        }
+
         public void Add(TKey key, TValue value)
         {
-            var result = new TimestampedValue(this, value);
-            AdjustSize();
-
-            // add/update delegates can be called multiple times, but only the last result counts
-            var added = false;
-            cache.AddOrUpdate(key, _ =>
-            {
-                added = true;
-                return result;
-            }, (_, old) =>
-            {
-                added = false;
-                // if multiple values are added at once for the same key, take the newest one
-                return old.Age.Elapsed >= result.Age.Elapsed && old.Generation > result.Generation ? old : result;
-            });
-
-            if (added) Interlocked.Increment(ref count);
+            GetOrAdd(key, static (value, key) => value, value);
         }
 
         public bool ContainsKey(TKey key) => cache.ContainsKey(key);
@@ -100,27 +115,29 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            if (predicate(context, timestampedValue.Value) && TryRemove(key, timestampedValue))
+            if (predicate(context, timestampedValue.Value) && TryRemoveInternal(key, timestampedValue))
             {
                 Interlocked.Decrement(ref count);
                 return true;
             }
 
             return false;
-        }
 
-        private bool TryRemove(TKey key, TimestampedValue value)
-        {
-            var entry = new KeyValuePair<TKey, TimestampedValue>(key, value);
+            bool TryRemoveInternal(TKey key, TimestampedValue value)
+            {
+                var entry = new KeyValuePair<TKey, TimestampedValue>(key, value);
 
 #if NET5_0_OR_GREATER
-            return cache.TryRemove(entry);
+                return cache.TryRemove(entry);
 #else
             // Cast the dictionary to its interface type to access the explicitly implemented Remove method.
             var cacheDictionary = (IDictionary<TKey, TimestampedValue>)cache;
             return cacheDictionary.Remove(entry);
 #endif
+            }
         }
+
+        private long GetNewGeneration() => Interlocked.Increment(ref nextGeneration);
 
         public void Clear()
         {
@@ -145,7 +162,8 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    result.Generation = Interlocked.Increment(ref nextGeneration);
+                    result.Age.Restart();
+                    result.Generation = GetNewGeneration();
                     value = result.Value;
                     return true;
                 }
@@ -177,16 +195,37 @@ namespace Orleans.Runtime
 
         private void AdjustSize()
         {
-            while (Count >= MaximumSize)
+            if (Count <= MaximumSize)
             {
-                long generationToDelete = Interlocked.Increment(ref generationToFree);
+                return;
+            }
+
+            RemoveExpired();
+
+            var minGeneration = long.MaxValue;
+            while (Count > MaximumSize)
+            {
+                var targetGeneration = Interlocked.Increment(ref generationToFree);
+
                 foreach (var e in cache)
                 {
-                    if (e.Value.Generation <= generationToDelete)
+                    var entryGeneration = e.Value.Generation;
+                    if (minGeneration > entryGeneration)
+                    {
+                        minGeneration = entryGeneration;
+                    }
+
+                    if (entryGeneration <= targetGeneration)
                     {
                         if (RemoveKey(e.Key)) RaiseFlushEvent?.Invoke();
-                        break;
                     }
+                }
+
+                // Skip forward to the minimum present generation.
+                var diff = minGeneration - generationToFree - 1;
+                if (minGeneration < long.MaxValue && diff > 0)
+                {
+                    Interlocked.Add(ref generationToFree, diff);
                 }
             }
         }

@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -57,14 +58,14 @@ namespace Tester.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task MemoryStreamProducerOnDroppedClientTest()
         {
-            this.fixture.Logger.Info("************************ MemoryStreamProducerOnDroppedClientTest *********************************");
+            this.fixture.Logger.LogInformation("************************ MemoryStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task MemoryStreamConsumerOnDroppedClientTest()
         {
-            this.fixture.Logger.Info("************************ MemoryStreamConsumerOnDroppedClientTest *********************************");
+            this.fixture.Logger.LogInformation("************************ MemoryStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace, output,
                     null, true);
         }

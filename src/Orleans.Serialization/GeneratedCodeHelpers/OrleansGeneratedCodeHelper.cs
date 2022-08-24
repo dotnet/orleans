@@ -94,11 +94,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <returns>The unwrapped service.</returns>
         public static TService UnwrapService<TService>(object caller, TService service)
         {
-            while (service is IServiceHolder<TService> && caller is TService callerService)
-            {
-                return callerService;
-            }
-
             var state = ResolutionState.Value;
 
             try
@@ -107,7 +102,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s && !(c is IServiceHolder<TService>))
+                    if (c is TService s and not IServiceHolder<TService>)
                     {
                         return s;
                     }
@@ -241,36 +236,54 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             foreach (var method in interfaceType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
             {
-                if (method.Name != methodName)
+                var current = method;
+                if (current.Name != methodName)
                 {
                     continue;
                 }
 
-                if (!method.ContainsGenericParameters && methodTypeParameters is { Length: > 0 })
+                if (!current.ContainsGenericParameters && methodTypeParameters is { Length: > 0 })
                 {
                     continue;
                 }
 
-                if (method.ContainsGenericParameters && methodTypeParameters is null or { Length: 0 })
+                if (current.ContainsGenericParameters && methodTypeParameters is null or { Length: 0 })
                 {
                     continue;
                 }
 
-                var parameters = method.GetParameters();
+                if (methodTypeParameters is { Length: > 0 })
+                {
+                    if (methodTypeParameters.Length != current.GetGenericArguments().Length)
+                    {
+                        continue;
+                    }
+
+                    current = current.MakeGenericMethod(methodTypeParameters);
+                }
+
+                var parameters = current.GetParameters();
                 if (parameters.Length != parameterTypes.Length)
                 {
                     continue;
                 }
 
+                var isMatch = true;
                 for (int i = 0; i < parameters.Length; i++)
                 {
-                    if (!parameters[0].ParameterType.Equals(parameterTypes[i]))
+                    if (!parameters[i].ParameterType.Equals(parameterTypes[i]))
                     {
-                        continue;
+                        isMatch = false;
+                        break;
                     }
                 }
 
-                return method;
+                if (!isMatch)
+                {
+                    continue;
+                }
+
+                return current;
             }
 
             foreach (var implemented in interfaceType.GetInterfaces())

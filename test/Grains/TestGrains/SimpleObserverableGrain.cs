@@ -3,12 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Runtime;
+using Orleans.Utilities;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-
     public class SimpleObserverableGrain : Grain, ISimpleObserverableGrain
     {
         private ILogger logger;
@@ -20,19 +19,19 @@ namespace UnitTests.Grains
         public SimpleObserverableGrain(ILoggerFactory loggerFactory)
         {
             EventDelay = 1000;
-            logger = loggerFactory.CreateLogger(string.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
-            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger, "observers");
+            logger = loggerFactory.CreateLogger( $"{nameof(SimpleObserverableGrain)}-{base.IdentityString}-{base.RuntimeIdentity}");
+            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger);
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.Info("Activate.");
+            logger.LogInformation("Activate.");
             return Task.CompletedTask;
         }
 
         public async Task SetA(int a)
         {
-            logger.Info("SetA={0}", a);
+            logger.LogInformation("SetA={A}", a);
             A = a;
 
             //If this were run with Task.Run there were no need for the added Unwrap call.

@@ -8,6 +8,9 @@ using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
+#elif ORLEANS_REMINDERS_PROVIDER
+using Orleans.Reminders.AdoNet.Converters;
+namespace Orleans.Reminders.AdoNet.Storage
 #elif PERSISTENCE_ADONET
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
@@ -87,9 +90,14 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         internal string DeleteMembershipTableEntriesKey => queries[nameof(DeleteMembershipTableEntriesKey)];
 
+        /// <summary>
+        /// A query template to cleanup defunct silo entries.
+        /// </summary>
+        internal string CleanupDefunctSiloEntriesKey => queries[nameof(CleanupDefunctSiloEntriesKey)];
+
 #endif
 
-#if REMINDERS_ADONET || TESTER_SQLUTILS
+#if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER
 
         /// <summary>
         /// A query template to read reminder entries.
@@ -128,7 +136,7 @@ namespace Orleans.Tests.SqlUtils
 
 #endif
 
-        internal class Converters
+        internal static class Converters
         {
             internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
             {
@@ -136,27 +144,7 @@ namespace Orleans.Tests.SqlUtils
                     record.GetValue<string>("QueryText"));
             }
 
-            internal static ReminderEntry GetReminderEntry(IDataRecord record, GrainReferenceKeyStringConverter grainReferenceConverter)
-            {
-                //Having non-null field, GrainId, means with the query filter options, an entry was found.
-                string grainId = record.GetValueOrDefault<string>(nameof(Columns.GrainId));
-                if (grainId != null)
-                {
-                    return new ReminderEntry
-                    {
-                        GrainRef = grainReferenceConverter.FromKeyString(grainId),
-                        ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
-                        StartAt = record.GetDateTimeValue(nameof(Columns.StartTime)),
-
-                        //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
-                        //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
-                        Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(Columns.Period))),
-                        ETag = GetVersion(record).ToString()
-                    };
-                }
-                return null;
-            }
-
+    
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
@@ -228,7 +216,7 @@ namespace Orleans.Tests.SqlUtils
                 int port = record.GetInt32(portName);
                 int generation = record.GetInt32(nameof(Columns.Generation));
                 string address = record.GetValue<string>(nameof(Columns.Address));
-                var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(address), port), generation);
+                var siloAddress = SiloAddress.New(IPAddress.Parse(address), port, generation);
                 return siloAddress;
             }
 

@@ -106,7 +106,7 @@ namespace Orleans.AzureUtils
             if (!string.IsNullOrEmpty(gateway.Generation))
                 int.TryParse(gateway.Generation, out gen);
 
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
+            SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address), proxyPort, gen);
             return address.ToGatewayUri();
         }
 
@@ -216,7 +216,7 @@ namespace Orleans.AzureUtils
 
             var asList = queryResults.ToList();
             if (asList.Count < 1 || asList.Count > 2)
-                throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress.ToLongString(), Utils.EnumerableToString(asList)));
+                throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(asList)));
 
             int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)

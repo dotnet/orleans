@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
@@ -13,7 +12,7 @@ using Orleans.Reminders.AzureStorage;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class ReminderTableEntry : ITableEntity
+    internal sealed class ReminderTableEntry : ITableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey
         public string ReminderName          { get; set; }    // Part of RowKey
@@ -28,22 +27,17 @@ namespace Orleans.Runtime.ReminderService
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
-        public static string ConstructRowKey(GrainReference grainRef, string reminderName)
-        {
-            var key = string.Format("{0}-{1}", grainRef.ToKeyString(), reminderName);
-            return AzureTableUtils.SanitizeTableProperty(key);
-        }
+        public static string ConstructRowKey(GrainId grainId, string reminderName)
+            => AzureTableUtils.SanitizeTableProperty($"{grainId}-{reminderName}");
 
-        public static (string LowerBound, string UpperBound) ConstructRowKeyBounds(GrainReference grainRef)
+        public static (string LowerBound, string UpperBound) ConstructRowKeyBounds(GrainId grainId)
         {
-            var baseKey = AzureTableUtils.SanitizeTableProperty(grainRef.ToKeyString());
+            var baseKey = AzureTableUtils.SanitizeTableProperty(grainId.ToString());
             return (baseKey + '-', baseKey + (char)('-' + 1));
         }
 
-        public static string ConstructPartitionKey(string serviceId, GrainReference grainRef)
-        {
-            return ConstructPartitionKey(serviceId, grainRef.GetUniformHashCode());
-        }
+        public static string ConstructPartitionKey(string serviceId, GrainId grainId)
+            => ConstructPartitionKey(serviceId, grainId.GetUniformHashCode());
 
         public static string ConstructPartitionKey(string serviceId, uint number)
         {
@@ -64,27 +58,10 @@ namespace Orleans.Runtime.ReminderService
             return (baseKey + '_', baseKey + (char)('_' + 1));
         }
 
-        public override string ToString()
-        {
-            var sb = new StringBuilder();
-            sb.Append("Reminder [");
-            sb.Append(" PartitionKey=").Append(PartitionKey);
-            sb.Append(" RowKey=").Append(RowKey);
-
-            sb.Append(" GrainReference=").Append(GrainReference);
-            sb.Append(" ReminderName=").Append(ReminderName);
-            sb.Append(" Deployment=").Append(DeploymentId);
-            sb.Append(" ServiceId=").Append(ServiceId);
-            sb.Append(" StartAt=").Append(StartAt);
-            sb.Append(" Period=").Append(Period);
-            sb.Append(" GrainRefConsistentHash=").Append(GrainRefConsistentHash);
-            sb.Append("]");
-
-            return sb.ToString();
-        }
+        public override string ToString() => $"Reminder [PartitionKey={PartitionKey} RowKey={RowKey} GrainId={GrainReference} ReminderName={ReminderName} Deployment={DeploymentId} ServiceId={ServiceId} StartAt={StartAt} Period={Period} GrainRefConsistentHash={GrainRefConsistentHash}]";
     }
 
-    internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
+    internal sealed class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
     {
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
@@ -94,14 +71,13 @@ namespace Orleans.Runtime.ReminderService
             var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
             try
             {
-                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
+                singleton.Logger.LogInformation("Creating RemindersTableManager for service id {ServiceId} and clusterId {ClusterId}.", serviceId, clusterId);
                 await singleton.InitTableAsync();
             }
             catch (Exception ex)
             {
-                string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_39, errorMsg, ex);
-                throw new OrleansException(errorMsg, ex);
+                singleton.Logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, "Exception trying to create or connect to the Azure table");
+                throw new OrleansException("Exception trying to create or connect to the Azure table", ex);
             }
             return singleton;
         }
@@ -151,19 +127,19 @@ namespace Orleans.Runtime.ReminderService
             return queryResults.ToList();
         }
 
-        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainReference grainRef)
+        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainId grainId)
         {
-            var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
-            var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainRef);
+            var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
+            var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainId);
             var query = TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and ((RowKey gt {rowKeyLowerBound}) and (RowKey le {rowKeyUpperBound}))");
             var queryResults = await ReadTableEntriesAndEtagsAsync(query);
             return queryResults.ToList();
         }
 
-        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainReference grainRef, string reminderName)
+        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName)
         {
-            string partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
-            string rowKey = ReminderTableEntry.ConstructRowKey(grainRef, reminderName);
+            string partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
+            string rowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName);
 
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -185,7 +161,7 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("UpsertRow failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;
                 }
                 throw;
@@ -205,7 +181,11 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace))
+                        Logger.LogTrace(
+                            "DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}",
+                            httpStatusCode,
+                            restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;

@@ -1,11 +1,10 @@
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Orleans.BroadcastChannel")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration.Build")]
 [assembly: InternalsVisibleTo("Orleans.Runtime")]
 [assembly: InternalsVisibleTo("Orleans.Streaming")]
-[assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Counters")]
-[assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Linux")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
@@ -22,6 +21,8 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("CodeGenerator.Tests")]
+
+[assembly: InternalsVisibleTo("Orleans.Reminders")]
 
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

@@ -131,9 +131,12 @@ namespace Orleans.Runtime.MembershipService
             if (myIndex < 0)
             {
                 // this should not happen ...
-                var error = string.Format("This silo {0} status {1} is not in its own local silo list! This is a bug!", self.SiloAddress.ToLongString(), self.Status);
-                log.Error(ErrorCode.Runtime_Error_100305, error);
-                throw new OrleansMissingMembershipEntryException(error);
+                log.LogError(
+                    (int)ErrorCode.Runtime_Error_100305,
+                    "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
+                    self.SiloAddress.ToString(),
+                    self.Status);
+                throw new OrleansMissingMembershipEntryException($"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
             }
 
             // Go over every node excluding me,
@@ -177,8 +180,11 @@ namespace Orleans.Runtime.MembershipService
             var result = newProbedSilos.ToImmutable();
             if (!AreTheSame(monitoredSilos, result))
             {
-                log.Info(ErrorCode.MembershipWatchList, "Will watch (actively ping) {0} silos: {1}",
-                    newProbedSilos.Count, Utils.EnumerableToString(newProbedSilos.Keys, silo => silo.ToLongString()));
+                log.LogInformation(
+                    (int)ErrorCode.MembershipWatchList,
+                    "Will watch (actively ping) {ProbedSiloCount} silos: {ProbedSilos}",
+                    newProbedSilos.Count,
+                    Utils.EnumerableToString(newProbedSilos.Keys));
             }
 
             return result;

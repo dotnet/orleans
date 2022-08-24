@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -18,21 +20,17 @@ namespace Orleans.Runtime
         bool InRange(uint value);
 
         /// <summary>
-        /// Returns a value indicating whether <paramref name="grainReference"/> is within this ring range.
+        /// Returns a value indicating whether <paramref name="grainId"/> is within this ring range.
         /// </summary>
-        /// <param name="grainReference">
-        /// The value to check.
-        /// </param>
+        /// <param name="grainId">The value to check.</param>
         /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
-        bool InRange(GrainReference grainReference);
+        public sealed bool InRange(GrainId grainId) => InRange(grainId.GetUniformHashCode());
     }
 
     // This is the internal interface to be used only by the different range implementations.
     internal interface IRingRangeInternal : IRingRange
     {
-        long RangeSize();
         double RangePercentage();
-        string ToFullString();
     }
 
     /// <summary>
@@ -45,7 +43,7 @@ namespace Orleans.Runtime
         /// Gets the exclusive lower bound of the range.
         /// </summary>
         uint Begin { get; }
-        
+
         /// <summary>
         /// Gets the inclusive upper bound of the range.
         /// </summary>
@@ -54,7 +52,7 @@ namespace Orleans.Runtime
 
     [Serializable]
     [GenerateSerializer]
-    internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange
+    internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
     {
         [Id(1)]
         private readonly uint begin;
@@ -75,11 +73,6 @@ namespace Orleans.Runtime
         {
             this.begin = begin;
             this.end = end;
-        }
-
-        public bool InRange(GrainReference grainReference)
-        {
-            return InRange(grainReference.GetUniformHashCode());
         }
 
         /// <summary>
@@ -109,33 +102,21 @@ namespace Orleans.Runtime
 
         public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
 
-        public bool Equals(SingleRange other)
-        {
-            return other != null && begin == other.begin && end == other.end;
-        }
+        public bool Equals(SingleRange? other) => other != null && begin == other.begin && end == other.end;
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as SingleRange);
-        }
+        public override bool Equals(object? obj) => Equals(obj as SingleRange);
 
-        public override int GetHashCode()
-        {
-            return (int)(begin ^ end);
-        }
+        public override int GetHashCode() => (int)(begin ^ end);
 
-        public override string ToString()
-        {
-            if (begin == 0 && end == 0)
-            {
-                return "<(0 0], Size=x100000000, %Ring=100%>";
-            }
-            return String.Format("<(x{0,8:X8} x{1,8:X8}], Size=x{2,8:X8}, %Ring={3:0.000}%>", begin, end, RangeSize(), RangePercentage());
-        }
+        public override string ToString() => begin == 0 && end == 0 ? "<(0 0], Size=x100000000, %Ring=100%>" : $"{this}";
 
-        public string ToFullString()
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
-            return ToString();
+            return begin == 0 && end == 0
+                ? destination.TryWrite($"<(0 0], Size=x100000000, %Ring=100%>", out charsWritten)
+                : destination.TryWrite($"<(x{begin:X8} x{end:X8}], Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
         }
 
         internal bool Overlaps(SingleRange other) => Equals(other) || InRange(other.begin) || other.InRange(begin);
@@ -257,7 +238,7 @@ namespace Orleans.Runtime
 
     [Serializable]
     [GenerateSerializer]
-    internal sealed class GeneralMultiRange : IRingRangeInternal
+    internal sealed class GeneralMultiRange : IRingRangeInternal, ISpanFormattable
     {
         [Id(1)]
         private readonly List<SingleRange> ranges;
@@ -268,6 +249,7 @@ namespace Orleans.Runtime
 
         internal GeneralMultiRange(List<SingleRange> ranges)
         {
+            Debug.Assert(ranges.Count != 1);
             this.ranges = ranges;
             foreach (var r in ranges)
                 rangeSize += r.RangeSize();
@@ -314,27 +296,17 @@ namespace Orleans.Runtime
             return false;
         }
 
-        public bool InRange(GrainReference grainReference)
+        public double RangePercentage() => rangeSize * (100.0 / RangeFactory.RING_SIZE);
+
+        public override string ToString() => ranges.Count == 0 ? "Empty MultiRange" : $"{this}";
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
-            return InRange(grainReference.GetUniformHashCode());
-        }
-
-        public long RangeSize() => rangeSize;
-
-        public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
-
-        public override string ToString()
-        {
-            if (ranges.Count == 0) return "Empty MultiRange";
-            if (ranges.Count == 1) return ranges[0].ToString();
-            return String.Format("<MultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%>", RangeSize(), RangePercentage());
-        }
-
-        public string ToFullString()
-        {
-            if (ranges.Count == 0) return "Empty MultiRange";
-            if (ranges.Count == 1) return ranges[0].ToString();
-            return String.Format("<MultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%, {2} Ranges: {3}>", RangeSize(), RangePercentage(), ranges.Count, Utils.EnumerableToString(ranges, r => r.ToFullString()));
+            return ranges.Count == 0
+                ? destination.TryWrite($"Empty MultiRange", out charsWritten)
+                : destination.TryWrite($"<MultiRange: Size=x{rangeSize:X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
         }
     }
 
@@ -380,7 +352,6 @@ namespace Orleans.Runtime
                     switch (multiRange.Ranges.Count)
                     {
                         case 0: return multiRange;
-                        case 1: return GetEquallyDividedSubRange(multiRange.Ranges[0], numSubRanges, mySubRangeIndex);
                         default:
                             // Take each of the single ranges in the multi range and divide each into equal sub ranges.
                             var singlesForThisIndex = new List<SingleRange>(multiRange.Ranges.Count);

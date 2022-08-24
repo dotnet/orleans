@@ -2,13 +2,14 @@ using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
-    internal readonly struct InternalStreamId : IEquatable<InternalStreamId>, IComparable<InternalStreamId>, ISerializable
+    internal readonly struct InternalStreamId : IEquatable<InternalStreamId>, IComparable<InternalStreamId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
         public StreamId StreamId { get; }
@@ -24,15 +25,15 @@ namespace Orleans.Runtime
 
         private InternalStreamId(SerializationInfo info, StreamingContext context)
         {
-            ProviderName = info.GetString("pvn");
-            StreamId = (StreamId) info.GetValue("sid", typeof(StreamId));
+            ProviderName = info.GetString("pvn")!;
+            StreamId = (StreamId)info.GetValue("sid", typeof(StreamId))!;
         }
 
         public static implicit operator StreamId(InternalStreamId internalStreamId) => internalStreamId.StreamId;
 
         public bool Equals(InternalStreamId other) => StreamId.Equals(other) && ProviderName.Equals(other.ProviderName);
 
-        public override bool Equals(object obj) => obj is InternalStreamId other ? this.Equals(other) : false;
+        public override bool Equals(object? obj) => obj is InternalStreamId other ? this.Equals(other) : false;
 
         public static bool operator ==(InternalStreamId s1, InternalStreamId s2) => s1.Equals(s2);
 
@@ -46,38 +47,14 @@ namespace Orleans.Runtime
             info.AddValue("sid", StreamId, typeof(StreamId));
         }
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return ProviderName.GetHashCode() * 43 ^ StreamId.GetHashCode();
-            }
-        }
+        public override int GetHashCode() => HashCode.Combine(ProviderName, StreamId);
 
-        public override string ToString()
-        {
-            return $"{ProviderName}/{StreamId.ToString()}";
-        }
+        public override string ToString() => $"{ProviderName}/{StreamId}";
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        public static InternalStreamId Parse(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                ThrowInvalidInternalStreamId(value);
-            }
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => destination.TryWrite($"{ProviderName}/{StreamId}", out charsWritten);
 
-            var i = value.IndexOf('/');
-            if (i < 0)
-            {
-                ThrowInvalidInternalStreamId(value);
-            }
-
-            return new InternalStreamId(value.Substring(0, i), StreamId.Parse(value.Substring(i + 1)));
-        }
-
-        private static void ThrowInvalidInternalStreamId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a stream id");
-
-
-        internal string GetNamespace() => StreamId.GetNamespace();
+        internal string? GetNamespace() => StreamId.GetNamespace();
     }
 }

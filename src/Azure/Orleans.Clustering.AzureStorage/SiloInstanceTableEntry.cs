@@ -68,7 +68,7 @@ namespace Orleans.AzureUtils
                 IPAddress address = IPAddress.Parse(addressStr);
                 int port = Int32.Parse(portStr);
                 int generation = Int32.Parse(genStr);
-                return SiloAddress.New(new IPEndPoint(address, port), generation);
+                return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)
             {

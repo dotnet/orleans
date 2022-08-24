@@ -1,5 +1,6 @@
 using System;
 
+#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -7,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, Immutable]
     [GenerateSerializer]
-    public struct GrainInterfaceType : IEquatable<GrainInterfaceType>
+    public readonly struct GrainInterfaceType : IEquatable<GrainInterfaceType>, ISpanFormattable
     {
         /// <summary>
         /// The underlying value.
@@ -41,7 +42,7 @@ namespace Orleans.Runtime
         public static GrainInterfaceType Create(string value) => new GrainInterfaceType(value);
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is GrainInterfaceType id && this.Equals(id);
+        public override bool Equals(object? obj) => obj is GrainInterfaceType id && Equals(id);
 
         /// <inheritdoc />
         public bool Equals(GrainInterfaceType other) => _value.Equals(other._value);
@@ -49,14 +50,16 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override int GetHashCode() => _value.GetHashCode();
 
-        /// <inheritdoc />
-        public override string ToString() => _value.ToStringUtf8();
-
         /// <summary>
         /// Returns a UTF8 interpretation of the current instance.
         /// </summary>
         /// <returns></returns>
-        public string ToStringUtf8() => _value.ToStringUtf8();
+        public override string? ToString() => _value.ToString();
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => _value.TryFormat(destination, out charsWritten);
 
         /// <summary>
         /// Compares the provided operands for equality.

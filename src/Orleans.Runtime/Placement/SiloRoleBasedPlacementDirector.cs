@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,7 +33,7 @@ namespace Orleans.Runtime.Placement
                 throw new OrleansException($"Cannot place grain with RoleName {siloRole}. Either Role name is invalid or there are no active silos with type {siloRole} in MembershipTableSnapshot registered yet.");
             }
 
-            return Task.FromResult(siloAddressesSameRole[ThreadSafeRandom.Next(siloAddressesSameRole.Count)]);
+            return Task.FromResult(siloAddressesSameRole[Random.Shared.Next(siloAddressesSameRole.Count)]);
         }
     }
 }

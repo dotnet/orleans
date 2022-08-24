@@ -32,11 +32,13 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void GeneratedSerializersRoundTripThroughCodec()
         {
-            var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30 };
+            var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30, OtherObject = MyCustomEnum.Two };
             var result = RoundTripThroughCodec(original);
 
             Assert.Equal(original.IntField, result.IntField);
             Assert.Equal(original.IntProperty, result.IntProperty);
+            var otherObj = Assert.IsType<MyCustomEnum>(result.OtherObject);
+            Assert.Equal(MyCustomEnum.Two, otherObj);
         }
 
         [Fact]
@@ -54,6 +56,75 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.Name, result.Name);
             Assert.Equal(original.FavouriteColor, result.FavouriteColor);
             Assert.Equal(original.StarSign, result.StarSign);
+        }
+
+        [Fact]
+        public void RecursiveTypeSerializersRoundTripThroughSerializer()
+        {
+            var original = new RecursiveClass { IntProperty = 30 };
+            original.RecursiveProperty = original;
+            var result = (RecursiveClass)RoundTripThroughUntypedSerializer(original, out _);
+
+            Assert.NotNull(result.RecursiveProperty);
+            Assert.Same(result, result.RecursiveProperty);
+            Assert.Equal(original.IntProperty, result.IntProperty);
+        }
+
+        [Fact]
+        public void RecursiveTypeSerializersRoundTripThroughCodec()
+        {
+            var original = new RecursiveClass { IntProperty = 30 };
+            original.RecursiveProperty = original;
+            var result = RoundTripThroughCodec(original);
+
+            Assert.NotNull(result.RecursiveProperty);
+            Assert.Same(result, result.RecursiveProperty);
+            Assert.Equal(original.IntProperty, result.IntProperty);
+        }
+
+        [Fact]
+        public void GeneratedRecordWithPCtorSerializersRoundTripThroughCodec()
+        {
+            var original = new Person2(2, "harry")
+            {
+                FavouriteColor = "redborine",
+                StarSign = "Aquaricorn"
+            };
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original.Age, result.Age);
+            Assert.Equal(original.Name, result.Name);
+            Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+            Assert.Equal(original.StarSign, result.StarSign);
+        }
+
+        [Fact]
+        public void GeneratedRecordWithExcludedPCtorSerializersRoundTripThroughCodec()
+        {
+            var original = new Person3(2, "harry")
+            {
+                FavouriteColor = "redborine",
+                StarSign = "Aquaricorn"
+            };
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(default, result.Age);
+            Assert.Equal(default, result.Name);
+            Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+            Assert.Equal(original.StarSign, result.StarSign);
+        }
+
+        [Fact]
+        public void GeneratedRecordWithExclusiveCtorSerializersRoundTripThroughCodec()
+        {
+            var original = new Person4(2, "harry");
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original.Age, result.Age);
+            Assert.Equal(original.Name, result.Name);
         }
 
         [Fact]
@@ -82,7 +153,7 @@ namespace Orleans.Serialization.UnitTests
         public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
         {
             var original = new ImmutableStruct(30, 2);
-            var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+             var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
             Assert.Equal(original.GetIntField(), result.GetIntField());
             Assert.Equal(original.IntProperty, result.IntProperty);

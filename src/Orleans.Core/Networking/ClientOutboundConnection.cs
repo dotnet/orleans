@@ -35,8 +35,6 @@ namespace Orleans.Runtime.Messaging
             this.connectionPreambleHelper = connectionPreambleHelper;
             this.clusterOptions = clusterOptions;
             this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
-            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
-            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
         }
 
         public SiloAddress RemoteSiloAddress { get; }
@@ -44,6 +42,16 @@ namespace Orleans.Runtime.Messaging
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
+
+        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+        }
+
+        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
+        {
+            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+        }
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -98,7 +106,6 @@ namespace Orleans.Runtime.Messaging
             if (!this.IsValid)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                msg.TargetActivation = default;
                 msg.TargetSilo = null;
                 this.messageCenter.SendMessage(msg);
                 return false;
@@ -107,8 +114,6 @@ namespace Orleans.Runtime.Messaging
             if (msg.TargetSilo != null) return true;
 
             msg.TargetSilo = this.RemoteSiloAddress;
-            if (msg.TargetGrain.IsSystemTarget())
-                msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
 
             return true;
         }
@@ -119,7 +124,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
-                msg.RetryCount = msg.RetryCount + 1;
+                ++msg.RetryCount;
                 this.messageCenter.SendMessage(msg);
             }
             else
@@ -136,8 +141,8 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
-            if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo - Unknown reason.");
+            MessagingInstruments.OnRejectedMessage(msg);
+            if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
             // rejection msgs are always originated locally, they are never remote.
@@ -146,17 +151,17 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+            MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
+                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
                 // Done retrying, send back an error instead
                 this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {<essage}. Reason = {Reason}", msg, reason);
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
+                MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
 

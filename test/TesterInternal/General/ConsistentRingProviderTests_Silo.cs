@@ -5,9 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
@@ -103,7 +105,11 @@ namespace UnitTests.General
                 VerificationScenario(PickKey(fail.SiloAddress)); // fail.SiloAddress.GetConsistentHashCode());
             }
 
-            logger.Info("FailureTest {0}, Code {1}, Stopping silos: {2}", numOfFailures, failCode, Utils.EnumerableToString(failures, handle => handle.SiloAddress.ToString()));
+            logger.LogInformation(
+                "FailureTest {FailureCount}, Code {FailureCode}, Stopping silos: {SiloAddresses}",
+                numOfFailures,
+                failCode,
+                Utils.EnumerableToString(failures, handle => handle.SiloAddress.ToString()));
             List<uint> keysToTest = new List<uint>();
             foreach (SiloHandle fail in failures) // verify before failure
             {
@@ -135,7 +141,7 @@ namespace UnitTests.General
 
         private async Task JoinTest(int numOfJoins)
         {
-            logger.Info("JoinTest {0}", numOfJoins);
+            logger.LogInformation("JoinTest {NumOfJoins}", numOfJoins);
             await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos - numOfJoins);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -158,7 +164,7 @@ namespace UnitTests.General
             List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
-            logger.Info("Killing silo {0} and joining a silo", failures[0].SiloAddress);
+            logger.LogInformation("Killing silo {SiloAddress} and joining a silo", failures[0].SiloAddress);
             
             var tasks = new Task[2]
             {
@@ -188,7 +194,7 @@ namespace UnitTests.General
             List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
-            logger.Info("Killing secondary silo {0} and joining a silo", fail.SiloAddress);
+            logger.LogInformation("Killing secondary silo {SiloAddress} and joining a silo", fail.SiloAddress);
             var tasks = new Task[2]
             {
                 Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(fail)),
@@ -211,7 +217,7 @@ namespace UnitTests.General
             var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             for (int i = 0; i < iteration; i++)
             {
-                double next = random.NextDouble();
+                double next = Random.Shared.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
                 SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
@@ -239,7 +245,7 @@ namespace UnitTests.General
             // some random keys
             for (int i = 0; i < 3; i++)
             {
-                VerifyKey((uint)random.Next(), silos);
+                VerifyKey((uint)Random.Shared.Next(), silos);
             }
             // lowest key
             uint lowest = (uint)(silos.First().GetConsistentHashCode() - 1);
@@ -278,11 +284,11 @@ namespace UnitTests.General
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
             var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(InMemoryReminderTable.ReminderTableGrainId);
+            var tableGrainId = ((GrainReference)tableGrain).GrainId;
 
             // Ping the grain to make sure it is active.
-            await tableGrain.ReadRows((GrainReference)tableGrain);
+            await tableGrain.ReadRows(tableGrainId);
 
-            var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
             var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
@@ -335,10 +341,10 @@ namespace UnitTests.General
                 default:
                     while (count++ < numOfFailures)
                     {
-                        SiloHandle r = ids.Values[random.Next(ids.Count)];
+                        SiloHandle r = ids.Values[Random.Shared.Next(ids.Count)];
                         while (failures.Contains(r))
                         {
-                            r = ids.Values[random.Next(ids.Count)];
+                            r = ids.Values[Random.Shared.Next(ids.Count)];
                         }
                         failures.Add(r);
                     }
@@ -355,10 +361,10 @@ namespace UnitTests.General
             {
                 ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle.SiloAddress);
             }
-            logger.Info("{0} list of silos: ", msg);
+            logger.LogInformation("{Message} list of silos: ", msg);
             foreach (var id in ids.Keys.ToList())
             {
-                logger.Info("{0} -> {1}", ids[id], id);
+                logger.LogInformation("{From} -> {To}", ids[id], id);
             }
         }
 

@@ -100,7 +100,10 @@ namespace Orleans.Runtime.Providers
                 var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
-                this.logger.LogInformation($"Successfully created queue balancer of type {balancer.GetType()} for stream provider {streamProviderName}");
+                this.logger.LogInformation(
+                    "Successfully created queue balancer of type {BalancerType} for stream provider {StreamProviderName}",
+                    balancer.GetType(),
+                    streamProviderName);
                 return balancer;
             }
             catch (Exception e)

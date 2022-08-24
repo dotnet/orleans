@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System;
+using Orleans.CodeGenerator.Diagnostics;
 using static Orleans.CodeGenerator.SerializerGenerator;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.CopierGenerator;
@@ -215,11 +216,17 @@ namespace Orleans.CodeGenerator
             }
 
             ITypeSymbol resultType;
-            var methodReturnType = (INamedTypeSymbol)methodDescription.Method.ReturnType;
-            if (methodReturnType.TypeArguments.Length == 1)
+            var methodReturnType = methodDescription.Method.ReturnType;
+            if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
+            {
+                var diagnostic = InvalidGrainMethodReturnTypeDiagnostic.CreateDiagnostic(methodDescription);
+                throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
+            }
+
+            if (namedMethodReturnType.TypeArguments.Length == 1)
             {
                 // Task<T> / ValueTask<T>
-                resultType = methodReturnType.TypeArguments[0];
+                resultType = namedMethodReturnType.TypeArguments[0];
             }
             else
             {
@@ -238,7 +245,7 @@ namespace Orleans.CodeGenerator
                              baseInvokeExpression,
                              ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
 
-            var rt = methodReturnType.ConstructedFrom;
+            var rt = namedMethodReturnType.ConstructedFrom;
             if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.Task))
             {
                 // C#: return <invocation>.AsTask()

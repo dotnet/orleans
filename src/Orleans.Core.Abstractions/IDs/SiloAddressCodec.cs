@@ -1,15 +1,14 @@
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization;
-using Orleans.Serialization.GeneratedCodeHelpers;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.WireProtocol;
-using Orleans.Serialization.Cloning;
-using System.Net;
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.WireProtocol;
 
+#nullable enable
 namespace Orleans.Runtime.Serialization
 {
     /// <summary>
@@ -19,13 +18,11 @@ namespace Orleans.Runtime.Serialization
     [RegisterCopier]
     public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>, IDeepCopier<SiloAddress>
     {
-        private static readonly Type _iPEndPointType = typeof(IPEndPoint);
-        private static readonly Type _int32Type = typeof(int);
         private static readonly Type _codecFieldType = typeof(SiloAddress);
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -35,8 +32,10 @@ namespace Orleans.Runtime.Serialization
 
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
-            IPEndPointCodec.WriteField(ref writer, 0U, _iPEndPointType, value.Endpoint);
-            Int32Codec.WriteField(ref writer, 1U, _int32Type, value.Generation);
+            IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Endpoint.Address);
+            uint delta = 2;
+            if (value.Endpoint.Port != 0) UInt16Codec.WriteField(ref writer, delta = 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
+            if (value.Generation != 0) Int32Codec.WriteField(ref writer, delta, Int32Codec.CodecFieldType, value.Generation);
             writer.WriteEndObject();
         }
 
@@ -50,34 +49,33 @@ namespace Orleans.Runtime.Serialization
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
-            int id = 0;
             Field header = default;
-            IPEndPoint endpoint = default;
-            int generation = default;
-            while (true)
+            int port = 0, generation = 0;
+
+            var id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, 0);
+            if (id != 0) throw new RequiredFieldMissingException("Serialized SiloAddress is missing its address field.");
+            var address = IPAddressCodec.ReadValue(ref reader, header);
+
+            id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
+            if (id == 1)
             {
+                port = UInt16Codec.ReadValue(ref reader, header);
                 id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                if (id == 0)
-                {
-                    endpoint = IPEndPointCodec.ReadValue(ref reader, header);
-                    id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                }
-
-                if (id == 1)
-                {
-                    generation = Int32Codec.ReadValue(ref reader, header);
-                    id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
-                }
-
-                if (id == -1)
-                {
-                    break;
-                }
-
-                reader.ConsumeUnknownField(header);
             }
 
-            return SiloAddress.New(endpoint, generation);
+            if (id == 2)
+            {
+                generation = Int32Codec.ReadValue(ref reader, header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
+
+            while (id >= 0)
+            {
+                reader.ConsumeUnknownField(header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
+
+            return SiloAddress.New(address, port, generation);
         }
 
         /// <inheritdoc />

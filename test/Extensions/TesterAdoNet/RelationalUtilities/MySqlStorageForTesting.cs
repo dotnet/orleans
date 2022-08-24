@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -8,6 +9,7 @@ namespace UnitTests.General
 {
     internal class MySqlStorageForTesting : RelationalStorageForTesting
     {
+        protected override string ProviderMoniker => "MySQL";
         public MySqlStorageForTesting(string connectionString) : base(AdoNetInvariants.InvariantNameMySql, connectionString)
         {
         }
@@ -15,11 +17,11 @@ namespace UnitTests.General
         public override string CancellationTestQuery { get { return "DO SLEEP(10); SELECT 1;"; } }
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData LONGBLOB NOT NULL);"; } }
-        
+
         public IEnumerable<string> SplitScript(string setupScript)
         {
             return setupScript.Replace("END$$", "END;")
-                .Split(new[] {"DELIMITER $$", "DELIMITER ;"}, StringSplitOptions.RemoveEmptyEntries);
+                .Split(new[] { "DELIMITER $$", "DELIMITER ;" }, StringSplitOptions.RemoveEmptyEntries);
         }
 
         protected override string CreateDatabaseTemplate
@@ -33,20 +35,7 @@ namespace UnitTests.General
         }
 
         public override string DefaultConnectionString => TestDefaultConfiguration.MySqlConnectionString;
-
-        protected override string[] SetupSqlScriptFileNames
-        {
-            get
-            {
-                return new[] {
-                    "MySQL-Main.sql",
-                    "MySQL-Clustering.sql",
-                    "MySQL-Persistence.sql",
-                    "MySQL-Reminders.sql"
-                };
-            }
-        }
-
+         
         protected override string ExistsDatabaseTemplate
         {
             get { return "SELECT COUNT(1) FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{0}'"; }
