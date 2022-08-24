@@ -115,6 +115,9 @@ namespace TestGrains
 
             logger.LogInformation("Received event.  StreamGuid: {StreamGuid}, SequenceToken: {SequenceToken}", State.StreamGuid, sequenceToken);
 
+            // Increment accumulator before trying to inject fault
+            State.Accumulator++;
+
             // We will only update the start token if this is the first event we're processed
             // In that case, we'll want to save the start token in case something goes wrong.
             if (State.TryUpdateStartToken(sequenceToken))
@@ -123,7 +126,6 @@ namespace TestGrains
                 await WriteStateAsync();
             }
 
-            State.Accumulator++;
             State.LastProcessedToken = sequenceToken;
             if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {

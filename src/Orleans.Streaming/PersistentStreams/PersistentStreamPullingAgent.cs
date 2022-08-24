@@ -296,11 +296,14 @@ namespace Orleans.Streams
                     if (requestedHandshakeToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
+                        // The handshake token points to an already processed event, we need to advance the cursor to
+                        // the next event.
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedHandshakeToken.Token);
+                        consumerData.Cursor.MoveNext(); //
                     }
                     else
                     {
-                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, jsut keep using it.
+                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                     }
                 }
@@ -614,6 +617,9 @@ namespace Orleans.Streams
                             {
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
+                                // The handshake token points to an already processed event, we need to advance the cursor to
+                                // the next event.
+                                newCursor.MoveNext();
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
                             }

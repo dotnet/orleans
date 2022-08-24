@@ -4,55 +4,86 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     [ImplicitStreamSubscription(nameof(IImplicitSubscriptionCounterGrain))]
-    public class ImplicitSubscriptionCounterGrain : Grain, IImplicitSubscriptionCounterGrain
+    public class ImplicitSubscriptionCounterGrain : Grain<ImplicitSubscriptionCounterGrain.MyState>, IImplicitSubscriptionCounterGrain, IStreamSubscriptionObserver
     {
         private readonly ILogger logger;
-        private int eventCounter = 0;
-        private int errorCounter = 0;
+        private bool deactivateOnEvent;
+
+        [GenerateSerializer]
+        public class MyState
+        {
+            [Id(0)]
+            public int EventCounter { get; set; }
+            [Id(1)]
+            public int ErrorCounter { get; set; }
+            [Id(2)]
+            public StreamSequenceToken Token { get; set; }
+        }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger($"{nameof(ImplicitSubscriptionCounterGrain)} {this.IdentityString}");
         }
 
-        public override async Task OnActivateAsync(CancellationToken cancellationToken)
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger.LogInformation("OnActivateAsync");
+            return base.OnActivateAsync(cancellationToken);
+        }
 
-            var stream = this
-                .GetStreamProvider("StreamingCacheMissTests")
-                .GetStream<byte[]>(this.GetPrimaryKey(), nameof(IImplicitSubscriptionCounterGrain));
-            await stream.SubscribeAsync(OnNext, OnError, OnCompleted);
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            this.logger.LogInformation($"OnDeactivateAsync: {reason}");
+            return base.OnDeactivateAsync(reason, cancellationToken);
+        }
 
-            Task OnNext(byte[] value, StreamSequenceToken token)
+        public Task<int> GetErrorCounter() => Task.FromResult(this.State.ErrorCounter);
+
+        public Task<int> GetEventCounter() => Task.FromResult(this.State.EventCounter);
+
+        public Task Deactivate()
+        {
+            this.DeactivateOnIdle();
+            return Task.CompletedTask;
+        }
+
+        public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
+        {
+            this.logger.LogInformation($"OnSubscribed: {handleFactory.ProviderName}/{handleFactory.StreamId}");
+
+            await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
+
+            async Task OnNext(byte[] value, StreamSequenceToken token)
             {
                 this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
-                this.eventCounter++;
-                return Task.CompletedTask;
+                this.State.EventCounter++;
+                this.State.Token = token;
+                await this.WriteStateAsync();
+                if (this.deactivateOnEvent)
+                {
+                    this.DeactivateOnIdle();
+                }
             }
 
-            Task OnError(Exception ex)
+            async Task OnError(Exception ex)
             {
-                this.logger.LogError(ex, "Error");
-                this.errorCounter++;
-                return Task.CompletedTask;
+                this.logger.LogError("Error: {Exception}", ex);
+                this.State.ErrorCounter++;
+                await this.WriteStateAsync();
             }
 
             Task OnCompleted() => Task.CompletedTask;
         }
 
-        public Task<int> GetErrorCounter() => Task.FromResult(this.errorCounter);
-
-        public Task<int> GetEventCounter() => Task.FromResult(this.eventCounter);
-
-        public Task Deactivate()
+        public Task DeactivateOnEvent(bool deactivate)
         {
-            this.DeactivateOnIdle();
+            this.deactivateOnEvent = deactivate;
             return Task.CompletedTask;
         }
     }

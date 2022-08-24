@@ -64,6 +64,8 @@ namespace UnitTests.Grains
         public int NumConsumed { get; private set; }
         private ILogger logger;
         private SlowConsumingGrain slowConsumingGrain;
+        private StreamSequenceToken firstToken;
+
         internal SlowObserver(SlowConsumingGrain grain, ILogger logger)
         {
             NumConsumed = 0;
@@ -74,8 +76,17 @@ namespace UnitTests.Grains
         public async Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
             NumConsumed++;
-            // slow consumer keep asking for the first item it received to mimic slow consuming behavior
-            this.slowConsumingGrain.ConsumerHandle = await this.slowConsumingGrain.ConsumerHandle.ResumeAsync(this.slowConsumingGrain.ConsumerObserver, token);
+
+            if (firstToken == null)
+            {
+                firstToken = token;
+            }
+            else
+            {
+                // slow consumer keep asking for the first item it received to mimic slow consuming behavior
+                this.slowConsumingGrain.ConsumerHandle = await this.slowConsumingGrain.ConsumerHandle.ResumeAsync(this.slowConsumingGrain.ConsumerObserver, firstToken);
+            }
+
             this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);
         }
 
