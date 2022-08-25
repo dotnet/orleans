@@ -6,6 +6,7 @@
     <PackageTags>$(PackageTags) AWS SQS</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <DefineConstants>$(DefineConstants);STREAMING_SQS</DefineConstants>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
