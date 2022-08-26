@@ -378,7 +378,7 @@ grow:
             [FieldOffset(0)]
             private MessageFlags _flags;
 
-            [FieldOffset(24)]
+            [FieldOffset(3)]
             public byte ForwardCount;
 
             public Directions Direction
