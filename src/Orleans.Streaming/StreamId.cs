@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Text;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Streams;
@@ -14,7 +13,6 @@ namespace Orleans.Runtime
     /// </summary>
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable
     {
@@ -53,7 +51,7 @@ namespace Orleans.Runtime
         }
 
         internal StreamId(byte[] fullKey, ushort keyIndex)
-            : this(fullKey, keyIndex, (int)JenkinsHash.ComputeHash(fullKey))
+            : this(fullKey, keyIndex, (int)StableHash.ComputeHash(fullKey))
         {
         }
 

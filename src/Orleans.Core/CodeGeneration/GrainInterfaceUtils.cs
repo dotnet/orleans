@@ -101,7 +101,7 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        public static int GetGrainClassTypeCode(Type grainClass) => (int)JenkinsHash.ComputeHash(RuntimeTypeNameFormatter.Format(grainClass));
+        public static int GetGrainClassTypeCode(Type grainClass) => (int)StableHash.ComputeHash(RuntimeTypeNameFormatter.Format(grainClass));
 
         private sealed class MethodInfoComparer : IEqualityComparer<MethodInfo>, IComparer<MethodInfo>
         {

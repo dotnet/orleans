@@ -1,13 +1,14 @@
-using Orleans.Serialization.Buffers;
 using System;
 using System.Buffers;
-using System.Collections;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Hashing;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -204,8 +205,10 @@ namespace Orleans.Serialization.TypeSystem
 
             public TypeKey(byte[] key)
             {
-                HashCode = unchecked((int)JenkinsHash.ComputeHash(key));
                 TypeName = key;
+                Unsafe.SkipInit(out int hash);
+                XxHash32.TryHash(key, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref hash, 1)), out _);
+                HashCode = BitConverter.IsLittleEndian ? hash : BinaryPrimitives.ReverseEndianness(hash);
             }
 
             public bool Equals(in TypeKey other)

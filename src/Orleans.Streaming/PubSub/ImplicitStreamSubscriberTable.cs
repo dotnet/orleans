@@ -194,7 +194,7 @@ namespace Orleans.Streams
             BinaryPrimitives.WriteUInt32LittleEndian(bytes, grainType.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], streamId.StreamId.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], streamId.StreamId.GetKeyIndex());
-            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], JenkinsHash.ComputeHash(streamId.ProviderName));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], StableHash.ComputeHash(streamId.ProviderName));
             return SubscriptionMarker.MarkAsImplictSubscriptionId(new(bytes));
         }
 

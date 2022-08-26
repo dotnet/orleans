@@ -11,17 +11,21 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     public sealed class GrainAddress : IEquatable<GrainAddress>, ISpanFormattable
     {
+        [Id(0)]
+        private GrainId _grainId;
+
+        [Id(1)]
+        private ActivationId _activationId;
+
         /// <summary>
         /// Identifier of the Grain
         /// </summary>
-        [Id(0)]
-        public GrainId GrainId { get; set; }
+        public GrainId GrainId { get => _grainId; set => _grainId = value; }
 
         /// <summary>
         /// Id of the specific Grain activation
         /// </summary>
-        [Id(1)]
-        public ActivationId ActivationId { get; set; }
+        public ActivationId ActivationId { get => _activationId; set => _activationId = value; }
 
         /// <summary>
         /// Address of the silo where the grain activation lives
@@ -36,14 +40,14 @@ namespace Orleans.Runtime
         public MembershipVersion MembershipVersion { get; set; } = MembershipVersion.MinValue;
 
         [JsonIgnore]
-        public bool IsComplete => !GrainId.IsDefault && !ActivationId.IsDefault && SiloAddress != null;
+        public bool IsComplete => !_grainId.IsDefault && !_activationId.IsDefault && SiloAddress != null;
 
         public override bool Equals(object? obj) => Equals(obj as GrainAddress);
 
         public bool Equals(GrainAddress? other)
         {
             return other != null && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
-                && GrainId == other.GrainId && ActivationId == other.ActivationId && MembershipVersion == other.MembershipVersion;
+                && _grainId.Equals(other._grainId) && _activationId.Equals(other._activationId) && MembershipVersion == other.MembershipVersion;
         }
 
         /// <summary>
@@ -54,20 +58,20 @@ namespace Orleans.Runtime
         /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match.</returns>
         public bool Matches(GrainAddress other)
         {
-            return other is not null && GrainId == other.GrainId && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
-                && (ActivationId.IsDefault || other.ActivationId.IsDefault || ActivationId.Equals(other.ActivationId));
+            return other is not null && _grainId.Equals(other._grainId) && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
+                && (_activationId.IsDefault || other._activationId.IsDefault || _activationId.Equals(other._activationId));
         }
 
-        public override int GetHashCode() => HashCode.Combine(this.SiloAddress, this.GrainId, this.ActivationId);
+        public override int GetHashCode() => HashCode.Combine(SiloAddress, _grainId, _activationId);
 
-        public override string ToString() => $"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}]";
+        public override string ToString() => $"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}]";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => destination.TryWrite($"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}]", out charsWritten);
+            => destination.TryWrite($"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}]", out charsWritten);
 
-        public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {GrainId}, ActivationId: {ActivationId}, SiloAddress: {SiloAddress}, MembershipVersion: {MembershipVersion}]";
+        public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}, MembershipVersion: {MembershipVersion}]";
 
         internal static GrainAddress NewActivationAddress(SiloAddress silo, GrainId grain) => GetAddress(silo, grain, ActivationId.NewId());
 
@@ -78,8 +82,8 @@ namespace Orleans.Runtime
 
             return new GrainAddress
             {
-                GrainId = grain,
-                ActivationId = activation,
+                _grainId = grain,
+                _activationId = activation,
                 SiloAddress = silo,
             };
         }
