@@ -65,7 +65,7 @@ namespace Orleans.Serialization.Buffers
         /// Fills the destination span with data from the input.
         /// </summary>
         /// <param name="destination">The destination.</param>
-        public abstract void ReadBytes(in Span<byte> destination);
+        public abstract void ReadBytes(Span<byte> destination);
 
         /// <summary>
         /// Reads bytes from the input into the destination array.
@@ -113,7 +113,7 @@ namespace Orleans.Serialization.Buffers
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void ReadBytes(in Span<byte> destination)
+        public override void ReadBytes(Span<byte> destination)
         {
 #if NETCOREAPP3_1_OR_GREATER
             var count = _stream.Read(destination);
@@ -702,7 +702,7 @@ namespace Orleans.Serialization.Buffers
                     span = span[..remaining];
                 }
 
-                ReadBytes(in span);
+                ReadBytes(span);
                 chunkSize = span.Length;
                 writer.Advance(chunkSize);
             }
@@ -729,7 +729,7 @@ namespace Orleans.Serialization.Buffers
             if (IsReadOnlySequenceInput || IsSpanInput)
             {
                 var destination = new Span<byte>(bytes);
-                ReadBytes(in destination);
+                ReadBytes(destination);
             }
             else if (_input is ReaderInput readerInput)
             {
@@ -743,7 +743,7 @@ namespace Orleans.Serialization.Buffers
         /// Fills <paramref name="destination"/> with bytes read from the input.
         /// </summary>
         /// <param name="destination">The destination.</param>
-        public void ReadBytes(in Span<byte> destination)
+        public void ReadBytes(Span<byte> destination)
         {
             if (IsReadOnlySequenceInput || IsSpanInput)
             {
@@ -754,34 +754,33 @@ namespace Orleans.Serialization.Buffers
                     return;
                 }
 
-                CopySlower(in destination, ref this);
-
-                static void CopySlower(in Span<byte> d, ref Reader<TInput> reader)
-                {
-                    var dest = d;
-                    while (true)
-                    {
-                        var writeSize = Math.Min(dest.Length, reader._currentSpan.Length - reader._bufferPos);
-                        reader._currentSpan.Slice(reader._bufferPos, writeSize).CopyTo(dest);
-                        reader._bufferPos += writeSize;
-                        dest = dest.Slice(writeSize);
-
-                        if (dest.Length == 0)
-                        {
-                            break;
-                        }
-
-                        reader.MoveNext();
-                    }
-                }
+                ReadBytesMultiSegment(destination);
             }
             else if (_input is ReaderInput readerInput)
             {
-                readerInput.ReadBytes(in destination);
+                readerInput.ReadBytes(destination);
             }
             else
             {
                 ThrowNotSupportedInput();
+            }
+        }
+
+        private void ReadBytesMultiSegment(Span<byte> dest)
+        {
+            while (true)
+            {
+                var writeSize = Math.Min(dest.Length, _currentSpan.Length - _bufferPos);
+                _currentSpan.Slice(_bufferPos, writeSize).CopyTo(dest);
+                _bufferPos += writeSize;
+                dest = dest.Slice(writeSize);
+
+                if (dest.Length == 0)
+                {
+                    break;
+                }
+
+                MoveNext();
             }
         }
 
