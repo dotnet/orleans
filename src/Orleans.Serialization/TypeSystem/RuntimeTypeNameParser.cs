@@ -212,7 +212,6 @@ namespace Orleans.Serialization.TypeSystem
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowGenericArityTooLarge(int arity) => throw new NotSupportedException($"An arity of {arity} is not supported");
 
         private ref struct BufferReader
@@ -254,7 +253,6 @@ namespace Orleans.Serialization.TypeSystem
                     if (assertChar != c)
                     {
                         ThrowUnexpectedCharacter(assertChar, c);
-                        return;
                     }
 
                     ++Index;
@@ -272,10 +270,8 @@ namespace Orleans.Serialization.TypeSystem
                 }
             }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             private static void ThrowUnexpectedCharacter(char expected, char actual) => throw new InvalidOperationException($"Encountered unexpected character. Expected '{expected}', actual '{actual}'.");
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             private static void ThrowEndOfInput() => throw new InvalidOperationException("Tried to read past the end of the input");
         }
     }

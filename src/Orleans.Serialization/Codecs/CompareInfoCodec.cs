@@ -1,11 +1,10 @@
+using System;
+using System.Buffers;
+using System.Globalization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Globalization;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -80,7 +79,6 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(CompareInfo)} fields. {field}");
     }

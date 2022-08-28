@@ -1,15 +1,12 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Utilities;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -239,16 +236,13 @@ namespace Orleans.Serialization.Codecs
 #endif
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for OrdinalComparer fields. {field}");
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotSupported(Field field, uint value) => throw new NotSupportedException($"Values of type {field.FieldType} are not supported. Value: {value}");
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotSupported(Type type) => throw new NotSupportedException($"Values of type {type} are not supported");
     }
 

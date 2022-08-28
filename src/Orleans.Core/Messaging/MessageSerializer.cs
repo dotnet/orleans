@@ -173,19 +173,14 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowIfLengthsInvalid(int headerLength, int bodyLength)
         {
-            if (headerLength <= 0 || headerLength > _maxHeaderLength)
-            {
-                throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
-            }
-
-            if (bodyLength < 0 || bodyLength > _maxBodyLength)
-            {
-                throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
-            }
+            if (headerLength <= 0 || headerLength > _maxHeaderLength) ThrowInvalidHeaderLength(headerLength);
+            if ((uint)bodyLength > (uint)_maxBodyLength) ThrowInvalidBodyLength(bodyLength);
         }
+
+        private void ThrowInvalidHeaderLength(int headerLength) => throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
+        private void ThrowInvalidBodyLength(int bodyLength) => throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
 
         private Message Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value) where TBufferWriter : IBufferWriter<byte>
         {

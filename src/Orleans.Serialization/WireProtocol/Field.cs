@@ -65,7 +65,7 @@ namespace Orleans.Serialization.WireProtocol
 #if DEBUG
                 if (!HasFieldId)
                 {
-                    ThrowFieldIdInvalid();
+                    throw new FieldIdNotPresentException();
                 }
 #endif
                 return FieldIdDeltaRaw;
@@ -100,7 +100,7 @@ namespace Orleans.Serialization.WireProtocol
 #if DEBUG
                 if (!IsSchemaTypeValid)
                 {
-                    ThrowFieldTypeInvalid();
+                    throw new FieldTypeInvalidException();
                 }
 #endif
                 return FieldTypeRaw;
@@ -112,7 +112,7 @@ namespace Orleans.Serialization.WireProtocol
 #if DEBUG
                 if (!IsSchemaTypeValid)
                 {
-                    ThrowFieldTypeInvalid();
+                    throw new FieldTypeInvalidException();
                 }
 #endif
                 FieldTypeRaw = value;
@@ -160,7 +160,7 @@ namespace Orleans.Serialization.WireProtocol
 #if DEBUG
                 if (!IsSchemaTypeValid)
                 {
-                    ThrowSchemaTypeInvalid();
+                    throw new SchemaTypeInvalidException();
                 }
 #endif
 
@@ -181,7 +181,7 @@ namespace Orleans.Serialization.WireProtocol
 #if DEBUG
                 if (WireType != WireType.Extended)
                 {
-                    ThrowExtendedWireTypeInvalid();
+                    throw new ExtendedWireTypeInvalidException();
                 }
 #endif
                 return Tag.ExtendedWireType;
@@ -257,17 +257,5 @@ namespace Orleans.Serialization.WireProtocol
             builder.AppendLiteral("]");
             return builder.ToStringAndClear();
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowFieldIdInvalid() => throw new FieldIdNotPresentException();
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowSchemaTypeInvalid() => throw new SchemaTypeInvalidException();
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowFieldTypeInvalid() => throw new FieldTypeInvalidException();
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowExtendedWireTypeInvalid() => throw new ExtendedWireTypeInvalidException();
     }
 }

@@ -71,7 +71,6 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         _currentPosition += bytes;
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         static void ThrowInvalidOperation() => throw new InvalidOperationException("Attempted to advance past the end of a buffer.");
     }
 

@@ -1,8 +1,7 @@
+using System;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -31,10 +30,8 @@ namespace Orleans.Serialization.Codecs
             return ReferenceCodec.ReadReference<object, TInput>(ref reader, field);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidWireType(Field field) => throw new UnsupportedWireTypeException($"Expected a reference, but encountered wire type of '{field.WireType}'.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotNullException(object value) => throw new InvalidOperationException(
             $"Expected a value of null, but encountered a value of '{value}'.");
     }
@@ -55,7 +52,6 @@ namespace Orleans.Serialization.Codecs
             return null;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotNullException(object value) => throw new InvalidOperationException($"Expected a value of null, but encountered a value of type '{value.GetType()}'.");
     }
 }

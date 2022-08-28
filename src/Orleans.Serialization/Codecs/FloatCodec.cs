@@ -82,11 +82,9 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt32BitsToSingle(reader.ReadUInt32());
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(float)}.");
     }
@@ -166,7 +164,6 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt64BitsToDouble(reader.ReadUInt64());
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
     }
@@ -278,11 +275,9 @@ namespace Orleans.Serialization.Codecs
             public ulong Lo64;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(decimal)}.");
     }

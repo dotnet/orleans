@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Orleans.Networking.Shared
@@ -208,13 +207,11 @@ namespace Orleans.Networking.Shared
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowArgumentOutOfRangeException_BufferRequestTooLarge(int maxSize)
         {
             throw new ArgumentOutOfRangeException("size", $"Cannot allocate more than {maxSize} bytes in a single buffer");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowObjectDisposedException() => throw new ObjectDisposedException("MemoryPool");
     }
 }

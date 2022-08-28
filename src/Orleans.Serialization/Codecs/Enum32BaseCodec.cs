@@ -58,7 +58,6 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public T DeepCopy(T input, CopyContext context) => input;
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {typeof(T).GetType()} fields. {field}");
 

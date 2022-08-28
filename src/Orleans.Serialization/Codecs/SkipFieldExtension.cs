@@ -1,8 +1,7 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -74,11 +73,9 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void ThrowUnexpectedExtendedWireType(Field field) => throw new ArgumentOutOfRangeException(
                 $"Unexpected {nameof(ExtendedWireType)} value [{field.ExtendedWireType}] in field {field} while skipping field.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void ThrowUnexpectedWireType(Field field) => throw new ArgumentOutOfRangeException(
                 $"Unexpected {nameof(WireType)} value [{field.WireType}] in field {field} while skipping field.");
 

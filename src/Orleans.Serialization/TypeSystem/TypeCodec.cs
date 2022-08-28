@@ -184,7 +184,6 @@ namespace Orleans.Serialization.TypeSystem
             return type is not null; 
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         [DoesNotReturn]
         private static void ThrowUnsupportedVersion(byte version) => throw new NotSupportedException($"Type encoding version {version} is not supported");
 

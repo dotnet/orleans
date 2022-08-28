@@ -1,11 +1,10 @@
+using System;
+using System.Buffers;
+using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -111,19 +110,15 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T[] ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(T[])}, {length}, is greater than total length of input.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T[] ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
@@ -266,18 +261,14 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T[] ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T[] ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
     }
@@ -430,18 +421,14 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static Memory<T> ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static Memory<T> ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
     }
@@ -588,18 +575,14 @@ namespace Orleans.Serialization.Codecs
             return new ArraySegment<T>(result);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static ArraySegment<T> ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static ArraySegment<T> ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");
     }

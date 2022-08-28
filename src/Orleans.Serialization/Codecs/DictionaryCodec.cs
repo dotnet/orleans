@@ -1,12 +1,11 @@
+using System;
+using System.Buffers;
+using System.Collections.Generic;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -129,11 +128,9 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
     }

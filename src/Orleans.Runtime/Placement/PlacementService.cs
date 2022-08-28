@@ -89,7 +89,6 @@ namespace Orleans.Runtime.Placement
             var worker = _workers[grainId.GetUniformHashCode() % PlacementWorkerCount];
             return worker.AddressMessage(message);
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowMissingAddress() => throw new InvalidOperationException("Cannot address a message without a target");
         }
 

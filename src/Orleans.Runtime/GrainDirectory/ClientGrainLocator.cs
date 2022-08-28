@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -61,8 +59,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause) => throw new InvalidOperationException($"Cannot unregister client grain explicitly");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static GrainId ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
+        private static void ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
 
         public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) { }
 

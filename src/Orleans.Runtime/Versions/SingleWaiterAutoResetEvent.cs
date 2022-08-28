@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
@@ -46,7 +45,6 @@ namespace Orleans.Runtime
 
         public ValueTask WaitAsync() => new(this, _waitSource.Version);
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowConcurrencyViolation() => throw new InvalidOperationException("Concurrent use is not supported");
     }
 

@@ -1,18 +1,17 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Options;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.Serializers
 {
@@ -447,7 +446,7 @@ namespace Orleans.Serialization.Serializers
 
             if (result is null)
             {
-                ThrowBaseCodecNotFound<TField>(type);
+                ThrowBaseCodecNotFound(type);
             }
 
             return result;
@@ -900,31 +899,22 @@ namespace Orleans.Serialization.Serializers
             return copierType != null ? (IDeepCopier)GetServiceOrCreateInstance(copierType, constructorArguments) : null;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowPointerType(Type fieldType) => throw new NotSupportedException($"Type {fieldType} is a pointer type and is therefore not supported.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowByRefType(Type fieldType) => throw new NotSupportedException($"Type {fieldType} is a by-ref type and is therefore not supported.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowGenericTypeDefinition(Type fieldType) => throw new InvalidOperationException($"Type {fieldType} is a non-constructed generic type and is therefore unsupported.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static IFieldCodec<TField> ThrowCodecNotFound<TField>(Type fieldType) => throw new CodecNotFoundException($"Could not find a codec for type {fieldType}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static IDeepCopier<T> ThrowCopierNotFound<T>(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static IBaseCodec<TField> ThrowBaseCodecNotFound<TField>(Type fieldType) where TField : class => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
+        private static void ThrowBaseCodecNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static IValueSerializer<TField> ThrowValueSerializerNotFound<TField>(Type fieldType) where TField : struct => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static IActivator<T> ThrowActivatorNotFound<T>(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
 
         private sealed class TypeTypeValueTupleComparer : IEqualityComparer<(Type, Type)>

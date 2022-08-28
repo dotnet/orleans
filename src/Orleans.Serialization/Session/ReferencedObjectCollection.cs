@@ -190,7 +190,6 @@ namespace Orleans.Serialization.Session
             {
                 // Unknown field markers can be replaced once the type is known.
                 ThrowReferenceExistsException(reference);
-                return;
             }
 
             if (_referenceToObjectOverflow is { } overflow)
@@ -223,7 +222,6 @@ namespace Orleans.Serialization.Session
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowReferenceExistsException(uint reference) => throw new InvalidOperationException($"Reference {reference} already exists");
 
         /// <summary>

@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
@@ -42,7 +41,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
             ThrowNotSupported();
             return default;
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowNotSupported() => throw new NotSupportedException("Method is not supported on this instance");
         }
 
@@ -57,11 +55,9 @@ namespace Orleans.Serialization.Buffers.Adaptors
             ThrowNotSupported();
             return default;
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowNotSupported() => throw new NotSupportedException("Method is not supported on this instance");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowInsufficientCapacity(int sizeHint) => throw new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {_bytesWritten} and requested size increase is {sizeHint}");
     }
 }

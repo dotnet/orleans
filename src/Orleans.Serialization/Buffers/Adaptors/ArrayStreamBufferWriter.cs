@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.IO;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
@@ -94,13 +93,10 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNegativeSizeHint() => throw new ArgumentException("Negative values are not supported", "sizeHint");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNegativeAdvanceCount() => throw new ArgumentException("Negative values are not supported", "count");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowAdvancePastCapacity() => throw new InvalidOperationException("Cannod advance past the end of the current capacity");
     }
 }

@@ -112,7 +112,6 @@ namespace Orleans.Serialization.Codecs
 
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for string fields. {field}");
     }
