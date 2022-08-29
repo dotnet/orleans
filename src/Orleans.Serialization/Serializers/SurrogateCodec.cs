@@ -83,13 +83,10 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
 
         // The type is a descendant, not an exact match, so get the specific serializer for it.
         var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
-        if (specificSerializer != null)
-        {
-            return (TField)specificSerializer.ReadValue(ref reader, field);
-        }
+        if (specificSerializer == null)
+            ThrowSerializerNotFoundException(fieldType);
 
-        ThrowSerializerNotFoundException(fieldType);
-        return default;
+        return (TField)specificSerializer.ReadValue(ref reader, field);
     }
 
     /// <inheritdoc/>
@@ -162,11 +159,9 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
         _populator.Populate(copy, output);
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
     [DoesNotReturn]
     private static void ThrowSerializerNotFoundException(Type type) => throw new KeyNotFoundException($"Could not find a serializer of type {type}.");
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
     [DoesNotReturn]
     private static void ThrowNoPopulatorException() => throw new NotSupportedException($"Surrogate type {typeof(TConverter)} does not implement {typeof(IPopulator<TField, TSurrogate>)} and therefore cannot be used in an inheritance hierarchy.");
 }

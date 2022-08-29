@@ -109,7 +109,6 @@ namespace Orleans.Serialization.Codecs
         /// <param name="surrogate">The surrogate.</param>
         public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate); 
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         [DoesNotReturn]
         private static void ThrowSerializerNotFoundException(Type type) => throw new KeyNotFoundException($"Could not find a serializer of type {type}.");
     }

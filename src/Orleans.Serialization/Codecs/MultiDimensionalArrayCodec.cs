@@ -1,10 +1,9 @@
+using System;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -156,15 +155,12 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public bool IsSupportedType(Type type) => type.IsArray && type.GetArrayRank() > 1;
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static object ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }
 

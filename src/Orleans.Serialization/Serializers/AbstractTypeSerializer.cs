@@ -1,9 +1,8 @@
+using System;
+using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Serializers
 {
@@ -26,14 +25,10 @@ namespace Orleans.Serialization.Serializers
 
             var fieldType = value.GetType();
             var specificSerializer = writer.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer != null)
-            {
-                specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
-            }
-            else
-            {
-                _ = ThrowSerializerNotFound(fieldType);
-            }
+            if (specificSerializer == null)
+                ThrowSerializerNotFound(fieldType);
+
+            specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
         /// <inheritdoc/>
@@ -51,18 +46,14 @@ namespace Orleans.Serialization.Serializers
             }
 
             var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer != null)
-            {
-                return (TField)specificSerializer.ReadValue(ref reader, field);
-            }
+            if (specificSerializer == null)
+                ThrowSerializerNotFound(fieldType);
 
-            return ThrowSerializerNotFound(fieldType);
+            return (TField)specificSerializer.ReadValue(ref reader, field);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static TField ThrowSerializerNotFound(Type type) => throw new KeyNotFoundException($"Could not find a serializer for type {type}.");
+        private static void ThrowSerializerNotFound(Type type) => throw new KeyNotFoundException($"Could not find a serializer for type {type}.");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowMissingFieldType() => throw new FieldTypeMissingException(typeof(TField));
     }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
 using Orleans.Serialization.Buffers;
@@ -193,8 +192,7 @@ namespace Orleans.Serialization
             return FSharpValueOption<T>.None;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
+        internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
 
@@ -287,7 +285,7 @@ namespace Orleans.Serialization
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -325,10 +323,6 @@ namespace Orleans.Serialization
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]
@@ -419,7 +413,7 @@ namespace Orleans.Serialization
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -458,10 +452,6 @@ namespace Orleans.Serialization
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]
@@ -566,7 +556,7 @@ namespace Orleans.Serialization
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -606,10 +596,6 @@ namespace Orleans.Serialization
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]
@@ -726,7 +712,7 @@ namespace Orleans.Serialization
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -767,10 +753,6 @@ namespace Orleans.Serialization
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]
@@ -899,7 +881,7 @@ namespace Orleans.Serialization
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -941,10 +923,6 @@ namespace Orleans.Serialization
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]
@@ -1253,7 +1231,7 @@ namespace Orleans.Serialization
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -1290,10 +1268,6 @@ namespace Orleans.Serialization
 
             throw new NotSupportedException("Cannot deserialize instance without value field");
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
     }
     
     [RegisterCopier]

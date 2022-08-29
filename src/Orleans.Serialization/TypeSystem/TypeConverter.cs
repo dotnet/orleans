@@ -1,9 +1,3 @@
-using Microsoft.Extensions.Options;
-using Orleans.Serialization.Activators;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Configuration;
-using Orleans.Serialization.Serializers;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -11,8 +5,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Extensions.Options;
+using Orleans.Serialization.Activators;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -439,8 +438,7 @@ namespace Orleans.Serialization.TypeSystem
         }
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static QualifiedType ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
+        private static void ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
         {
             if (errors is { Count: 1 })
             {
@@ -473,7 +471,6 @@ namespace Orleans.Serialization.TypeSystem
         }
 
         [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowTypeNotAllowed(Type value)
         {
             var message = $"Type \"{value.FullName}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it.";

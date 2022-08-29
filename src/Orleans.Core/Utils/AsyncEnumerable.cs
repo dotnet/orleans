@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Internal;
@@ -85,10 +84,8 @@ namespace Orleans.Runtime.Utilities
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
 
         public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
@@ -188,11 +185,7 @@ namespace Orleans.Runtime.Utilities
 
             public void SetNext(Element next) => this.next.SetResult(next);
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             private static T ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
-
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            private static T ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
         }
     }
 }

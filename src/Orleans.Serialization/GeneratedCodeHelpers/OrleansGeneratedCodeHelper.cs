@@ -144,7 +144,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
         /// </summary>                
-        [MethodImpl(MethodImplOptions.NoInlining)]
         public static TArgument InvokableThrowArgumentOutOfRange<TArgument>(int index, int maxArgs) => throw new ArgumentOutOfRangeException($"The argument index value {index} must be between 0 and {maxArgs}");
 
         /// <summary>

@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
@@ -35,7 +34,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
             {
                 ThrowInvalidCount();
 
-                [MethodImpl(MethodImplOptions.NoInlining)]
                 static void ThrowInvalidCount() => throw new InvalidOperationException("Cannot advance past the end of the buffer");
             }
 
@@ -64,7 +62,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return _buffer.Span.Slice(_bytesWritten);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowInsufficientCapacity(int sizeHint) => throw new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_buffer.Length}. Current length is {_bytesWritten} and requested size increase is {sizeHint}");
     }
 }

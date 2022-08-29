@@ -1,3 +1,8 @@
+using System;
+using System.Buffers;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
@@ -5,12 +10,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 
 namespace Orleans.Serialization;
 
@@ -224,10 +223,8 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     /// <inheritdoc/>
     bool? ITypeFilter.IsTypeAllowed(Type type) => (((IGeneralizedCopier)this).IsSupportedType(type) || ((IGeneralizedCodec)this).IsSupportedType(type)) ? true : null;
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
         $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for JSON fields. {field}");
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");
 }

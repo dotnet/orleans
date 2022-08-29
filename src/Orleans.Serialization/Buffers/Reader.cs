@@ -196,7 +196,6 @@ namespace Orleans.Serialization.Buffers
             return false;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         private static byte[] GetScratchBuffer() => Scratch ??= new byte[1024];
@@ -476,7 +475,6 @@ namespace Orleans.Serialization.Buffers
                 throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
             }
             
-            [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowInvalidPosition(long expectedPosition, long actualPosition)
             {
                 throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after ForkFrom, but resulting position is {actualPosition}");
@@ -514,7 +512,6 @@ namespace Orleans.Serialization.Buffers
                 ThrowInvalidPosition(position, Position);
             }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
             static void ThrowInvalidPosition(long expectedPosition, long actualPosition)
             {
                 throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after ResumeFrom, but resulting position is {actualPosition}");
@@ -685,7 +682,6 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         /// <summary>
@@ -986,13 +982,10 @@ namespace Orleans.Serialization.Buffers
             return ExceptionHelper.ThrowArgumentOutOfRange<ulong>("value");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static T ThrowNotSupportedInput<T>() => throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowNotSupportedInput() => throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(byte[])}, {length}, is greater than total length of input.");
     }

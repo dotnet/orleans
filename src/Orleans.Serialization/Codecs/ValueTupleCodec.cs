@@ -1,9 +1,8 @@
+using System;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -35,8 +34,7 @@ namespace Orleans.Serialization.Codecs
             return default;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
+        internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
@@ -89,7 +87,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -117,10 +115,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T>(item1);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -191,7 +185,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -223,10 +217,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2>(item1, item2);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -312,7 +302,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -348,10 +338,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3>(item1, item2, item3);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -452,7 +438,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -492,10 +478,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3, T4>(item1, item2, item3, item4);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -608,7 +590,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -652,10 +634,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3, T4, T5>(item1, item2, item3, item4, item5);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -782,7 +760,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -830,10 +808,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3, T4, T5, T6>(item1, item2, item3, item4, item5, item6);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
     /// <summary>
@@ -975,7 +949,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -1027,10 +1001,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -1184,7 +1154,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
@@ -1240,10 +1210,6 @@ namespace Orleans.Serialization.Codecs
 
             return new ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, item8);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>

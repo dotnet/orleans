@@ -77,8 +77,9 @@ namespace Orleans.Runtime.Versions
 
         private void ThrowIfNotEnabled()
         {
-            if (!IsEnabled)
-                throw new OrleansException("Version store not enabled, make sure the store is configured");
+            if (!IsEnabled) ThrowDisabled();
+
+            static void ThrowDisabled() => throw new OrleansException("Version store not enabled, make sure the store is configured");
         }
 
         public void Participate(ISiloLifecycle lifecycle)

@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Buffers.Text;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
 
@@ -244,7 +243,6 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(n0, n1, typeCodeData, keyExt));
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static LegacyGrainId ThrowNotLegacyGrainId(GrainId id)
         {
             throw new InvalidOperationException($"Cannot convert non-legacy id {id} into legacy id");

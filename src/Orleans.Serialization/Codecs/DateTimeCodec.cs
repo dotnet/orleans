@@ -1,9 +1,8 @@
+using System;
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -44,7 +43,6 @@ namespace Orleans.Serialization.Codecs
             return DateTime.FromBinary(reader.ReadInt64());
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed64} is supported for {nameof(DateTime)} fields. {field}");
     }

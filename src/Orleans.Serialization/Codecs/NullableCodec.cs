@@ -1,9 +1,8 @@
+using System;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -51,17 +50,6 @@ namespace Orleans.Serialization.Codecs
             // Read the non-null value.
             return _fieldCodec.ReadValue(ref reader, field);
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T?)} with declared length {length}.");
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
     /// <summary>

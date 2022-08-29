@@ -215,10 +215,9 @@ namespace Orleans.Runtime
 
         private void ThrowIfDisposed()
         {
-            if (disposed)
-            {
-                throw new ObjectDisposedException("Cannot access disposed AsynchAgent");
-            }
+            if (disposed) ThrowDisposed();
+
+            static void ThrowDisposed() => throw new ObjectDisposedException("Cannot access disposed AsynchAgent");
         }
     }
 }

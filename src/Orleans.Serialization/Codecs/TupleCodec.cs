@@ -1,9 +1,8 @@
+using System;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -52,7 +51,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -82,10 +81,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -176,7 +171,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -210,10 +205,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -318,7 +309,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -356,10 +347,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -480,7 +467,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -522,10 +509,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
     /// <summary>
@@ -662,7 +645,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -708,10 +691,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -861,7 +840,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -911,10 +890,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
     /// <summary>
@@ -1078,7 +1053,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -1132,10 +1107,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
     /// <summary>
@@ -1311,7 +1282,7 @@ namespace Orleans.Serialization.Codecs
 
             if (field.WireType != WireType.TagDelimited)
             {
-                ThrowUnsupportedWireTypeException();
+                ValueTupleCodec.ThrowUnsupportedWireTypeException();
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
@@ -1369,10 +1340,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
     }
     
     /// <summary>

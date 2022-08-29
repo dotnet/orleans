@@ -1,9 +1,8 @@
+using System;
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -67,7 +66,6 @@ namespace Orleans.Serialization.Codecs
             return new DateTimeOffset(dateTime, offset);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(DateTimeOffset)} fields. {field}");
     }
