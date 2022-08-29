@@ -20,7 +20,7 @@ namespace UnitTests.StorageTests.Relational
             //This way of using the hasher is like ADO.NET Storage provider would use it. This tests
             //the hasher is thread safe.
             var adonetDefaultHasher = new StorageHasherPicker(new[] { new OrleansDefaultHasher() }); ;
-            const int TestGrainHash = 1491221312;
+            const int TestGrainHash = -201809205;
             var grainType = "Grains.PersonGrain";
             Parallel.For(0, 1000000, i =>
             {
