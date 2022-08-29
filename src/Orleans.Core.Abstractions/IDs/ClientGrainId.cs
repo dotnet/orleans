@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the underlying <see cref="GrainId"/>.
         /// </summary>
-        public GrainId GrainId { get; }
+        public readonly GrainId GrainId;
 
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.

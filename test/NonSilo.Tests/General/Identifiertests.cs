@@ -31,7 +31,7 @@ namespace UnitTests.General
         {
             var id = GrainId.Create("type", "key");
             var hashCode = id.GetUniformHashCode();
-            Assert.Equal((uint)2618661990, hashCode);
+            Assert.Equal(831806783u, hashCode);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
@@ -185,24 +185,6 @@ namespace UnitTests.General
 
             Assert.Equal(expectedKey, actualKey); // "UniqueKey objects should preserve the value of their primary key (long case).");
             Assert.Equal(expectedKeyExt, actualKeyExt); // "UniqueKey objects should preserve the value of their key extension (long case).");
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void ID_HashCorrectness()
-        {
-            // This tests that our optimized Jenkins hash computes the same value as the reference implementation
-            int testCount = 1000;
-            for (int i = 0; i < testCount; i++)
-            {
-                byte[] byteData = new byte[24];
-                random.NextBytes(byteData);
-                ulong u1 = BitConverter.ToUInt64(byteData, 0);
-                ulong u2 = BitConverter.ToUInt64(byteData, 8);
-                ulong u3 = BitConverter.ToUInt64(byteData, 16);
-                var referenceHash = JenkinsHash.ComputeHash(byteData);
-                var optimizedHash = JenkinsHash.ComputeHash(u1, u2, u3);
-                Assert.Equal(referenceHash,  optimizedHash);  //  "Optimized hash value doesn't match the reference value for inputs {0}, {1}, {2}", u1, u2, u3
-            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]

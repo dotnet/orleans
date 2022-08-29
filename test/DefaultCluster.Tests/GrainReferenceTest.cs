@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests.General
             // It's probably because the way hash codes are generated for the GrainReference
             // have changed. If you are sure the new code is repeatable, then it's fine to
             // update the expected value here. Good luck, friend.
-            Assert.Equal(3068696999u, r.GetUniformHashCode());
+            Assert.Equal(3643965955u, r.GetUniformHashCode());
         }
 
         [Fact]

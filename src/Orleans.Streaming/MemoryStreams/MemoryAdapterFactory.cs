@@ -2,7 +2,11 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO.Hashing;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,6 +32,7 @@ namespace Orleans.Providers
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly TSerializer serializer;
+        private readonly ulong _nameHash;
         private IStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
@@ -84,6 +89,9 @@ namespace Orleans.Providers
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
+
+            var nameBytes = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(Name.AsSpan()) : Encoding.Unicode.GetBytes(Name);
+            XxHash64.Hash(nameBytes, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref _nameHash, 1)));
         }
 
         /// <summary>
@@ -182,9 +190,9 @@ namespace Orleans.Providers
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             Span<byte> bytes = stackalloc byte[16];
-            BinaryPrimitives.WriteUInt32LittleEndian(bytes, JenkinsHash.ComputeHash(Name));
-            BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], queueId.GetUniformHashCode());
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes[8..], queueId.GetNumericId());
+            MemoryMarshal.Write(bytes, ref Unsafe.AsRef(in _nameHash));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], queueId.GetUniformHashCode());
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], queueId.GetNumericId());
             return new(bytes);
         }
 

@@ -24,24 +24,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the underlying <see cref="GrainId"/>.
         /// </summary>
-        public GrainId GrainId { get; }
-
-        /// <summary>
-        /// Returns the <see cref="ClientGrainId"/> associated with this instance.
-        /// </summary>
-        /// <returns>
-        /// The <see cref="ClientGrainId"/> associated with this instance.
-        /// </returns>
-        public ClientGrainId GetClientId()
-        {
-            if (!ClientGrainId.TryParse(this.GrainId, out var result))
-            {
-                static void ThrowInvalidGrainId(GrainId grainId) => throw new InvalidOperationException($"GrainId {grainId} cannot be converted to a {nameof(ClientGrainId)}");
-                ThrowInvalidGrainId(this.GrainId);
-            }
-
-            return result;
-        }
+        public readonly GrainId GrainId;
 
         /// <summary>
         /// Returns a new, random <see cref="ObserverGrainId"/> instance for the provided client id.
@@ -135,53 +118,5 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public int CompareTo(ObserverGrainId other) => this.GrainId.CompareTo(other.GrainId);
-
-        /// <summary>
-        /// Compares the provided operands for equality.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator ==(ObserverGrainId left, ObserverGrainId right) => left.Equals(right);
-
-        /// <summary>
-        /// Compares the provided operands for inequality.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
-        public static bool operator !=(ObserverGrainId left, ObserverGrainId right) => !(left == right);
-
-        /// <summary>
-        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the left operand is less than the right operand, otherwise <see langword="false"/>.</returns>
-        public static bool operator <(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) < 0;
-
-        /// <summary>
-        /// Compares the provided operands and returns <see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the left operand is less than or equal to the right operand, otherwise <see langword="false"/>.</returns>
-        public static bool operator <=(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) <= 0;
-
-        /// <summary>
-        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the left operand is greater than the right operand, otherwise <see langword="false"/>.</returns>
-        public static bool operator >(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) > 0;
-
-        /// <summary>
-        /// Compares the provided operands and returns <see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.
-        /// </summary>
-        /// <param name="left">The left operand.</param>
-        /// <param name="right">The right operand.</param>
-        /// <returns><see langword="true"/> if the left operand is greater than or equal to the right operand, otherwise <see langword="false"/>.</returns>
-        public static bool operator >=(ObserverGrainId left, ObserverGrainId right) => left.CompareTo(right) >= 0;
     }
 }

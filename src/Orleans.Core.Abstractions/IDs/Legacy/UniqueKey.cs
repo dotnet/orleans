@@ -226,18 +226,18 @@ namespace Orleans.Runtime
             // ReSharper disable NonReadonlyFieldInGetHashCode
             if (uniformHashCache == 0)
             {
-                uint n;
                 if (KeyExt != null)
                 {
-                    n = JenkinsHash.ComputeHash(this.ToByteArray());
+                    uniformHashCache = StableHash.ComputeHash(this.ToByteArray());
                 }
                 else
                 {
-                    n = JenkinsHash.ComputeHash(TypeCodeData, N0, N1);
+                    Span<byte> data = stackalloc byte[24];
+                    BinaryPrimitives.WriteUInt64LittleEndian(data, TypeCodeData);
+                    BinaryPrimitives.WriteUInt64LittleEndian(data[8..], N0);
+                    BinaryPrimitives.WriteUInt64LittleEndian(data[16..], N1);
+                    uniformHashCache = StableHash.ComputeHash(data);
                 }
-                // Unchecked is required because the Jenkins hash is an unsigned 32-bit integer, 
-                // which we need to convert to a signed 32-bit integer.
-                uniformHashCache = n;
             }
             return uniformHashCache;
             // ReSharper restore NonReadonlyFieldInGetHashCode

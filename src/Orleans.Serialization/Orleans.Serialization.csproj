@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
     <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="$(MicrosoftExtensionsObjectPoolVersion)" />
+    <PackageReference Include="System.IO.Hashing" Version="$(SystemIOHashingVersion)" NoWarn="NU5104" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net5.0' and '$(TargetFramework)' != 'net6.0'">

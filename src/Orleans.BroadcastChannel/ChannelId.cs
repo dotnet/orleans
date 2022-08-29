@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Text;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Runtime;
@@ -14,7 +13,6 @@ namespace Orleans.BroadcastChannel
     /// </summary>
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct ChannelId : IEquatable<ChannelId>, IComparable<ChannelId>, ISerializable, ISpanFormattable
     {
@@ -53,7 +51,7 @@ namespace Orleans.BroadcastChannel
         }
 
         internal ChannelId(byte[] fullKey, ushort keyIndex)
-            : this(fullKey, keyIndex, (int)JenkinsHash.ComputeHash(fullKey))
+            : this(fullKey, keyIndex, (int)StableHash.ComputeHash(fullKey))
         {
         }
 
@@ -215,15 +213,14 @@ namespace Orleans.BroadcastChannel
 
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     internal readonly struct InternalChannelId : IEquatable<InternalChannelId>, IComparable<InternalChannelId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
-        public ChannelId ChannelId { get; }
+        public readonly ChannelId ChannelId;
 
         [Id(1)]
-        public string ProviderName { get; }
+        public readonly string ProviderName;
 
         public InternalChannelId(string providerName, ChannelId streamId)
         {

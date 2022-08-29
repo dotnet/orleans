@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 
@@ -11,17 +10,19 @@ namespace Orleans.Runtime
     /// </summary>
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable, ISpanFormattable
     {
+        [Id(1)]
+        private readonly IdSpan _value;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainType"/> struct. 
         /// </summary>
         /// <param name="id">
         /// The id.
         /// </param>
-        public GrainType(IdSpan id) => Value = id;
+        public GrainType(IdSpan id) => _value = id;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainType"/> struct. 
@@ -29,7 +30,7 @@ namespace Orleans.Runtime
         /// <param name="value">
         /// The raw id value.
         /// </param>
-        public GrainType(byte[] value) => Value = new IdSpan(value);
+        public GrainType(byte[] value) => _value = new IdSpan(value);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainType"/> struct. 
@@ -42,14 +43,13 @@ namespace Orleans.Runtime
         /// </param>
         private GrainType(SerializationInfo info, StreamingContext context)
         {
-            Value = IdSpan.UnsafeCreate((byte[]?)info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
+            _value = IdSpan.UnsafeCreate((byte[]?)info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
         }
 
         /// <summary>
         /// Gets the underlying value.
         /// </summary>
-        [Id(1)]
-        public IdSpan Value { get; }
+        public IdSpan Value => _value;
 
         /// <summary>
         /// Returns a span representation of this instance.
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="ReadOnlySpan{Byte}"/> representation of the value.
         /// </returns>
-        public ReadOnlySpan<byte> AsSpan() => this.Value.AsSpan();
+        public ReadOnlySpan<byte> AsSpan() => _value.AsSpan();
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="kind">The grain type to convert.</param>
         /// <returns>The corresponding <see cref="IdSpan"/>.</returns>
-        public static explicit operator IdSpan(GrainType kind) => kind.Value;
+        public static explicit operator IdSpan(GrainType kind) => kind._value;
 
         /// <summary>
         /// Converts a <see cref="IdSpan"/> to a <see cref="GrainType"/>.
@@ -87,16 +87,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether this instance is the default value.
         /// </summary>
-        public bool IsDefault => Value.IsDefault;
+        public bool IsDefault => _value.IsDefault;
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is GrainType kind && Equals(kind);
 
         /// <inheritdoc/>
-        public bool Equals(GrainType obj) => Value.Equals(obj.Value);
+        public bool Equals(GrainType obj) => _value.Equals(obj._value);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => Value.GetHashCode();
+        public override int GetHashCode() => _value.GetHashCode();
 
         /// <summary>
         /// Generates a uniform, stable hash code for this grain type. 
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A uniform, stable hash of this instance.
         /// </returns>
-        public uint GetUniformHashCode() => Value.GetUniformHashCode();
+        public uint GetUniformHashCode() => _value.GetUniformHashCode();
 
         /// <summary>
         /// Returns the array underlying a grain type instance.
@@ -114,16 +114,16 @@ namespace Orleans.Runtime
         /// <remarks>
         /// The returned array must not be modified.
         /// </remarks>
-        public static byte[]? UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
+        public static byte[]? UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id._value);
 
         /// <inheritdoc/>
-        public int CompareTo(GrainType other) => Value.CompareTo(other.Value);
+        public int CompareTo(GrainType other) => _value.CompareTo(other._value);
 
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("v", IdSpan.UnsafeGetArray(Value));
-            info.AddValue("h", Value.GetHashCode());
+            info.AddValue("v", IdSpan.UnsafeGetArray(_value));
+            info.AddValue("h", _value.GetHashCode());
         }
 
         /// <summary>
@@ -132,12 +132,12 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="string"/> representation of this instance.
         /// </returns>
-        public override string? ToString() => Value.ToString();
+        public override string? ToString() => _value.ToString();
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => Value.TryFormat(destination, out charsWritten);
+            => _value.TryFormat(destination, out charsWritten);
 
         /// <summary>
         /// Compares the provided operands for equality.

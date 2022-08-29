@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 
 #nullable enable
@@ -7,15 +6,14 @@ namespace Orleans.Runtime
 {
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     internal readonly struct InternalStreamId : IEquatable<InternalStreamId>, IComparable<InternalStreamId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
-        public StreamId StreamId { get; }
+        public readonly StreamId StreamId;
 
         [Id(1)]
-        public string ProviderName { get; }
+        public readonly string ProviderName;
 
         public InternalStreamId(string providerName, StreamId streamId)
         {

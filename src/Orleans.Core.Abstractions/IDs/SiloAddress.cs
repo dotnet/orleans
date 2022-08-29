@@ -268,28 +268,16 @@ namespace Orleans.Runtime
 
         private int CalculateConsistentHashCode()
         {
-            ulong u1, u2, u3;
-            var address = Endpoint.Address;
-            if (address.AddressFamily == AddressFamily.InterNetworkV6)
-            {
-                Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
-                var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
-                address.TryWriteBytes(buf, out var len);
-                Debug.Assert(len == buf.Length);
-                u1 = BinaryPrimitives.ReadUInt64LittleEndian(buf);
-                u2 = BinaryPrimitives.ReadUInt64LittleEndian(buf[8..]);
-            }
-            else
-            {
-#pragma warning disable CS0618 // Type or member is obsolete
-                u1 = (ulong)address.Address;
-#pragma warning restore CS0618
-                u2 = 0;
-            }
+            Unsafe.SkipInit(out (long, long, long) tmp); // avoid stackalloc overhead by using a fixed size buffer
+            var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1))[..24];
 
-            u3 = ((ulong)(uint)Endpoint.Port << 32) | (uint)Generation;
+            Endpoint.Address.TryWriteBytes(buf, out var len);
+            Debug.Assert(len is 4 or 16);
 
-            hashCode = (int)JenkinsHash.ComputeHash(u1, u2, u3);
+            BinaryPrimitives.WriteInt32LittleEndian(buf[16..], Endpoint.Port);
+            BinaryPrimitives.WriteInt32LittleEndian(buf[20..], Generation);
+
+            hashCode = (int)StableHash.ComputeHash(buf);
             hashCodeSet = true;
             return hashCode;
         }
@@ -337,7 +325,7 @@ namespace Orleans.Runtime
             for (int extraBit = 0; extraBit < numHashes; extraBit++)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
-                hashes[extraBit] = JenkinsHash.ComputeHash(bytes);
+                hashes[extraBit] = StableHash.ComputeHash(bytes);
             }
             return hashes;
         }

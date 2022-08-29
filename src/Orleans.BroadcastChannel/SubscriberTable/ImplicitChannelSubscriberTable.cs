@@ -152,7 +152,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
             BinaryPrimitives.WriteUInt32LittleEndian(bytes, grainType.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[4..], channelId.ChannelId.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], channelId.ChannelId.GetKeyIndex());
-            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], JenkinsHash.ComputeHash(channelId.ProviderName));
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], StableHash.ComputeHash(channelId.ProviderName));
             bytes[15] |= 0x80; // set high bit of last byte (implicit subscription)
             return new(bytes);
         }

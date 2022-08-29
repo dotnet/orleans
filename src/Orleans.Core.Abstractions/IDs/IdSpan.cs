@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 
@@ -11,7 +10,6 @@ namespace Orleans.Runtime
     /// </summary>
     [Immutable]
     [Serializable]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable, ISpanFormattable
     {
@@ -36,7 +34,7 @@ namespace Orleans.Runtime
         public IdSpan(byte[] value)
         {
             _value = value;
-            _hashCode = (int)JenkinsHash.ComputeHash(value);
+            _hashCode = (int)StableHash.ComputeHash(value);
         }
 
         /// <summary>

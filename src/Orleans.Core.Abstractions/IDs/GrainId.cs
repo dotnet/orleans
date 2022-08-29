@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
@@ -14,17 +13,22 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [JsonConverter(typeof(GrainIdJsonConverter))]
-    [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable
     {
+        [Id(1)]
+        private readonly GrainType _type;
+
+        [Id(2)]
+        private readonly IdSpan _key;
+
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
         public GrainId(GrainType type, IdSpan key)
         {
-            Type = type;
-            Key = key;
+            _type = type;
+            _key = key;
         }
 
         /// <summary>
@@ -32,21 +36,19 @@ namespace Orleans.Runtime
         /// </summary>
         private GrainId(SerializationInfo info, StreamingContext context)
         {
-            Type = new GrainType(IdSpan.UnsafeCreate((byte[]?)info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
-            Key = IdSpan.UnsafeCreate((byte[]?)info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+            _type = new GrainType(IdSpan.UnsafeCreate((byte[]?)info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
+            _key = IdSpan.UnsafeCreate((byte[]?)info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
 
         /// <summary>
         /// Gets the grain type.
         /// </summary>
-        [Id(1)]
-        public GrainType Type { get; }
+        public GrainType Type => _type;
 
         /// <summary>
         /// Gets the grain key.
         /// </summary>
-        [Id(2)]
-        public IdSpan Key { get; }
+        public IdSpan Key => _key;
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -97,16 +99,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
         /// </summary>
-        public bool IsDefault => Type.IsDefault && Key.IsDefault;
+        public bool IsDefault => _type.IsDefault && _key.IsDefault;
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is GrainId id && Equals(id);
 
         /// <inheritdoc/>
-        public bool Equals(GrainId other) => Type.Equals(other.Type) && Key.Equals(other.Key);
+        public bool Equals(GrainId other) => _type.Equals(other._type) && _key.Equals(other._key);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => HashCode.Combine(Type, Key);
+        public override int GetHashCode() => HashCode.Combine(_type, _key);
 
         /// <summary>
         /// Generates a uniform, stable hash code for a grain id.
@@ -115,31 +117,25 @@ namespace Orleans.Runtime
         {
             // This value must be stable for a given id and equal for all nodes in a cluster.
             // HashCode.Combine does not currently offer stability with respect to its inputs.
-            unchecked
-            {
-                var hash = 17u;
-                hash = hash * 31 + Type.GetUniformHashCode();
-                hash = hash * 31 + Key.GetUniformHashCode();
-                return hash;
-            }
+            return _type.GetUniformHashCode() * 31 + _key.GetUniformHashCode();
         }
 
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("tv", GrainType.UnsafeGetArray(Type));
-            info.AddValue("th", Type.GetHashCode());
-            info.AddValue("kv", IdSpan.UnsafeGetArray(Key));
-            info.AddValue("kh", Key.GetHashCode());
+            info.AddValue("tv", GrainType.UnsafeGetArray(_type));
+            info.AddValue("th", _type.GetHashCode());
+            info.AddValue("kv", IdSpan.UnsafeGetArray(_key));
+            info.AddValue("kh", _key.GetHashCode());
         }
 
         /// <inheritdoc/>
         public int CompareTo(GrainId other)
         {
-            var typeComparison = Type.CompareTo(other.Type);
+            var typeComparison = _type.CompareTo(other._type);
             if (typeComparison != 0) return typeComparison;
 
-            return Key.CompareTo(other.Key);
+            return _key.CompareTo(other._key);
         }
 
         /// <summary>
@@ -159,12 +155,12 @@ namespace Orleans.Runtime
         public static bool operator !=(GrainId left, GrainId right) => !left.Equals(right);
 
         /// <inheritdoc/>
-        public override string ToString() => $"{Type}/{Key}";
+        public override string ToString() => $"{_type}/{_key}";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => destination.TryWrite($"{Type}/{Key}", out charsWritten);
+            => destination.TryWrite($"{_type}/{_key}", out charsWritten);
     }
 
     /// <summary>
