@@ -30,10 +30,9 @@ namespace Orleans.Providers
     /// <summary>
     /// Default <see cref="IMemoryMessageBodySerializer"/> implementation.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     [SerializationCallbacks(typeof(Runtime.OnDeserializedCallbacks))]
-    public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
+    public sealed class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
     {
         [NonSerialized]
         private Serializer<MemoryMessageBody> serializer;
@@ -71,7 +70,7 @@ namespace Orleans.Providers
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class MemoryMessageBody
+    public sealed class MemoryMessageBody
     {        
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryMessageBody"/> class.

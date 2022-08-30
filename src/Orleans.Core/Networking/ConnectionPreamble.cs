@@ -10,23 +10,23 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime.Messaging
 {
-    [GenerateSerializer]
-    internal class ConnectionPreamble
+    [GenerateSerializer, Immutable]
+    internal sealed class ConnectionPreamble
     {
         [Id(0)]
-        public NetworkProtocolVersion NetworkProtocolVersion { get; set; }
+        public NetworkProtocolVersion NetworkProtocolVersion { get; init; }
 
         [Id(1)]
-        public GrainId NodeIdentity { get; set; }
+        public GrainId NodeIdentity { get; init; }
 
         [Id(2)]
-        public SiloAddress SiloAddress { get; set; }
+        public SiloAddress SiloAddress { get; init; }
 
         [Id(3)]
-        public string ClusterId { get; set; }
+        public string ClusterId { get; init; }
     }
 
-    internal class ConnectionPreambleHelper
+    internal sealed class ConnectionPreambleHelper
     {
         private const int MaxPreambleLength = 1024;
         private readonly Serializer<ConnectionPreamble> _preambleSerializer;

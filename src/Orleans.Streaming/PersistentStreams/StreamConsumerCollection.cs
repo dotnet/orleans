@@ -8,7 +8,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
-    internal class StreamConsumerCollection
+    internal sealed class StreamConsumerCollection
     {
         [Id(1)]
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData

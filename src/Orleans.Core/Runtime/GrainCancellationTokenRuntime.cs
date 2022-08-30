@@ -101,9 +101,9 @@ namespace Orleans.Runtime
     internal struct GrainCancellationTokenSurrogate
     {
         [Id(0)]
-        public bool IsCancellationRequested { get; set; }
+        public bool IsCancellationRequested;
 
         [Id(1)]
-        public Guid TokenId { get; set; }
+        public Guid TokenId;
     }
 }

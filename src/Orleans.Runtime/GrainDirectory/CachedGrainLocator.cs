@@ -84,7 +84,13 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(address.GrainId);
             }
 
-            address.MembershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
+            address = new()
+            {
+                GrainId = address.GrainId,
+                ActivationId = address.ActivationId,
+                SiloAddress = address.SiloAddress,
+                MembershipVersion = clusterMembershipService.CurrentSnapshot.Version
+            };
 
             var result = await GetGrainDirectory(grainType).Register(address);
 

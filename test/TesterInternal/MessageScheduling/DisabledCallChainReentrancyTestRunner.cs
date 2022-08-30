@@ -31,15 +31,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
-                }
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
             }
             if (performDeadlockDetection)
             {
@@ -64,15 +56,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
-                }
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
             }
             if (performDeadlockDetection)
             {
@@ -97,15 +81,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
-                }
+                Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
             }
             if (performDeadlockDetection)
             {

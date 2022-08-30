@@ -71,9 +71,8 @@ namespace Orleans.Providers
         }
     }
 
-    [Serializable]
-    [GenerateSerializer]
-    public class ProviderStateException : OrleansException
+    [Serializable, GenerateSerializer]
+    public sealed class ProviderStateException : OrleansException
     {
         public ProviderStateException() : base("Unexpected provider state")
         { }
@@ -81,7 +80,7 @@ namespace Orleans.Providers
 
         public ProviderStateException(string message, Exception innerException) : base(message, innerException) { }
 
-        protected ProviderStateException(SerializationInfo info, StreamingContext context)
+        private ProviderStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

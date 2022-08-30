@@ -10,7 +10,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class FaultedSubscriptionException : OrleansException
+    public sealed class FaultedSubscriptionException : OrleansException
     {
         private const string ErrorStringFormat =
             "Subscription is in a Faulted state.  Subscription:{0}, Stream:{1}";
@@ -46,6 +46,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        public FaultedSubscriptionException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+        private FaultedSubscriptionException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 }

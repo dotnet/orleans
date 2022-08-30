@@ -7,9 +7,8 @@ namespace Orleans.Providers
     /// <summary>
     /// Exception thrown whenever a provider has failed to be initialized.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class ProviderInitializationException : OrleansException
+    [Serializable, GenerateSerializer]
+    public sealed class ProviderInitializationException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ProviderInitializationException"/> class.
@@ -41,7 +40,7 @@ namespace Orleans.Providers
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        protected ProviderInitializationException(SerializationInfo info, StreamingContext context)
+        private ProviderInitializationException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

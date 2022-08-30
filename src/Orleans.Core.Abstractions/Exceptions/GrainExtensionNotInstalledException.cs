@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class GrainExtensionNotInstalledException : OrleansException
+    public sealed class GrainExtensionNotInstalledException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainExtensionNotInstalledException"/> class.
@@ -52,7 +52,7 @@ namespace Orleans.Runtime
         /// <param name="context">
         /// The context.
         /// </param>
-        protected GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
+        private GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

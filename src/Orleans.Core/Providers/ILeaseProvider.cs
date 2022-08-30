@@ -6,9 +6,8 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Acquired lease
     /// </summary>
-    [Immutable]
-    [GenerateSerializer]
-    public class AcquiredLease 
+    [GenerateSerializer, Immutable]
+    public sealed class AcquiredLease
     {
         /// <summary>
         /// The resource key which the lease is attached to 
@@ -62,9 +61,8 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// AcquireLeaseResult class, which demonstrates result of acquiring or renewing lease operation
     /// </summary>
-    [Immutable]
-    [GenerateSerializer]
-    public class AcquireLeaseResult
+    [GenerateSerializer, Immutable]
+    public sealed class AcquireLeaseResult
     {
         /// <summary>
         /// Acquired lease, which will be null if acquire or renew operation failed.
@@ -116,26 +114,20 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>
-    [GenerateSerializer]
-    public class LeaseRequest
+    [GenerateSerializer, Immutable]
+    public sealed class LeaseRequest
     {
         /// <summary>
         /// The key of the resource where you want to apply the lease on
         /// </summary>
         [Id(0)]
-        public string ResourceKey { get; set; }
+        public string ResourceKey { get; }
 
         /// <summary>
         /// Duration of the lease
         /// </summary>
         [Id(1)]
-        public TimeSpan Duration { get; set; }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public LeaseRequest()
-        { }
+        public TimeSpan Duration { get; }
 
         /// <summary>
         /// Constructor

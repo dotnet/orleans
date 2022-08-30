@@ -9,7 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class ProviderStartException : OrleansException
+    public sealed class ProviderStartException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ProviderStartException"/> class.
@@ -39,7 +39,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        protected ProviderStartException(SerializationInfo info, StreamingContext context)
+        private ProviderStartException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
     }

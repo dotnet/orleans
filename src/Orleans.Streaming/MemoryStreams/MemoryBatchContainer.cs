@@ -11,7 +11,7 @@ namespace Orleans.Providers
     [Serializable]
     [GenerateSerializer]
     [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
-    internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
+    internal sealed class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         [NonSerialized]

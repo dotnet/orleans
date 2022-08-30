@@ -181,16 +181,15 @@ namespace Orleans
         internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag);
     }
 
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     internal sealed class ReminderData : IGrainReminder
     {
         [Id(1)]
-        public GrainId GrainId { get; private set; }
+        public readonly GrainId GrainId;
         [Id(2)]
-        public string ReminderName { get; private set; }
+        public string ReminderName { get; }
         [Id(3)]
-        public string ETag { get; private set; }
+        public readonly string ETag;
 
         internal ReminderData(GrainId grainId, string reminderName, string eTag)
         {

@@ -7,8 +7,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents a snapshot of cluster membership.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMembershipSnapshot
     {
         /// <summary>

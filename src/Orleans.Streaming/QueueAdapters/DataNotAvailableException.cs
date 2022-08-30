@@ -34,7 +34,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        public DataNotAvailableException(SerializationInfo info, StreamingContext context)
+        protected DataNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -45,7 +45,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class CacheFullException : OrleansException
+    public sealed class CacheFullException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="CacheFullException"/> class.
@@ -70,7 +70,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        public CacheFullException(SerializationInfo info, StreamingContext context)
+        private CacheFullException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

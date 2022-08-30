@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
-    public class LimitExceededException : OrleansException
+    public sealed class LimitExceededException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="LimitExceededException"/> class.
@@ -77,7 +77,7 @@ namespace Orleans.Runtime
         /// <param name="context">
         /// The context.
         /// </param>
-        protected LimitExceededException(SerializationInfo info, StreamingContext context)
+        private LimitExceededException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

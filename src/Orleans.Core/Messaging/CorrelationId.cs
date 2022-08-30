@@ -3,8 +3,7 @@ using System;
 #nullable enable
 namespace Orleans.Runtime
 {
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>, ISpanFormattable
     {
         [Id(1)]

@@ -12,9 +12,8 @@ namespace Orleans.Streams
     /// <remarks>
     /// Use <see cref="StreamId"/> where possible, instead.
     /// </remarks>
-    [Serializable]
-    [GenerateSerializer]
-    public class StreamIdentity : IStreamIdentity
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class StreamIdentity : IStreamIdentity
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamIdentity"/> class.

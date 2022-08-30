@@ -7,10 +7,8 @@ namespace Orleans.Metadata
     /// <summary>
     /// Information about types which are available in the cluster.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    [Immutable]
-    public class ClusterManifest
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class ClusterManifest
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterManifest"/> class.

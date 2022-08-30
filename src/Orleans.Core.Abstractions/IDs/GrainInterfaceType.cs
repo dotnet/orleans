@@ -6,8 +6,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Uniquely identifies a grain interface.
     /// </summary>
-    [Serializable, Immutable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public readonly struct GrainInterfaceType : IEquatable<GrainInterfaceType>, ISpanFormattable
     {
         /// <summary>

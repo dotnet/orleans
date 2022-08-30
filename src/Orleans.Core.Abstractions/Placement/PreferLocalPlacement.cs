@@ -10,9 +10,8 @@ namespace Orleans.Runtime
     /// If the host is not compatible with the grain type or if a grain receives an incompatible request, the grain will be
     /// placed on a random, compatible server.
     /// </remarks>
-    [Serializable]
-    [GenerateSerializer]
-    public class PreferLocalPlacement : PlacementStrategy
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class PreferLocalPlacement : PlacementStrategy
     {
         /// <summary>
         /// Gets the singleton instance of this class.

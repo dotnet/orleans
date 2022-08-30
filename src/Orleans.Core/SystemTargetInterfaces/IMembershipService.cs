@@ -7,15 +7,6 @@ namespace Orleans.Runtime
     internal interface IMembershipService : ISystemTarget
     {
         /// <summary>
-        /// Receive notifications about silo status events. 
-        /// </summary>
-        /// <param name="updatedSilo">Silo to update about</param>
-        /// <param name="status">Status of the silo</param>
-        /// <returns></returns>
-        /// TODO REMOVE in a next version
-        Task SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status);
-
-        /// <summary>
         /// Receive notifications about a change in the membership table
         /// </summary>
         /// <param name="snapshot">Snapshot of the membership table</param>
@@ -34,33 +25,32 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents the result of probing a node via an intermediary node.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public struct IndirectProbeResponse
+    [Serializable, GenerateSerializer, Immutable]
+    public readonly struct IndirectProbeResponse
     {
         /// <summary>
         /// The health score of the intermediary node.
         /// </summary>
         [Id(1)]
-        public int IntermediaryHealthScore { get; set; }
+        public int IntermediaryHealthScore { get; init; }
 
         /// <summary>
         /// <see langword="true"/> if the probe succeeded; otherwise, <see langword="false"/>.
         /// </summary>
         [Id(2)]
-        public bool Succeeded { get; set; }
+        public bool Succeeded { get; init; }
 
         /// <summary>
         /// The duration of the probe attempt.
         /// </summary>
         [Id(3)]
-        public TimeSpan ProbeResponseTime { get; set; }
+        public TimeSpan ProbeResponseTime { get; init; }
 
         /// <summary>
         /// The failure message if the probe did not succeed.
         /// </summary>
         [Id(4)]
-        public string FailureMessage { get; set; }
+        public string FailureMessage { get; init; }
 
         /// <inheritdoc />
         public override string ToString() => $"IndirectProbeResponse {{ Succeeded: {Succeeded}, IntermediaryHealthScore: {IntermediaryHealthScore}, ProbeResponseTime: {ProbeResponseTime}, FailureMessage: {FailureMessage} }}";

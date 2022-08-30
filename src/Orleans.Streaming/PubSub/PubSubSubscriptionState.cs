@@ -7,7 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
+    internal sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
         internal enum SubscriptionStates
         {

@@ -5,8 +5,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents a cluster member.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMember : IEquatable<ClusterMember>
     {                
         /// <summary>

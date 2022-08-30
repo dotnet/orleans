@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class SiloUnavailableException : OrleansMessageRejectionException
+    public sealed class SiloUnavailableException : OrleansMessageRejectionException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SiloUnavailableException"/> class.
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
         /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
-        protected SiloUnavailableException(SerializationInfo info, StreamingContext context)
+        private SiloUnavailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
-    public class GatewayTooBusyException : OrleansException
+    public sealed class GatewayTooBusyException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GatewayTooBusyException"/> class.
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
         /// <param name="context">
         /// The context.
         /// </param>
-        protected GatewayTooBusyException(SerializationInfo info, StreamingContext context)
+        private GatewayTooBusyException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

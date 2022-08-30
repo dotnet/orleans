@@ -140,36 +140,34 @@ namespace Orleans.Runtime
 
         public DetailedGrainReport GetDetailedGrainReport(GrainId grain)
         {
-            var report = new DetailedGrainReport
+            string grainClassName;
+            try
+            {
+                var properties = this.grainPropertiesResolver.GetGrainProperties(grain.Type);
+                properties.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out grainClassName);
+            }
+            catch (Exception exc)
+            {
+                grainClassName = exc.ToString();
+            }
+
+            var activation = activations.FindTarget(grain) switch
+            {
+                ActivationData data => data.ToDetailedString(),
+                var a => a?.ToString()
+            };
+
+            return new()
             {
                 Grain = grain,
                 SiloAddress = LocalSilo,
                 SiloName = localSiloName,
                 LocalCacheActivationAddress = directory.GetLocalCacheData(grain),
                 LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grain).Address,
-                PrimaryForGrain = directory.GetPrimaryForGrain(grain)
+                PrimaryForGrain = directory.GetPrimaryForGrain(grain),
+                GrainClassTypeName = grainClassName,
+                LocalActivation = activation,
             };
-            try
-            {
-                var properties = this.grainPropertiesResolver.GetGrainProperties(grain.Type);
-                if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out var grainClassName))
-                {
-                    report.GrainClassTypeName = grainClassName;
-                }
-            }
-            catch (Exception exc)
-            {
-                report.GrainClassTypeName = exc.ToString();
-            }
-
-            var activation = activations.FindTarget(grain);
-            report.LocalActivation = activation switch
-            {
-                ActivationData data => data.ToDetailedString(),
-                _ => activation?.ToString()
-            };
-
-            return report;
         }
 
         /// <summary>
