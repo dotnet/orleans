@@ -204,16 +204,14 @@ namespace Orleans.Runtime
         public Task<List<GrainId>> GetActiveGrains(GrainType grainType)
         {
             var results = new List<GrainId>();
-            activationDirectory.ForEachGrainId(AddIfMatch, (grainType, results));
-            return Task.FromResult(results);
-
-            static void AddIfMatch((GrainType Type, List<GrainId> Result) context, GrainId id)
+            foreach (var pair in activationDirectory)
             {
-                if (id.Type.Equals(context.Type))
+                if (grainType.Equals(pair.Key.Type))
                 {
-                    context.Result.Add(id);
+                    results.Add(pair.Key);
                 }
             }
+            return Task.FromResult(results);
         }
     }
 }
