@@ -22,8 +22,8 @@ namespace Orleans.CodeGenerator
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription, method);
             INamedTypeSymbol baseClassType = GetBaseClassType(method);
-            var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription, out var methodTypeArguments, out var interfaceTypeArguments, out var parameterTypes);
-            var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes, methodTypeArguments, parameterTypes);
+            var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription);
+            var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes);
             var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, fieldDescriptions, baseClassType);
 
             Accessibility accessibility = GetAccessibility(interfaceDescription);
@@ -49,9 +49,6 @@ namespace Orleans.CodeGenerator
                     GenerateGetInterfaceName(libraryTypes, method),
                     GenerateGetActivityName(libraryTypes, method),
                     GenerateGetInterfaceType(libraryTypes, method),
-                    GenerateGetTypeArrayHelper(libraryTypes, "InterfaceTypeArguments", interfaceTypeArguments),
-                    GenerateGetTypeArrayHelper(libraryTypes, "MethodTypeArguments", methodTypeArguments),
-                    GenerateGetTypeArrayHelper(libraryTypes, "ParameterTypes", parameterTypes),
                     GenerateGetMethod(libraryTypes),
                     GenerateSetTargetMethod(libraryTypes, interfaceDescription, targetField),
                     GenerateGetTargetMethod(libraryTypes, targetField),
@@ -446,13 +443,6 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        private static MemberDeclarationSyntax GenerateGetTypeArrayHelper(LibraryTypes libraryTypes, string propertyName, ExpressionSyntax backingField)
-            => backingField is null ? null
-            : PropertyDeclaration(ArrayType(libraryTypes.Type.ToTypeSyntax(), SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(OmittedArraySizeExpression())))), propertyName)
-                .WithExpressionBody(ArrowExpressionClause(backingField))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
         private static MemberDeclarationSyntax GenerateGetMethod(
             LibraryTypes libraryTypes)
             => PropertyDeclaration(libraryTypes.MethodInfo.ToTypeSyntax(), "Method")
@@ -470,28 +460,18 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GetFieldDeclarations(
             MethodDescription method,
             List<InvokerFieldDescripton> fieldDescriptions,
-            LibraryTypes libraryTypes,
-            ExpressionSyntax methodTypeArguments,
-            ExpressionSyntax parameterTypes)
+            LibraryTypes libraryTypes)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
             MemberDeclarationSyntax GetFieldDeclaration(InvokerFieldDescripton description)
             {
                 FieldDeclarationSyntax field;
-                if (description is TypeArrayFieldDescription types)
+                if (description is MethodInfoFieldDescription methodInfo)
                 {
-                    field = FieldDeclaration(
-                        VariableDeclaration(
-                            ArrayType(libraryTypes.Type.ToTypeSyntax(), SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(OmittedArraySizeExpression())))),
-                            SingletonSeparatedList(VariableDeclarator(description.FieldName)
-                            .WithInitializer(EqualsValueClause(ArrayCreationExpression(
-                                ArrayType(libraryTypes.Type.ToTypeSyntax(), SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(OmittedArraySizeExpression())))),
-                                InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList<ExpressionSyntax>(types.Values.Select(t => TypeOfExpression(t))))))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                }
-                else if (description is MethodInfoFieldDescription methodInfo)
-                {
+                    var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
+                    var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
+
                     field = FieldDeclaration(
                         VariableDeclaration(
                             libraryTypes.MethodInfo.ToTypeSyntax(),
@@ -503,8 +483,8 @@ namespace Orleans.CodeGenerator
                                     {
                                         Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
                                         Argument(method.Method.Name.GetLiteralExpression()),
-                                        Argument(methodTypeArguments ?? LiteralExpression(SyntaxKind.NullLiteralExpression)),
-                                        Argument(parameterTypes ?? LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                                        Argument(methodTypeArguments),
+                                        Argument(parameterTypes),
                                     }))))))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                 }
@@ -547,6 +527,14 @@ namespace Orleans.CodeGenerator
 
                 return field;
             }
+        }
+
+        private static ExpressionSyntax GetTypesArray(MethodDescription method, IEnumerable<ITypeSymbol> typeSymbols)
+        {
+            var types = typeSymbols.ToArray();
+            return types.Length == 0 ? LiteralExpression(SyntaxKind.NullLiteralExpression)
+                : ImplicitArrayCreationExpression(InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList<ExpressionSyntax>(
+                    types.Select(t => TypeOfExpression(t.ToTypeSyntax(method.TypeParameterSubstitutions))))));
         }
 
         private static (ConstructorDeclarationSyntax Constructor, List<TypeSyntax> ConstructorArguments) GenerateConstructor(
@@ -607,10 +595,7 @@ namespace Orleans.CodeGenerator
 
         private static List<InvokerFieldDescripton> GetFieldDescriptions(
             MethodDescription method,
-            InvokableInterfaceDescription interfaceDescription,
-            out ExpressionSyntax methodTypeArgumentsSyntax,
-            out ExpressionSyntax interfaceTypeArgumentsSyntax,
-            out ExpressionSyntax parameterTypesSyntax)
+            InvokableInterfaceDescription interfaceDescription)
         {
             var fields = new List<InvokerFieldDescripton>();
 
@@ -621,31 +606,10 @@ namespace Orleans.CodeGenerator
                 fieldId++;
             }
 
-            fields.Add(new TargetFieldDescription(method, interfaceDescription.InterfaceType));
-
-            var libraryTypes = interfaceDescription.CodeGenerator.LibraryTypes;
-
-            var methodTypeArguments = method.MethodTypeParameters.Select(p => p.Parameter.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            methodTypeArgumentsSyntax = AddTypesField(method, libraryTypes, fields, "MethodTypeArgumentsBackingField", methodTypeArguments);
-
-            var interfaceTypeArguments = method.Method.ContainingType.TypeArguments.Select(p => p.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            interfaceTypeArgumentsSyntax = AddTypesField(method, libraryTypes, fields, "InterfaceTypeArgumentsBackingField", interfaceTypeArguments);
-
-            var methodParameterTypes = method.Method.Parameters.Select(p => p.Type.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            parameterTypesSyntax = AddTypesField(method, libraryTypes, fields, "ParameterTypesBackingField", methodParameterTypes);
-
-            fields.Add(new MethodInfoFieldDescription(method, libraryTypes.MethodInfo, "MethodBackingField"));
+            fields.Add(new TargetFieldDescription(interfaceDescription.InterfaceType));
+            fields.Add(new MethodInfoFieldDescription(interfaceDescription.CodeGenerator.LibraryTypes.MethodInfo, "MethodBackingField"));
 
             return fields;
-        }
-
-        private static ExpressionSyntax AddTypesField(MethodDescription method, LibraryTypes libraryTypes, List<InvokerFieldDescripton> fields, string name, TypeSyntax[] types)
-        {
-            if (types.Length == 0)
-                return null;
-
-            fields.Add(new TypeArrayFieldDescription(method, libraryTypes.Type, name, types));
-            return IdentifierName(name);
         }
 
         internal abstract class InvokerFieldDescripton
@@ -657,27 +621,20 @@ namespace Orleans.CodeGenerator
             }
 
             public ITypeSymbol FieldType { get; }
-            public abstract TypeSyntax FieldTypeSyntax { get; }
             public string FieldName { get; }
             public abstract bool IsSerializable { get; }
             public abstract bool IsInstanceField { get; }
         }
 
-        internal class TargetFieldDescription : InvokerFieldDescripton
+        internal sealed class TargetFieldDescription : InvokerFieldDescripton
         {
-            private readonly MethodDescription _method;
-
-            public TargetFieldDescription(MethodDescription method, ITypeSymbol fieldType) : base(fieldType, "target")
-            {
-                _method = method;
-            }
+            public TargetFieldDescription(ITypeSymbol fieldType) : base(fieldType, "target") { }
 
             public override bool IsSerializable => false;
-            public override TypeSyntax FieldTypeSyntax => FieldType.ToTypeSyntax(_method.TypeParameterSubstitutions);
             public override bool IsInstanceField => true;
         }
 
-        internal class MethodParameterFieldDescription : InvokerFieldDescripton, IMemberDescription
+        internal sealed class MethodParameterFieldDescription : InvokerFieldDescripton, IMemberDescription
         {
             public MethodParameterFieldDescription(MethodDescription method, IParameterSymbol parameter, string fieldName, ushort fieldId)
                 : base(parameter.Type, fieldName)
@@ -696,7 +653,6 @@ namespace Orleans.CodeGenerator
                     TypeSyntax = Type.ToTypeSyntax(method.TypeParameterSubstitutions);
                 }
 
-                FieldTypeSyntax = TypeSyntax;
                 Symbol = parameter;
             }
 
@@ -711,7 +667,6 @@ namespace Orleans.CodeGenerator
             public IParameterSymbol Parameter { get; }
             public override bool IsSerializable => true;
             public override bool IsInstanceField => true;
-            public override TypeSyntax FieldTypeSyntax { get; }
 
             public string AssemblyName => Parameter.Type.ContainingAssembly.ToDisplayName();
             public string TypeName { get; }
@@ -734,34 +689,12 @@ namespace Orleans.CodeGenerator
             public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax(Method.TypeParameterSubstitutions);
         }
 
-        internal class TypeArrayFieldDescription : InvokerFieldDescripton
+        internal sealed class MethodInfoFieldDescription : InvokerFieldDescripton
         {
-            private readonly MethodDescription _method;
-
-            public TypeArrayFieldDescription(MethodDescription method, ITypeSymbol fieldType, string fieldName, TypeSyntax[] values) : base(fieldType, fieldName)
-            {
-                _method = method;
-                Values = values;
-            }
-
-            public TypeSyntax[] Values { get; }
-            public override bool IsSerializable => false;
-            public override bool IsInstanceField => false;
-            public override TypeSyntax FieldTypeSyntax => FieldType.ToTypeSyntax(_method.TypeParameterSubstitutions);
-        }
-
-        internal class MethodInfoFieldDescription : InvokerFieldDescripton
-        {
-            private readonly MethodDescription _method;
-
-            public MethodInfoFieldDescription(MethodDescription method, ITypeSymbol fieldType, string fieldName) : base(fieldType, fieldName)
-            {
-                _method = method;
-            }
+            public MethodInfoFieldDescription(ITypeSymbol fieldType, string fieldName) : base(fieldType, fieldName) { }
 
             public override bool IsSerializable => false;
             public override bool IsInstanceField => false;
-            public override TypeSyntax FieldTypeSyntax => FieldType.ToTypeSyntax(_method.TypeParameterSubstitutions);
         }
     }
 }

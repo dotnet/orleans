@@ -70,20 +70,5 @@ namespace Orleans.Serialization.Invocation
         /// Gets the interface type.
         /// </summary>
         Type InterfaceType { get; }
-
-        /// <summary>
-        /// Gets the type arguments for the method if the method is generic, otherwise an empty array.
-        /// </summary>
-        Type[] MethodTypeArguments { get; }
-
-        /// <summary>
-        /// Gets the type arguments for the interface if the interface is generic, otherwise an empty array.
-        /// </summary>
-        Type[] InterfaceTypeArguments { get; }
-
-        /// <summary>
-        /// Gets the parameter types for the method.
-        /// </summary>
-        Type[] ParameterTypes { get; }
     }
 }

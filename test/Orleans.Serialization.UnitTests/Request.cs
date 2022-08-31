@@ -15,12 +15,9 @@ namespace Orleans.Serialization.Invocation
         public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
         public abstract void Dispose();
         public abstract string MethodName { get; }
-        public virtual Type[] MethodTypeArguments => Type.EmptyTypes;
         public abstract string InterfaceName { get; }
         public abstract string ActivityName { get; }
         public abstract Type InterfaceType { get; }
-        public virtual Type[] InterfaceTypeArguments => Type.EmptyTypes;
-        public virtual Type[] ParameterTypes => Type.EmptyTypes;
         public abstract MethodInfo Method { get; }
     }
 

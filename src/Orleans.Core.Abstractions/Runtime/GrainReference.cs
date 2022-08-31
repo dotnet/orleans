@@ -487,9 +487,6 @@ namespace Orleans.Runtime
         public abstract string MethodName { get; }
 
         /// <inheritdoc/>
-        public virtual Type[] MethodTypeArguments => Type.EmptyTypes;
-
-        /// <inheritdoc/>
         public abstract string InterfaceName { get; }
 
         /// <inheritdoc/>
@@ -497,12 +494,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public abstract Type InterfaceType { get; }
-
-        /// <inheritdoc/>
-        public virtual Type[] InterfaceTypeArguments => Type.EmptyTypes;
-
-        /// <inheritdoc/>
-        public virtual Type[] ParameterTypes => Type.EmptyTypes;
 
         /// <inheritdoc/>
         public abstract MethodInfo Method { get; }
