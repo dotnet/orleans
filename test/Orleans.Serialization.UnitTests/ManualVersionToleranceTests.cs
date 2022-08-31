@@ -239,8 +239,8 @@ namespace Orleans.Serialization.UnitTests
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
-            using var readerSesssion = GetSession();
-            var reader = Reader.Create(readResult.Buffer, readerSesssion);
+            using var readerSession = GetSession();
+            var reader = Reader.Create(readResult.Buffer, readerSession);
             var initialHeader = reader.ReadFieldHeader();
 
             _log.WriteLine("Header:");
@@ -292,8 +292,8 @@ namespace Orleans.Serialization.UnitTests
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
-            using var readerSesssion = GetSession();
-            var reader = Reader.Create(readResult.Buffer, readerSesssion);
+            using var readerSession = GetSession();
+            var reader = Reader.Create(readResult.Buffer, readerSession);
             var initialHeader = reader.ReadFieldHeader();
 
             _log.WriteLine("Header:");
