@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans
 {
@@ -276,6 +277,26 @@ namespace Orleans
         /// </summary>
         /// <value>The identifier.</value>
         public ushort Id { get; }
+    }
+
+    /// <summary>
+    /// Specifies the constructor the serializer should use when creating new instances from serialized data.
+    /// </summary>
+    /// <remarks>
+    /// At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored.
+    /// </remarks>
+    /// <seealso cref="Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" />
+    [AttributeUsage(
+        AttributeTargets.Class
+        | AttributeTargets.Struct)]
+    public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansConstructorAttribute"/> class.
+        /// </summary>
+        public OrleansConstructorAttribute()
+        {
+        }
     }
 
     /// <summary>

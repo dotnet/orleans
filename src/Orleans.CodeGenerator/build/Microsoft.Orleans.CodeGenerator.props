@@ -8,6 +8,7 @@
     <CompilerVisibleProperty Include="Orleans_IdAttributes" />
     <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
     <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
+    <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -17,6 +18,7 @@
     <Orleans_IdAttributes>$(OrleansIdAttributes)</Orleans_IdAttributes>
     <Orleans_AliasAttributes>$(OrleansAliasAttributes)</Orleans_AliasAttributes>
     <Orleans_GenerateSerializerAttributes>$(OrleansGenerateSerializerAttributes)</Orleans_GenerateSerializerAttributes>
+    <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
   </PropertyGroup>
 
 </Project>
