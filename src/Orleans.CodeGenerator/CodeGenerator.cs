@@ -206,8 +206,8 @@ namespace Orleans.CodeGenerator
                         else
                         {
                             // Regular type
-                            var supportsPrimaryContstructorParameters = ShouldSupportPrimaryConstructorParameters(symbol);
-                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryContstructorParameters, GetDataMembers(symbol), LibraryTypes);
+                            var supportsPrimaryConstructorParameters = ShouldSupportPrimaryConstructorParameters(symbol);
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryConstructorParameters, GetDataMembers(symbol), LibraryTypes);
                             metadataModel.SerializableTypes.Add(typeDescription);
                         }
                     }
