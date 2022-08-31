@@ -55,7 +55,8 @@ namespace Orleans.CodeGenerator
 
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is { Length: > 0 })
                 {
-                    options.GenerateFieldIds = bool.Parse(generateFieldIds);
+                    if (Enum.TryParse(generateFieldIds, out GenerateFieldIds fieldIdOption))
+                        options.GenerateFieldIds = fieldIdOption;
                 }
 
                 var codeGenerator = new CodeGenerator(context.Compilation, options);

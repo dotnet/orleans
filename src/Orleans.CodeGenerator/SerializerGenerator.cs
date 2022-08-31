@@ -1341,7 +1341,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 // If the symbol itself is a property but is not settable, then error out, since we do not know how to set it value
-                if (IsProperty)
+                if (IsProperty && !IsPrimaryConstructorParameter)
                 {
                     Location location = default;
                     if (Member.Symbol is IPropertySymbol prop && prop.SetMethod is { } setMethod)
