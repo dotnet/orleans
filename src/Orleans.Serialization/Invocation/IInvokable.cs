@@ -30,7 +30,7 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Gets the number of arguments.
         /// </summary>
-        int ArgumentCount { get; }
+        int GetArgumentCount();
 
         /// <summary>
         /// Gets the argument at the specified index.
@@ -49,26 +49,26 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Gets the method name.
         /// </summary>
-        string MethodName { get; }
+        string GetMethodName();
 
         /// <summary>
         /// Gets the full interface name.
         /// </summary>
-        string InterfaceName { get; }
+        string GetInterfaceName();
 
         /// <summary>
         /// Gets the activity name, which refers to both the interface name and method name.
         /// </summary>
-        string ActivityName { get; }
+        string GetActivityName();
 
         /// <summary>
         /// Gets the method info object, which may be <see langword="null"/>.
         /// </summary>
-        MethodInfo Method { get; }
+        MethodInfo GetMethod();
 
         /// <summary>
         /// Gets the interface type.
         /// </summary>
-        Type InterfaceType { get; }
+        Type GetInterfaceType();
     }
 }

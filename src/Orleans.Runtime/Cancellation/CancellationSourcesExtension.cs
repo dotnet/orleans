@@ -61,7 +61,7 @@ namespace Orleans.Runtime
             IGrainContext target,
             IInvokable request)
         {
-            var argumentCount = request.ArgumentCount;
+            var argumentCount = request.GetArgumentCount();
             for (var i = 0; i < argumentCount; i++)
             {
                 var arg = request.GetArgument(i);

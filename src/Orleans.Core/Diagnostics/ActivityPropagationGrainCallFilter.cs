@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public Task Invoke(IOutgoingGrainCallContext context)
         {
-            var activity = Source.StartActivity(context.Request.ActivityName, ActivityKind.Client);
+            var activity = Source.StartActivity(context.Request.GetActivityName(), ActivityKind.Client);
 
             if (activity is not null)
             {
@@ -131,7 +131,7 @@ namespace Orleans.Runtime
 
             if (!string.IsNullOrEmpty(traceParent))
             {
-                activity = Source.CreateActivity(context.Request.ActivityName, ActivityKind.Server, traceParent);
+                activity = Source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
 
                 if (activity is not null)
                 {
@@ -157,7 +157,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                activity = Source.CreateActivity(context.Request.ActivityName, ActivityKind.Server);
+                activity = Source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server);
             }
 
             activity?.Start();

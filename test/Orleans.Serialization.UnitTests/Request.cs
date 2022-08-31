@@ -7,18 +7,20 @@ namespace Orleans.Serialization.Invocation
 {
     public abstract class UnitTestRequestBase : IInvokable
     {
-        public virtual int ArgumentCount => 0;
+        public virtual int GetArgumentCount() => 0;
         public abstract ValueTask<Response> Invoke();
         public abstract object GetTarget();
         public abstract void SetTarget(ITargetHolder holder);
         public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
         public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
         public abstract void Dispose();
-        public abstract string MethodName { get; }
-        public abstract string InterfaceName { get; }
-        public abstract string ActivityName { get; }
-        public abstract Type InterfaceType { get; }
-        public abstract MethodInfo Method { get; }
+        public abstract string GetMethodName();
+        public abstract string GetInterfaceName();
+
+        public abstract string GetActivityName();
+        public abstract Type GetInterfaceType();
+
+        public abstract MethodInfo GetMethod();
     }
 
     public abstract class UnitTestRequest : UnitTestRequestBase

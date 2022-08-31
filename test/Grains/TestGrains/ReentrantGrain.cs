@@ -90,17 +90,17 @@ namespace UnitTests.Grains
         public static bool MayInterleave(IInvokable req)
         {
             // not interested
-            if (req.ArgumentCount == 0)
+            if (req.GetArgumentCount() == 0)
                 return false;
 
             string arg = null;
 
             // assume single argument message
-            if (req.ArgumentCount == 1)
+            if (req.GetArgumentCount() == 1)
                 arg = (string)UnwrapImmutable(req.GetArgument(0));
 
             // assume stream message
-            if (req.ArgumentCount == 2)
+            if (req.GetArgumentCount() == 2)
                 arg = (string)UnwrapImmutable(req.GetArgument(1));
 
             if (arg == "err")

@@ -51,7 +51,7 @@ namespace Orleans.Runtime
 
         public object Grain => grainContext.GrainInstance;
 
-        public MethodInfo InterfaceMethod => request.Method;
+        public MethodInfo InterfaceMethod => request.GetMethod();
 
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
@@ -75,9 +75,9 @@ namespace Orleans.Runtime
 
         public GrainInterfaceType InterfaceType => message.InterfaceType;
 
-        public string InterfaceName => request.InterfaceName;
+        public string InterfaceName => request.GetInterfaceName();
 
-        public string MethodName => request.MethodName;
+        public string MethodName => request.GetMethodName();
 
         public async Task Invoke()
         {
@@ -160,7 +160,7 @@ namespace Orleans.Runtime
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
-            var interfaceType = this.request.InterfaceType;
+            var interfaceType = this.request.GetInterfaceType();
             var implementationType = this.request.GetTarget().GetType();
 
             // Get or create the implementation map for this object.
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
                 interfaceType);
 
             // Get the method info for the method being invoked.
-            var method = request.Method;
+            var method = request.GetMethod();
             if (method.IsConstructedGenericMethod)
             {
                 if (implementationMap.TryGetValue(method.GetGenericMethodDefinition(), out var entry))

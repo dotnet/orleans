@@ -451,7 +451,7 @@ namespace Orleans.Runtime
         public InvokeMethodOptions Options { get; private set; }
 
         /// <inheritdoc/>
-        public virtual int ArgumentCount => 0;
+        public virtual int GetArgumentCount() => 0;
 
         /// <summary>
         /// Incorporates the provided invocation options.
@@ -484,42 +484,42 @@ namespace Orleans.Runtime
         public abstract void Dispose();
 
         /// <inheritdoc/>
-        public abstract string MethodName { get; }
+        public abstract string GetMethodName();
 
         /// <inheritdoc/>
-        public abstract string InterfaceName { get; }
+        public abstract string GetInterfaceName();
 
         /// <inheritdoc/>
-        public abstract string ActivityName { get; }
+        public abstract string GetActivityName();
 
         /// <inheritdoc/>
-        public abstract Type InterfaceType { get; }
+        public abstract Type GetInterfaceType();
 
         /// <inheritdoc/>
-        public abstract MethodInfo Method { get; }
+        public abstract MethodInfo GetMethod();
 
         /// <inheritdoc/>
         public override string ToString()
         {
             var result = new StringBuilder();
-            result.Append(InterfaceName);
+            result.Append(GetInterfaceName());
             if (GetTarget() is { } target)
             {
                 result.Append("[(");
-                result.Append(InterfaceName);
+                result.Append(GetInterfaceName());
                 result.Append(')');
                 result.Append(target.ToString());
                 result.Append(']');
             }
             else
             {
-                result.Append(InterfaceName);
+                result.Append(GetInterfaceName());
             }
 
             result.Append('.');
-            result.Append(MethodName);
+            result.Append(GetMethodName());
             result.Append('(');
-            var argumentCount = ArgumentCount;
+            var argumentCount = GetArgumentCount();
             for (var n = 0; n < argumentCount; n++)
             {
                 if (n > 0)

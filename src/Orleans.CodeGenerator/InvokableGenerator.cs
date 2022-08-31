@@ -382,7 +382,7 @@ namespace Orleans.CodeGenerator
 
         private static MemberDeclarationSyntax GenerateGetArgumentCount(LibraryTypes libraryTypes, MethodDescription methodDescription)
             => methodDescription.Method.Parameters.Length is var count and not 0 ?
-            PropertyDeclaration(libraryTypes.Int32.ToTypeSyntax(), "ArgumentCount")
+            MethodDeclaration(libraryTypes.Int32.ToTypeSyntax(), "GetArgumentCount")
                 .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
@@ -399,7 +399,7 @@ namespace Orleans.CodeGenerator
             var interfaceName = methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false, includeNamespace: false);
             var methodName = methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var activityName = $"{interfaceName}/{methodName}";
-            return PropertyDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "ActivityName")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetActivityName")
                 .WithExpressionBody(
                     ArrowExpressionClause(
                         LiteralExpression(
@@ -412,7 +412,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax GenerateGetMethodName(
             LibraryTypes libraryTypes,
             MethodDescription methodDescription) =>
-            PropertyDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "MethodName")
+            MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetMethodName")
                 .WithExpressionBody(
                     ArrowExpressionClause(
                         LiteralExpression(
@@ -424,7 +424,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax GenerateGetInterfaceName(
             LibraryTypes libraryTypes,
             MethodDescription methodDescription) =>
-            PropertyDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "InterfaceName")
+            MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetInterfaceName")
                 .WithExpressionBody(
                     ArrowExpressionClause(
                         LiteralExpression(
@@ -436,7 +436,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax GenerateGetInterfaceType(
             LibraryTypes libraryTypes,
             MethodDescription methodDescription) =>
-            PropertyDeclaration(libraryTypes.Type.ToTypeSyntax(), "InterfaceType")
+            MethodDeclaration(libraryTypes.Type.ToTypeSyntax(), "GetInterfaceType")
                 .WithExpressionBody(
                     ArrowExpressionClause(
                         TypeOfExpression(methodDescription.Method.ContainingType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions))))
@@ -445,7 +445,7 @@ namespace Orleans.CodeGenerator
 
         private static MemberDeclarationSyntax GenerateGetMethod(
             LibraryTypes libraryTypes)
-            => PropertyDeclaration(libraryTypes.MethodInfo.ToTypeSyntax(), "Method")
+            => MethodDeclaration(libraryTypes.MethodInfo.ToTypeSyntax(), "GetMethod")
                 .WithExpressionBody(ArrowExpressionClause(IdentifierName("MethodBackingField")))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));

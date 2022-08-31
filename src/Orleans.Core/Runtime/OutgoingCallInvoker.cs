@@ -54,7 +54,7 @@ namespace Orleans.Runtime
 
         public object Grain => this.grainReference;
 
-        public MethodInfo InterfaceMethod => request.Method;
+        public MethodInfo InterfaceMethod => request.GetMethod();
 
         public object Result { get => TypedResult; set => TypedResult = (TResult)value; }
 
@@ -70,9 +70,9 @@ namespace Orleans.Runtime
 
         public GrainInterfaceType InterfaceType => grainReference.InterfaceType;
 
-        public string InterfaceName => request.InterfaceName;
+        public string InterfaceName => request.GetInterfaceName();
 
-        public string MethodName => request.MethodName;
+        public string MethodName => request.GetMethodName();
 
         public async Task Invoke()
         {
