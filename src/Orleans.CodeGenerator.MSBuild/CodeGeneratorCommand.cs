@@ -73,6 +73,7 @@ namespace Orleans.CodeGenerator.MSBuild
         public List<string> AliasAttributes { get; private set; } = new();
         public List<string> ImmutableAttributes { get; private set; } = new();
         public List<string> GenerateSerializerAttributes { get; private set; } = new();
+        public List<string> ConstructorAttributes { get; private set; } = new();
 
         public async Task<bool> Execute(CancellationToken cancellationToken)
         {
@@ -133,6 +134,7 @@ namespace Orleans.CodeGenerator.MSBuild
                 codeGeneratorOptions.AliasAttributes.AddRange(AliasAttributes);
                 codeGeneratorOptions.ImmutableAttributes.AddRange(ImmutableAttributes);
                 codeGeneratorOptions.GenerateSerializerAttributes.AddRange(GenerateSerializerAttributes);
+                codeGeneratorOptions.ConstructorAttributes.AddRange(ConstructorAttributes);
 
                 var generator = new CodeGenerator(compilation, codeGeneratorOptions);
                 stopwatch.Restart();
