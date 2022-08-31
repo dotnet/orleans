@@ -400,38 +400,6 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static IEnumerable<MemberDeclarationSyntax> GetTypeDeclarations(SyntaxNode node)
-        {
-            SyntaxList<MemberDeclarationSyntax> members;
-            switch (node)
-            {
-                case EnumDeclarationSyntax enumDecl:
-                    yield return enumDecl;
-                    members = new SyntaxList<MemberDeclarationSyntax>();
-                    break;
-                case TypeDeclarationSyntax type:
-                    yield return type;
-                    members = type.Members;
-                    break;
-                case NamespaceDeclarationSyntax ns:
-                    members = ns.Members;
-                    break;
-                case CompilationUnitSyntax compilationUnit:
-                    members = compilationUnit.Members;
-                    break;
-                default:
-                    yield break;
-            }
-
-            foreach (var member in members)
-            {
-                foreach (var decl in GetTypeDeclarations(member))
-                {
-                    yield return decl;
-                }
-            }
-        }
-
         // Returns descriptions of all data members (fields and properties) 
         private IEnumerable<IMemberDescription> GetDataMembers(INamedTypeSymbol symbol)
         {

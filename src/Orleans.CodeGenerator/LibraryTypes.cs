@@ -76,6 +76,7 @@ namespace Orleans.CodeGenerator
                 ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1"),
                 ValueTask = Type("System.Threading.Tasks.ValueTask"),
                 ValueTask_1 = Type("System.Threading.Tasks.ValueTask`1"),
+                ValueTypeGetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeGetter`2"),
                 ValueTypeSetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeSetter`2"),
                 Void = compilation.GetSpecialType(SpecialType.System_Void),
                 Writer = Type("Orleans.Serialization.Buffers.Writer`1"),
@@ -253,6 +254,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ValueSerializer { get; private set; }
         public INamedTypeSymbol ValueTask { get; private set; }
         public INamedTypeSymbol ValueTask_1 { get; private set; }
+        public INamedTypeSymbol ValueTypeGetter_2 { get; private set; }
         public INamedTypeSymbol ValueTypeSetter_2 { get; private set; }
         public INamedTypeSymbol Void { get; private set; }
         public INamedTypeSymbol Writer { get; private set; }

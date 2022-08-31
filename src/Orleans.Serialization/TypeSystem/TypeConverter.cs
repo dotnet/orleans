@@ -135,7 +135,7 @@ namespace Orleans.Serialization.TypeSystem
                 });
             }
 
-            void AddFromMetadata(IEnumerable<Type> metadataCollection, Type genericType)
+            void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 

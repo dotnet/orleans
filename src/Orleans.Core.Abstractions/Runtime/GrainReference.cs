@@ -451,7 +451,7 @@ namespace Orleans.Runtime
         public InvokeMethodOptions Options { get; private set; }
 
         /// <inheritdoc/>
-        public abstract int ArgumentCount { get; }
+        public virtual int ArgumentCount => 0;
 
         /// <summary>
         /// Incorporates the provided invocation options.
@@ -476,10 +476,10 @@ namespace Orleans.Runtime
             where TTargetHolder : ITargetHolder;
 
         /// <inheritdoc/>
-        public abstract TArgument GetArgument<TArgument>(int index);
+        public virtual TArgument GetArgument<TArgument>(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
-        public abstract void SetArgument<TArgument>(int index, in TArgument value);
+        public virtual void SetArgument<TArgument>(int index, in TArgument value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
         public abstract void Dispose();
@@ -488,7 +488,7 @@ namespace Orleans.Runtime
         public abstract string MethodName { get; }
 
         /// <inheritdoc/>
-        public abstract Type[] MethodTypeArguments { get; }
+        public virtual Type[] MethodTypeArguments => Type.EmptyTypes;
 
         /// <inheritdoc/>
         public abstract string InterfaceName { get; }
@@ -500,10 +500,10 @@ namespace Orleans.Runtime
         public abstract Type InterfaceType { get; }
 
         /// <inheritdoc/>
-        public abstract Type[] InterfaceTypeArguments { get; }
+        public virtual Type[] InterfaceTypeArguments => Type.EmptyTypes;
 
         /// <inheritdoc/>
-        public abstract Type[] ParameterTypes { get; }
+        public virtual Type[] ParameterTypes => Type.EmptyTypes;
 
         /// <inheritdoc/>
         public abstract MethodInfo Method { get; }
@@ -551,7 +551,7 @@ namespace Orleans.Runtime
     public abstract class Request : RequestBase 
     {
         [DebuggerHidden]
-        public override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke()
         {
             try
             {
@@ -600,7 +600,7 @@ namespace Orleans.Runtime
     {
         /// <inheritdoc/>
         [DebuggerHidden]
-        public override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke()
         {
             try
             {
@@ -651,7 +651,7 @@ namespace Orleans.Runtime
     {
         /// <inheritdoc/>
         [DebuggerHidden]
-        public override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke()
         {
             try
             {
@@ -700,7 +700,7 @@ namespace Orleans.Runtime
     {
         /// <inheritdoc/>
         [DebuggerHidden]
-        public override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke()
         {
             try
             {
@@ -750,7 +750,7 @@ namespace Orleans.Runtime
     {
         /// <inheritdoc/>
         [DebuggerHidden]
-        public override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke()
         {
             try
             {

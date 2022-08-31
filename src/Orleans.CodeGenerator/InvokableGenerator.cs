@@ -22,8 +22,8 @@ namespace Orleans.CodeGenerator
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription, method);
             INamedTypeSymbol baseClassType = GetBaseClassType(method);
-            var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription);
-            var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes);
+            var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription, out var methodTypeArguments, out var interfaceTypeArguments, out var parameterTypes);
+            var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes, methodTypeArguments, parameterTypes);
             var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, fieldDescriptions, baseClassType);
 
             Accessibility accessibility = GetAccessibility(interfaceDescription);
@@ -41,16 +41,17 @@ namespace Orleans.CodeGenerator
                 .AddAttributeLists(
                     AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(fields)
-                .AddMembers(ctor)
-                .AddMembers(
+                .AddMembers(ctor);
+
+            classDeclaration = AddOptionalMembers(classDeclaration,
                     GenerateGetArgumentCount(libraryTypes, method),
                     GenerateGetMethodName(libraryTypes, method),
                     GenerateGetInterfaceName(libraryTypes, method),
                     GenerateGetActivityName(libraryTypes, method),
                     GenerateGetInterfaceType(libraryTypes, method),
-                    GenerateGetInterfaceTypeArguments(libraryTypes, method),
-                    GenerateGetMethodTypeArguments(libraryTypes, method),
-                    GenerateGetParameterTypes(libraryTypes, method),
+                    GenerateGetTypeArrayHelper(libraryTypes, "InterfaceTypeArguments", interfaceTypeArguments),
+                    GenerateGetTypeArrayHelper(libraryTypes, "MethodTypeArguments", methodTypeArguments),
+                    GenerateGetTypeArrayHelper(libraryTypes, "ParameterTypes", parameterTypes),
                     GenerateGetMethod(libraryTypes),
                     GenerateSetTargetMethod(libraryTypes, interfaceDescription, targetField),
                     GenerateGetTargetMethod(targetField),
@@ -103,6 +104,9 @@ namespace Orleans.CodeGenerator
                 return accessibility;
             }
         }
+
+        private static ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
+            => decl.WithMembers(decl.Members.AddRange(items.Where(i => i != null)));
 
         private static INamedTypeSymbol GetBaseClassType(MethodDescription method)
         {
@@ -182,6 +186,9 @@ namespace Orleans.CodeGenerator
             MethodDescription methodDescription,
             List<InvokerFieldDescripton> fields)
         {
+            if (methodDescription.Method.Parameters.Length == 0)
+                return null;
+
             var index = IdentifierName("index");
             var type = IdentifierName("TArgument");
             var typeToken = type.Identifier;
@@ -251,6 +258,9 @@ namespace Orleans.CodeGenerator
             MethodDescription methodDescription,
             List<InvokerFieldDescripton> fields)
         {
+            if (methodDescription.Method.Parameters.Length == 0)
+                return null;
+
             var index = IdentifierName("index");
             var value = IdentifierName("value");
             var type = IdentifierName("TArgument");
@@ -405,17 +415,12 @@ namespace Orleans.CodeGenerator
                 .WithBody(Block(body));
         }
 
-        private static MemberDeclarationSyntax GenerateGetArgumentCount(
-            LibraryTypes libraryTypes,
-            MethodDescription methodDescription) =>
+        private static MemberDeclarationSyntax GenerateGetArgumentCount(LibraryTypes libraryTypes, MethodDescription methodDescription)
+            => methodDescription.Method.Parameters.Length is var count and not 0 ?
             PropertyDeclaration(libraryTypes.Int32.ToTypeSyntax(), "ArgumentCount")
-                .WithExpressionBody(
-                    ArrowExpressionClause(
-                        LiteralExpression(
-                            SyntaxKind.NumericLiteralExpression,
-                            Literal(methodDescription.Method.Parameters.Length))))
+                .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
 
         private static MemberDeclarationSyntax GenerateGetActivityName(
             LibraryTypes libraryTypes,
@@ -473,27 +478,10 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        private static MemberDeclarationSyntax GenerateGetInterfaceTypeArguments(
-            LibraryTypes libraryTypes,
-            MethodDescription methodDescription) =>
-                GenerateGetTypeArrayHelper(libraryTypes, "InterfaceTypeArguments", "InterfaceTypeArgumentsBackingField");
-
-        private static MemberDeclarationSyntax GenerateGetMethodTypeArguments(
-            LibraryTypes libraryTypes,
-            MethodDescription methodDescription) =>
-                GenerateGetTypeArrayHelper(libraryTypes, "MethodTypeArguments", "MethodTypeArgumentsBackingField");
-
-        private static MemberDeclarationSyntax GenerateGetParameterTypes(
-            LibraryTypes libraryTypes,
-            MethodDescription methodDescription) =>
-                GenerateGetTypeArrayHelper(libraryTypes, "ParameterTypes", "ParameterTypesBackingField");
-
-        private static MemberDeclarationSyntax GenerateGetTypeArrayHelper(
-            LibraryTypes libraryTypes,
-            string propertyName,
-            string backingPropertyName)
-            => PropertyDeclaration(ArrayType(libraryTypes.Type.ToTypeSyntax(), SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(OmittedArraySizeExpression())))), propertyName)
-                .WithExpressionBody(ArrowExpressionClause(IdentifierName(backingPropertyName)))
+        private static MemberDeclarationSyntax GenerateGetTypeArrayHelper(LibraryTypes libraryTypes, string propertyName, ExpressionSyntax backingField)
+            => backingField is null ? null
+            : PropertyDeclaration(ArrayType(libraryTypes.Type.ToTypeSyntax(), SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(OmittedArraySizeExpression())))), propertyName)
+                .WithExpressionBody(ArrowExpressionClause(backingField))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
@@ -514,7 +502,9 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GetFieldDeclarations(
             MethodDescription method,
             List<InvokerFieldDescripton> fieldDescriptions,
-            LibraryTypes libraryTypes)
+            LibraryTypes libraryTypes,
+            ExpressionSyntax methodTypeArguments,
+            ExpressionSyntax parameterTypes)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -545,8 +535,8 @@ namespace Orleans.CodeGenerator
                                     {
                                         Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
                                         Argument(method.Method.Name.GetLiteralExpression()),
-                                        Argument(IdentifierName("MethodTypeArgumentsBackingField")),
-                                        Argument(IdentifierName("ParameterTypesBackingField")),
+                                        Argument(methodTypeArguments ?? LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                                        Argument(parameterTypes ?? LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     }))))))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                 }
@@ -567,9 +557,10 @@ namespace Orleans.CodeGenerator
 
                 if (!description.IsSerializable)
                 {
-                    field = field.AddAttributeLists(
-                            AttributeList()
-                                .AddAttributes(Attribute(libraryTypes.NonSerializedAttribute.ToNameSyntax())));
+                    if (description.IsInstanceField)
+                        field = field.AddAttributeLists(
+                                AttributeList()
+                                    .AddAttributes(Attribute(libraryTypes.NonSerializedAttribute.ToNameSyntax())));
                 }
                 else if (description is MethodParameterFieldDescription parameter)
                 {
@@ -648,7 +639,10 @@ namespace Orleans.CodeGenerator
 
         private static List<InvokerFieldDescripton> GetFieldDescriptions(
             MethodDescription method,
-            InvokableInterfaceDescription interfaceDescription)
+            InvokableInterfaceDescription interfaceDescription,
+            out ExpressionSyntax methodTypeArgumentsSyntax,
+            out ExpressionSyntax interfaceTypeArgumentsSyntax,
+            out ExpressionSyntax parameterTypesSyntax)
         {
             var fields = new List<InvokerFieldDescripton>();
 
@@ -661,18 +655,29 @@ namespace Orleans.CodeGenerator
 
             fields.Add(new TargetFieldDescription(method, interfaceDescription.InterfaceType));
 
+            var libraryTypes = interfaceDescription.CodeGenerator.LibraryTypes;
+
             var methodTypeArguments = method.MethodTypeParameters.Select(p => p.Parameter.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            fields.Add(new TypeArrayFieldDescription(method, interfaceDescription.CodeGenerator.LibraryTypes.Type, "MethodTypeArgumentsBackingField", methodTypeArguments));
+            methodTypeArgumentsSyntax = AddTypesField(method, libraryTypes, fields, "MethodTypeArgumentsBackingField", methodTypeArguments);
 
             var interfaceTypeArguments = method.Method.ContainingType.TypeArguments.Select(p => p.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            fields.Add(new TypeArrayFieldDescription(method, interfaceDescription.CodeGenerator.LibraryTypes.Type, "InterfaceTypeArgumentsBackingField", interfaceTypeArguments));
+            interfaceTypeArgumentsSyntax = AddTypesField(method, libraryTypes, fields, "InterfaceTypeArgumentsBackingField", interfaceTypeArguments);
 
             var methodParameterTypes = method.Method.Parameters.Select(p => p.Type.ToTypeSyntax(method.TypeParameterSubstitutions)).ToArray();
-            fields.Add(new TypeArrayFieldDescription(method, interfaceDescription.CodeGenerator.LibraryTypes.Type, "ParameterTypesBackingField", methodParameterTypes));
+            parameterTypesSyntax = AddTypesField(method, libraryTypes, fields, "ParameterTypesBackingField", methodParameterTypes);
 
-            fields.Add(new MethodInfoFieldDescription(method, interfaceDescription.CodeGenerator.LibraryTypes.MethodInfo, "MethodBackingField"));
+            fields.Add(new MethodInfoFieldDescription(method, libraryTypes.MethodInfo, "MethodBackingField"));
 
             return fields;
+        }
+
+        private static ExpressionSyntax AddTypesField(MethodDescription method, LibraryTypes libraryTypes, List<InvokerFieldDescripton> fields, string name, TypeSyntax[] types)
+        {
+            if (types.Length == 0)
+                return null;
+
+            fields.Add(new TypeArrayFieldDescription(method, libraryTypes.Type, name, types));
+            return IdentifierName(name);
         }
 
         internal abstract class InvokerFieldDescripton

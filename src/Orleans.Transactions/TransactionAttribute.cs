@@ -319,7 +319,7 @@ namespace Orleans
         {
         }
 
-        protected override ValueTask<Response> BaseInvoke()
+        protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
             {
@@ -363,7 +363,7 @@ namespace Orleans
         {
         }
 
-        protected override ValueTask<Response> BaseInvoke()
+        protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
             {
@@ -406,7 +406,7 @@ namespace Orleans
         {
         }
 
-        protected override ValueTask<Response> BaseInvoke()
+        protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
             {
@@ -450,7 +450,7 @@ namespace Orleans
         {
         }
 
-        protected override ValueTask<Response> BaseInvoke()
+        protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
             {

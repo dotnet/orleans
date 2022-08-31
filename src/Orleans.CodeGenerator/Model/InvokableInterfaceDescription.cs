@@ -49,7 +49,7 @@ namespace Orleans.CodeGenerator
             }
 
             InvokableBaseTypes = invokableBaseTypes;
-            Methods = GetMethods(interfaceType).ToList();
+            Methods = GetMethods(interfaceType);
 
             static string GetTypeParameterName(HashSet<string> names, ITypeParameterSymbol tp)
             {
@@ -67,7 +67,7 @@ namespace Orleans.CodeGenerator
 
         public CodeGenerator CodeGenerator { get; }
 
-        private IEnumerable<MethodDescription> GetMethods(INamedTypeSymbol symbol)
+        private List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
         {
 #pragma warning disable RS1024 // Compare symbols correctly
             var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
@@ -87,6 +87,7 @@ namespace Orleans.CodeGenerator
             }
 
             var idCounter = 1;
+            var res = new List<MethodDescription>();
             foreach (var pair in methods.OrderBy(kv => kv.Key, MethodSignatureComparer.Default))
             {
                 var method = pair.Key;
@@ -96,8 +97,9 @@ namespace Orleans.CodeGenerator
                     idCounter = id + 1;
                 }
 
-                yield return new MethodDescription(this, method, id.ToString(CultureInfo.InvariantCulture), hasCollision: pair.Value);
+                res.Add(new(this, method, id.ToString(CultureInfo.InvariantCulture), hasCollision: pair.Value));
             }
+            return res;
 
             IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
             {
