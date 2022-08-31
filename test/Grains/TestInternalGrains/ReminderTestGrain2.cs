@@ -452,6 +452,11 @@ namespace UnitTests.Grains
         {
             return GetGrainService(callingGrainId).GetReminders(callingGrainId);
         }
+
+        public Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+            return GetGrainService(grainId).TryRegisterReminder(grainId, reminderName, dueTime, period);
+        }
     }
 }
 #pragma warning restore 612, 618

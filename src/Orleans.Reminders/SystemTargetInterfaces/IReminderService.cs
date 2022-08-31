@@ -32,6 +32,15 @@ namespace Orleans
         /// <param name="period">The time interval between invocations of the reminder.</param>
         /// <returns>The reminder.</returns>
         Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period);
+        /// <summary>
+        /// Tries to register a new reminder if theres an existing one it skips register
+        /// </summary>
+        /// <param name="grainId"></param>
+        /// <param name="reminderName"></param>
+        /// <param name="dueTime"></param>
+        /// <param name="period"></param>
+        /// <returns>boolean</returns>
+        Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period);
 
         /// <summary>
         /// Unregisters the specified reminder.

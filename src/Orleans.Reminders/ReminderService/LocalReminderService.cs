@@ -145,6 +145,41 @@ namespace Orleans.Runtime.ReminderService
             throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
         }
 
+        public async Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+
+            var existingEtag = await reminderTable.ReadRow(grainId, reminderName);
+            if (existingEtag == null)
+            {
+                var entry = new ReminderEntry
+                {
+                    GrainId = grainId,
+                    ReminderName = reminderName,
+                    StartAt = DateTime.UtcNow.Add(dueTime),
+                    Period = period,
+                };
+
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_RegisterOrUpdate, "RegisterOrUpdateReminder: {Entry}", entry.ToString());
+                await DoResponsibilitySanityCheck(grainId, "RegisterReminder");
+                var newEtag = await reminderTable.UpsertRow(entry);
+
+                if(newEtag != null)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Registered reminder {Entry} in table, assigned localSequence {LocalSequence}", entry, localTableSequence);
+                    entry.ETag = newEtag;
+                    StartAndAddTimer(entry);
+                    if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
+                    return true;
+                }
+
+                logger.LogError((int)ErrorCode.RS_Register_TableError, "Could not register reminder {Entry} to reminder table due to a race. Please try again later.", entry);
+                throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
+
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Stop the reminder locally, and remove it from the external storage system
         /// </summary>

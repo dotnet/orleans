@@ -22,6 +22,16 @@ namespace Orleans.Timers
         Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period);
 
         /// <summary>
+        /// Tries to register a new reminder if theres an existing one it skips register
+        /// </summary>
+        /// <param name="grainId"></param>
+        /// <param name="reminderName"></param>
+        /// <param name="dueTime"></param>
+        /// <param name="period"></param>
+        /// <returns>boolean</returns>
+        Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period);
+
+        /// <summary>
         /// Unregisters a reminder from the currently active grain.
         /// </summary>
         /// <param name="callingGrainId">The ID of the the currently executing grain</param>
