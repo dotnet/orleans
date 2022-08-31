@@ -14,6 +14,11 @@ namespace Orleans
         /// Defaults to <see langword="true"/> for record types.
         /// </summary>
         public bool IncludePrimaryConstructorParameters { get; init; } = true;
+
+        /// <summary>
+        /// Get or sets when Orleans should auto-assign field ids. The default behavior is to not auto-assign field ids.
+        /// </summary>
+        public GenerateFieldIds GenerateFieldIds { get; init; } = GenerateFieldIds.None;
     }
 
     /// <summary>
