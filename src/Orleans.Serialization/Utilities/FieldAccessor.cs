@@ -57,7 +57,7 @@ namespace Orleans.Serialization.Utilities
             emitter.Emit(OpCodes.Ldfld, field);
             emitter.Emit(OpCodes.Ret);
 
-            return method.CreateDelegate(typeof(Func<,>).MakeGenericType(declaringType, field.FieldType));
+            return method.CreateDelegate((byref ? typeof(ValueTypeGetter<,>) : typeof(Func<,>)).MakeGenericType(declaringType, field.FieldType));
         }
 
         /// <summary>
