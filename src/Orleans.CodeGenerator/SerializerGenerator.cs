@@ -340,7 +340,7 @@ namespace Orleans.CodeGenerator
                             .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
             }
 
-            if (type.SupportsPrimaryContstructorParameters)
+            if (type.SupportsPrimaryConstructorParameters)
             {
                 body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
@@ -486,7 +486,7 @@ namespace Orleans.CodeGenerator
 
             body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserializing"));
 
-            if (type.SupportsPrimaryContstructorParameters)
+            if (type.SupportsPrimaryConstructorParameters)
             {
                 body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => m.IsPrimaryConstructorParameter)))));
                 body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
