@@ -353,8 +353,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var copiedException = _deepCopier.Copy(ex);
-                SendResponse(message, Response.FromException(copiedException));
+                SendResponse(message, Response.FromException(ex));
             }
             catch (Exception exc1)
             {

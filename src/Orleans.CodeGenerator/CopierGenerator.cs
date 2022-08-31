@@ -475,11 +475,9 @@ skip:;
                     inputValue: member.GetGetter(sourceVar),
                     contextVar,
                     codecs,
-                    member,
-                    onlyDeepFields);
-
-                if (getValueExpression is { })
-                    body.Add(ExpressionStatement(member.GetSetter(destinationVar, getValueExpression)));
+                    member);
+                var memberAssignment = ExpressionStatement(member.GetSetter(destinationVar, getValueExpression));
+                body.Add(memberAssignment);
             }
         }
 
@@ -489,8 +487,7 @@ skip:;
             ExpressionSyntax inputValue,
             ExpressionSyntax copyContextVar,
             List<ICopierDescription> codecs,
-            ISerializableMember member,
-            bool onlyDeepFields = false)
+            ISerializableMember member)
         {
             if (member.IsShallowCopyable)
                 return inputValue;
@@ -505,7 +502,7 @@ skip:;
 
             if (codec is null)
             {
-                return onlyDeepFields ? null : InvocationExpression(
+                getValueExpression = InvocationExpression(
                     copyContextVar.Member(DeepCopyMethodName),
                     ArgumentList(SeparatedList(new[] { Argument(inputValue) })));
             }
