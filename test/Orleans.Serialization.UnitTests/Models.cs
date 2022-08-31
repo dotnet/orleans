@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans;
 
@@ -420,5 +421,21 @@ namespace Orleans.Serialization.UnitTests
                 GuidProperty = Guid.TryParse(value, out var guidValue) ? guidValue : default;
             }
         }
+    }
+
+    [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
+    public class ClassWithImplicitFieldIds
+    {
+        public string StringValue { get; }
+        public MyCustomEnum EnumValue { get; }
+
+        [ActivatorUtilitiesConstructor]
+        public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
+        {
+            StringValue = stringValue;
+            EnumValue = enumValue;
+        }
+
+        public override string ToString() => $"{nameof(StringValue)}: {StringValue}, {nameof(EnumValue)}: {EnumValue}";
     }
 }
