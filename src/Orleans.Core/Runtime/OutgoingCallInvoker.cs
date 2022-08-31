@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain reference.
     /// </summary>
-    internal class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext, IMethodArguments
+    internal sealed class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext
     {
         private readonly IInvokable request;
         private readonly InvokeMethodOptions options;
@@ -56,29 +56,15 @@ namespace Orleans.Runtime
 
         public MethodInfo InterfaceMethod => request.Method;
 
-        public IMethodArguments Arguments => this;
-
         public object Result { get => TypedResult; set => TypedResult = (TResult)value; }
 
         public Response Response { get; set; }
 
         public TResult TypedResult { get => Response.GetResult<TResult>(); set => Response = Response.FromResult(value); }
 
-        object IMethodArguments.this[int index]
-        {
-            get => request.GetArgument<object>(index);
-            set => request.SetArgument(index, value);
-        }
-
-        T IMethodArguments.GetArgument<T>(int index) => request.GetArgument<T>(index);
-
-        void IMethodArguments.SetArgument<T>(int index, T value) => request.SetArgument(index, value);
-
-        int IMethodArguments.Length => request.ArgumentCount;
-
         public IGrainContext SourceContext { get; }
 
-        public GrainId? SourceId => SourceContext is { } source ? source.GrainId : null;
+        public GrainId? SourceId => SourceContext?.GrainId;
 
         public GrainId TargetId => grainReference.GrainId;
 

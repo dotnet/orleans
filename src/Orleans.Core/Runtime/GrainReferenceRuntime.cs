@@ -99,9 +99,10 @@ namespace Orleans.Runtime
         /// </summary>
         private void SetGrainCancellationTokensTarget(GrainReference target, IInvokable request)
         {
-            for (var i = 0; i < request.ArgumentCount; i++)
+            var argumentCount = request.ArgumentCount;
+            for (var i = 0; i < argumentCount; i++)
             {
-                var arg = request.GetArgument<object>(i);
+                var arg = request.GetArgument(i);
                 if (arg is not GrainCancellationToken grainToken)
                 {
                     continue;

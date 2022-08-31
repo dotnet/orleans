@@ -469,17 +469,16 @@ namespace Orleans.Runtime
         public abstract ValueTask<Response> Invoke();
 
         /// <inheritdoc/>
-        public abstract TTarget GetTarget<TTarget>();
+        public abstract object GetTarget();
 
         /// <inheritdoc/>
-        public abstract void SetTarget<TTargetHolder>(TTargetHolder holder)
-            where TTargetHolder : ITargetHolder;
+        public abstract void SetTarget(ITargetHolder holder);
 
         /// <inheritdoc/>
-        public virtual TArgument GetArgument<TArgument>(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+        public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
-        public virtual void SetArgument<TArgument>(int index, in TArgument value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+        public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
         public abstract void Dispose();
@@ -513,7 +512,7 @@ namespace Orleans.Runtime
         {
             var result = new StringBuilder();
             result.Append(InterfaceName);
-            if (GetTarget<object>() is { } target)
+            if (GetTarget() is { } target)
             {
                 result.Append("[(");
                 result.Append(InterfaceName);
@@ -529,14 +528,15 @@ namespace Orleans.Runtime
             result.Append('.');
             result.Append(MethodName);
             result.Append('(');
-            for (var n = 0; n < ArgumentCount; n++)
+            var argumentCount = ArgumentCount;
+            for (var n = 0; n < argumentCount; n++)
             {
                 if (n > 0)
                 {
                     result.Append(", ");
                 }
 
-                result.Append(GetArgument<object>(n));
+                result.Append(GetArgument(n));
             }
 
             result.Append(')');

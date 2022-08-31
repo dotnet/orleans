@@ -73,11 +73,6 @@ namespace Orleans
         MethodInfo InterfaceMethod { get; }
 
         /// <summary>
-        /// Gets the arguments for this method invocation.
-        /// </summary>
-        IMethodArguments Arguments { get; }
-
-        /// <summary>
         /// Gets or sets the result.
         /// </summary>
         object Result { get; set; }
@@ -121,45 +116,5 @@ namespace Orleans
         /// Gets the grain context of the sender.
         /// </summary>
         public IGrainContext SourceContext { get; }
-    }
-
-    /// <summary>
-    /// Represents the arguments to a method invocation.
-    /// </summary>
-    public interface IMethodArguments
-    {
-        /// <summary>
-        /// Gets the number of arguments.
-        /// </summary>
-        int Length { get; }
-
-        /// <summary>
-        /// Gets the argument at the provided index.
-        /// </summary>
-        /// <param name="index">The argument index.</param>
-        /// <returns>The argument at the provided index.</returns>
-        object this[int index] { get; set; }
-
-        /// <summary>
-        /// Gets the argument at the provided index.
-        /// </summary>
-        /// <param name="index">
-        /// The argument index.
-        /// </param>
-        /// <typeparam name="T">
-        /// The type of the argument.
-        /// </typeparam>
-        /// <returns>
-        /// The argument at the provided index.
-        /// </returns>
-        T GetArgument<T>(int index);
-
-        /// <summary>
-        /// Sets the argument at the provided index.
-        /// </summary>
-        /// <typeparam name="T">The type of the argument.</typeparam>
-        /// <param name="index">The argument index.</param>
-        /// <param name="value">The new argument value.</param>
-        void SetArgument<T>(int index, T value);
     }
 }

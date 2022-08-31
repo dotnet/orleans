@@ -97,11 +97,11 @@ namespace UnitTests.Grains
 
             // assume single argument message
             if (req.ArgumentCount == 1)
-                arg = (string)UnwrapImmutable(req.GetArgument<object>(0));
+                arg = (string)UnwrapImmutable(req.GetArgument(0));
 
             // assume stream message
             if (req.ArgumentCount == 2)
-                arg = (string)UnwrapImmutable(req.GetArgument<object>(1));
+                arg = (string)UnwrapImmutable(req.GetArgument(1));
 
             if (arg == "err")
                 throw new ApplicationException("boom");

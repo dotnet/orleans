@@ -54,7 +54,7 @@ namespace Orleans.CodeGenerator
                     GenerateGetTypeArrayHelper(libraryTypes, "ParameterTypes", parameterTypes),
                     GenerateGetMethod(libraryTypes),
                     GenerateSetTargetMethod(libraryTypes, interfaceDescription, targetField),
-                    GenerateGetTargetMethod(targetField),
+                    GenerateGetTargetMethod(libraryTypes, targetField),
                     GenerateDisposeMethod(libraryTypes, method, fieldDescriptions, baseClassType),
                     GenerateGetArgumentMethod(libraryTypes, method, fieldDescriptions),
                     GenerateSetArgumentMethod(libraryTypes, method, fieldDescriptions),
@@ -138,8 +138,6 @@ namespace Orleans.CodeGenerator
             InvokableInterfaceDescription interfaceDescription,
             TargetFieldDescription targetField)
         {
-            var type = IdentifierName("TTargetHolder");
-            var typeToken = type.Identifier;
             var holder = IdentifierName("holder");
             var holderParameter = holder.Identifier;
 
@@ -156,27 +154,20 @@ namespace Orleans.CodeGenerator
             var body =
                 AssignmentExpression(
                     SyntaxKind.SimpleAssignmentExpression,
-                    ThisExpression().Member(targetField.FieldName),
+                    IdentifierName(targetField.FieldName),
                     getTarget);
             return MethodDeclaration(libraryTypes.Void.ToTypeSyntax(), "SetTarget")
-                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
-                .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(type))))
+                .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(libraryTypes.ITargetHolder.ToTypeSyntax()))))
                 .WithExpressionBody(ArrowExpressionClause(body))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private static MemberDeclarationSyntax GenerateGetTargetMethod(
-            TargetFieldDescription targetField)
+        private static MemberDeclarationSyntax GenerateGetTargetMethod(LibraryTypes libraryTypes, TargetFieldDescription targetField)
         {
-            var type = IdentifierName("TTarget");
-            var typeToken = type.Identifier;
-
-            var body = CastExpression(type, ThisExpression().Member(targetField.FieldName));
-            return MethodDeclaration(type, "GetTarget")
-                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
+            return MethodDeclaration(libraryTypes.Object.ToTypeSyntax(), "GetTarget")
                 .WithParameterList(ParameterList())
-                .WithExpressionBody(ArrowExpressionClause(body))
+                .WithExpressionBody(ArrowExpressionClause(IdentifierName(targetField.FieldName)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
@@ -190,8 +181,6 @@ namespace Orleans.CodeGenerator
                 return null;
 
             var index = IdentifierName("index");
-            var type = IdentifierName("TArgument");
-            var typeToken = type.Identifier;
 
             var cases = new List<SwitchSectionSyntax>();
             foreach (var field in fields)
@@ -201,7 +190,7 @@ namespace Orleans.CodeGenerator
                     continue;
                 }
 
-                // C#: case {index}: return (TArgument)(object){field}
+                // C#: case {index}: return {field}
                 var label = CaseSwitchLabel(
                     LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
                 cases.Add(
@@ -209,21 +198,14 @@ namespace Orleans.CodeGenerator
                         SingletonList<SwitchLabelSyntax>(label),
                         new SyntaxList<StatementSyntax>(
                             ReturnStatement(
-                                CastExpression(
-                                    type,
-                                    CastExpression(
-                                        libraryTypes.Object.ToTypeSyntax(),
-                                        ThisExpression().Member(parameter.FieldName)))))));
+                                IdentifierName(parameter.FieldName)))));
             }
 
-            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
+            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
             var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
                 IdentifierName("OrleansGeneratedCodeHelper"),
-                GenericName("InvokableThrowArgumentOutOfRange")
-                    .WithTypeArgumentList(
-                        TypeArgumentList(
-                            SingletonSeparatedList<TypeSyntax>(type))));
+                IdentifierName("InvokableThrowArgumentOutOfRange"));
             cases.Add(
                 SwitchSection(
                     SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
@@ -242,9 +224,8 @@ namespace Orleans.CodeGenerator
                                                     Literal(
                                                         Math.Max(0, methodDescription.Method.Parameters.Length - 1))))
                                         })))))));
-            var body = SwitchStatement(ParenthesizedExpression(index), new SyntaxList<SwitchSectionSyntax>(cases));
-            return MethodDeclaration(type, "GetArgument")
-                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
+            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
+            return MethodDeclaration(libraryTypes.Object.ToTypeSyntax(), "GetArgument")
                 .WithParameterList(
                     ParameterList(
                         SingletonSeparatedList(
@@ -263,8 +244,6 @@ namespace Orleans.CodeGenerator
 
             var index = IdentifierName("index");
             var value = IdentifierName("value");
-            var type = IdentifierName("TArgument");
-            var typeToken = type.Identifier;
 
             var cases = new List<SwitchSectionSyntax>();
             foreach (var field in fields)
@@ -274,7 +253,7 @@ namespace Orleans.CodeGenerator
                     continue;
                 }
 
-                // C#: case {index}: {field} = (TField)(object)value; return;
+                // C#: case {index}: {field} = (TField)value; return;
                 var label = CaseSwitchLabel(
                     LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
                 cases.Add(
@@ -286,26 +265,18 @@ namespace Orleans.CodeGenerator
                                 ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
-                                        ThisExpression().Member(parameter.FieldName),
-                                        CastExpression(
-                                            parameter.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions),
-                                            CastExpression(
-                                                libraryTypes.Object.ToTypeSyntax(),
-                                                value
-                                            )))),
+                                        IdentifierName(parameter.FieldName),
+                                        CastExpression(parameter.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), value))),
                                 ReturnStatement()
                             })));
             }
 
-            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
+            // C#: default: OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
             var maxArgs = Math.Max(0, methodDescription.Method.Parameters.Length - 1);
             var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
                 IdentifierName("OrleansGeneratedCodeHelper"),
-                GenericName("InvokableThrowArgumentOutOfRange")
-                    .WithTypeArgumentList(
-                        TypeArgumentList(
-                            SingletonSeparatedList<TypeSyntax>(type))));
+                IdentifierName("InvokableThrowArgumentOutOfRange"));
             cases.Add(
                 SwitchSection(
                     SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
@@ -327,18 +298,15 @@ namespace Orleans.CodeGenerator
                                             })))),
                             ReturnStatement()
                         })));
-            var body = SwitchStatement(ParenthesizedExpression(index), new SyntaxList<SwitchSectionSyntax>(cases));
+            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
             return MethodDeclaration(libraryTypes.Void.ToTypeSyntax(), "SetArgument")
-                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
                 .WithParameterList(
                     ParameterList(
                         SeparatedList(
                             new[]
                             {
                                 Parameter(Identifier("index")).WithType(libraryTypes.Int32.ToTypeSyntax()),
-                                Parameter(Identifier("value"))
-                                    .WithType(type)
-                                    .WithModifiers(TokenList(Token(SyntaxKind.InKeyword)))
+                                Parameter(Identifier("value")).WithType(libraryTypes.Object.ToTypeSyntax())
                             }
                         )))
                 .WithBody(Block(body))

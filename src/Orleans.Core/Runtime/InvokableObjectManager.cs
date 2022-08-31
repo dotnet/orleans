@@ -77,7 +77,7 @@ namespace Orleans
             Utils.SafeExecute(() => tokenSource?.Dispose());
         }
 
-        public class LocalObjectData : IGrainContext
+        public sealed class LocalObjectData : IGrainContext
         {
             private static readonly Func<object, Task> HandleFunc = self => ((LocalObjectData)self).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;

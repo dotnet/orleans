@@ -9,10 +9,10 @@ namespace Orleans.Serialization.Invocation
     {
         public virtual int ArgumentCount => 0;
         public abstract ValueTask<Response> Invoke();
-        public abstract TTarget GetTarget<TTarget>();
-        public abstract void SetTarget<TTargetHolder>(TTargetHolder holder) where TTargetHolder : ITargetHolder;
-        public virtual TArgument GetArgument<TArgument>(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
-        public virtual void SetArgument<TArgument>(int index, in TArgument value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+        public abstract object GetTarget();
+        public abstract void SetTarget(ITargetHolder holder);
+        public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+        public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
         public abstract void Dispose();
         public abstract string MethodName { get; }
         public virtual Type[] MethodTypeArguments => Type.EmptyTypes;

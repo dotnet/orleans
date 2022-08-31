@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal class GrainMethodInvoker : IIncomingGrainCallContext, IMethodArguments
+    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext
     {
         private readonly Message message;
         private readonly IInvokable request;
@@ -55,8 +55,6 @@ namespace Orleans.Runtime
 
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
-        public IMethodArguments Arguments => this;
-        
         public object Result
         {
             get => Response switch
@@ -68,18 +66,6 @@ namespace Orleans.Runtime
         }
 
         public Response Response { get; set; }
-
-        object IMethodArguments.this[int index]
-        {
-            get => request.GetArgument<object>(index);
-            set => request.SetArgument(index, value);
-        }
-
-        T IMethodArguments.GetArgument<T>(int index) => request.GetArgument<T>(index);
-
-        void IMethodArguments.SetArgument<T>(int index, T value) => request.SetArgument(index, value);
-
-        int IMethodArguments.Length => request.ArgumentCount;
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
@@ -175,7 +161,7 @@ namespace Orleans.Runtime
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
             var interfaceType = this.request.InterfaceType;
-            var implementationType = this.request.GetTarget<object>().GetType();
+            var implementationType = this.request.GetTarget().GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(
@@ -183,14 +169,15 @@ namespace Orleans.Runtime
                 interfaceType);
 
             // Get the method info for the method being invoked.
-            if (request.Method.IsConstructedGenericMethod)
+            var method = request.Method;
+            if (method.IsConstructedGenericMethod)
             {
-                if (implementationMap.TryGetValue(request.Method.GetGenericMethodDefinition(), out var entry))
+                if (implementationMap.TryGetValue(method.GetGenericMethodDefinition(), out var entry))
                 {
-                    return entry.GetConstructedGenericMethod(request.Method);
+                    return entry.GetConstructedGenericMethod(method);
                 }
             }
-            else if (implementationMap.TryGetValue(request.Method, out var entry))
+            else if (implementationMap.TryGetValue(method, out var entry))
             {
                 return (entry.ImplementationMethod, entry.InterfaceMethod);
             }
