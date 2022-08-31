@@ -148,8 +148,8 @@ namespace Orleans.Runtime.ReminderService
         public async Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
 
-            var existingEtag = await reminderTable.ReadRow(grainId, reminderName);
-            if (existingEtag == null)
+            var reminderEntry = await reminderTable.ReadRow(grainId, reminderName);
+            if (reminderEntry == null)
             {
                 var entry = new ReminderEntry
                 {
