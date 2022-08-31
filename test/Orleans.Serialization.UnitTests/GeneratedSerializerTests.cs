@@ -332,6 +332,16 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal("bananas", result.StringProperty);
         }
 
+        [Fact]
+        public void ImmutableClassWithImplicitFieldIdsRoundTrip()
+        {
+            var original = new ClassWithImplicitFieldIds("apples", MyCustomEnum.One);
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original.StringValue, result.StringValue);
+            Assert.Equal(original.EnumValue, result.EnumValue);
+        }
+
         public void Dispose() => _serviceProvider?.Dispose();
 
         private T RoundTripThroughCodec<T>(T original)
