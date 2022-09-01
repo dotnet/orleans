@@ -25,6 +25,8 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in metadataModel.SerializableTypes)
             {
+                if (type.IsEnumType) continue;
+
                 if (!metadataModel.DefaultCopiers.TryGetValue(type, out var typeName))
                     typeName = GetCopierTypeName(type);
 

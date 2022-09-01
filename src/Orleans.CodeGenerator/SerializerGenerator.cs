@@ -258,30 +258,31 @@ namespace Orleans.CodeGenerator
 
             CodecFieldDescription GetCodecDescription(IMemberDescription member, int index)
             {
+                var t = member.Type;
                 TypeSyntax codecType = null;
-                if (member.Type.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    && (!SymbolEqualityComparer.Default.Equals(member.Type.ContainingAssembly, libraryTypes.Compilation.Assembly) || member.Type.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute)))
+                if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
+                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                    && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
-                    // Use the concrete generated type and avoid expensive interface dispatch
-                    if (member.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
+                    // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IFieldCodec<TField>)
+                    SimpleNameSyntax name;
+                    if (t is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
                     {
                         // Construct the full generic type name
-                        var ns = ParseName(GetGeneratedNamespaceName(member.Type));
-                        var name = GenericName(Identifier(GetSimpleClassName(member.Type.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => member.GetTypeSyntax(arg)))));
-                        codecType = QualifiedName(ns, name);
+                        name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => member.GetTypeSyntax(arg)))));
                     }
                     else
                     {
-                        var simpleName = $"{GetGeneratedNamespaceName(member.Type)}.{GetSimpleClassName(member.Type.Name)}";
-                        codecType = ParseTypeName(simpleName);
+                        name = IdentifierName(GetSimpleClassName(t.Name));
                     }
+                    codecType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
-                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)) is WellKnownCodecDescription codec)
+                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCodecDescription codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.
                     codecType = codec.CodecType.ToTypeSyntax();
                 }
-                else if (member.Type is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => member.Type is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
+                else if (t is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => t is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
                 {
                     // Construct the generic codec type using the field's type arguments.
                     codecType = genericCodec.CodecType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -292,7 +293,7 @@ namespace Orleans.CodeGenerator
                     codecType = libraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
-                return new CodecFieldDescription(codecType, $"_codec{index}", member.Type);
+                return new CodecFieldDescription(codecType, $"_codec{index}", t);
             }
         }
 

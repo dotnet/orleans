@@ -268,21 +268,21 @@ namespace Orleans.CodeGenerator
 
                 TypeSyntax copierType;
                 if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    && (!SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute)))
+                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                    && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
-                    // Use the concrete generated type and avoid expensive interface dispatch
+                    // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IDeepCopier<T>)
+                    SimpleNameSyntax name;
                     if (t is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
                     {
                         // Construct the full generic type name
-                        var ns = GetGeneratedNamespaceName(t);
-                        var name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => arg.ToTypeSyntax()))));
-                        copierType = QualifiedName(ParseName(ns), name);
+                        name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => arg.ToTypeSyntax()))));
                     }
                     else
                     {
-                        var simpleName = $"{GetGeneratedNamespaceName(t)}.{GetSimpleClassName(t.Name)}";
-                        copierType = ParseTypeName(simpleName);
+                        name = IdentifierName(GetSimpleClassName(t.Name));
                     }
+                    copierType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
                 else if (libraryTypes.WellKnownCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCopierDescription copier)
                 {
