@@ -14,6 +14,7 @@ namespace Orleans.CodeGenerator
         public List<ISerializableTypeDescription> ActivatableTypes { get; } = new(1024);
         public List<INamedTypeSymbol> DetectedSerializers { get; } = new();
         public List<INamedTypeSymbol> DetectedActivators { get; } = new();
+        public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; } = new();
         public List<INamedTypeSymbol> DetectedCopiers { get; } = new();
         public List<INamedTypeSymbol> DetectedConverters { get; } = new();
         public List<(TypeSyntax Type, string Alias)> TypeAliases { get; } = new(1024);

@@ -1,13 +1,13 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using static Orleans.CodeGenerator.InvokableGenerator;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.InvokableGenerator;
 
 namespace Orleans.CodeGenerator
 {
@@ -178,7 +178,7 @@ namespace Orleans.CodeGenerator
                             res.Add(ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
-                                        ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                        field.FieldName.ToIdentifierName(),
                                         GetService(field.FieldType))));
                             break;
                     }
@@ -212,9 +212,6 @@ namespace Orleans.CodeGenerator
             LibraryTypes libraryTypes)
         {
             var fields = new List<GeneratedFieldDescription>();
-            fields.AddRange(serializableTypeDescription.Members
-                .Distinct(MemberDescriptionTypeComparer.Default)
-                .Select(member => GetTypeDescription(member)));
 
             fields.Add(new CodecFieldTypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, serializableTypeDescription.TypeSyntax)); 
 
@@ -228,11 +225,15 @@ namespace Orleans.CodeGenerator
                 fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
             }
 
-            // Add a codec field for any field in the target which does not have a static codec.
-            fields.AddRange(serializableTypeDescription.Members
-                .Distinct(MemberDescriptionTypeComparer.Default)
-                .Where(t => !libraryTypes.StaticCodecs.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t.Type)))
-                .Select(member => GetCodecDescription(member)));
+            int typeIndex = 0;
+            foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
+            {
+                fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+                // Add a codec field for any field in the target which does not have a static codec.
+                if (!libraryTypes.StaticCodecs.Exists(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                    fields.Add(GetCodecDescription(member, typeIndex));
+                typeIndex++;
+            }
 
             foreach (var member in members)
             {
@@ -255,7 +256,7 @@ namespace Orleans.CodeGenerator
 
             return fields;
 
-            CodecFieldDescription GetCodecDescription(IMemberDescription member)
+            CodecFieldDescription GetCodecDescription(IMemberDescription member, int index)
             {
                 TypeSyntax codecType = null;
                 if (member.Type.HasAttribute(libraryTypes.GenerateSerializerAttribute)
@@ -291,17 +292,8 @@ namespace Orleans.CodeGenerator
                     codecType = libraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Codec";
-                return new CodecFieldDescription(codecType, fieldName, member.Type);
+                return new CodecFieldDescription(codecType, $"_codec{index}", member.Type);
             }
-
-            TypeFieldDescription GetTypeDescription(IMemberDescription member)
-            {
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Type";
-                return new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), fieldName, member.TypeSyntax, member.Type);
-            }
-
-            static string ToLowerCamelCase(string input) => char.IsLower(input, 0) ? input : char.ToLowerInvariant(input[0]) + input.Substring(1);
         }
 
         private static MemberDeclarationSyntax GenerateSerializeMethod(
@@ -321,7 +313,7 @@ namespace Orleans.CodeGenerator
                 body.Add(
                     ExpressionStatement(
                         InvocationExpression(
-                            ThisExpression().Member(BaseTypeSerializerFieldName.ToIdentifierName()).Member(SerializeMethodName),
+                            BaseTypeSerializerFieldName.ToIdentifierName().Member(SerializeMethodName),
                             ArgumentList(SeparatedList(new[] { Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam) })))));
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
@@ -401,7 +393,7 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
-                    codecExpression = ThisExpression().Member(instanceCodec.FieldName);
+                    codecExpression = IdentifierName(instanceCodec.FieldName);
                 }
 
                 var expectedType = serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType));
@@ -472,11 +464,11 @@ namespace Orleans.CodeGenerator
 
             if (type.HasComplexBaseType)
             {
-                // C#: this.baseTypeSerializer.Deserialize(ref reader, instance);
+                // C#: _baseTypeSerializer.Deserialize(ref reader, instance);
                 body.Add(
                     ExpressionStatement(
                         InvocationExpression(
-                            ThisExpression().Member(BaseTypeSerializerFieldName.ToIdentifierName()).Member(DeserializeMethodName),
+                            BaseTypeSerializerFieldName.ToIdentifierName().Member(DeserializeMethodName),
                             ArgumentList(SeparatedList(new[]
                             {
                                 Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
@@ -570,7 +562,7 @@ namespace Orleans.CodeGenerator
                     else
                     {
                         var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-                        codecExpression = ThisExpression().Member(instanceCodec.FieldName);
+                        codecExpression = IdentifierName(instanceCodec.FieldName);
                     }
 
                     ExpressionSyntax readValueExpression = InvocationExpression(
@@ -640,7 +632,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 body.Add(ExpressionStatement(InvocationExpression(
-                    ThisExpression().Member($"_hook{hookIndex}").Member(callbackMethodName),
+                    IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
                     ArgumentList(SeparatedList(new[] { argument })))));
             }
         }
@@ -737,7 +729,7 @@ namespace Orleans.CodeGenerator
             innerBody.Add(
                 ExpressionStatement(
                     InvocationExpression(
-                        ThisExpression().Member(SerializeMethodName),
+                        IdentifierName(SerializeMethodName),
                         ArgumentList(
                             SeparatedList(
                                 new[]
@@ -841,11 +833,12 @@ namespace Orleans.CodeGenerator
                 false => type.GetObjectCreationExpression(libraryTypes)
             };
 
-            // C#: TField result = _activator.Create();
-            // or C#: TField result = new TField();
+            // C#: var result = _activator.Create();
+            // or C#: var result = new TField();
+            // or C#: var result = default(TField);
             innerBody.Add(LocalDeclarationStatement(
                 VariableDeclaration(
-                    type.TypeSyntax,
+                    IdentifierName("var"),
                     SingletonSeparatedList(VariableDeclarator(resultVar.Identifier)
                     .WithInitializer(EqualsValueClause(createValueExpression))))));
 
@@ -869,7 +862,7 @@ namespace Orleans.CodeGenerator
             innerBody.Add(
                 ExpressionStatement(
                     InvocationExpression(
-                        ThisExpression().Member(DeserializeMethodName),
+                        IdentifierName(DeserializeMethodName),
                         ArgumentList(
                             SeparatedList(
                                 new[]

@@ -111,11 +111,5 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
             return allConstraints;
         }
-
-        public static string GetSanitizedName(IParameterSymbol parameter, int index)
-        {
-            var parameterName = string.IsNullOrWhiteSpace(parameter.Name) ? "arg" : parameter.Name;
-            return string.Format(CultureInfo.InvariantCulture, "{0}{1:G}", parameterName, index);
-        }
     }
 }

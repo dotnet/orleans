@@ -42,7 +42,7 @@ namespace Orleans.CodeGenerator
                         Token(SyntaxKind.ReadOnlyKeyword)));
             }
 
-            members.Add(GenerateConstructor(libraryTypes, simpleClassName, orderedFields));
+            members.Add(GenerateConstructor(simpleClassName, orderedFields));
             members.Add(GenerateCreateMethod(libraryTypes, type, orderedFields));
 
             var classDeclaration = ClassDeclaration(simpleClassName)
@@ -63,7 +63,6 @@ namespace Orleans.CodeGenerator
         public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => $"Activator_{serializableType.Name}";
 
         private static ConstructorDeclarationSyntax GenerateConstructor(
-            LibraryTypes libraryTypes,
             string simpleClassName,
             List<ConstructorArgument> orderedFields)
         {
@@ -76,7 +75,7 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(
                             AssignmentExpression(
                                 SyntaxKind.SimpleAssignmentExpression,
-                                ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                field.FieldName.ToIdentifierName(),
                                 Unwrapped(field.ParameterName.ToIdentifierName()))));
             }
 

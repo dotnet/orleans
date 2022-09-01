@@ -382,9 +382,10 @@ namespace Orleans.CodeGenerator
                     return _shallowCopyableTypes[type] = IsShallowCopyable(namedType.TypeArguments.Single());
                 }
 
-                if (TupleTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, def)))
+                foreach (var t in TupleTypes)
                 {
-                    return _shallowCopyableTypes[type] = namedType.TypeArguments.All(IsShallowCopyable);
+                    if (SymbolEqualityComparer.Default.Equals(t, def))
+                        return _shallowCopyableTypes[type] = namedType.TypeArguments.All(IsShallowCopyable);
                 }
             }
             else

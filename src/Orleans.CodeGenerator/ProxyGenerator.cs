@@ -1,15 +1,15 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
-using System.Linq;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System;
 using Orleans.CodeGenerator.Diagnostics;
-using static Orleans.CodeGenerator.SerializerGenerator;
-using static Orleans.CodeGenerator.InvokableGenerator;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.CopierGenerator;
+using static Orleans.CodeGenerator.InvokableGenerator;
+using static Orleans.CodeGenerator.SerializerGenerator;
 
 namespace Orleans.CodeGenerator
 {
@@ -190,7 +190,7 @@ namespace Orleans.CodeGenerator
                 var valueExpression = GenerateMemberCopy(
                     fieldDescriptions,
                     libraryTypes,
-                    IdentifierName(SyntaxFactoryUtility.GetSanitizedName(parameter.Member.Parameter, parameterIndex)),
+                    IdentifierName($"arg{parameterIndex}"),
                     copyContextVariable,
                     codecs,
                     parameter);
@@ -332,7 +332,7 @@ namespace Orleans.CodeGenerator
 
             static ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter, int index)
             {
-                var name = SyntaxFactoryUtility.GetSanitizedName(parameter, index);
+                var name = $"arg{index}";
                 var result = Argument(IdentifierName(name));
                 switch (parameter.RefKind)
                 {
@@ -370,7 +370,7 @@ namespace Orleans.CodeGenerator
                                 res.Add(ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
-                                        ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                        field.FieldName.ToIdentifierName(),
                                         GetService(field.FieldType))));
                             }
                             break;
@@ -396,7 +396,7 @@ namespace Orleans.CodeGenerator
 
         private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
         {
-            var result = Parameter(Identifier(SyntaxFactoryUtility.GetSanitizedName(parameter, index))).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+            var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
             switch (parameter.RefKind)
             {
                 case RefKind.None:

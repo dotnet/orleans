@@ -47,6 +47,7 @@ namespace Orleans.CodeGenerator
         public string Name { get; }
         public bool IsValueType => false;
         public bool IsSealedType => true;
+        public bool IsAbstractType => false;
         public bool IsEnumType => false;
         public bool IsGenericType => TypeParameters.Count > 0;
         public List<IMemberDescription> Members { get; }
