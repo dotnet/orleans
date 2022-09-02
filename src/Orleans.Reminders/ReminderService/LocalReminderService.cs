@@ -151,30 +151,8 @@ namespace Orleans.Runtime.ReminderService
             var reminderEntry = await reminderTable.ReadRow(grainId, reminderName);
             if (reminderEntry == null)
             {
-                var entry = new ReminderEntry
-                {
-                    GrainId = grainId,
-                    ReminderName = reminderName,
-                    StartAt = DateTime.UtcNow.Add(dueTime),
-                    Period = period,
-                };
-
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_RegisterOrUpdate, "RegisterOrUpdateReminder: {Entry}", entry.ToString());
-                await DoResponsibilitySanityCheck(grainId, "RegisterReminder");
-                var newEtag = await reminderTable.UpsertRow(entry);
-
-                if(newEtag != null)
-                {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Registered reminder {Entry} in table, assigned localSequence {LocalSequence}", entry, localTableSequence);
-                    entry.ETag = newEtag;
-                    StartAndAddTimer(entry);
-                    if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
-                    return true;
-                }
-
-                logger.LogError((int)ErrorCode.RS_Register_TableError, "Could not register reminder {Entry} to reminder table due to a race. Please try again later.", entry);
-                throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
-
+                await RegisterOrUpdateReminder(grainId, reminderName,  dueTime, period);
+                return true;
             }
 
             return false;
