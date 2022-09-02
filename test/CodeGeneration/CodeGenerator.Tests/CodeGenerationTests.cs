@@ -4,21 +4,22 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.CodeGenerator;
 using Orleans.CodeGeneration;
+using Orleans.CodeGenerator;
 using Orleans.CodeGenerator.Compatibility;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Utilities;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.CodeGenerator.Model;
-using System.Text;
-using Orleans.Serialization;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("Microsoft")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("2.0.0.0")]
@@ -33,7 +34,7 @@ namespace CodeGenerator.Tests
     /// Tests for <see cref="RoslynTypeNameFormatter"/>.
     /// </summary>
     [Trait("Category", "BVT")]
-    public class RoslynTypeNameFormatterTests
+    public class CodeGenerationTests
     {
         private readonly ITestOutputHelper output;
 
@@ -77,8 +78,10 @@ namespace CodeGenerator.Tests
         };
 
         private readonly CSharpCompilation compilation;
+        private readonly LoggerFactory loggerFactory;
+        private readonly ILogger<CodeGenerationTests> logger;
 
-        public RoslynTypeNameFormatterTests(ITestOutputHelper output)
+        public CodeGenerationTests(ITestOutputHelper output)
         {
             this.output = output;
 
@@ -92,11 +95,12 @@ namespace CodeGenerator.Tests
                 typeof(Attribute).Assembly,
                 typeof(System.Net.IPAddress).Assembly,
                 typeof(ExcludeFromCodeCoverageAttribute).Assembly,
+                typeof(GenericMethodInvoker).Assembly,
             }.Select(a => MetadataReference.CreateFromFile(a.Location, MetadataReferenceProperties.Assembly));
             var metadataReferences = metas.Concat(GetGlobalReferences()).ToArray();
 
             var syntaxTrees = new[] { CSharpSyntaxTree.ParseText(testCode, path: "TestProgram.cs") };
-            var assemblyName = typeof(RoslynTypeNameFormatterTests).Assembly.GetName().Name;
+            var assemblyName = typeof(CodeGenerationTests).Assembly.GetName().Name;
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithMetadataImportOptions(MetadataImportOptions.All);
             this.compilation = CSharpCompilation.Create(assemblyName, syntaxTrees, metadataReferences, options);
 
@@ -119,11 +123,14 @@ namespace CodeGenerator.Tests
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.Serialization.Formatters.dll"))
                 };
             }
+
+            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            this.logger = this.loggerFactory.CreateLogger<CodeGenerationTests>();
         }
 
         private string GetSource()
         {
-            var type = typeof(RoslynTypeNameFormatterTests);
+            var type = typeof(CodeGenerationTests);
             using (var stream = type.Assembly.GetManifestResourceStream($"{type.Namespace}.{type.Name}.cs"))
             using (StreamReader reader = new StreamReader(stream))
             {
@@ -137,7 +144,7 @@ namespace CodeGenerator.Tests
         [Fact]
         public void FullNameMatchesClr()
         {
-            foreach (var (type, symbol) in GetTypeSymbolPairs(nameof(Types)))
+            foreach (var (type, symbol) in GetTypeSymbolPairs(this.compilation, nameof(Types)))
             {
                 this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
                 var expected = type.FullName;
@@ -150,7 +157,7 @@ namespace CodeGenerator.Tests
         [Fact]
         public void TypeKeyMatchesRuntimeTypeKey()
         {
-            foreach (var (type, symbol) in GetTypeSymbolPairs(nameof(Types)))
+            foreach (var (type, symbol) in GetTypeSymbolPairs(this.compilation, nameof(Types)))
             {
                 var expectedTypeKey = TypeUtilities.OrleansTypeKeyString(type);
                 var actualTypeKey = OrleansLegacyCompat.OrleansTypeKeyString(symbol);
@@ -166,7 +173,7 @@ namespace CodeGenerator.Tests
         public void TypeCodesMatch()
         {
             var wellKnownTypes = new WellKnownTypes(this.compilation);
-            foreach (var (type, symbol) in GetTypeSymbolPairs(nameof(Grains)))
+            foreach (var (type, symbol) in GetTypeSymbolPairs(this.compilation, nameof(Grains)))
             {
                 this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
 
@@ -205,7 +212,7 @@ namespace CodeGenerator.Tests
         public void MethodIdsMatch()
         {
             var wellKnownTypes = new WellKnownTypes(this.compilation);
-            foreach (var (type, typeSymbol) in GetTypeSymbolPairs(nameof(Grains)))
+            foreach (var (type, typeSymbol) in GetTypeSymbolPairs(this.compilation, nameof(Grains)))
             {
                 this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
 
@@ -234,7 +241,33 @@ namespace CodeGenerator.Tests
             }
         }
 
-        private IEnumerable<(Type, ITypeSymbol)> GetTypeSymbolPairs(string fieldName)
+        [Fact]
+        public void SerializerClassesShouldBeGeneratedCorrectly()
+        {
+            var codeGenerator = new Orleans.CodeGenerator.CodeGenerator(this.compilation, new CodeGeneratorOptions(), this.logger);
+
+            // Execute code generator on the compilation produced from this source file
+            string generatedCode = codeGenerator.GenerateCode(CancellationToken.None)
+                .NormalizeWhitespace()
+                .ToFullString();
+
+            // Create a new compilation from the code generator output
+            var syntaxTree = CSharpSyntaxTree.ParseText(generatedCode, path: "GeneratedCode.cs");
+            var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithMetadataImportOptions(MetadataImportOptions.All);
+            var generatedCodeCompilation = CSharpCompilation.Create("GeneratedCode", options: options, syntaxTrees: new[] { syntaxTree });
+
+            // Verify that the compilation includeds a serializer for a type only present in inherited methods
+            GetClassDeclaration(
+                compilation: generatedCodeCompilation,
+                className: $"{Orleans.CodeGenerator.CodeGenerator.ToolName}CodeGenerator_Tests_{nameof(CodeGenerationTests)}Serializer_{nameof(TypeInParentInterface)}Serializer");
+
+            // Verify that the compilation includeds a serializer for a type present in the grain class
+            GetClassDeclaration(
+                compilation: generatedCodeCompilation,
+                className: $"{Orleans.CodeGenerator.CodeGenerator.ToolName}CodeGenerator_Tests_{nameof(CodeGenerationTests)}Serializer_{nameof(TypeInGrain)}Serializer");
+        }
+
+        private IEnumerable<(Type, ITypeSymbol)> GetTypeSymbolPairs(CSharpCompilation compilation, string fieldName)
         {
             var typesMember = compilation.Assembly.GlobalNamespace
                 .GetMembers("CodeGenerator")
@@ -242,7 +275,7 @@ namespace CodeGenerator.Tests
                 .GetMembers("Tests")
                 .Cast<INamespaceOrTypeSymbol>()
                 .First()
-                .GetTypeMembers("RoslynTypeNameFormatterTests")
+                .GetTypeMembers(nameof(CodeGenerationTests))
                 .First()
                 .GetMembers(fieldName)
                 .First();
@@ -262,6 +295,23 @@ namespace CodeGenerator.Tests
             var types = (Type[])this.GetType().GetField(fieldName, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             var pairs = types.Zip(typeSymbols, ValueTuple.Create);
             return pairs;
+        }
+
+        private ITypeSymbol GetClassDeclaration(CSharpCompilation compilation, string className)
+        {
+            var typesMember = compilation.Assembly.GlobalNamespace
+                .GetMembers("CodeGenerator")
+                .First()
+                .GetMembers("Tests")
+                .Cast<INamespaceOrTypeSymbol>()
+                .First()
+                .GetTypeMembers(className)
+                .FirstOrDefault();
+
+            Assert.NotNull(typesMember);
+            Assert.IsType<ClassDeclarationSyntax>(typesMember.DeclaringSyntaxReferences.First().GetSyntax());
+
+            return typesMember;
         }
 
         public interface IMyGrainInterface : IGrainWithGuidKey
@@ -311,6 +361,26 @@ namespace CodeGenerator.Tests
 
             [MethodId(-41243)]
             public Task<int> Two() => throw new NotImplementedException();
+        }
+
+        public class TypeInParentInterface
+        {
+
+        }
+
+        public class TypeInGrain
+        {
+
+        }
+
+        public interface IParentInterface
+        {
+            public Task<TypeInParentInterface> One();
+        }
+
+        public interface IMyGrainWithInterfaceInheritance : IGrainWithGuidKey, IParentInterface
+        {
+            public Task<TypeInGrain> Two();
         }
     }
 
