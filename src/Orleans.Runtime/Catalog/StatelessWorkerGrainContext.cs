@@ -14,9 +14,9 @@ namespace Orleans.Runtime
         private readonly GrainTypeSharedContext _sharedContext;
         private readonly IGrainContextActivator _innerActivator;
         private readonly int _maxWorkers;
-        private readonly List<IGrainContext> _workers = new();
+        private readonly List<ActivationData> _workers = new();
         private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
-        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
+        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };        
 
         /// <summary>
         /// The <see cref="Task"/> representing the <see cref="RunMessageLoop"/> invocation.
@@ -27,8 +27,7 @@ namespace Orleans.Runtime
 #pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
-
-        private int _nextWorker;
+        
         private GrainReference _grainReference;
 
         public StatelessWorkerGrainContext(
@@ -149,7 +148,7 @@ namespace Orleans.Runtime
                                 }
                             case WorkItemType.OnDestroyActivation:
                                 {
-                                    var grainContext = (IGrainContext)workItem.State;
+                                    var grainContext = (ActivationData)workItem.State;
                                     _workers.Remove(grainContext);
                                     break;
                                 }
@@ -170,24 +169,54 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (_workers.Count < _maxWorkers)
+                ActivationData worker = null;
+                ActivationData minimumWaitingCountWorker = null;
+                var minimumWaitingCount = int.MaxValue;
+
+                // Make sure there is at least one worker
+                if (_workers.Count == 0)
                 {
-                    // Create a new worker
-                    var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
-                    var newWorker = _innerActivator.CreateContext(address);
+                    worker = CreateWorker(message);
+                }
+                else
+                {
+                    // Check to see if we have any inactive workers, prioritizing
+                    // them in the order they were created to minimize the number
+                    // of workers spawned
+                    for (var i = 0; i < _workers.Count; i++)
+                    {
+                        if (_workers[i].IsInactive)
+                        {
+                            worker = _workers[i];
+                            break;
+                        }
+                        else
+                        {
+                            // Track the worker with the lowest value for WaitingCount,
+                            // this is used if all workers are busy
+                            if (_workers[i].WaitingCount < minimumWaitingCount)
+                            {
+                                minimumWaitingCount = _workers[i].WaitingCount;
+                                minimumWaitingCountWorker = _workers[i];
+                            }
+                        }
+                    }
 
-                    // Observe the create/destroy lifecycle of the activation
-                    newWorker.SetComponent<IActivationLifecycleObserver>(this);
-
-                    // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
-                    var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-                    var cancellation = new CancellationTokenSource(_sharedContext.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-                    newWorker.Activate(requestContext, cancellation.Token);
-
-                    _workers.Add(newWorker);
+                    if (worker == null)
+                    {
+                        // There are no inactive workers, can we make more of them?
+                        if (_workers.Count < _maxWorkers)
+                        {
+                            worker = CreateWorker(message);
+                        }
+                        else
+                        {
+                            // Pick the one with the lowest waiting count
+                            worker = minimumWaitingCountWorker;
+                        }
+                    }
                 }
 
-                var worker = _workers[Math.Abs(_nextWorker++) % _workers.Count];
                 worker.ReceiveMessage(message);
             }
             catch (Exception exception) when (message is Message msg)
@@ -198,6 +227,23 @@ namespace Orleans.Runtime
                     exception,
                     "Exception while creating grain context");
             }
+        }
+
+        private ActivationData CreateWorker(object message)
+        {
+            var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
+            var newWorker = (ActivationData)_innerActivator.CreateContext(address);
+
+            // Observe the create/destroy lifecycle of the activation
+            newWorker.SetComponent<IActivationLifecycleObserver>(this);
+
+            // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
+            var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
+            var cancellation = new CancellationTokenSource(_sharedContext.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+            newWorker.Activate(requestContext, cancellation.Token);
+
+            _workers.Add(newWorker);
+            return newWorker;
         }
 
         private void ActivateInternal(Dictionary<string, object> requestContext, CancellationToken? cancellationToken)
@@ -245,10 +291,10 @@ namespace Orleans.Runtime
                         {
                             tasks.Add(disposable.DisposeAsync().AsTask());
                         }
-                        else if (worker is IDisposable syncDisposable)
-                        {
-                            syncDisposable.Dispose();
-                        }
+                        //else if (worker is IDisposable syncDisposable)
+                        //{
+                        //    syncDisposable.Dispose();
+                        //}
                     }
                     catch (Exception exception)
                     {
