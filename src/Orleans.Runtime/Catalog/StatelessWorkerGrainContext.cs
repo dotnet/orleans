@@ -291,10 +291,6 @@ namespace Orleans.Runtime
                         {
                             tasks.Add(disposable.DisposeAsync().AsTask());
                         }
-                        //else if (worker is IDisposable syncDisposable)
-                        //{
-                        //    syncDisposable.Dispose();
-                        //}
                     }
                     catch (Exception exception)
                     {
