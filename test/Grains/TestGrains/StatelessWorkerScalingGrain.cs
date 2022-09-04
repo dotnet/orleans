@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
@@ -21,7 +17,6 @@ public class StatelessWorkerScalingGrain : Grain, IStatelessWorkerScalingGrain
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         activation = activationCounter.AddOrUpdate(this.GetPrimaryKeyLong(), 1, (k, v) => v + 1);
-
         return base.OnActivateAsync(cancellationToken);
     }
 

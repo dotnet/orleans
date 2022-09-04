@@ -115,7 +115,7 @@ namespace DefaultCluster.Tests.General
             IStatelessWorkerScalingGrain firstGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
             IStatelessWorkerScalingGrain secondGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
 
-            foreach (var taskNo in Enumerable.Range(0, 10))
+            foreach (var _ in Enumerable.Range(0, 10))
             {
                 IStatelessWorkerScalingGrain transientGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
                 var activation1 = await firstGrain.GetActivation();
@@ -140,7 +140,7 @@ namespace DefaultCluster.Tests.General
             var secondActivation = await secondGrain.GetActivation();   // Now that the semaphore is blocking the first call,
                                                                         // get the activation number
             await Task.WhenAll(firstGrain.Release(),
-                               secondGrain.Release());                  // And then release the semaphore
+                               secondGrain.Release());                  // And then release the semaphores
             
             Assert.Equal(1, firstActivation);
             Assert.Equal(2, secondActivation);
