@@ -11,12 +11,12 @@ namespace UnitTests.Grains;
 public class StatelessWorkerScalingGrain : Grain, IStatelessWorkerScalingGrain
 {
     private static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1);
-    private static ConcurrentDictionary<long, int> activationCounter = new();
-    private int activation;
+    private static ConcurrentDictionary<long, int> _activationCounter = new();
+    private int _activation;
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        activation = activationCounter.AddOrUpdate(this.GetPrimaryKeyLong(), 1, (k, v) => v + 1);
+        _activation = _activationCounter.AddOrUpdate(this.GetPrimaryKeyLong(), 1, (k, v) => v + 1);
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -38,5 +38,5 @@ public class StatelessWorkerScalingGrain : Grain, IStatelessWorkerScalingGrain
         return Task.CompletedTask;
     }
 
-    public Task<int> GetActivation() => Task.FromResult(activation);
+    public Task<int> GetActivation() => Task.FromResult(_activation);
 }
