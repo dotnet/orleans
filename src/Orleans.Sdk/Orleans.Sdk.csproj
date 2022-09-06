@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Sdk</PackageId>
     <Description>Microsoft Orleans meta package to bring in the base Orleans packages for all project types.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeSymbols>false</IncludeSymbols>

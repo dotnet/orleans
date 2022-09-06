@@ -5,7 +5,7 @@
     <Title>Microsoft Orleans TLS support</Title>
     <Description>Support for security communication using TLS in Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) TLS SSL</PackageTags>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

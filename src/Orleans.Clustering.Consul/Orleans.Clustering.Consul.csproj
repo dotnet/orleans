@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans clustering provider for Consul</Title>
     <Description>Microsoft Orleans clustering provider backed by Consul</Description>
     <PackageTags>$(PackageTags) Consul</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Clustering.Consul</AssemblyName>
   </PropertyGroup>
 

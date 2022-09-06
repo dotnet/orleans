@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Azure Storage Transactions Provider</Title>
     <Description>Microsoft Orleans transactions storage provider backed by Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Transactions</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Transactions.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Transactions.AzureStorage</RootNamespace>
     <DefineConstants>$(DefineConstants);ORLEANS_TRANSACTIONS</DefineConstants>

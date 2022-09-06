@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans AWS DynamoDB Clustering Provider</Title>
     <Description>Microsoft Orleans clustering provider backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

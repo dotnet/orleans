@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.TestingHost</PackageId>
     <Title>Microsoft Orleans Testing Host Library</Title>
     <Description>Microsoft Orleans library for hosting a silo in a testing project.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

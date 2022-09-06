@@ -7,7 +7,7 @@
     <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

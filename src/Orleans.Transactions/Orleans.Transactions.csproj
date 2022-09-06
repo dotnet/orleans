@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Transactions support</Title>
     <Description>Core Transaction library of Microsoft Orleans used on the server.</Description>
     <PackageTags>$(PackageTags) Transactions</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Transactions</AssemblyName>
     <RootNamespace>Orleans.Transactions</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

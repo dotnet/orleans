@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.Runtime</PackageId>
     <Title>Microsoft Orleans Runtime</Title>
     <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

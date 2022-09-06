@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Azure Storage Grain Directory Provider</Title>
     <Description>Microsoft Orleans Grain Directory provider backed by Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Grain Directory</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.GrainDirectory.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.GrainDirectory.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

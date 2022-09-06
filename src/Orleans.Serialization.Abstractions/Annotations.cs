@@ -45,33 +45,6 @@ namespace Orleans
         /// </summary>
         /// <value>true if this instance is extension; otherwise, false.</value>
         public bool IsExtension { get; }
-
-#pragma warning disable 1574 // ValueTask not directly in netstandard2.0
-        /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.ValueTask"/>.
-        /// </summary>
-        public Type ValueTaskInvoker { get; init; }
-
-        /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.ValueTask{T}"/> value.
-        /// </summary>
-        public Type ValueTask1Invoker { get; init; }
-#pragma warning restore 1574
-
-        /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.Task"/> value.
-        /// </summary>
-        public Type TaskInvoker { get; init; }
-
-        /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.Task{T}"/> value.
-        /// </summary>
-        public Type Task1Invoker { get; init; }
-
-        /// <summary>
-        /// Gets or sets the base type for the method call representation which is generated for any method which returns <see langword="void"/>.
-        /// </summary>
-        public Type VoidInvoker { get; init; }
     }
 
     /// <summary>

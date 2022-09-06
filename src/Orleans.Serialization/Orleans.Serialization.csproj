@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Serialization</PackageId>
     <PackageDescription>Fast, flexible, and version-tolerant serializer for .NET</PackageDescription>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
