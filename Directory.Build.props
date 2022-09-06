@@ -57,7 +57,6 @@
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
     <SystemIoPipelinesVersion>6.0.1</SystemIoPipelinesVersion>
     <SystemMemoryDataVersion>1.0.1</SystemMemoryDataVersion>
-    <SystemThreadingTasksExtensionsVersion>4.5.4</SystemThreadingTasksExtensionsVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>17.2.0</MicrosoftBuildVersion>
