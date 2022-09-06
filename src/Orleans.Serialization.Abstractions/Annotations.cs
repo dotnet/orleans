@@ -46,6 +46,7 @@ namespace Orleans
         /// <value>true if this instance is extension; otherwise, false.</value>
         public bool IsExtension { get; }
 
+#pragma warning disable 1574 // ValueTask not directly in netstandard2.0
         /// <summary>
         /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.ValueTask"/>.
         /// </summary>
@@ -55,6 +56,7 @@ namespace Orleans
         /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.ValueTask{T}"/> value.
         /// </summary>
         public Type ValueTask1Invoker { get; init; }
+#pragma warning restore 1574
 
         /// <summary>
         /// Gets or sets the base type for the method call representation which is generated for any method which returns a <see cref="System.Threading.Tasks.Task"/> value.
@@ -542,7 +544,7 @@ namespace Orleans
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The surrogate.</returns>
-        TSurrogate ConvertToSurrogate(in TValue value); 
+        TSurrogate ConvertToSurrogate(in TValue value);
     }
 
     /// <summary>
