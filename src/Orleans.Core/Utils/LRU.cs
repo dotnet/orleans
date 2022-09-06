@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
@@ -10,7 +9,7 @@ namespace Orleans.Runtime
 {
     // This class implements an LRU (Least Recently Used) cache of values. It keeps a bounded set of values and will
     // flush "old" values 
-    internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+    internal sealed class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {
         // The following machinery is used to notify client objects when a key and its value 
         // is being flushed from the cache.
@@ -24,7 +23,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan requiredFreshness;
         // We want this to be a reference type so that we can update the values in the cache
         // without having to call AddOrUpdate, which is a nuisance
-        private class TimestampedValue : IEquatable<TimestampedValue>
+        private sealed class TimestampedValue : IEquatable<TimestampedValue>
         {
             public readonly TValue Value;
             public CoarseStopwatch Age;
@@ -115,26 +114,13 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            if (predicate(context, timestampedValue.Value) && TryRemoveInternal(key, timestampedValue))
+            if (predicate(context, timestampedValue.Value) && cache.TryRemove(KeyValuePair.Create(key, timestampedValue)))
             {
                 Interlocked.Decrement(ref count);
                 return true;
             }
 
             return false;
-
-            bool TryRemoveInternal(TKey key, TimestampedValue value)
-            {
-                var entry = new KeyValuePair<TKey, TimestampedValue>(key, value);
-
-#if NET5_0_OR_GREATER
-                return cache.TryRemove(entry);
-#else
-            // Cast the dictionary to its interface type to access the explicitly implemented Remove method.
-            var cacheDictionary = (IDictionary<TKey, TimestampedValue>)cache;
-            return cacheDictionary.Remove(entry);
-#endif
-            }
         }
 
         private long GetNewGeneration() => Interlocked.Increment(ref nextGeneration);
