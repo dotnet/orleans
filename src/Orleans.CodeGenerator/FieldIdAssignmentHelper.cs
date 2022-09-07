@@ -173,7 +173,7 @@ internal class FieldIdAssignmentHelper
             return false;
         }
 
-        return true;
+        return success;
 
         bool GenerateFromProperties(IEnumerable<IPropertySymbol> properties)
         {
