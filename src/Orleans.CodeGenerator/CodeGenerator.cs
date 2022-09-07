@@ -232,7 +232,19 @@ namespace Orleans.CodeGenerator
                                 }
                             }
 
-                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryConstructorParameters && constructorParameters.Length > 0, GetDataMembers(symbol, constructorParameters), LibraryTypes);
+                            var implicitMemberSelectionStrategy = (_options.GenerateFieldIds, GetGenerateFieldIdsOptionFromType(symbol)) switch
+                            {
+                                (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
+                                (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
+                                _  => GenerateFieldIds.None
+                            };
+                            var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
+                            if (!fieldIdAssignmentHelper.IsValidForSerialization)
+                            {
+                                throw new InvalidOperationException($"Implicit field ids cannot be generated for type {symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}: {fieldIdAssignmentHelper.FailureReason}.");
+                            }
+
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryConstructorParameters && constructorParameters.Length > 0, GetDataMembers(fieldIdAssignmentHelper), LibraryTypes);
                             metadataModel.SerializableTypes.Add(typeDescription);
                         }
                     }
@@ -302,6 +314,23 @@ namespace Orleans.CodeGenerator
                                 break;
                             }
                         }
+                    }
+
+                    GenerateFieldIds GetGenerateFieldIdsOptionFromType(INamedTypeSymbol t)
+                    {
+                        var attribute = HasAttribute(t, LibraryTypes.GenerateSerializerAttribute);
+                        if (attribute == null)
+                            return GenerateFieldIds.None;
+
+                        foreach (var namedArgument in attribute.NamedArguments)
+                        {
+                            if (namedArgument.Key == "GenerateFieldIds")
+                            {
+                                var value = namedArgument.Value.Value;
+                                return value == null ? GenerateFieldIds.None : (GenerateFieldIds)(int)value;
+                            }
+                        }
+                        return GenerateFieldIds.None;
                     }
 
                     bool ShouldGenerateSerializer(INamedTypeSymbol t)
@@ -421,152 +450,32 @@ namespace Orleans.CodeGenerator
         }
 
         // Returns descriptions of all data members (fields and properties)
-        private IEnumerable<IMemberDescription> GetDataMembers(INamedTypeSymbol symbol, ImmutableArray<IParameterSymbol> constructorParameters)
+        private IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
         {
             var members = new Dictionary<(ushort, bool), IMemberDescription>();
-            var hasAttributes = false;
-            foreach (var member in symbol.GetMembers())
+
+            foreach (var member in fieldIdAssignmentHelper.Members)
             {
-                if (member.IsStatic || member.IsAbstract)
-                {
+                if (!fieldIdAssignmentHelper.TryGetSymbolKey(member, out var key))
                     continue;
-                }
+                var (id, isConstructorParameter) = key;
 
-                if (member.HasAttribute(LibraryTypes.NonSerializedAttribute))
+                // FieldDescription takes precedence over PropertyDescription (never replace)
+                if (member is IPropertySymbol property && !members.TryGetValue((id, isConstructorParameter), out _))
                 {
-                    continue;
-                }
-
-                if (LibraryTypes.IdAttributeTypes.Any(t => member.HasAttribute(t)))
-                {
-                    hasAttributes = true;
-                    break;
-                }
-            }
-
-            var nextFieldId = (ushort)0;
-
-            var allowImplicitFieldIds = _options.GenerateFieldIds != GenerateFieldIds.None || TypeAllowsImplicitFieldIds(symbol);
-
-            foreach (var member in symbol.GetMembers().OrderBy(m => m.MetadataName))
-            {
-                if (member.IsStatic || member.IsAbstract)
-                {
-                    continue;
-                }
-
-                // Only consider fields and properties.
-                if (member is not (IFieldSymbol or IPropertySymbol))
-                {
-                    continue;
-                }
-
-                if (member.HasAttribute(LibraryTypes.NonSerializedAttribute))
-                {
-                    continue;
-                }
-
-                if (member is IPropertySymbol prop)
-                {
-                    var id = GetId(prop);
-                    var isPrimaryConstructorParameter = false;
-
-                    if (!id.HasValue)
-                    {
-                        if (hasAttributes || !allowImplicitFieldIds)
-                        {
-                            continue;
-                        }
-
-                        var primaryConstructorParameter = constructorParameters.FirstOrDefault(x => x.Name.Equals(prop.Name, StringComparison.OrdinalIgnoreCase));
-                        if (primaryConstructorParameter is not null)
-                        {
-                            id = (ushort)constructorParameters.IndexOf(primaryConstructorParameter);
-                            isPrimaryConstructorParameter = true;
-                        }
-                        else
-                        {
-                            id = ++nextFieldId;
-                        }
-                    }
-
-                    // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue((id.Value, isPrimaryConstructorParameter), out var existing))
-                    {
-                        members[(id.Value, isPrimaryConstructorParameter)] = new PropertyDescription(id.Value, isPrimaryConstructorParameter, prop);
-                    }
+                    members[(id, isConstructorParameter)] = new PropertyDescription(id, isConstructorParameter, property);
                 }
 
                 if (member is IFieldSymbol field)
                 {
-                    var id = GetId(field);
-                    var isPrimaryConstructorParameter = false;
-
-                    if (!id.HasValue)
+                    // FieldDescription takes precedence over PropertyDescription (add or replace)
+                    if (!members.TryGetValue((id, isConstructorParameter), out var existing) || existing is PropertyDescription)
                     {
-                        prop = PropertyUtility.GetMatchingProperty(field);
-
-                        if (prop is null)
-                        {
-                            continue;
-                        }
-
-                        if (prop.HasAttribute(LibraryTypes.NonSerializedAttribute))
-                        {
-                            continue;
-                        }
-
-                        id = GetId(prop);
-
-                        if (!id.HasValue)
-                        {
-                            var primaryConstructorParameter = constructorParameters.FirstOrDefault(x => x.Name.Equals(prop.Name, StringComparison.OrdinalIgnoreCase));
-                            if (primaryConstructorParameter is not null)
-                            {
-                                id = (ushort)constructorParameters.IndexOf(primaryConstructorParameter);
-                                isPrimaryConstructorParameter = true;
-                            }
-                        }
-                    }
-
-                    if (!id.HasValue)
-                    {
-                        if (hasAttributes || !allowImplicitFieldIds)
-                        {
-                            continue;
-                        }
-
-                        id = nextFieldId++;
-                    }
-
-                    // FieldDescription takes precedence over PropertyDescription
-                    if (!members.TryGetValue((id.Value, isPrimaryConstructorParameter), out var existing) || existing is PropertyDescription)
-                    {
-                        members[(id.Value, isPrimaryConstructorParameter)] = new FieldDescription(id.Value, isPrimaryConstructorParameter, field);
-                        continue;
+                        members[(id, isConstructorParameter)] = new FieldDescription(id, isConstructorParameter, field);
                     }
                 }
             }
-
             return members.Values;
-
-            bool TypeAllowsImplicitFieldIds(INamedTypeSymbol t)
-            {
-                var attribute = HasAttribute(t, LibraryTypes.GenerateSerializerAttribute);
-                if (attribute == null)
-                    return false;
-
-                foreach (var namedArgument in attribute.NamedArguments)
-                {
-                    if (namedArgument.Key == "GenerateFieldIds")
-                    {
-                        var value = namedArgument.Value.Value;
-                        var enumValue = value == null ? GenerateFieldIds.None : (GenerateFieldIds)(int)value;
-                        return enumValue != GenerateFieldIds.None;
-                    }
-                }
-                return false;
-            }
         }
 
         public ushort? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
