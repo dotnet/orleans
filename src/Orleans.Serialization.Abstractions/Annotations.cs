@@ -286,9 +286,7 @@ namespace Orleans
     /// At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored.
     /// </remarks>
     /// <seealso cref="Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" />
-    [AttributeUsage(
-        AttributeTargets.Class
-        | AttributeTargets.Struct)]
+    [AttributeUsage(AttributeTargets.Constructor)]
     public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>

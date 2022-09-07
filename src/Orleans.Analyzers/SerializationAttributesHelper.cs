@@ -18,9 +18,10 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static (List<MemberDeclarationSyntax> UnannotatedMembers, List<MemberDeclarationSyntax> AnnotatedMembers, uint NextAvailableId) AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
+        public static (List<MemberDeclarationSyntax> UnannotatedMembers, List<MemberDeclarationSyntax> AnnotatedMembers, uint NextAvailableId, uint AnnotatedConstructorCount) AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
         {
             uint nextId = 0;
+            uint annotatedConstructorCount = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             var annotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             foreach (var member in declaration.Members)
@@ -47,6 +48,12 @@ namespace Orleans.Analyzers
                     continue;
                 }
 
+                if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+                {
+                    annotatedConstructorCount++;
+                    continue;
+                }
+
                 if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(Constants.NonSerializedAttribute) || member.IsAbstract())
                 {
                     // No need to add any attribute.
@@ -56,7 +63,7 @@ namespace Orleans.Analyzers
                 unannotatedSerializableMembers.Add(member);
             }
 
-            return (unannotatedSerializableMembers, annotatedSerializableMembers, nextId);
+            return (unannotatedSerializableMembers, annotatedSerializableMembers, nextId, annotatedConstructorCount);
         }
     }
 }
