@@ -5,7 +5,7 @@
     <Title>Microsoft Orleans Grain Directory Redis Provider</Title>
     <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
   </PropertyGroup>
 

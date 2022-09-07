@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.BroadcastChannel</PackageId>
     <Title>Microsoft Orleans Broadcast Channel Library</Title>
     <Description>Broadcast Channel library for Microsoft Orleans used both on the client and server.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
   </PropertyGroup>

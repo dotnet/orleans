@@ -12,8 +12,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <StandardTargetFrameworks>net6.0</StandardTargetFrameworks>
-    <MultiTargetFrameworks>net6.0</MultiTargetFrameworks>
+    <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
+    <DefaultTargetFrameworks>net6.0</DefaultTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

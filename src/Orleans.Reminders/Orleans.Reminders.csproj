@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.Reminders</PackageId>
     <Title>Microsoft Orleans Reminders Library</Title>
     <Description>Reminders library for Microsoft Orleans used both on the server.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS_PROVIDER</DefineConstants>

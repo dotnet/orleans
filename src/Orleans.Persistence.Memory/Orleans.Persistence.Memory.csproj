@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.Persistence.Memory</PackageId>
     <Title>Microsoft Orleans grain persistence provider which holds state only in memory.</Title>
     <Description>In-memory storage for Microsoft Orleans</Description>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Persistence.Memory</AssemblyName>
     <RootNamespace>Orleans.Persistence.Memory</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Serialization.Abstractions</PackageId>
     <Title>Microsoft Orleans Serialization Abstractions</Title>
     <Description>Serialization abstractions for Microsoft Orleans</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks);$(CompatibilityTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>

@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans ProtobufNet</Title>
     <Description>Library of utility types for ProtobufNet of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) ProtoBuf protobuf-net</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

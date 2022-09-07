@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans AWS DynamoDB Persistence Provider</Title>
     <Description>Microsoft Orleans persistence providers backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
