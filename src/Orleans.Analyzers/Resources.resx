@@ -141,4 +141,10 @@
   <data name="AddSerializationAttributesTitle" xml:space="preserve">
     <value>Add missing serialization attributes.</value>
   </data>
+  <data name="AtMostOneOrleansConstructorTitle" xml:space="preserve">
+    <value>At most one constructor can be annotated with the [OrleansConstructor] attribute.</value>
+  </data>
+  <data name="AtMostOneOrleansConstructorMessageFormat" xml:space="preserve">
+    <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute.</value>
+  </data>
 </root>

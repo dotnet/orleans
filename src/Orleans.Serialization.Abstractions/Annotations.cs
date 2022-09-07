@@ -311,9 +311,7 @@ namespace Orleans
     /// At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored.
     /// </remarks>
     /// <seealso cref="Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" />
-    [AttributeUsage(
-        AttributeTargets.Class
-        | AttributeTargets.Struct)]
+    [AttributeUsage(AttributeTargets.Constructor)]
     public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>
@@ -568,7 +566,7 @@ namespace Orleans
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The surrogate.</returns>
-        TSurrogate ConvertToSurrogate(in TValue value); 
+        TSurrogate ConvertToSurrogate(in TValue value);
     }
 
     /// <summary>
