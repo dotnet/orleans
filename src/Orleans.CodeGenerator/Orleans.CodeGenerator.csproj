@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageDescription>Code generation library for Orleans.Serialization</PackageDescription>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
@@ -22,6 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="$(MicrosoftCodeAnalysisAnalyzersVersion)" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Hashing" Version="$(SystemIOHashingVersion)" NoWarn="NU5104" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
