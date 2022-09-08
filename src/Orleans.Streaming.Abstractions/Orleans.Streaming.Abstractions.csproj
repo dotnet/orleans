@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Streaming.Abstractions</PackageId>
     <Title>Microsoft Orleans Streaming Abstractions</Title>
     <Description>Streaming abstractions library for Microsoft Orleans</Description>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>

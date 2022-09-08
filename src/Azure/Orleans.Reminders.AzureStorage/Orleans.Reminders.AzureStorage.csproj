@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Azure Table Storage Reminders Provider</Title>
     <Description>Microsoft Orleans reminders provider backed by Azure Table Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Storage</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Reminders.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Reminders.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

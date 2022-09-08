@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Reminders.Abstractions</PackageId>
     <Title>Microsoft Orleans Reminders Abstractions</Title>
     <Description>Reminders abstractions library for Microsoft Orleans</Description>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>

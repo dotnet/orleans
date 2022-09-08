@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.Streaming</PackageId>
     <Title>Microsoft Orleans Streaming Library</Title>
     <Description>Streaming library for Microsoft Orleans used both on the client and server.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
   </PropertyGroup>

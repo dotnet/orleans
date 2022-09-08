@@ -315,13 +315,11 @@ namespace Orleans.Runtime.Messaging
             }
 
             string result;
-#if NETCOREAPP3_1_OR_GREATER
             if (reader.TryReadBytes(length, out var span))
             {
                 result = Encoding.UTF8.GetString(span);
             }
             else
-#endif
             {
                 var bytes = reader.ReadBytes((uint)length);
                 result = Encoding.UTF8.GetString(bytes);
@@ -339,7 +337,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-#if NETCOREAPP3_1_OR_GREATER
             var numBytes = Encoding.UTF8.GetByteCount(value);
             writer.WriteVarInt32(numBytes);
             if (numBytes < 512)
@@ -362,11 +359,6 @@ namespace Orleans.Runtime.Messaging
                 Span<byte> bytes = Encoding.UTF8.GetBytes(value);
                 writer.Write(bytes);
             }
-#else
-            var bytes = Encoding.UTF8.GetBytes(value);
-            writer.WriteVarInt32(bytes.Length);
-            writer.Write(bytes);
-#endif
         }
 
         public void WriteRequestContext<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<string, object> value) where TBufferWriter : IBufferWriter<byte>

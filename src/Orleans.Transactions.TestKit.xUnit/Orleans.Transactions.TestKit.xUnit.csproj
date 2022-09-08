@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Transactions test kit for xUnit</Title>
     <Description>xUnit testkit library for transactions</Description>
     <PackageTags>$(PackageTags) TransactionTestKit</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>

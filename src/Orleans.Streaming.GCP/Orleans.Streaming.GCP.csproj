@@ -4,11 +4,11 @@
     <Title>Microsoft Orleans Google Cloud Platform Streaming Provider</Title>
     <Description>Microsoft Orleans stream provider for Google Cloud Platform PubSub.</Description>
     <PackageTags>$(PackageTags)</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Streaming.GCP</AssemblyName>
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
   </PropertyGroup>
-  
+
   <PropertyGroup>
     <!-- Cannot release a stable version of this package that depends on a prerelease version of Google.Cloud.PubSub.V1. -->
     <IsPackable>false</IsPackable>

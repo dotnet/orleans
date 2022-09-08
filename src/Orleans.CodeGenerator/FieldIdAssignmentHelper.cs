@@ -1,9 +1,13 @@
-﻿#nullable enable
+#nullable enable
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
+using System.IO.Hashing;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -146,9 +150,17 @@ internal class FieldIdAssignmentHelper
         name = GetCanonicalName(name);
 
         // compute the hash from the type name (without namespace, to allow it to move around) and name
-        var hashCode = (2617 * typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat).GetHashCode())
-                       ^ (7019 * name.GetHashCode());
+        var typeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var hashCode = ComputeHash($"{typeName}%{name}");
         return (name, (ushort)hashCode);
+
+        static unsafe uint ComputeHash(string data)
+        {
+            uint hash;
+            var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(data.AsSpan()) : Encoding.Unicode.GetBytes(data);
+            XxHash32.TryHash(input, new Span<byte>((byte*)&hash, sizeof(uint)), out _);
+            return BitConverter.IsLittleEndian ? hash : BinaryPrimitives.ReverseEndianness(hash);
+        }
     }
 
     private bool GenerateImplicitFieldIds()
