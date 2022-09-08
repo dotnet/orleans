@@ -10,10 +10,8 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies a grain.
     /// </summary>
-    [Immutable]
-    [Serializable]
+    [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(GrainIdJsonConverter))]
-    [GenerateSerializer]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable
     {
         [Id(1)]

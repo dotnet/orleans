@@ -8,36 +8,36 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents an entry in a <see cref="IGrainDirectory"/>
     /// </summary>
-    [GenerateSerializer]
+    [GenerateSerializer, Immutable]
     public sealed class GrainAddress : IEquatable<GrainAddress>, ISpanFormattable
     {
         [Id(0)]
-        private GrainId _grainId;
+        private readonly GrainId _grainId;
 
         [Id(1)]
-        private ActivationId _activationId;
+        private readonly ActivationId _activationId;
 
         /// <summary>
         /// Identifier of the Grain
         /// </summary>
-        public GrainId GrainId { get => _grainId; set => _grainId = value; }
+        public GrainId GrainId { get => _grainId; init => _grainId = value; }
 
         /// <summary>
         /// Id of the specific Grain activation
         /// </summary>
-        public ActivationId ActivationId { get => _activationId; set => _activationId = value; }
+        public ActivationId ActivationId { get => _activationId; init => _activationId = value; }
 
         /// <summary>
         /// Address of the silo where the grain activation lives
         /// </summary>
         [Id(2)]
-        public SiloAddress? SiloAddress { get; set; }
+        public SiloAddress? SiloAddress { get; init; }
 
         /// <summary>
         /// MembershipVersion at the time of registration
         /// </summary>
         [Id(3)]
-        public MembershipVersion MembershipVersion { get; set; } = MembershipVersion.MinValue;
+        public MembershipVersion MembershipVersion { get; init; } = MembershipVersion.MinValue;
 
         [JsonIgnore]
         public bool IsComplete => !_grainId.IsDefault && !_activationId.IsDefault && SiloAddress != null;
@@ -82,8 +82,8 @@ namespace Orleans.Runtime
 
             return new GrainAddress
             {
-                _grainId = grain,
-                _activationId = activation,
+                GrainId = grain,
+                ActivationId = activation,
                 SiloAddress = silo,
             };
         }

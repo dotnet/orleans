@@ -63,8 +63,15 @@ namespace Tester.AzureUtils
             }
 
             // Modify the Rth entry locally, to simulate another activation tentative by another silo
-            var oldActivation = addresses[R].ActivationId;
-            addresses[R].ActivationId = ActivationId.NewId();
+            var ra = addresses[R];
+            var oldActivation = ra.ActivationId;
+            addresses[R] = new()
+            {
+                GrainId = ra.GrainId,
+                SiloAddress = ra.SiloAddress,
+                MembershipVersion = ra.MembershipVersion,
+                ActivationId = ActivationId.NewId()
+            };
 
             // Batch unregister
             await this.grainDirectory.UnregisterMany(addresses);

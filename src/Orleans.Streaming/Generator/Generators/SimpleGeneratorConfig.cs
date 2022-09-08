@@ -12,7 +12,7 @@ namespace Orleans.Hosting
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class SimpleGeneratorOptions : IStreamGeneratorConfig
+    public sealed class SimpleGeneratorOptions : IStreamGeneratorConfig
     {
         /// <summary>
         /// Gets or sets the stream namespace.

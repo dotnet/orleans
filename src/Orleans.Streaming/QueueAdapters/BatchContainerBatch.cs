@@ -10,7 +10,7 @@ namespace Orleans.Streams
     /// PersistenStreamPullingAgent from it's underlying cache
     /// </summary>
     [GenerateSerializer]
-    public class BatchContainerBatch : IBatchContainerBatch
+    public sealed class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>
         /// Gets the stream identifier for the stream this batch is part of.

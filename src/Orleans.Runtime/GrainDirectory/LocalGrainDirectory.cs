@@ -623,7 +623,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (silo == null)
             {
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}=null", grain);
-                result = new AddressAndTag();
+                result = default;
                 return false;
             }
 
@@ -632,10 +632,7 @@ namespace Orleans.Runtime.GrainDirectory
             var address = GetLocalCacheData(grain);
             if (address != default)
             {
-                result = new AddressAndTag
-                {
-                    Address = address,
-                };
+                result = new(address, 0);
 
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup cache {GrainId}={TargetAddress}", grain, result.Address);
                 DirectoryInstruments.LookupsCacheSuccesses.Add(1);
@@ -711,9 +708,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
                     if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}=none", grainId);
-                    localResult.Address = default;
-                    localResult.VersionTag = GrainInfo.NO_ETAG;
-                    return localResult;
+                    return new(default, GrainInfo.NO_ETAG);
                 }
 
                 if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}={Address}", grainId, localResult.Address);

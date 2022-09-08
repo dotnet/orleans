@@ -69,21 +69,26 @@ namespace Orleans.GrainDirectory
     /// <summary>
     /// Represents the address of a grain as well as a version tag.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    internal struct AddressAndTag
+    [Serializable, GenerateSerializer, Immutable]
+    internal readonly struct AddressAndTag
     {
         /// <summary>
         /// The address.
         /// </summary>
         [Id(1)]
-        public GrainAddress Address;
+        public readonly GrainAddress Address;
        
         /// <summary>
         /// The version of this entry.
         /// </summary>
         [Id(2)]
-        public int VersionTag;
+        public readonly int VersionTag;
+
+        public AddressAndTag(GrainAddress address, int versionTag)
+        {
+            Address = address;
+            VersionTag = versionTag;
+        }
     }
 
     /// <summary>

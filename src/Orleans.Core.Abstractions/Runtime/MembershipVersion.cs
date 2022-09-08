@@ -7,8 +7,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies the version of a cluster membership configuration.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(MembershipVersionConverter))]
     public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {

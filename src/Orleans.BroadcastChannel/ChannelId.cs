@@ -11,9 +11,7 @@ namespace Orleans.BroadcastChannel
     /// <summary>
     /// Identifies a Channel within a provider
     /// </summary>
-    [Immutable]
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public readonly struct ChannelId : IEquatable<ChannelId>, IComparable<ChannelId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
@@ -211,9 +209,7 @@ namespace Orleans.BroadcastChannel
         internal IdSpan GetKeyIdSpan() => keyIndex == 0 ? IdSpan.UnsafeCreate(fullKey, hash) : new(fullKey.AsSpan(keyIndex).ToArray());
     }
 
-    [Immutable]
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     internal readonly struct InternalChannelId : IEquatable<InternalChannelId>, IComparable<InternalChannelId>, ISerializable, ISpanFormattable
     {
         [Id(0)]

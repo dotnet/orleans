@@ -78,17 +78,6 @@ namespace Orleans.Runtime
             LogDispatcherReceiveInvalidActivation(this, activationState, message, null);
         }
 
-        internal void OnDispatcherDetectedDeadlock(Message message, ActivationData targetActivation, DeadlockException exception)
-        {
-            if (this.IsEnabled(DispatcherDetectedDeadlockEventName))
-            {
-                this.Write(DispatcherDetectedDeadlockEventName, new { Message = message, Activation = targetActivation, Exception = exception});
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
-            LogDispatcherDetectedDeadlock(this, message, targetActivation, exception);
-        }
-
         internal void OnDispatcherDiscardedRejection(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
         {
             if (this.IsEnabled(DispatcherDiscardedRejectionEventName))

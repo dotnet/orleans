@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansLifecycleCanceledException : OrleansException
+    public sealed class OrleansLifecycleCanceledException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansLifecycleCanceledException"/> class.
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
         /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
-        protected OrleansLifecycleCanceledException(SerializationInfo info, StreamingContext context)
+        private OrleansLifecycleCanceledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

@@ -9,7 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class StreamEventDeliveryFailureException : OrleansException
+    public sealed class StreamEventDeliveryFailureException : OrleansException
     {
         private const string ErrorStringFormat =
             "Stream provider failed to deliver an event.  StreamProvider:{0}  Stream:{1}";

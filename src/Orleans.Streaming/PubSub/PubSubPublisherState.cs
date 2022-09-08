@@ -7,7 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    internal class PubSubPublisherState : IEquatable<PubSubPublisherState>
+    internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState>
     {
         // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JSonSerialization to work!

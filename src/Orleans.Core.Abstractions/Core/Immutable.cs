@@ -12,8 +12,7 @@ namespace Orleans.Concurrency
     /// then considerable savings in memory usage and message throughput can be obtained by marking that byte[] argument as <c>Immutable</c>.
     /// </remarks>
     /// <typeparam name="T">Type of data to be wrapped by this Immutable</typeparam>
-    [GenerateSerializer]
-    [Immutable]
+    [GenerateSerializer, Immutable]
     public readonly struct Immutable<T>
     {
         [Id(1)]

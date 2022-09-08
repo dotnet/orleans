@@ -9,7 +9,7 @@ namespace Orleans.TestingHost
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class RandomlyInjectedStorageException : Exception
+    public sealed class RandomlyInjectedStorageException : Exception
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="RandomlyInjectedStorageException"/> class.
@@ -21,7 +21,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
         /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
-        protected RandomlyInjectedStorageException(SerializationInfo info, StreamingContext context)
+        private RandomlyInjectedStorageException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -32,7 +32,7 @@ namespace Orleans.TestingHost
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class RandomlyInjectedInconsistentStateException : InconsistentStateException
+    public sealed class RandomlyInjectedInconsistentStateException : InconsistentStateException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="RandomlyInjectedInconsistentStateException"/> class.
@@ -44,7 +44,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        protected RandomlyInjectedInconsistentStateException(SerializationInfo info, StreamingContext context)
+        private RandomlyInjectedInconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

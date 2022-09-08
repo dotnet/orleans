@@ -6,8 +6,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents a cluster membership snapshot and changes from a previous snapshot.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMembershipUpdate
     {
         /// <summary>

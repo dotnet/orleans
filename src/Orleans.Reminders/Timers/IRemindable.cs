@@ -39,27 +39,26 @@ namespace Orleans
         /// The app can keep track of it as 'count'. Upon receiving a tick, the number of missed ticks = curCount - count - 1
         /// Thereafter, the app can set count = curCount
         /// </summary>
-        [Serializable]
-        [GenerateSerializer]
-        public struct TickStatus
+        [Serializable, GenerateSerializer, Immutable]
+        public readonly struct TickStatus
         {
             /// <summary>
             /// Gets the time at which the first tick of this reminder is due, or was triggered.
             /// </summary>
             [Id(1)]
-            public DateTime FirstTickTime { get; private set; }
+            public DateTime FirstTickTime { get; }
 
             /// <summary>
             /// Gets the period of the reminder.
             /// </summary>
             [Id(2)]
-            public TimeSpan Period { get; private set; }
+            public TimeSpan Period { get; }
 
             /// <summary>
             /// Gets the time on the runtime silo when the silo initiated the delivery of this tick.
             /// </summary>
             [Id(3)]
-            public DateTime CurrentTickTime { get; private set; }
+            public DateTime CurrentTickTime { get; }
 
             /// <summary>
             /// Creates a new <see cref="TickStatus"/> instance.
@@ -68,15 +67,11 @@ namespace Orleans
             /// <param name="period">The period of the reminder.</param>
             /// <param name="timeStamp">The time when delivery of the current tick was initiated.</param>
             /// <returns></returns>
-            public static TickStatus Create(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
+            public TickStatus(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
             {
-                return
-                    new TickStatus
-                        {
-                            FirstTickTime = firstTickTime,
-                            Period = period,
-                            CurrentTickTime = timeStamp
-                        };
+                FirstTickTime = firstTickTime;
+                Period = period;
+                CurrentTickTime = timeStamp;
             }
 
             /// <inheritdoc/>
@@ -86,9 +81,8 @@ namespace Orleans
         /// <summary>
         /// Exception related to Orleans Reminder functions or Reminder service.
         /// </summary>
-        [Serializable]
-        [GenerateSerializer]
-        public class ReminderException : OrleansException
+        [Serializable, GenerateSerializer]
+        public sealed class ReminderException : OrleansException
         {
             /// <summary>
             /// Initializes a new instance of the <see cref="ReminderException"/> class.

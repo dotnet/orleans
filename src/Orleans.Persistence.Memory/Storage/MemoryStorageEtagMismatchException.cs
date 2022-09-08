@@ -6,7 +6,7 @@ namespace Orleans.Storage.Internal
     /// <summary>Exception used to communicate with the storage provider, so that it throws this exception to its caller.</summary>
     [Serializable]
     [GenerateSerializer]
-    internal class MemoryStorageEtagMismatchException : Exception
+    internal sealed class MemoryStorageEtagMismatchException : Exception
     {
         /// <summary>Gets the Etag value currently held in persistent storage.</summary>
         [Id(0)]
@@ -32,7 +32,7 @@ namespace Orleans.Storage.Internal
         /// </summary>
         /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
         /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
-        protected MemoryStorageEtagMismatchException(SerializationInfo info, StreamingContext context)
+        private MemoryStorageEtagMismatchException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.StoredEtag = info.GetString(nameof(StoredEtag));

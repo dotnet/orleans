@@ -245,13 +245,13 @@ namespace Orleans.Runtime
         /// Gets or sets the grain id.
         /// </summary>
         [Id(1)]
-        public GrainId GrainId { get; set; }
+        public GrainId GrainId;
 
         /// <summary>
         /// Gets or sets the grain interface type.
         /// </summary>
         [Id(2)]
-        public GrainInterfaceType GrainInterfaceType { get; set; }
+        public GrainInterfaceType GrainInterfaceType;
     }
 
     /// <summary>
