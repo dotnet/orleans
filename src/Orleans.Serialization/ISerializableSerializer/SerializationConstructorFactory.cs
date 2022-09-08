@@ -10,21 +10,11 @@ namespace Orleans.Serialization
     /// <summary>
     /// Creates delegates for calling ISerializable-conformant constructors.
     /// </summary>
-    internal class SerializationConstructorFactory
+    internal sealed class SerializationConstructorFactory
     {
         private static readonly Type[] SerializationConstructorParameterTypes = { typeof(SerializationInfo), typeof(StreamingContext) };
-        private readonly Func<Type, object> _createConstructorDelegate;
+        private readonly Func<Type, object> _createConstructorDelegate = t => GetSerializationConstructorInvoker(t, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
         private readonly ConcurrentDictionary<Type, object> _constructors = new();
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SerializationConstructorFactory"/> class.
-        /// </summary>
-        [SecurityCritical]
-        public SerializationConstructorFactory()
-        {
-            _createConstructorDelegate =
-                GetSerializationConstructorInvoker<object, Action<object, SerializationInfo, StreamingContext>>;
-        }
 
         /// <summary>
         /// Determines whether the provided type has a serialization constructor.
@@ -35,14 +25,15 @@ namespace Orleans.Serialization
         public static bool HasSerializationConstructor(Type type) => GetSerializationConstructor(type) != null;
 
         [SecurityCritical]
-        public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(Type type) => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(
-                type,
-                _createConstructorDelegate);
+        public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(Type type)
+            => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, _createConstructorDelegate);
 
         [SecurityCritical]
-        public TConstructor GetSerializationConstructorDelegate<TOwner, TConstructor>() => (TConstructor)_constructors.GetOrAdd(
-                typeof(TOwner),
-                type => (object)GetSerializationConstructorInvoker<TOwner, TConstructor>(type));
+        public TConstructor GetSerializationConstructorDelegate<TOwner, TConstructor>() where TConstructor : Delegate
+            => (TConstructor)GetSerializationConstructorDelegate(typeof(TOwner), typeof(TConstructor));
+
+        private object GetSerializationConstructorDelegate(Type owner, Type delegateType)
+            => _constructors.GetOrAdd(owner, (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
 
         [SecurityCritical]
         private static ConstructorInfo GetSerializationConstructor(Type type) => type.GetConstructor(
@@ -52,7 +43,7 @@ namespace Orleans.Serialization
                 null);
 
         [SecurityCritical]
-        private static TConstructor GetSerializationConstructorInvoker<TOwner, TConstructor>(Type type)
+        private static Delegate GetSerializationConstructorInvoker(Type type, Type owner, Type delegateType)
         {
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
             if (constructor is null)
@@ -61,31 +52,31 @@ namespace Orleans.Serialization
             }
 
             Type[] parameterTypes;
-            if (typeof(TOwner).IsValueType)
+            if (owner.IsValueType)
             {
-                parameterTypes = new[] { typeof(TOwner).MakeByRefType(), typeof(SerializationInfo), typeof(StreamingContext) };
+                parameterTypes = new[] { typeof(object), owner.MakeByRefType(), typeof(SerializationInfo), typeof(StreamingContext) };
             }
             else
             {
-                parameterTypes = new[] { typeof(object), typeof(SerializationInfo), typeof(StreamingContext) };
+                parameterTypes = new[] { typeof(object), typeof(object), typeof(SerializationInfo), typeof(StreamingContext) };
             }
 
-            var method = new DynamicMethod($"{type}_serialization_ctor", null, parameterTypes, typeof(TOwner), skipVisibility: true);
+            var method = new DynamicMethod($"{type}_serialization_ctor", null, parameterTypes, type, skipVisibility: true);
             var il = method.GetILGenerator();
 
-            il.Emit(OpCodes.Ldarg_0);
-            if (type != typeof(TOwner))
+            // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
+            il.Emit(OpCodes.Ldarg_1);
+            if (type != owner)
             {
                 il.Emit(OpCodes.Castclass, type);
             }
 
-            il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Ldarg_3);
             il.Emit(OpCodes.Call, constructor);
             il.Emit(OpCodes.Ret);
 
-            object result = method.CreateDelegate(typeof(TConstructor));
-            return (TConstructor)result;
+            return method.CreateDelegate(delegateType);
         }
     }
 }

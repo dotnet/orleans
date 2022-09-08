@@ -30,9 +30,9 @@ namespace Orleans.CodeGenerator
 
             var fieldDescriptions = GetFieldDescriptions(interfaceDescription, metadataModel, libraryTypes);
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var proxyMethods = CreateProxyMethods(libraryTypes, fieldDescriptions, interfaceDescription, metadataModel).ToArray();
+            var proxyMethods = CreateProxyMethods(libraryTypes, fieldDescriptions, interfaceDescription, metadataModel);
 
-            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType).ToArray();
+            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
 
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(
@@ -67,7 +67,7 @@ namespace Orleans.CodeGenerator
             var allTypes = interfaceDescription.Methods
                 .Where(method => method.MethodTypeParameters.Count == 0)
                 .SelectMany(method => metadataModel.GeneratedInvokables[method].Members);
-            fields.AddRange(GetCopierFieldDescriptions(allTypes, libraryTypes));
+            GetCopierFieldDescriptions(allTypes, libraryTypes, fields);
             return fields;
         }
 
@@ -82,16 +82,18 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static IEnumerable<MemberDeclarationSyntax> CreateProxyMethods(
+        private static MemberDeclarationSyntax[] CreateProxyMethods(
             LibraryTypes libraryTypes,
             List<GeneratedFieldDescription> fieldDescriptions,
             InvokableInterfaceDescription interfaceDescription,
             MetadataModel metadataModel)
         {
+            var res = new List<MemberDeclarationSyntax>();
             foreach (var methodDescription in interfaceDescription.Methods)
             {
-                yield return CreateProxyMethod(methodDescription);
+                res.Add(CreateProxyMethod(methodDescription));
             }
+            return res.ToArray();
 
             MethodDeclarationSyntax CreateProxyMethod(MethodDescription methodDescription)
             {
@@ -266,18 +268,18 @@ namespace Orleans.CodeGenerator
             return Block(statements);
         }
 
-        private static IEnumerable<MemberDeclarationSyntax> GenerateConstructors(
+        private static MemberDeclarationSyntax[] GenerateConstructors(
             string simpleClassName,
             List<GeneratedFieldDescription> fieldDescriptions,
             INamedTypeSymbol baseType)
         {
-            var bodyStatements = GetBodyStatements().ToList();
-
             if (baseType is null)
             {
-                yield break;
+                return Array.Empty<MemberDeclarationSyntax>();
             }
 
+            var bodyStatements = GetBodyStatements();
+            var res = new List<MemberDeclarationSyntax>();
             foreach (var member in baseType.GetMembers())
             {
                 if (member is not IMethodSymbol method)
@@ -295,8 +297,9 @@ namespace Orleans.CodeGenerator
                     continue;
                 }
 
-                yield return CreateConstructor(method);
+                res.Add(CreateConstructor(method));
             }
+            return res.ToArray();
 
             ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
             {
@@ -311,21 +314,19 @@ namespace Orleans.CodeGenerator
                     .WithBody(Block(bodyStatements));
             }
 
-            static IEnumerable<SyntaxToken> GetModifiers(IMethodSymbol method)
+            static SyntaxToken[] GetModifiers(IMethodSymbol method)
             {
                 switch (method.DeclaredAccessibility)
                 {
                     case Accessibility.Public:
                     case Accessibility.Protected:
-                        yield return Token(SyntaxKind.PublicKeyword);
-                        break;
+                        return new[] { Token(SyntaxKind.PublicKeyword) };
                     case Accessibility.Internal:
                     case Accessibility.ProtectedOrInternal:
                     case Accessibility.ProtectedAndInternal:
-                        yield return Token(SyntaxKind.InternalKeyword);
-                        break;
+                        return new[] { Token(SyntaxKind.InternalKeyword) };
                     default:
-                        break;
+                        return Array.Empty<SyntaxToken>();
                 }
             }
 
@@ -350,30 +351,32 @@ namespace Orleans.CodeGenerator
                 return result;
             }
 
-            IEnumerable<StatementSyntax> GetBodyStatements()
+            List<StatementSyntax> GetBodyStatements()
             {
+                var res = new List<StatementSyntax>();
                 foreach (var field in fieldDescriptions)
                 {
                     switch (field)
                     {
                         case GeneratedFieldDescription _ when field.IsInjected:
-                            yield return ExpressionStatement(
+                            res.Add(ExpressionStatement(
                                 AssignmentExpression(
                                     SyntaxKind.SimpleAssignmentExpression,
                                     ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                    Unwrapped(field.FieldName.ToIdentifierName())));
+                                    Unwrapped(field.FieldName.ToIdentifierName()))));
                             break;
                         case CopierFieldDescription codec:
                             {
-                                yield return ExpressionStatement(
+                                res.Add(ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
                                         ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                        GetService(field.FieldType)));
+                                        GetService(field.FieldType))));
                             }
                             break;
                     }
                 }
+                return res;
 
                 static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
                 {

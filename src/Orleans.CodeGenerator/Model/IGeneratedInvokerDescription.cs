@@ -60,7 +60,7 @@ namespace Orleans.CodeGenerator
         public bool OmitDefaultMemberValues => false;
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _methodDescription.AllTypeParameters;
         public List<INamedTypeSymbol> SerializationHooks { get; }
-        public bool IsImmutable => false;
+        public bool IsShallowCopyable => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => true;
 

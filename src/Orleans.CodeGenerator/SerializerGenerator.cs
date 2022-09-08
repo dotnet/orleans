@@ -152,38 +152,38 @@ namespace Orleans.CodeGenerator
 
             var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
 
-            IEnumerable<StatementSyntax> GetStatements()
+            List<StatementSyntax> GetStatements()
             {
+                var res = new List<StatementSyntax>();
                 foreach (var field in fieldDescriptions)
                 {
                     switch (field)
                     {
                         case GetterFieldDescription getter:
-                            yield return getter.InitializationSyntax;
+                            res.Add(getter.InitializationSyntax);
                             break;
 
                         case SetterFieldDescription setter:
-                            yield return setter.InitializationSyntax;
+                            res.Add(setter.InitializationSyntax);
                             break;
 
                         case GeneratedFieldDescription _ when field.IsInjected:
-                            yield return ExpressionStatement(
+                            res.Add(ExpressionStatement(
                                 AssignmentExpression(
                                     SyntaxKind.SimpleAssignmentExpression,
                                     ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                    Unwrapped(field.FieldName.ToIdentifierName())));
+                                    Unwrapped(field.FieldName.ToIdentifierName()))));
                             break;
                         case CodecFieldDescription codec when !field.IsInjected:
-                            {
-                                yield return ExpressionStatement(
+                            res.Add(ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
                                         ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                        GetService(field.FieldType)));
-                            }
+                                        GetService(field.FieldType))));
                             break;
                     }
                 }
+                return res;
             }
 
             return ConstructorDeclaration(simpleClassName)
@@ -326,7 +326,7 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
-            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerializing"));
+            AddSerializationCallbacks(type, instanceParam, "OnSerializing", body);
 
             // Order members according to their FieldId, since fields must be serialized in order and FieldIds are serialized as deltas.
             var previousFieldIdVar = "previousFieldId".ToIdentifierName();
@@ -342,13 +342,13 @@ namespace Orleans.CodeGenerator
 
             if (type.SupportsPrimaryContstructorParameters)
             {
-                body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
+                AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
-            body.AddRange(AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar));
+            AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
 
-            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnSerialized"));
+            AddSerializationCallbacks(type, instanceParam, "OnSerialized", body);
 
             var parameters = new[]
             {
@@ -370,7 +370,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static IEnumerable<StatementSyntax> AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, LibraryTypes libraryTypes, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar)
+        private static void AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, LibraryTypes libraryTypes, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
         {
             uint previousFieldId = 0;
             foreach (var member in members.OrderBy(m => m.Member.FieldId))
@@ -400,11 +400,11 @@ namespace Orleans.CodeGenerator
                 }
                 else
                 {
-                    var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
+                    var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
                     codecExpression = ThisExpression().Member(instanceCodec.FieldName);
                 }
 
-                var expectedType = serializerFields.OfType<TypeFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
+                var expectedType = serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType));
                 var writeFieldExpr = ExpressionStatement(
                         InvocationExpression(
                             codecExpression.Member("WriteField"),
@@ -419,7 +419,7 @@ namespace Orleans.CodeGenerator
                                     }))));
                 if (!type.OmitDefaultMemberValues)
                 {
-                    yield return writeFieldExpr;
+                    body.Add(writeFieldExpr);
                 }
                 else
                 {
@@ -429,11 +429,11 @@ namespace Orleans.CodeGenerator
                         false => IsPatternExpression(member.GetGetter(instanceParam), TypePattern(libraryTypes.Object.ToTypeSyntax()))
                     };
 
-                    yield return IfStatement(
+                    body.Add(IfStatement(
                         condition,
                         Block(
                             writeFieldExpr,
-                            ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, previousFieldIdVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId))))));
+                            ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, previousFieldIdVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId)))))));
                 }
             }
         }
@@ -484,7 +484,7 @@ namespace Orleans.CodeGenerator
                             })))));
             }
 
-            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserializing"));
+            AddSerializationCallbacks(type, instanceParam, "OnDeserializing", body);
 
             if (type.SupportsPrimaryContstructorParameters)
             {
@@ -501,7 +501,7 @@ namespace Orleans.CodeGenerator
                 body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter)))));
             }
 
-            body.AddRange(AddSerializationCallbacks(type, instanceParam, "OnDeserialized"));
+            AddSerializationCallbacks(type, instanceParam, "OnDeserialized", body);
 
             var genericParam = ParseTypeName("TReaderInput");
             var parameters = new[]
@@ -622,7 +622,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static IEnumerable<StatementSyntax> AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName)
+        private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
         {
             for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
             {
@@ -639,9 +639,9 @@ namespace Orleans.CodeGenerator
                     argument = argument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
                 }
 
-                yield return ExpressionStatement(InvocationExpression(
+                body.Add(ExpressionStatement(InvocationExpression(
                     ThisExpression().Member($"_hook{hookIndex}").Member(callbackMethodName),
-                    ArgumentList(SeparatedList(new[] { argument }))));
+                    ArgumentList(SeparatedList(new[] { argument })))));
             }
         }
 
@@ -1233,12 +1233,12 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets the name of the getter field.
             /// </summary>
-            private string GetterFieldName => "getField" + _ordinal;
+            private string GetterFieldName => $"getField{_ordinal}";
 
             /// <summary>
             /// Gets the name of the setter field.
             /// </summary>
-            private string SetterFieldName => "setField" + _ordinal;
+            private string SetterFieldName => $"setField{_ordinal}";
 
             /// <summary>
             /// Gets a value indicating if the member is a property.
@@ -1305,10 +1305,17 @@ namespace Orleans.CodeGenerator
                 }
                 else
                 {
+
+                    var instanceArg = Argument(instance);
+                    if (ContainingType?.IsValueType == true)
+                    {
+                        instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
+                    }
+
                     // Retrieve the field using the generated getter.
                     result =
                         InvocationExpression(IdentifierName(GetterFieldName))
-                            .AddArgumentListArguments(Argument(instance));
+                            .AddArgumentListArguments(instanceArg);
                 }
 
                 return result;
@@ -1355,7 +1362,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 var instanceArg = Argument(instance);
-                if (ContainingType != null && ContainingType.IsValueType)
+                if (ContainingType?.IsValueType == true)
                 {
                     instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
                 }
@@ -1369,14 +1376,18 @@ namespace Orleans.CodeGenerator
             {
                 if (IsGettableField || IsGettableProperty) return null;
 
-                var getterType = _libraryTypes.Func_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
+                var isContainedByValueType = ContainingType?.IsValueType ?? false;
+
+                var getterType = (isContainedByValueType ? _libraryTypes.ValueTypeGetter_2: _libraryTypes.Func_2)
+                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
                 var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
+                var accessorMethod = isContainedByValueType ? "GetValueGetter" : "GetGetter";
                 var accessorInvoke = CastExpression(
                     getterType,
-                    InvocationExpression(fieldAccessorUtility.Member("GetGetter")).AddArgumentListArguments(Argument(fieldInfo)));
+                    InvocationExpression(fieldAccessorUtility.Member(accessorMethod)).AddArgumentListArguments(Argument(fieldInfo)));
                 var initializationSyntax = ExpressionStatement(
                     AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(GetterFieldName), accessorInvoke));
 
@@ -1385,22 +1396,16 @@ namespace Orleans.CodeGenerator
 
             public SetterFieldDescription GetSetterFieldDescription()
             {
-                if (IsSettableField || IsProperty) return null;
+                if (IsSettableField || IsSettableProperty) return null;
 
-                TypeSyntax fieldType;
-                if (ContainingType != null && ContainingType.IsValueType)
-                {
-                    fieldType = _libraryTypes.ValueTypeSetter_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
-                }
-                else
-                {
-                    fieldType = _libraryTypes.Action_2.ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
-                }
+                var isContainedByValueType = ContainingType?.IsValueType ?? false;
+
+                var fieldType = (isContainedByValueType ? _libraryTypes.ValueTypeSetter_2 : _libraryTypes.Action_2)
+                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
                 var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
-                var isContainedByValueType = ContainingType != null && ContainingType.IsValueType;
                 var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
                 var accessorInvoke = CastExpression(
                     fieldType,

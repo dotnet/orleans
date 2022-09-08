@@ -10,19 +10,10 @@ namespace Orleans.Serialization
     /// <summary>
     /// Creates delegates for calling methods marked with serialization attributes.
     /// </summary>
-    internal class SerializationCallbacksFactory
+    internal sealed class SerializationCallbacksFactory
     {
         private readonly ConcurrentDictionary<Type, object> _cache = new();
-        private readonly Func<Type, object> _factory;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SerializationCallbacksFactory"/> class.
-        /// </summary>
-        [SecurityCritical]
-        public SerializationCallbacksFactory()
-        {
-            _factory = CreateTypedCallbacks<object, Action<object, StreamingContext>>;
-        }
+        private readonly Func<Type, object> _factory = t => CreateTypedCallbacks<Action<object, StreamingContext>>(t, typeof(object));
 
         /// <summary>
         /// Gets serialization callbacks for reference types.
@@ -41,11 +32,14 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
         [SecurityCritical]
-        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(Type type) => (
-            SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, t => CreateTypedCallbacks<TOwner, TDelegate>(t));
+        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(Type type) where TOwner : struct where TDelegate : Delegate
+            => GetValueTypeCallbacks<TDelegate>(type, typeof(TOwner));
+
+        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
+            => (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, (t, o) => CreateTypedCallbacks<TDelegate>(t, o), owner);
 
         [SecurityCritical]
-        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TOwner, TDelegate>(Type type)
+        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
         {
             var onDeserializing = default(TDelegate);
             var onDeserialized = default(TDelegate);
@@ -64,24 +58,24 @@ namespace Orleans.Serialization
                     continue;
                 }
 
-                if (method.GetCustomAttribute<OnDeserializingAttribute>() != null)
+                if (method.IsDefined(typeof(OnDeserializingAttribute), false))
                 {
-                    onDeserializing = GetSerializationMethod<TOwner, TDelegate>(type, method);
+                    onDeserializing = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
                 }
 
-                if (method.GetCustomAttribute<OnDeserializedAttribute>() != null)
+                if (method.IsDefined(typeof(OnDeserializedAttribute), false))
                 {
-                    onDeserialized = GetSerializationMethod<TOwner, TDelegate>(type, method);
+                    onDeserialized = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
                 }
 
-                if (method.GetCustomAttribute<OnSerializingAttribute>() != null)
+                if (method.IsDefined(typeof(OnSerializingAttribute), false))
                 {
-                    onSerializing = GetSerializationMethod<TOwner, TDelegate>(type, method);
+                    onSerializing = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
                 }
 
-                if (method.GetCustomAttribute<OnSerializedAttribute>() != null)
+                if (method.IsDefined(typeof(OnSerializedAttribute), false))
                 {
-                    onSerialized = GetSerializationMethod<TOwner, TDelegate>(type, method);
+                    onSerialized = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
                 }
             }
 
@@ -89,40 +83,40 @@ namespace Orleans.Serialization
         }
 
         [SecurityCritical]
-        private static TDelegate GetSerializationMethod<TOwner, TDelegate>(Type type, MethodInfo callbackMethod)
+        private static DynamicMethod GetSerializationMethod(Type type, MethodInfo callbackMethod, Type owner)
         {
             Type[] callbackParameterTypes;
-            if (typeof(TOwner).IsValueType)
+            if (owner.IsValueType)
             {
-                callbackParameterTypes = new[] { typeof(TOwner).MakeByRefType(), typeof(StreamingContext) };
+                callbackParameterTypes = new[] { typeof(object), owner.MakeByRefType(), typeof(StreamingContext) };
             }
             else
             {
-                callbackParameterTypes = new[] { typeof(object), typeof(StreamingContext) };
+                callbackParameterTypes = new[] { typeof(object), typeof(object), typeof(StreamingContext) };
             }
 
             var method = new DynamicMethod($"{callbackMethod.Name}_Trampoline", null, callbackParameterTypes, type, skipVisibility: true);
             var il = method.GetILGenerator();
 
-            il.Emit(OpCodes.Ldarg_0);
-            if (type != typeof(TOwner))
+            // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
+            il.Emit(OpCodes.Ldarg_1);
+            if (type != owner)
             {
                 il.Emit(OpCodes.Castclass, type);
             }
 
-            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldarg_2);
             il.Emit(OpCodes.Callvirt, callbackMethod);
             il.Emit(OpCodes.Ret);
 
-            object result = method.CreateDelegate(typeof(TDelegate));
-            return (TDelegate)result;
+            return method;
         }
 
         /// <summary>
         /// Serialization callbacks.
         /// </summary>
         /// <typeparam name="TDelegate">The delegate type for each callback.</typeparam>
-        public class SerializationCallbacks<TDelegate>
+        public sealed class SerializationCallbacks<TDelegate>
         {
             /// <summary>
             /// Initializes a new instance of the <see cref="SerializationCallbacks{TDelegate}"/> class.
@@ -146,23 +140,23 @@ namespace Orleans.Serialization
             /// <summary>
             /// Gets the callback invoked while deserializing.
             /// </summary>
-            public TDelegate OnDeserializing { get; }
+            public readonly TDelegate OnDeserializing;
 
             /// <summary>
             /// Gets the callback invoked once a value has been deserialized.
             /// </summary>
-            public TDelegate OnDeserialized { get; }
+            public readonly TDelegate OnDeserialized;
 
             /// <summary>
             /// Gets the callback invoked during serialization.
             /// </summary>
             /// <value>The on serializing.</value>
-            public TDelegate OnSerializing { get; }
+            public readonly TDelegate OnSerializing;
 
             /// <summary>
             /// Gets the callback invoked once a value has been serialized. 
             /// </summary>
-            public TDelegate OnSerialized { get; }
+            public readonly TDelegate OnSerialized;
         }
     }
 }

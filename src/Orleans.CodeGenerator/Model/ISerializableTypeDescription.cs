@@ -30,7 +30,7 @@ namespace Orleans.CodeGenerator
         bool OmitDefaultMemberValues { get; }
         ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes);
         List<INamedTypeSymbol> SerializationHooks { get; }
-        bool IsImmutable { get; }
+        bool IsShallowCopyable { get; }
         List<TypeSyntax> ActivatorConstructorParameters { get; }
     }
 }
