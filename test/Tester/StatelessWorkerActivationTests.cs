@@ -1,17 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General;
 
@@ -35,12 +31,10 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
     }
 
     private readonly Fixture _fixture;
-    private readonly ITestOutputHelper _output;
 
-    public StatelessWorkerActivationTests(Fixture fixture, ITestOutputHelper output)
+    public StatelessWorkerActivationTests(Fixture fixture)
     {
         _fixture = fixture;
-        _output = output;
     }
 
     [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
