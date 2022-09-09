@@ -25,7 +25,7 @@ namespace DefaultCluster.Tests.General
             this.output = output;
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerThrowExceptionConstructor()
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
@@ -37,7 +37,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
@@ -95,7 +95,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task ManyConcurrentInvocationsOnActivationLimitedStatelessWorkerDoesNotFail()
         {
             // Issue #6795: significantly more concurrent invocations than the local worker limit results in too many
@@ -107,43 +107,6 @@ namespace DefaultCluster.Tests.General
                 var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
                 await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => grain.DummyCall()));
             }
-        }
-
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
-        public async Task SingleWorkerInvocationUnderLoad()
-        {
-            IStatelessWorkerScalingGrain firstGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
-            IStatelessWorkerScalingGrain secondGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
-
-            foreach (var _ in Enumerable.Range(0, 10))
-            {
-                IStatelessWorkerScalingGrain transientGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
-                var activation1 = await firstGrain.GetActivation();
-                var activation2 = await secondGrain.GetActivation();
-                var transientActivation = await transientGrain.GetActivation();
-                Assert.Equal(1, activation1);
-                Assert.Equal(1, activation2);
-                Assert.Equal(1, transientActivation);
-            }
-        }
-
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
-        public async Task MultipleWorkerInvocationUnderLoad()
-        {
-            IStatelessWorkerScalingGrain firstGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(1);
-            IStatelessWorkerScalingGrain secondGrain = this.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(1);
-
-            await firstGrain.Wait();                                    // This turns the semaphore from 1 to 0
-            var firstActivation = await firstGrain.GetActivation();     // This should be the first activation       
-            _ = secondGrain.Wait();                                     // This cannot be awaited because the test would block
-            await Task.Delay(500);                                      // Make sure the semaphore has time to lock  
-            var secondActivation = await secondGrain.GetActivation();   // Now that the semaphore is blocking the first call,
-                                                                        // get the activation number
-            await Task.WhenAll(firstGrain.Release(),
-                               secondGrain.Release());                  // And then release the semaphores
-            
-            Assert.Equal(1, firstActivation);
-            Assert.Equal(2, secondActivation);
         }
 
         [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
