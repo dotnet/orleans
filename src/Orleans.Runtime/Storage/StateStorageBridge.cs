@@ -46,7 +46,7 @@ namespace Orleans.Core
         public StateStorageBridge(string name, GrainId grainId, IGrainStorage store, ILoggerFactory loggerFactory)
         {
             ArgumentNullException.ThrowIfNull(name);
-            if (grainId.IsDefault) ArgumentNullException.ThrowIfNull(null, nameof(grainId));
+            if (grainId.IsDefault) throw new ArgumentNullException(nameof(grainId));
             ArgumentNullException.ThrowIfNull(store);
             ArgumentNullException.ThrowIfNull(loggerFactory);
 

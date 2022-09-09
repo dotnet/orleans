@@ -46,7 +46,7 @@ public static class GrainReminderExtensions
     private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, TimeSpan dueTime, TimeSpan period)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
-        if (string.IsNullOrWhiteSpace(reminderName)) ArgumentNullException.ThrowIfNull(null, nameof(reminderName));
+        if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
         if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{nameof(IRemindable)}'. A grain should implement {nameof(IRemindable)} to use the persistent reminder service");
 
         return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period);
@@ -93,7 +93,7 @@ public static class GrainReminderExtensions
     private static Task<IGrainReminder> GetReminder(IGrainContext? grainContext, string reminderName)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
-        if (string.IsNullOrWhiteSpace(reminderName)) ArgumentNullException.ThrowIfNull(null, nameof(reminderName));
+        if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
 
         return GetReminderRegistry(grainContext).GetReminder(grainContext.GrainId, reminderName);
     }
