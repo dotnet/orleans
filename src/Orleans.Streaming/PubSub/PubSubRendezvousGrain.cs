@@ -92,7 +92,7 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             StreamInstruments.PubSubProducersAdded.Add(1);
 
@@ -120,7 +120,7 @@ namespace Orleans.Streams
             return State.Consumers.Where(c => !c.IsFaulted).ToSet();
         }
 
-        public async Task UnregisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public async Task UnregisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             StreamInstruments.PubSubProducersRemoved.Add(1);
             try
@@ -158,7 +158,7 @@ namespace Orleans.Streams
 
         public async Task RegisterConsumer(
             GuidId subscriptionId,
-            InternalStreamId streamId,
+            QualifiedStreamId streamId,
             IStreamConsumerExtension streamConsumer,
             string filterData)
         {
@@ -263,7 +263,7 @@ namespace Orleans.Streams
             State.Producers.Remove(producer);
         }
 
-        public async Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId)
+        public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
         {
             StreamInstruments.PubSubConsumersRemoved.Add(1);
 
@@ -303,22 +303,22 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<int> ProducerCount(InternalStreamId streamId)
+        public Task<int> ProducerCount(QualifiedStreamId streamId)
         {
             return Task.FromResult(State.Producers.Count);
         }
 
-        public Task<int> ConsumerCount(InternalStreamId streamId)
+        public Task<int> ConsumerCount(QualifiedStreamId streamId)
         {
             return Task.FromResult(GetConsumersForStream(streamId).Length);
         }
 
-        public Task<PubSubSubscriptionState[]> DiagGetConsumers(InternalStreamId streamId)
+        public Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId)
         {
             return Task.FromResult(GetConsumersForStream(streamId));
         }
 
-        private PubSubSubscriptionState[] GetConsumersForStream(InternalStreamId streamId)
+        private PubSubSubscriptionState[] GetConsumersForStream(QualifiedStreamId streamId)
         {
             return State.Consumers.Where(c => !c.IsFaulted && c.Stream.Equals(streamId)).ToArray();
         }
@@ -374,7 +374,7 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             var grainRef = streamConsumer as GrainReference;
             if (grainRef != null)
@@ -429,7 +429,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task NotifyProducersOfRemovedSubscription(GuidId subscriptionId, InternalStreamId streamId)
+        private async Task NotifyProducersOfRemovedSubscription(GuidId subscriptionId, QualifiedStreamId streamId)
         {
             int numProducersBeforeNotify = State.Producers.Count;
             if (numProducersBeforeNotify > 0)

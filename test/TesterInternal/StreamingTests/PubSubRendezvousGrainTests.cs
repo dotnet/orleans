@@ -43,7 +43,7 @@ namespace UnitTests.StreamingTests
         public async Task RegisterConsumerFaultTest()
         {
             this.fixture.Logger.LogInformation("************************ RegisterConsumerFaultTest *********************************");
-            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterConsumerFaultTest()
         {
             this.fixture.Logger.LogInformation("************************ UnregisterConsumerFaultTest *********************************");
-            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
@@ -115,7 +115,7 @@ namespace UnitTests.StreamingTests
         public async Task RegisterProducerFaultTest()
         {
             this.fixture.Logger.LogInformation("************************ RegisterProducerFaultTest *********************************");
-            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
@@ -145,7 +145,7 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterProducerFaultTest()
         {
             this.fixture.Logger.LogInformation("************************ UnregisterProducerFaultTest *********************************");
-            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
@@ -194,12 +194,12 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+            public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
             {
                 return Task.CompletedTask;
             }
 
-            public Task RemoveSubscriber(GuidId subscriptionId, InternalStreamId streamId)
+            public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
             {
                 return Task.CompletedTask;
             }

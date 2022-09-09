@@ -20,7 +20,7 @@ namespace Orleans.Streams.Core
         public async Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef)
         {
             var consumer = grainRef.AsReference<IStreamConsumerExtension>();
-            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            var internalStreamId = new QualifiedStreamId(streamProviderName, streamId);
             var subscriptionId = streamPubSub.CreateSubscriptionId(internalStreamId, consumer);
             await streamPubSub.RegisterConsumer(subscriptionId, internalStreamId, consumer, null);
             var newSub = new StreamSubscription(subscriptionId.Guid, streamProviderName, streamId, grainRef.GrainId);
@@ -29,13 +29,13 @@ namespace Orleans.Streams.Core
 
         public async Task RemoveSubscription(string streamProviderName, StreamId streamId, Guid subscriptionId)
         {
-            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            var internalStreamId = new QualifiedStreamId(streamProviderName, streamId);
             await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), internalStreamId);
         }
 
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId)
         {
-            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            var internalStreamId = new QualifiedStreamId(streamProviderName, streamId);
             return streamPubSub.GetAllSubscriptions(internalStreamId).ContinueWith(subs => subs.Result.AsEnumerable());
         }
     }

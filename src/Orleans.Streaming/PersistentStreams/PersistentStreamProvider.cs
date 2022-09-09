@@ -154,7 +154,7 @@ namespace Orleans.Providers.Streams.Common
 
         public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
-            var id = new InternalStreamId(Name, streamId);
+            var id = new QualifiedStreamId(Name, streamId);
             return this.runtime.GetStreamDirectory().GetOrAddStream<T>(
                 id, () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
         }

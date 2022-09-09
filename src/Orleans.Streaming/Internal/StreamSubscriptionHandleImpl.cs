@@ -231,7 +231,7 @@ namespace Orleans.Streams
                 : this.observer.OnErrorAsync(ex);
         }
 
-        internal bool SameStreamId(InternalStreamId streamId)
+        internal bool SameStreamId(QualifiedStreamId streamId)
         {
             return IsValid && streamImpl.InternalStreamId.Equals(streamId);
         }

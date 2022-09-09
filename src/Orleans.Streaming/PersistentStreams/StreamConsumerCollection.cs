@@ -24,7 +24,7 @@ namespace Orleans.Streams
             lastActivityTime = now;
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData);
             queueData.Add(subscriptionId, consumerData);

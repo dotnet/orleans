@@ -44,7 +44,7 @@ namespace UnitTests.StreamingTests
         internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace)
         {
             var pubSub = GetStreamPubSub(client);
-            var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
+            var streamId = new QualifiedStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
             var totalWait = TimeSpan.Zero;
 
             int consumerCount;

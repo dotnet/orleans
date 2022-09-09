@@ -24,7 +24,7 @@ namespace Orleans.Streams
 
         [JsonProperty]
         [Id(2)]
-        public InternalStreamId Stream;
+        public QualifiedStreamId Stream;
 
         [JsonProperty]
         [Id(3)]
@@ -48,7 +48,7 @@ namespace Orleans.Streams
         // Implement ISerializable if changing it to non-public
         public PubSubSubscriptionState(
             GuidId subscriptionId,
-            InternalStreamId streamId,
+            QualifiedStreamId streamId,
             IStreamConsumerExtension streamConsumer)
         {
             SubscriptionId = subscriptionId;

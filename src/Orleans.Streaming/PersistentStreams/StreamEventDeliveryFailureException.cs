@@ -29,7 +29,7 @@ namespace Orleans.Streams
         /// Initializes a new instance of the <see cref="StreamEventDeliveryFailureException"/> class.
         /// </summary>
         /// <param name="streamId">The stream identifier.</param>
-        internal StreamEventDeliveryFailureException(InternalStreamId streamId)
+        internal StreamEventDeliveryFailureException(QualifiedStreamId streamId)
             : base(string.Format(ErrorStringFormat, streamId.GetNamespace(), streamId.StreamId)) { }
 
         /// <summary>

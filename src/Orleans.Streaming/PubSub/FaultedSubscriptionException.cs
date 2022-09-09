@@ -31,7 +31,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="subscriptionId">The subscription identifier.</param>
         /// <param name="streamId">The stream identifier.</param>
-        internal FaultedSubscriptionException(GuidId subscriptionId, InternalStreamId streamId)
+        internal FaultedSubscriptionException(GuidId subscriptionId, QualifiedStreamId streamId)
             : base(string.Format(ErrorStringFormat, subscriptionId.Guid, streamId)) { }
 
         /// <summary>

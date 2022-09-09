@@ -19,7 +19,7 @@ namespace Orleans.Streams
         [Id(1)]
         public GuidId SubscriptionId;
         [Id(2)]
-        public InternalStreamId StreamId;
+        public QualifiedStreamId StreamId;
         [Id(3)]
         public IStreamConsumerExtension StreamConsumer;
         [Id(4)]
@@ -31,7 +31,7 @@ namespace Orleans.Streams
         [Id(7)]
         public string FilterData;
 
-        public StreamConsumerData(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;
