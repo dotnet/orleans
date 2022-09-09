@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
@@ -21,13 +21,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="RoslynTypeNameFormatterTests.cs" />
+    <EmbeddedResource Include="CodeGenerationTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 
 </Project>

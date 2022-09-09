@@ -225,6 +225,12 @@ namespace Orleans.CodeGenerator.Utilities
             {
                 foreach (var t in baseType.GetInstanceMembers<TSymbol>()) yield return t;
             }
+
+            var interfaces = type.AllInterfaces;
+            foreach (var iface in interfaces)
+            {
+                foreach (var t in iface.GetInstanceMembers<TSymbol>()) yield return t;
+            }
         }
 
         public static TSymbol Member<TSymbol>(this ITypeSymbol type, string name, Func<TSymbol, bool> predicate = null) where TSymbol : class
