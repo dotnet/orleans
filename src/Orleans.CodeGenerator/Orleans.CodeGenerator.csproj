@@ -23,7 +23,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="$(MicrosoftCodeAnalysisAnalyzersVersion)" PrivateAssets="all" />
-    <PackageReference Include="System.IO.Hashing" Version="$(SystemIOHashingVersion)" NoWarn="NU5104" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
