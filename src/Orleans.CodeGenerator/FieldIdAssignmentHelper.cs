@@ -6,7 +6,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -84,7 +83,7 @@ internal class FieldIdAssignmentHelper
 
                 if (!id.HasValue)
                 {
-                    var property = GetMatchingProperty(field);
+                    var property = PropertyUtility.GetMatchingProperty(field, _memberSymbols);
                     if (property is null)
                     {
                         continue;
@@ -111,42 +110,9 @@ internal class FieldIdAssignmentHelper
         return true;
     }
 
-    private IPropertySymbol? GetMatchingProperty(IFieldSymbol field)
-    {
-        var propertyName = Regex.Match(field.Name, "^<([^>]+)>.*$");
-        if (!propertyName.Success)
-        {
-            return null;
-        }
-
-        var name = propertyName.Groups[1].Value;
-        var candidates = _memberSymbols.OfType<IPropertySymbol>()
-            .Where(property => string.Equals(name, property.Name, StringComparison.Ordinal)
-                               && SymbolEqualityComparer.Default.Equals(field.Type, property.Type)).ToArray();
-        return candidates.Length == 1 ? candidates[0] : null;
-    }
-
-    private IFieldSymbol? GetMatchingField(IPropertySymbol property)
-    {
-        var backingFieldName = $"<{property.Name}>k__BackingField";
-        var candidates = (from field in _memberSymbols.OfType<IFieldSymbol>()
-                          where SymbolEqualityComparer.Default.Equals(field.Type, property.Type)
-                          where field.Name == backingFieldName || GetCanonicalName(field.Name) == GetCanonicalName(property.Name)
-                          select field).ToArray();
-        return candidates.Length == 1 ? candidates[0] : null;
-    }
-
-    private string GetCanonicalName(string name)
-    {
-        name = name.TrimStart('_');
-        if (name.Length > 0 && char.IsUpper(name[0]))
-            name = $"{char.ToLowerInvariant(name[0])}{name.Substring(1)}";
-        return name;
-    }
-
     private (string, ushort) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
     {
-        name = GetCanonicalName(name);
+        name = PropertyUtility.GetCanonicalName(name);
 
         // compute the hash from the type name (without namespace, to allow it to move around) and name
         var typeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
@@ -206,7 +172,7 @@ internal class FieldIdAssignmentHelper
                                                               || property.SetMethod.IsInitOnly
                                                               || property.IsStatic
                                                               || property.SetMethod.IsAbstract;
-                ISymbol? symbol = mustUseField ? GetMatchingField(property) : property;
+                ISymbol? symbol = mustUseField ? PropertyUtility.GetMatchingField(property, _memberSymbols) : property;
                 if (symbol == null)
                     continue;
 
