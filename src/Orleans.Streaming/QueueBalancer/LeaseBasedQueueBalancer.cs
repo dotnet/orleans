@@ -248,10 +248,7 @@ namespace Orleans.Streams
                 List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList());
                 // build lease request from each queue
                 LeaseRequest[] leaseRequests = expectedQueues
-                    .Select(queue => new LeaseRequest() {
-                        ResourceKey = queue.ToString(),
-                        Duration = this.options.LeaseLength
-                    })
+                    .Select(queue => new LeaseRequest(queue.ToString(), options.LeaseLength))
                     .ToArray();
 
                 AcquireLeaseResult[] results = await this.leaseProvider.Acquire(this.options.LeaseCategory, leaseRequests);

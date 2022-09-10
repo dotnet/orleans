@@ -61,9 +61,10 @@ namespace Orleans.Runtime
             IGrainContext target,
             IInvokable request)
         {
-            for (var i = 0; i < request.ArgumentCount; i++)
+            var argumentCount = request.GetArgumentCount();
+            for (var i = 0; i < argumentCount; i++)
             {
-                var arg = request.GetArgument<object>(i);
+                var arg = request.GetArgument(i);
                 if (arg is not GrainCancellationToken grainToken)
                 {
                     continue;

@@ -19,22 +19,16 @@ namespace Orleans.Runtime.Versions
     }
 
     [GenerateSerializer]
-    internal class VersionStoreGrainState
+    internal sealed class VersionStoreGrainState
     {
         [Id(0)]
-        internal Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies { get; }
+        public readonly Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies = new();
         [Id(1)]
-        internal Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies { get; }
+        public readonly Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies = new();
         [Id(2)]
-        public VersionSelectorStrategy SelectorOverride { get; set; }
+        public VersionSelectorStrategy SelectorOverride;
         [Id(3)]
-        public CompatibilityStrategy CompatibilityOverride { get; set; }
-
-        public VersionStoreGrainState()
-        {
-            this.CompatibilityStrategies = new Dictionary<GrainInterfaceType, CompatibilityStrategy>();
-            this.VersionSelectorStrategies = new Dictionary<GrainInterfaceType, VersionSelectorStrategy>();
-        }
+        public CompatibilityStrategy CompatibilityOverride;
     }
 
     [StorageProvider(ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]

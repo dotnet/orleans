@@ -6,8 +6,7 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
-    [Serializable, Immutable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     [SuppressReferenceTracking]
     public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {

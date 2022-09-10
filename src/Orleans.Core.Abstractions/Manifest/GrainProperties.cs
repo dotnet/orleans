@@ -10,9 +10,8 @@ namespace Orleans.Metadata
     /// <summary>
     /// Information about a logical grain type <see cref="GrainType"/>.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class GrainProperties
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class GrainProperties
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainProperties"/> class.

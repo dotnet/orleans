@@ -108,22 +108,20 @@ namespace Orleans
     {
     }
 
-    [Serializable]
-    [Immutable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     public sealed class TableVersion : ISpanFormattable
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
         /// </summary>
         [Id(1)]
-        public int Version { get; private set; }
+        public int Version { get; }
 
         /// <summary>
         /// The etag of this TableVersion, used for validation of table update operations.
         /// </summary>
         [Id(2)]
-        public string VersionEtag { get; private set; }
+        public string VersionEtag { get; }
 
         public TableVersion(int version, string eTag)
         {

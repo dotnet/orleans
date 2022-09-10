@@ -48,9 +48,9 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
-    internal class StartToken : StreamHandshakeToken { }
+    internal sealed class StartToken : StreamHandshakeToken { }
     
     [Serializable]
     [GenerateSerializer]
-    internal class DeliveryToken : StreamHandshakeToken { }
+    internal sealed class DeliveryToken : StreamHandshakeToken { }
 }

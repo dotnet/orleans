@@ -6,9 +6,8 @@ namespace Orleans.Runtime
     /// <summary>
     /// Indicates that a <see cref="GrainReference"/> was not bound to the runtime before being used.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class GrainReferenceNotBoundException : OrleansException
+    [Serializable, GenerateSerializer]
+    public sealed class GrainReferenceNotBoundException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceNotBoundException"/> class.
@@ -34,7 +33,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        protected GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
+        private GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

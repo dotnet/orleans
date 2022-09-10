@@ -194,7 +194,7 @@ namespace Orleans.CodeGenerator
 
         public List<INamedTypeSymbol> SerializationHooks { get; }
 
-        public bool IsImmutable => IsEnumType || Type.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+        public bool IsShallowCopyable => IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes)
         {

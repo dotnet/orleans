@@ -1,31 +1,28 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.CodeGeneration;
-using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
-using Orleans.Serialization;
-using Orleans.Storage;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Threading;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
-using Orleans.Serialization.Invocation;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -352,50 +349,11 @@ namespace Orleans.Runtime
             }
         }
 
-        private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
-            new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-
-        private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
-        {
-            var methodInfo = typeof(Exception).GetMethod(
-                "PrepForRemoting",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            //This was added to avoid failure on .Net Core since Remoting APIs aren't available there.
-            if (methodInfo == null)
-                return exc => exc;
-
-            var method = new DynamicMethod(
-                "PrepForRemoting",
-                typeof(Exception),
-                new[] { typeof(Exception) },
-                typeof(InsideRuntimeClient).Module,
-                true);
-            var il = method.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Call, methodInfo);
-            il.Emit(OpCodes.Ret);
-            return (Func<Exception, Exception>)method.CreateDelegate(typeof(Func<Exception, Exception>));
-        }
-
-        private static Exception PrepareForRemoting(Exception exception)
-        {
-            // Call the Exception.PrepForRemoting internal method, which preserves the original stack when the exception
-            // is rethrown at the remote site (and appends the call site stacktrace). If this is not done, then when the
-            // exception is rethrown the original stacktrace is entire replaced.
-            // Note: another commonly used approach since .NET 4.5 is to use ExceptionDispatchInfo.Capture(ex).Throw()
-            // but that involves rethrowing the exception in-place, which is not what we want here, but could in theory
-            // be done at the receiving end with some rework (could be tackled when we reopen #875 Avoid unnecessary use of TCS).
-            prepForRemotingLazy.Value.Invoke(exception);
-            return exception;
-        }
-
         private void SafeSendExceptionResponse(Message message, Exception ex)
         {
             try
             {
-                var copiedException = PrepareForRemoting((Exception)this._deepCopier.Copy(ex));
-                SendResponse(message, Response.FromException(copiedException));
+                SendResponse(message, Response.FromException(ex));
             }
             catch (Exception exc1)
             {

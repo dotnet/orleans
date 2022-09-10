@@ -58,8 +58,8 @@ namespace UnitTests.General
                             if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
-                                var orig = (string)ctx.Arguments[0];
-                                ctx.Arguments[0] = orig + orig;
+                                var orig = (string)ctx.Request.GetArgument(0);
+                                ctx.Request.SetArgument(0, orig + orig);
                             }
 
                             if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IMethodInterceptionGrain.SystemWideCallFilterMarker)))
@@ -87,7 +87,7 @@ namespace UnitTests.General
                             if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
                                 && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
                             {
-                                ctx.Arguments[1] = ((string)ctx.Arguments[1]).ToUpperInvariant();
+                                ctx.Request.SetArgument(1, ((string)ctx.Request.GetArgument(1)).ToUpperInvariant());
                             }
 
                             await ctx.Invoke();
@@ -115,9 +115,9 @@ namespace UnitTests.General
                             }
                             catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1 && ctx.Grain is IOutgoingMethodInterceptionGrain)
                             {
-                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
+                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
                                 {
-                                    ctx.Arguments[0] = value - 1;
+                                    ctx.Request.SetArgument(0, value - 1);
                                 }
 
                                 --attemptsRemaining;

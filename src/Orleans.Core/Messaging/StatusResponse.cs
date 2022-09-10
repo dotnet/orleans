@@ -3,10 +3,8 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    [Immutable]
-    [Serializable]
-    [GenerateSerializer]
-    internal class StatusResponse
+    [Serializable, GenerateSerializer, Immutable]
+    internal sealed class StatusResponse
     {
         [Id(1)]
         private readonly uint _statusFlags;

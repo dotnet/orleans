@@ -9,7 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class QueueCacheMissException : DataNotAvailableException
+    public sealed class QueueCacheMissException : DataNotAvailableException
     {
         private const string MESSAGE_FORMAT = "Item not found in cache.  Requested: {0}, Low: {1}, High: {2}";
 
@@ -80,7 +80,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        public QueueCacheMissException(SerializationInfo info, StreamingContext context)
+        private QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             Requested = info.GetString("Requested");

@@ -29,7 +29,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    internal class StreamConsumerExtension : IStreamConsumerExtension
+    internal sealed class StreamConsumerExtension : IStreamConsumerExtension
     {
         [Id(0)]
         private readonly IStreamProviderRuntime providerRuntime;

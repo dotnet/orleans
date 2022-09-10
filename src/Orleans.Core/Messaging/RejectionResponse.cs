@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
-    [GenerateSerializer]
+    [GenerateSerializer, Immutable]
     internal sealed class RejectionResponse
     {
         [Id(0)]
-        public string RejectionInfo { get; set; }
+        public string RejectionInfo { get; init; }
 
         [Id(1)]
-        public Message.RejectionTypes RejectionType { get; set; }
+        public Message.RejectionTypes RejectionType { get; init; }
 
         [Id(2)]
-        public Exception Exception { get; set; }
+        public Exception Exception { get; init; }
     }
 }

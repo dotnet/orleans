@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansConfigurationException : Exception
+    public sealed class OrleansConfigurationException : Exception
     {
         /// <inheritdoc />
         public OrleansConfigurationException(string message)
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
         /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
-        protected OrleansConfigurationException(SerializationInfo info, StreamingContext context) : base(info, context)
+        private OrleansConfigurationException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }

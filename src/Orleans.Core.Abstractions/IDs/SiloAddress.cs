@@ -37,13 +37,13 @@ namespace Orleans.Runtime
         /// Gets the endpoint.
         /// </summary>
         [Id(0)]
-        public IPEndPoint Endpoint { get; private set; }
+        public IPEndPoint Endpoint { get; }
 
         /// <summary>
         /// Gets the generation.
         /// </summary>
         [Id(1)]
-        public int Generation { get; private set; }
+        public int Generation { get; }
 
         [NonSerialized]
         private byte[]? utf8;

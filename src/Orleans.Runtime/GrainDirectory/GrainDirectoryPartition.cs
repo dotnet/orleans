@@ -162,7 +162,6 @@ namespace Orleans.Runtime.GrainDirectory
                 throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 
-            AddressAndTag result;
             lock (lockable)
             {
                 if (!partitionData.TryGetValue(address.GrainId, out var grainInfo))
@@ -179,11 +178,8 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                result.Address = grainInfo.TryAddSingleActivation(address);
-                result.VersionTag = grainInfo.VersionTag;
+                return new(grainInfo.TryAddSingleActivation(address), grainInfo.VersionTag);
             }
-
-            return result;
         }
 
 
@@ -224,21 +220,20 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal AddressAndTag LookUpActivation(GrainId grain)
         {
-            var result = new AddressAndTag();
+            AddressAndTag result;
             lock (lockable)
             {
                 if (!partitionData.TryGetValue(grain, out var grainInfo) || grainInfo.Activation is null)
                 {
-                    return result;
+                    return default;
                 }
 
-                result.Address = grainInfo.Activation;
-                result.VersionTag = grainInfo.VersionTag;
+                result = new(grainInfo.Activation, grainInfo.VersionTag);
             }
 
             if (!IsValidSilo(result.Address.SiloAddress))
             {
-                result.Address = null;
+                result = new(null, result.VersionTag);
             }
 
             return result;

@@ -7,9 +7,8 @@ namespace Orleans.Metadata
     /// <summary>
     /// Information about available grains.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class GrainManifest
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class GrainManifest
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainManifest"/> class.

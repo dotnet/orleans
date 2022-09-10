@@ -7,9 +7,8 @@ namespace Orleans.Storage
     /// <summary>
     /// Exception thrown whenever a grain call is attempted with a bad / missing storage provider configuration settings for that grain.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
-    public class BadProviderConfigException : OrleansException
+    [Serializable, GenerateSerializer]
+    public sealed class BadProviderConfigException : OrleansException
     {
         public BadProviderConfigException()
         { }
@@ -20,7 +19,7 @@ namespace Orleans.Storage
             : base(msg, exc)
         { }
 
-        protected BadProviderConfigException(SerializationInfo info, StreamingContext context)
+        private BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
     }

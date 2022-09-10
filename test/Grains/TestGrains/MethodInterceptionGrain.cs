@@ -134,7 +134,7 @@ namespace UnitTests.Grains
         {
             if (context.ImplementationMethod.Name == nameof(GetInputAsString))
             {
-                context.Result = $"Hah! You wanted {context.Arguments[0]}, but you got me!";
+                context.Result = $"Hah! You wanted {context.Request.GetArgument(0)}, but you got me!";
                 return;
             }
 
@@ -155,7 +155,7 @@ namespace UnitTests.Grains
         {
             if (context.ImplementationMethod.Name == nameof(GetInputAsString))
             {
-                context.Result = $"Hah! You wanted {context.Arguments[0]}, but you got me!";
+                context.Result = $"Hah! You wanted {context.Request.GetArgument(0)}, but you got me!";
                 return;
             }
 
@@ -206,9 +206,9 @@ namespace UnitTests.Grains
                 }
                 catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
                 {
-                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
+                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
                     {
-                        ctx.Arguments[0] = (object)(value - 1);
+                        ctx.Request.SetArgument(0, value - 1);
                     }
 
                     --attemptsRemaining;

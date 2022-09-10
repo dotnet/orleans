@@ -30,16 +30,6 @@ namespace Orleans.Runtime.MembershipService
 
         public Task Ping(int pingNumber) => Task.CompletedTask;
 
-        public async Task SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
-        {
-            if (this.log.IsEnabled(LogLevel.Trace))
-            {
-                this.log.LogTrace("-Received GOSSIP SiloStatusChangeNotification about {Silo} status {Status}. Going to read the table.", updatedSilo, status);
-            }
-
-            await ReadTable();
-        }
-
         public async Task MembershipChangeNotification(MembershipTableSnapshot snapshot)
         {
             if (snapshot.Version != MembershipVersion.MinValue)
@@ -155,16 +145,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
-
-                try
-                {
-                    await remoteOracle.MembershipChangeNotification(snapshot);
-                }
-                catch (NotImplementedException)
-                {
-                    // Fallback to "old" gossip
-                    await remoteOracle.SiloStatusChangeNotification(updatedSilo, updatedStatus);
-                }
+                await remoteOracle.MembershipChangeNotification(snapshot);
             }
             catch (Exception exception)
             {

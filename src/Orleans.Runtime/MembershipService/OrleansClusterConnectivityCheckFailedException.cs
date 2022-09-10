@@ -9,7 +9,7 @@ namespace Orleans.Runtime.MembershipService
     /// <seealso cref="Orleans.Runtime.OrleansException" />
     [Serializable]
     [GenerateSerializer]
-    public class OrleansClusterConnectivityCheckFailedException : OrleansException
+    public sealed class OrleansClusterConnectivityCheckFailedException : OrleansException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansClusterConnectivityCheckFailedException"/> class.
@@ -34,7 +34,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        public OrleansClusterConnectivityCheckFailedException(SerializationInfo info, StreamingContext context)
+        private OrleansClusterConnectivityCheckFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

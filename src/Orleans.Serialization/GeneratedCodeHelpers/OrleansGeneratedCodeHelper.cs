@@ -140,11 +140,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             return null;
         }
-        
+
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
         /// </summary>                
-        public static TArgument InvokableThrowArgumentOutOfRange<TArgument>(int index, int maxArgs) => throw new ArgumentOutOfRangeException($"The argument index value {index} must be between 0 and {maxArgs}");
+        public static object InvokableThrowArgumentOutOfRange(int index, int maxArgs)
+            => throw new ArgumentOutOfRangeException(message: $"The argument index value {index} must be between 0 and {maxArgs}", null);
 
         /// <summary>
         /// Reads a field header.
@@ -241,12 +242,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     continue;
                 }
 
-                if (!current.ContainsGenericParameters && methodTypeParameters is { Length: > 0 })
-                {
-                    continue;
-                }
-
-                if (current.ContainsGenericParameters && methodTypeParameters is null or { Length: 0 })
+                if (current.ContainsGenericParameters != methodTypeParameters is { Length: > 0 })
                 {
                     continue;
                 }
@@ -262,7 +258,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 }
 
                 var parameters = current.GetParameters();
-                if (parameters.Length != parameterTypes.Length)
+                if (parameters.Length != (parameterTypes?.Length ?? 0))
                 {
                     continue;
                 }

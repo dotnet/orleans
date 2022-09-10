@@ -12,8 +12,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Uniquely identifies a grain activation.
     /// </summary>
-    [Serializable, Immutable]
-    [GenerateSerializer]
+    [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(ActivationIdConverter))]
     public readonly struct ActivationId : IEquatable<ActivationId>, ISpanFormattable
     {
