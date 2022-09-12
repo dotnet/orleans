@@ -491,7 +491,7 @@ namespace UnitTests.StreamingTests
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
                 var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
-                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new InternalStreamId(providerName, streamId));
+                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new QualifiedStreamId(providerName, streamId));
                 logger.LogInformation(
                     "StreamingTestRunner.AssertProducerCount: expected={ExpectedCount} actual (SMSStreamRendezvousGrain.ProducerCount)={ActualCount} streamId={StreamId}",
                     expectedCount,
@@ -503,7 +503,7 @@ namespace UnitTests.StreamingTests
 
         private Task ValidatePubSub(StreamId streamId, string providerName)
         {
-            var intStreamId = new InternalStreamId(providerName, streamId);
+            var intStreamId = new QualifiedStreamId(providerName, streamId);
             var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
             return rendez.Validate();
         }

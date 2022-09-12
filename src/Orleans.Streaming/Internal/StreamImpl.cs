@@ -15,7 +15,7 @@ namespace Orleans.Streams
     internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
         [Id(1)]
-        private readonly InternalStreamId                        streamId;
+        private readonly QualifiedStreamId                        streamId;
 
         [Id(2)]
         private readonly bool                                    isRewindable;
@@ -35,7 +35,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IRuntimeClient?                                  runtimeClient;
 
-        internal InternalStreamId InternalStreamId { get { return streamId; } }
+        internal QualifiedStreamId InternalStreamId { get { return streamId; } }
         public StreamId StreamId => streamId;
 
         public bool IsRewindable => isRewindable;
@@ -46,7 +46,7 @@ namespace Orleans.Streams
         {
         }
 
-        internal StreamImpl(InternalStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
+        internal StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             this.streamId = streamId;
             this.provider = provider ?? throw new ArgumentNullException(nameof(provider));

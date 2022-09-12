@@ -28,7 +28,7 @@ namespace Orleans.Streams
             this.implicitPubSub = implicitPubSub;
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             ISet<PubSubSubscriptionState> explicitRes = await explicitPubSub.RegisterProducer(streamId, streamProducer);
             ISet<PubSubSubscriptionState> implicitRes = await implicitPubSub.RegisterProducer(streamId, streamProducer);
@@ -36,36 +36,36 @@ namespace Orleans.Streams
             return explicitRes;
         }
 
-        public Task UnregisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public Task UnregisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             return explicitPubSub.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
                 ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData)
                 : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
         }
 
-        public Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId)
+        public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
         {
             return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
                 ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId)
                 : explicitPubSub.UnregisterConsumer(subscriptionId, streamId);
         }
 
-        public Task<int> ProducerCount(InternalStreamId streamId)
+        public Task<int> ProducerCount(QualifiedStreamId streamId)
         {
             return explicitPubSub.ProducerCount(streamId); 
         }
 
-        public Task<int> ConsumerCount(InternalStreamId streamId)
+        public Task<int> ConsumerCount(QualifiedStreamId streamId)
         {
             return explicitPubSub.ConsumerCount(streamId); 
         }
 
-        public async Task<List<StreamSubscription>> GetAllSubscriptions(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public async Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             if (streamConsumer != null)
             {
@@ -81,14 +81,14 @@ namespace Orleans.Streams
             }
         }
 
-        public GuidId CreateSubscriptionId(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
                ? implicitPubSub.CreateSubscriptionId(streamId, streamConsumer)
                : explicitPubSub.CreateSubscriptionId(streamId, streamConsumer);
         }
 
-        public Task<bool> FaultSubscription(InternalStreamId streamId, GuidId subscriptionId)
+        public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId)
         {
             return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
                 ? implicitPubSub.FaultSubscription(streamId, subscriptionId)

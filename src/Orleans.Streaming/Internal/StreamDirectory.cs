@@ -12,9 +12,9 @@ namespace Orleans.Streams
     /// </summary>
     internal class StreamDirectory : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<InternalStreamId, object> allStreams = new ConcurrentDictionary<InternalStreamId, object>();
+        private readonly ConcurrentDictionary<QualifiedStreamId, object> allStreams = new ConcurrentDictionary<QualifiedStreamId, object>();
 
-        internal IAsyncStream<T> GetOrAddStream<T>(InternalStreamId streamId, Func<IAsyncStream<T>> streamCreator)
+        internal IAsyncStream<T> GetOrAddStream<T>(QualifiedStreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {
             var stream = allStreams.GetOrAdd(streamId, (_, streamCreator) => streamCreator(), streamCreator);
             var streamOfT = stream as IAsyncStream<T>;
@@ -34,8 +34,8 @@ namespace Orleans.Streams
             }
 
             var promises = new List<Task>();
-            List<InternalStreamId> streamIds = GetUsedStreamIds();
-            foreach (InternalStreamId s in streamIds)
+            List<QualifiedStreamId> streamIds = GetUsedStreamIds();
+            foreach (QualifiedStreamId s in streamIds)
             {
                 IStreamControl streamControl = GetStreamControl(s);
                 if (streamControl != null)
@@ -51,14 +51,14 @@ namespace Orleans.Streams
             allStreams.Clear();
         }
 
-        private IStreamControl GetStreamControl(InternalStreamId streamId)
+        private IStreamControl GetStreamControl(QualifiedStreamId streamId)
         {
             object streamObj;
             bool ok = allStreams.TryGetValue(streamId, out streamObj);
             return ok ? streamObj as IStreamControl : null;
         }
 
-        private List<InternalStreamId> GetUsedStreamIds()
+        private List<QualifiedStreamId> GetUsedStreamIds()
         {
             return allStreams.Select(kv => kv.Key).ToList();
         }

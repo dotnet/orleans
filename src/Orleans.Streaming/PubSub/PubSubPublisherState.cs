@@ -14,7 +14,7 @@ namespace Orleans.Streams
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
         [Id(1)]
-        public InternalStreamId Stream;
+        public QualifiedStreamId Stream;
         [JsonProperty]
         [Id(2)]
         public GrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
@@ -24,7 +24,7 @@ namespace Orleans.Streams
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
-        public PubSubPublisherState(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public PubSubPublisherState(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             Stream = streamId;
             producerReference = streamProducer as GrainReference;
@@ -41,7 +41,7 @@ namespace Orleans.Streams
             // Note: PubSubPublisherState is a struct, so 'other' can never be null.
             return Equals(other.Stream, other.Producer);
         }
-        public bool Equals(InternalStreamId streamId, IStreamProducerExtension streamProducer)
+        public bool Equals(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
         {
             if (Stream == default) return false;
             if (ReferenceEquals(null, Producer)) return false;

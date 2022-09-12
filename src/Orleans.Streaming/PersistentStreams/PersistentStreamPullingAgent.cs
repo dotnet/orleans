@@ -22,7 +22,7 @@ namespace Orleans.Streams
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
-        private readonly Dictionary<InternalStreamId, StreamConsumerCollection> pubSubCache;
+        private readonly Dictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly IQueueAdapterCache queueAdapterCache;
@@ -60,7 +60,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
-            pubSubCache = new Dictionary<InternalStreamId, StreamConsumerCollection>();
+            pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
             this.options = options;
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler)); ;
@@ -233,7 +233,7 @@ namespace Orleans.Streams
 
         public Task AddSubscriber(
             GuidId subscriptionId,
-            InternalStreamId streamId,
+            QualifiedStreamId streamId,
             IStreamConsumerExtension streamConsumer,
             string filterData)
         {
@@ -249,7 +249,7 @@ namespace Orleans.Streams
         // Called by rendezvous when new remote subscriber subscribes to this stream.
         private async Task AddSubscriber_Impl(
             GuidId subscriptionId,
-            InternalStreamId streamId,
+            QualifiedStreamId streamId,
             IStreamConsumerExtension streamConsumer,
             string filterData,
             StreamSequenceToken cacheToken)
@@ -336,13 +336,13 @@ namespace Orleans.Streams
             return true;
         }
 
-        public Task RemoveSubscriber(GuidId subscriptionId, InternalStreamId streamId)
+        public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
         {
             RemoveSubscriber_Impl(subscriptionId, streamId);
             return Task.CompletedTask;
         }
 
-        public void RemoveSubscriber_Impl(GuidId subscriptionId, InternalStreamId streamId)
+        public void RemoveSubscriber_Impl(GuidId subscriptionId, QualifiedStreamId streamId)
         {
             if (IsShutdown) return;
 
@@ -492,7 +492,7 @@ namespace Orleans.Streams
                 .Where(m => m != null)
                 .GroupBy(container => container.StreamId))
             {
-                var streamId = new InternalStreamId(queueAdapter.Name, group.Key);
+                var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 StreamConsumerCollection streamData;
                 if (pubSubCache.TryGetValue(streamId, out streamData))
@@ -532,7 +532,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RegisterStream(InternalStreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        private async Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
             var streamData = new StreamConsumerCollection(now);
             pubSubCache.Add(streamId, streamData);
@@ -807,7 +807,7 @@ namespace Orleans.Streams
             return false;
         }
 
-        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, InternalStreamId streamId,
+        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, QualifiedStreamId streamId,
             IStreamProducerExtension meAsStreamProducer, ILogger logger)
         {
             try
@@ -822,7 +822,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RegisterAsStreamProducer(InternalStreamId streamId, StreamSequenceToken streamStartToken)
+        private async Task RegisterAsStreamProducer(QualifiedStreamId streamId, StreamSequenceToken streamStartToken)
         {
             try
             {

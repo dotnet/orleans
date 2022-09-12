@@ -84,12 +84,12 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out _);
         }
 
-        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, InternalStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             return DeliverMutable(subscriptionId, streamId, item.Value, currentToken, handshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, InternalStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
@@ -128,7 +128,7 @@ namespace Orleans.Streams
             return default(StreamHandshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch.Value, subscriptionId);
 
@@ -208,7 +208,7 @@ namespace Orleans.Streams
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
-        internal int DiagCountStreamObservers<T>(InternalStreamId streamId)
+        internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId)
         {
             return allStreamObservers.Count(o => o.Value is StreamSubscriptionHandleImpl<T> i && i.SameStreamId(streamId));
         }
