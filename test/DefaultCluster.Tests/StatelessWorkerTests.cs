@@ -25,7 +25,7 @@ namespace DefaultCluster.Tests.General
             this.output = output;
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerThrowExceptionConstructor()
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
@@ -37,7 +37,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
@@ -95,7 +95,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task ManyConcurrentInvocationsOnActivationLimitedStatelessWorkerDoesNotFail()
         {
             // Issue #6795: significantly more concurrent invocations than the local worker limit results in too many
