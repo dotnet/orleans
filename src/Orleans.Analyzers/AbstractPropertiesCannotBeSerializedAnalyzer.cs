@@ -29,7 +29,7 @@ namespace Orleans.Analyzers
         {
             if (context.Node is TypeDeclarationSyntax declaration && SerializationAttributesHelper.ShouldGenerateSerializer(declaration))
             {
-                var (_, members, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                var (_, members, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
                 foreach (var member in members)
                 {
                     string modifier = null;

@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageDescription>Code generation library for Orleans.Serialization</PackageDescription>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
@@ -29,6 +30,9 @@
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="..\Orleans.Serialization.Abstractions\GenerateFieldIds.cs">
+      <Link>Model\GenerateFieldIds.cs</Link>
     </Compile>
   </ItemGroup>
 

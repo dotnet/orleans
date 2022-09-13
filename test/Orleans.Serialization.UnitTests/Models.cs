@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans;
 
@@ -140,7 +141,7 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(0)]
         public int IntValue { get; set; }
-        
+
         public override bool Equals(object obj) => obj is DerivedFromMyForeignLibraryType type && base.Equals(obj) && Num == type.Num && String == type.String && DateTimeOffset.Equals(type.DateTimeOffset) && IntValue == type.IntValue;
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), Num, String, DateTimeOffset, IntValue);
     }
@@ -371,7 +372,7 @@ namespace Orleans.Serialization.UnitTests
     {
         [Id(0)]
         public HashSet<string> hashSetField;
-        
+
         [Id(1)]
         public HashSet<string> HashSetProperty { get; set; }
 
@@ -420,5 +421,21 @@ namespace Orleans.Serialization.UnitTests
                 GuidProperty = Guid.TryParse(value, out var guidValue) ? guidValue : default;
             }
         }
+    }
+
+    [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
+    public class ClassWithImplicitFieldIds
+    {
+        public string StringValue { get; }
+        public MyCustomEnum EnumValue { get; }
+
+        [OrleansConstructor]
+        public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
+        {
+            StringValue = stringValue;
+            EnumValue = enumValue;
+        }
+
+        public override string ToString() => $"{nameof(StringValue)}: {StringValue}, {nameof(EnumValue)}: {EnumValue}";
     }
 }

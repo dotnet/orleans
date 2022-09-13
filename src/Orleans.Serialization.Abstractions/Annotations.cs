@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans
 {
@@ -14,6 +15,11 @@ namespace Orleans
         /// Defaults to <see langword="true"/> for record types.
         /// </summary>
         public bool IncludePrimaryConstructorParameters { get; init; } = true;
+
+        /// <summary>
+        /// Get or sets when Orleans should auto-assign field ids. The default behavior is to not auto-assign field ids.
+        /// </summary>
+        public GenerateFieldIds GenerateFieldIds { get; init; } = GenerateFieldIds.None;
     }
 
     /// <summary>
@@ -271,6 +277,24 @@ namespace Orleans
         /// </summary>
         /// <value>The identifier.</value>
         public ushort Id { get; }
+    }
+
+    /// <summary>
+    /// Specifies the constructor the serializer should use when creating new instances from serialized data.
+    /// </summary>
+    /// <remarks>
+    /// At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored.
+    /// </remarks>
+    /// <seealso cref="Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" />
+    [AttributeUsage(AttributeTargets.Constructor)]
+    public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansConstructorAttribute"/> class.
+        /// </summary>
+        public OrleansConstructorAttribute()
+        {
+        }
     }
 
     /// <summary>

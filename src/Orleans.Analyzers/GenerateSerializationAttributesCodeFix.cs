@@ -18,7 +18,7 @@ namespace Orleans.Analyzers
     {
         public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(GenerateSerializationAttributesAnalyzer.RuleId, GenerateGenerateSerializerAttributeAnalyzer.RuleId);
 
-        public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer; 
+        public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
@@ -59,7 +59,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddSerializationAttributes(TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var (serializableMembers, _, nextId) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var (serializableMembers, _, nextId, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
 
             foreach (var member in serializableMembers)
             {
@@ -76,7 +76,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddNonSerializedAttributes(SyntaxNode root, TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var (serializableMembers, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var (serializableMembers, _, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
 
             var insertUsingDirective = true;
             var ns = root.DescendantNodesAndSelf()
@@ -104,10 +104,10 @@ namespace Orleans.Analyzers
                     editor.InsertBefore(firstNode, usingDirective);
                 }
             }
-            
+
             foreach (var member in serializableMembers)
             {
-                // Add the [NonSerialized] attribute 
+                // Add the [NonSerialized] attribute
                 var attribute = AttributeList().AddAttributes(Attribute(ParseName(Constants.NonSerializedAttributeFullyQualifiedName)).WithAdditionalAnnotations(Simplifier.Annotation));
 
                 // Since [NonSerialized] is a field-only attribute, add the field target specifier.

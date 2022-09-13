@@ -340,7 +340,7 @@ namespace Orleans.CodeGenerator
                             .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
             }
 
-            if (type.SupportsPrimaryContstructorParameters)
+            if (type.SupportsPrimaryConstructorParameters)
             {
                 AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
@@ -486,7 +486,7 @@ namespace Orleans.CodeGenerator
 
             AddSerializationCallbacks(type, instanceParam, "OnDeserializing", body);
 
-            if (type.SupportsPrimaryContstructorParameters)
+            if (type.SupportsPrimaryConstructorParameters)
             {
                 body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => m.IsPrimaryConstructorParameter)))));
                 body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
@@ -1348,7 +1348,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 // If the symbol itself is a property but is not settable, then error out, since we do not know how to set it value
-                if (IsProperty)
+                if (IsProperty && !IsPrimaryConstructorParameter)
                 {
                     Location location = default;
                     if (Member.Symbol is IPropertySymbol prop && prop.SetMethod is { } setMethod)

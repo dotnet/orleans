@@ -16,7 +16,7 @@ namespace Orleans.Analyzers
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AddSerializationAttributesMessageFormat), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AddSerializationAttributesDescription), Resources.ResourceManager, typeof(Resources));
 
-        internal static DiagnosticDescriptor Rule { get; } = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Info, isEnabledByDefault: true, description: Description);
+        private static DiagnosticDescriptor Rule { get; } = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Info, isEnabledByDefault: true, description: Description);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -33,7 +33,7 @@ namespace Orleans.Analyzers
             {
                 if (declaration.TryGetAttribute(Constants.GenerateSerializerAttributeName, out var attribute))
                 {
-                    var (serializableMembers, _, nextId) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                    var (serializableMembers, _, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
                     if (serializableMembers.Count > 0)
                     {
                         context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
