@@ -13,7 +13,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -34,7 +33,6 @@ namespace Orleans.Storage
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
-            IGrainStorageSerializer grainStorageSerializer,
             IBlobContainerFactory blobContainerFactory,
             IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
