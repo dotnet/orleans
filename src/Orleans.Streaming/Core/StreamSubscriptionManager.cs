@@ -19,7 +19,7 @@ namespace Orleans.Streams.Core
 
         public async Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef)
         {
-            var consumer = grainRef.AsReference<IStreamConsumerExtension>();
+            var consumer = grainRef.GrainId;
             var internalStreamId = new QualifiedStreamId(streamProviderName, streamId);
             var subscriptionId = streamPubSub.CreateSubscriptionId(internalStreamId, consumer);
             await streamPubSub.RegisterConsumer(subscriptionId, internalStreamId, consumer, null);

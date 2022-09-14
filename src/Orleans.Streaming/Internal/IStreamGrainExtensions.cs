@@ -20,7 +20,7 @@ namespace Orleans.Streams
     internal interface IStreamProducerExtension : IGrainExtension
     {
         [AlwaysInterleave]
-        Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData);
+        Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
 
         [AlwaysInterleave]
         Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId);

@@ -107,7 +107,7 @@ namespace Orleans.Streams
         /// <returns>A set of references to implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
-        internal Dictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(QualifiedStreamId streamId, IInternalGrainFactory grainFactory)
+        internal Dictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(QualifiedStreamId streamId, IInternalGrainFactory grainFactory) // TODO BPETIT
         {
             var streamNamespace = streamId.GetNamespace();
             if (!IsImplicitSubscribeEligibleNameSpace(streamNamespace))

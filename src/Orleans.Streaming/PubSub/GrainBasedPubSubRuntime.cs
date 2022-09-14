@@ -15,19 +15,19 @@ namespace Orleans.Streams
             this.grainFactory = grainFactory;
         }
 
-        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
+        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.RegisterProducer(streamId, streamProducer);
         }
 
-        public Task UnregisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
+        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
@@ -51,7 +51,7 @@ namespace Orleans.Streams
             return streamRendezvous.ConsumerCount(streamId);
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);
@@ -62,7 +62,7 @@ namespace Orleans.Streams
             return grainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
         }
 
-        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer)
         {
             Guid subscriptionId = SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
             return GuidId.GetGuidId(subscriptionId);
