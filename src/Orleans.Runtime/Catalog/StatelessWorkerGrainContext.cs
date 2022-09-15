@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
     {
         private readonly GrainAddress _address;
-        private readonly GrainTypeSharedContext _sharedContext;
+        private readonly GrainTypeSharedContext _shared;
         private readonly IGrainContextActivator _innerActivator;
         private readonly int _maxWorkers;
         private readonly List<ActivationData> _workers = new();
@@ -36,15 +36,14 @@ namespace Orleans.Runtime
             IGrainContextActivator innerActivator)
         {
             _address = address;
-            _sharedContext = sharedContext;
+            _shared = sharedContext;
             _innerActivator = innerActivator;
-            _maxWorkers = ((StatelessWorkerPlacement)_sharedContext.PlacementStrategy).MaxLocal;
+            _maxWorkers = ((StatelessWorkerPlacement)_shared.PlacementStrategy).MaxLocal;
             _messageLoopTask = Task.Run(RunMessageLoop);
-            _sharedContext.OnCreateActivation(this);
-
+            _shared.OnCreateActivation(this);
         }
 
-        public GrainReference GrainReference => _grainReference ??= _sharedContext.GrainReferenceActivator.CreateReference(GrainId, default);
+        public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
         public GrainId GrainId => _address.GrainId;
 
@@ -60,7 +59,7 @@ namespace Orleans.Runtime
 
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
-        public PlacementStrategy PlacementStrategy => _sharedContext.PlacementStrategy;
+        public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
 
         public Task Deactivated
         {
@@ -100,13 +99,20 @@ namespace Orleans.Runtime
             }
             finally
             {
-                _sharedContext.OnDestroyActivation(this);
+                _shared.OnDestroyActivation(this);
             }
         }
 
         public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
-        public TComponent GetComponent<TComponent>() => throw new NotImplementedException();
-        public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();
+
+        public TComponent GetComponent<TComponent>() => this switch
+        {
+            TComponent contextResult => contextResult,
+            _ => _shared.GetComponent<TComponent>()
+        };
+
+        public void SetComponent<TComponent>(TComponent instance) => throw new ArgumentException($"Cannot set a component on a {nameof(StatelessWorkerGrainContext)}");
+
         public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
 
         private async Task RunMessageLoop()
@@ -160,7 +166,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    _sharedContext.Logger.LogError(exception, "Error in stateless worker message loop");
+                    _shared.Logger.LogError(exception, "Error in stateless worker message loop");
                 }
             }
         }
@@ -221,7 +227,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception) when (message is Message msg)
             {
-                _sharedContext.InternalRuntime.MessageCenter.RejectMessage(
+                _shared.InternalRuntime.MessageCenter.RejectMessage(
                     msg,
                     Message.RejectionTypes.Transient,
                     exception,
@@ -239,7 +245,7 @@ namespace Orleans.Runtime
 
             // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
             var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-            var cancellation = new CancellationTokenSource(_sharedContext.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+            var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
             newWorker.Activate(requestContext, cancellation.Token);
 
             _workers.Add(newWorker);
@@ -317,7 +323,7 @@ namespace Orleans.Runtime
             _workSignal.Signal();
             if (_workers.Count == 0)
             {
-                _sharedContext.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
             }
         }
 
