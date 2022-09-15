@@ -63,7 +63,7 @@ namespace Orleans.Streams
         ImplicitOnly,
     }
 
-    internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
+    public interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
     {
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
