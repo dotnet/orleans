@@ -208,13 +208,12 @@ namespace Orleans.Streams
             }
 
             var unregisterTasks = new List<Task>();
-            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
             foreach (var tuple in pubSubCache)
             {
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {StreamId}.", streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, meAsStreamProducer));
+                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, GrainId));
             }
 
             try
@@ -234,7 +233,7 @@ namespace Orleans.Streams
         public Task AddSubscriber(
             GuidId subscriptionId,
             QualifiedStreamId streamId,
-            IStreamConsumerExtension streamConsumer,
+            GrainId streamConsumer,
             string filterData)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={StreamId} Subscriber={SubscriberId}.", streamId, streamConsumer);
@@ -250,7 +249,7 @@ namespace Orleans.Streams
         private async Task AddSubscriber_Impl(
             GuidId subscriptionId,
             QualifiedStreamId streamId,
-            IStreamConsumerExtension streamConsumer,
+            GrainId streamConsumer,
             string filterData,
             StreamSequenceToken cacheToken)
         {
@@ -265,7 +264,12 @@ namespace Orleans.Streams
 
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filterData);
+            {
+                var consumerReference = this.RuntimeClient.InternalGrainFactory
+                    .GetGrain(streamConsumer)
+                    .AsReference<IStreamConsumerExtension>();
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData);
+            }
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
@@ -808,7 +812,7 @@ namespace Orleans.Streams
         }
 
         private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, QualifiedStreamId streamId,
-            IStreamProducerExtension meAsStreamProducer, ILogger logger)
+            GrainId meAsStreamProducer, ILogger logger)
         {
             try
             {
@@ -828,11 +832,10 @@ namespace Orleans.Streams
             {
                 if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetrieveNewStream");
 
-                IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 async i => { streamData =
-                                    await PubsubRegisterProducer(pubSub, streamId, meAsStreamProducer, logger); },
+                                    await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,

@@ -7,9 +7,9 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    internal sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
+    public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
-        internal enum SubscriptionStates
+        public enum SubscriptionStates
         {
             Active,
             Faulted,
@@ -28,7 +28,7 @@ namespace Orleans.Streams
 
         [JsonProperty]
         [Id(3)]
-        public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public GrainId Consumer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
         [Id(4)]
@@ -38,9 +38,6 @@ namespace Orleans.Streams
         [Id(5)]
         public SubscriptionStates state;
 
-        // This property does not need to be Json serialized, since we already have producerReference.
-        [JsonIgnore]
-        public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
         [JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
@@ -49,11 +46,11 @@ namespace Orleans.Streams
         public PubSubSubscriptionState(
             GuidId subscriptionId,
             QualifiedStreamId streamId,
-            IStreamConsumerExtension streamConsumer)
+            GrainId streamConsumer)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
-            consumerReference = streamConsumer as GrainReference;
+            Consumer = streamConsumer;
             state = SubscriptionStates.Active;
         }
 

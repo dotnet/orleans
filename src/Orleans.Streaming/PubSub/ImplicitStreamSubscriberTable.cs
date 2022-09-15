@@ -104,10 +104,10 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamId">A stream ID.</param>
         /// <param name="grainFactory">The grain factory used to get consumer references.</param>
-        /// <returns>A set of references to implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
+        /// <returns>A set of GrainId that are implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
-        internal Dictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(QualifiedStreamId streamId, IInternalGrainFactory grainFactory)
+        internal Dictionary<Guid, GrainId> GetImplicitSubscribers(QualifiedStreamId streamId, IInternalGrainFactory grainFactory) 
         {
             var streamNamespace = streamId.GetNamespace();
             if (!IsImplicitSubscribeEligibleNameSpace(streamNamespace))
@@ -117,16 +117,16 @@ namespace Orleans.Streams
 
             var entries = GetOrAddImplicitSubscribers(streamNamespace);
 
-            var result = new Dictionary<Guid, IStreamConsumerExtension>();
+            var result = new Dictionary<Guid, GrainId>();
             foreach (var entry in entries)
             {
-                var consumer = MakeConsumerReference(grainFactory, streamId, entry);
+                var grainId = entry.GetGrainId(streamId);
                 Guid subscriptionGuid = MakeSubscriptionGuid(entry.GrainType, streamId);
-                CollectionsMarshal.GetValueRefOrAddDefault(result, subscriptionGuid, out var duplicate) = consumer;
+                CollectionsMarshal.GetValueRefOrAddDefault(result, subscriptionGuid, out var duplicate) = grainId;
                 if (duplicate)
                 {
                     throw new InvalidOperationException(
-                        $"Internal invariant violation: generated duplicate subscriber reference: {consumer}, subscriptionId: {subscriptionGuid}");
+                        $"Internal invariant violation: generated duplicate subscriber reference: {grainId}, subscriptionId: {subscriptionGuid}");
                 }
             }
             return result;
@@ -218,22 +218,6 @@ namespace Orleans.Streams
             }
 
             return result;
-        }
-
-        /// <summary>
-        /// Create a reference to a grain that we expect to support the stream consumer extension.
-        /// </summary>
-        /// <param name="grainFactory">The grain factory used to get consumer references.</param>
-        /// <param name="streamId">The stream ID to use for the grain ID construction.</param>
-        /// <param name="streamSubscriber">The GrainBindings for the grain to create</param>
-        /// <returns></returns>
-        private IStreamConsumerExtension MakeConsumerReference(
-            IInternalGrainFactory grainFactory,
-            QualifiedStreamId streamId,
-            StreamSubscriber streamSubscriber)
-        {
-            var grainId = streamSubscriber.GetGrainId(streamId);
-            return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 
         private class StreamSubscriberPredicate
