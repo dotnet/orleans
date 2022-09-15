@@ -28,11 +28,11 @@ namespace Orleans.Streams
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace())) return Task.FromResult(result);
 
-            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
+            IDictionary<Guid, GrainId> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
-                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value.GetGrainId()));
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value));
             }
             return Task.FromResult(result);
         }
@@ -87,9 +87,9 @@ namespace Orleans.Streams
                 var implicitConsumers = this.implicitTable.GetImplicitSubscribers(streamId, grainFactory);
                 var subscriptions = implicitConsumers.Select(consumer =>
                 {
-                    var grainRef = consumer.Value as GrainReference;
+                    var grainId = consumer.Value;
                     var subId = consumer.Key;
-                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainRef.GrainId);
+                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainId);
                 }).ToList();
                 return Task.FromResult(subscriptions);
             }   
