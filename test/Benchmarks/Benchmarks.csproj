@@ -9,6 +9,7 @@
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +27,12 @@
     <PackageReference Include="Hyperion" Version="$(HyperionVersion)" />
     <PackageReference Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
     <PackageReference Include="Grpc.Tools" Version="$(GrpcToolsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>
