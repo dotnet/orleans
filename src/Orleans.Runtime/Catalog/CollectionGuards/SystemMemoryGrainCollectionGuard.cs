@@ -5,8 +5,8 @@ using Orleans.Statistics;
 namespace Orleans.Runtime.CollectionGuards;
 
 /// <summary>
-/// A policy that limits the number of activations of grains based on
-/// memory pressure on the system.
+/// A guard that stops collection of grains until the system memory
+/// is under a certain load.
 /// </summary>
 public class SystemMemoryGrainCollectionGuard : IGrainCollectionGuard
 {
