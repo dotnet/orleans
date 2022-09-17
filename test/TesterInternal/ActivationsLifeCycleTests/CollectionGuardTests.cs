@@ -35,17 +35,17 @@ public class CollectionGuardTests
     [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
     public void CollectionGCGuardTest()
     {
-        var guard1 = new ProcessMemoryCollectionGuard(new GigabyteAppEnvironmentStatistics(),
+        var guard1 = new ProcessMemoryGrainCollectionGuard(new GigabyteAppEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = 1_000_000
             }));
-        var guard2 = new ProcessMemoryCollectionGuard(new GigabyteAppEnvironmentStatistics(),
+        var guard2 = new ProcessMemoryGrainCollectionGuard(new GigabyteAppEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = 2_000_000_000
             }));
-        var guard3 = new ProcessMemoryCollectionGuard(new GigabyteAppEnvironmentStatistics(),
+        var guard3 = new ProcessMemoryGrainCollectionGuard(new GigabyteAppEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = null
@@ -67,7 +67,7 @@ public class CollectionGuardTests
     [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
     public void CollectionGCMissingConfigurationGuardTest()
     {
-        var guard1 = new ProcessMemoryCollectionGuard(new UnknownGCPressureEnvironmentStatistics(),
+        var guard1 = new ProcessMemoryGrainCollectionGuard(new UnknownGCPressureEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = 1_000_000
@@ -80,17 +80,17 @@ public class CollectionGuardTests
     [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
     public void CollectionSystemMemoryGuardTest()
     {
-        var guard1 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard1 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = 1_000_000
             }));
-        var guard2 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard2 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = 2_000_000_000
             }));
-        var guard3 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard3 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionGCMemoryThreshold = null
@@ -108,22 +108,22 @@ public class CollectionGuardTests
     [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
     public void CollectionSystemMemoryPercentGuardTest()
     {
-        var guard1 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard1 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreePercentThreshold = 60
             }));
-        var guard2 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard2 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreePercentThreshold = 50
             }));
-        var guard3 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard3 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreePercentThreshold = 20
             }));
-        var guard4 = new SystemMemoryCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+        var guard4 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreePercentThreshold = null
@@ -147,12 +147,12 @@ public class CollectionGuardTests
     [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
     public void CollectionSystemMissingConfigurationGuardTest()
     {
-        var guard1 = new SystemMemoryCollectionGuard(new UnknownHostEnvironmentStatistics(),
+        var guard1 = new SystemMemoryGrainCollectionGuard(new UnknownHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreeThreshold = 1_000_000
             }));
-        var guard2 = new SystemMemoryCollectionGuard(new UnknownHostEnvironmentStatistics(),
+        var guard2 = new SystemMemoryGrainCollectionGuard(new UnknownHostEnvironmentStatistics(),
             Options.Create(new GrainCollectionOptions
             {
                 CollectionSystemMemoryFreeThreshold = null

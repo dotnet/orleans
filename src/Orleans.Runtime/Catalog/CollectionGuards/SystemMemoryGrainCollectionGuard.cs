@@ -8,12 +8,12 @@ namespace Orleans.Runtime.CollectionGuards;
 /// A policy that limits the number of activations of grains based on
 /// memory pressure on the system.
 /// </summary>
-public class SystemMemoryCollectionGuard : ICollectionGuard
+public class SystemMemoryGrainCollectionGuard : IGrainCollectionGuard
 {
     private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
     private readonly IOptions<GrainCollectionOptions> _grainCollectionOptions;
 
-    public SystemMemoryCollectionGuard(
+    public SystemMemoryGrainCollectionGuard(
         IHostEnvironmentStatistics hostEnvironmentStatistics,
         IOptions<GrainCollectionOptions> grainCollectionOptions)
     {

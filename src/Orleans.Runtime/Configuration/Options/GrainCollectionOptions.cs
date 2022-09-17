@@ -25,7 +25,7 @@ namespace Orleans.Configuration
         public TimeSpan CollectionAge { get; set; } = TimeSpan.FromMinutes(15);
 
         /// <summary>
-        /// If used with <see cref="ProcessMemoryCollectionGuard"/>, this sets the threshold in bytes for when
+        /// If used with <see cref="ProcessMemoryGrainCollectionGuard"/>, this sets the threshold in bytes for when
         /// the system will start evicting grains.
         ///
         /// If set to 0 or null, the grains will never evade eviction based on GC memory pressure.
@@ -33,7 +33,7 @@ namespace Orleans.Configuration
         public long? CollectionGCMemoryThreshold { get; set; }
 
         /// <summary>
-        /// If used with <see cref="SystemMemoryCollectionGuard"/>, this sets the threshold in bytes for when
+        /// If used with <see cref="SystemMemoryGrainCollectionGuard"/>, this sets the threshold in bytes for when
         /// how much memory must be available for the system to start evicting grains.
         ///
         /// If set to 0 or null, the grains will never evade eviction based on available system memory.
@@ -41,7 +41,7 @@ namespace Orleans.Configuration
         public long? CollectionSystemMemoryFreeThreshold { get; set; }
 
         /// <summary>
-        /// If used with <see cref="SystemMemoryCollectionGuard"/>, this sets the threshold in percent for when
+        /// If used with <see cref="SystemMemoryGrainCollectionGuard"/>, this sets the threshold in percent for when
         /// how much memory must be available for the system to start evicting grains.
         ///
         /// If set to 0 or null, the grains will never evade eviction based on available system memory.

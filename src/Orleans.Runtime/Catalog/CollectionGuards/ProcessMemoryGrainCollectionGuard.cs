@@ -9,12 +9,12 @@ namespace Orleans.Runtime.CollectionGuards;
 /// A guard that stops collection of grains if the memory
 /// pressure is low.
 /// </summary>
-public class ProcessMemoryCollectionGuard : ICollectionGuard
+public class ProcessMemoryGrainCollectionGuard : IGrainCollectionGuard
 {
     private readonly IAppEnvironmentStatistics _appEnvironmentStatistics;
     private readonly IOptions<GrainCollectionOptions> _grainCollectionOptions;
 
-    public ProcessMemoryCollectionGuard(
+    public ProcessMemoryGrainCollectionGuard(
         IAppEnvironmentStatistics appEnvironmentStatistics,
         IOptions<GrainCollectionOptions> grainCollectionOptions)
     {

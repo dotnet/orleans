@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         private int collectionNumber;
         private int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
-        private readonly IEnumerable<ICollectionGuard> _collectionGuards;
+        private readonly IEnumerable<IGrainCollectionGuard> _collectionGuards;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
-            IEnumerable<ICollectionGuard> collectionGuards,
+            IEnumerable<IGrainCollectionGuard> collectionGuards,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger)
         {
