@@ -30,7 +30,6 @@ namespace Orleans.Runtime
         private int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
         private readonly IEnumerable<ICollectionGuard> _collectionGuards;
-        private readonly ICollectionStrategy _collectionStrategy;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -38,7 +37,6 @@ namespace Orleans.Runtime
         /// <param name="timerFactory">The timer factory.</param>
         /// <param name="options">The options.</param>
         /// <param name="collectionGuards">The eviction guards.</param>
-        /// <param name="collectionStrategy">The collection strategy.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
@@ -53,7 +51,6 @@ namespace Orleans.Runtime
             this.logger = logger;
             _collectionTimer = timerFactory.Create(quantum, "ActivationCollector");
             _collectionGuards = collectionGuards;
-            _collectionStrategy = collectionStrategy;
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
