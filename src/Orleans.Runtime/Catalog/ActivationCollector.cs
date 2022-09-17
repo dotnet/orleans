@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="timerFactory">The timer factory.</param>
         /// <param name="options">The options.</param>
-        /// <param name="collectionGuards">The eviction guards.</param>
+        /// <param name="collectionGuards">The collection guards.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
-        private int GetNumRecentlyUsed(TimeSpan recencyPeriod)
+        public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
             var now = DateTime.UtcNow;
             int sum = 0;
