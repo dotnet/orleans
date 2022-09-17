@@ -13,7 +13,7 @@ using Orleans.Statistics;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Identifies activations that have been idle long enough to be deactivated.
+    /// Identifies activations that should be deactivated.
     /// </summary>
     internal class ActivationCollector : IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
     {
@@ -29,15 +29,20 @@ namespace Orleans.Runtime
         private int collectionNumber;
         private int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
+        private readonly IEnumerable<ICollectionGuard> _collectionGuards;
+        private readonly ICollectionStrategy _collectionStrategy;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
         /// </summary>
         /// <param name="timerFactory">The timer factory.</param>
         /// <param name="options">The options.</param>
+        /// <param name="collectionGuards">The eviction guards.</param>
+        /// <param name="collectionStrategy">The collection strategy.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
+            IEnumerable<ICollectionGuard> collectionGuards,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger)
         {
@@ -47,10 +52,12 @@ namespace Orleans.Runtime
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             this.logger = logger;
             _collectionTimer = timerFactory.Create(quantum, "ActivationCollector");
+            _collectionGuards = collectionGuards;
+            _collectionStrategy = collectionStrategy;
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
-        public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
+        private int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
             var now = DateTime.UtcNow;
             int sum = 0;
@@ -463,6 +470,14 @@ namespace Orleans.Runtime
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
         {
+            foreach (var collectionGuard in _collectionGuards)
+            {
+                if (collectionGuard.ShouldCollect() == false)
+                {
+                    return;
+                }
+            }
+
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);

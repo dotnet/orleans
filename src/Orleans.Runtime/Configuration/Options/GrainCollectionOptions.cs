@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime.CollectionGuards;
 
 namespace Orleans.Configuration
 {
@@ -22,6 +23,32 @@ namespace Orleans.Configuration
         /// Gets or sets the default period of inactivity necessary for a grain to be available for collection and deactivation.
         /// </summary>
         public TimeSpan CollectionAge { get; set; } = TimeSpan.FromMinutes(15);
+
+        /// <summary>
+        /// If used with <see cref="ProcessMemoryCollectionGuard"/>, this sets the threshold in bytes for when
+        /// the system will start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on GC memory pressure.
+        /// </summary>
+        public long? CollectionGCMemoryThreshold { get; set; }
+
+        /// <summary>
+        /// If used with <see cref="SystemMemoryCollectionGuard"/>, this sets the threshold in bytes for when
+        /// how much memory must be available for the system to start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on available system memory.
+        /// </summary>
+        public long? CollectionSystemMemoryFreeThreshold { get; set; }
+
+        /// <summary>
+        /// If used with <see cref="SystemMemoryCollectionGuard"/>, this sets the threshold in percent for when
+        /// how much memory must be available for the system to start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on available system memory.
+        ///
+        /// The range is from 0.0 to 100.0.
+        /// </summary>
+        public float? CollectionSystemMemoryFreePercentThreshold { get; set; }
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
