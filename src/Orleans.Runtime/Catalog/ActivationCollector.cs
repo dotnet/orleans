@@ -274,7 +274,8 @@ namespace Orleans.Runtime
             var now = DateTime.UtcNow;
             var reason = GetDeactivationReason();
 
-            // Order the buckets by key, so that we can scan them in order of increasing age.
+            // Order the buckets by key so that the activations scheduled for collection first
+            // are collected first.
             foreach (var kv in buckets.OrderBy(x => x.Key))
             {
                 var bucket = kv.Value;
@@ -516,7 +517,8 @@ namespace Orleans.Runtime
 
         private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
-            if (_options.Value.CollectionGuardFrequency != 0)
+            if (_options.Value.CollectionGuardFrequency != 0
+                && _collectionGuards.Count() != 0)
             {
                 await BatchDeactivateActivationsFromCollector(list);
                 return;
