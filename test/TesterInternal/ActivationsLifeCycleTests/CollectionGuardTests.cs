@@ -81,27 +81,32 @@ public class CollectionGuardTests
     public void CollectionSystemMemoryGuardTest()
     {
         var guard1 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+            // Make it collect at 1MB (mock environment has 500MB available),
+            // so this should not collect
             Options.Create(new GrainCollectionOptions
             {
-                CollectionGCMemoryThreshold = 1_000_000
+                CollectionSystemMemoryFreeThreshold = 1_000_000
             }));
         var guard2 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+            // Make it collect at 2GB (mock environment has 500MB available),
+            // so this should collect
             Options.Create(new GrainCollectionOptions
             {
-                CollectionGCMemoryThreshold = 2_000_000_000
+                CollectionSystemMemoryFreeThreshold = 2_000_000_000
             }));
         var guard3 = new SystemMemoryGrainCollectionGuard(new GigabyteHostEnvironmentStatistics(),
+            // Missing configuration, so this should collect
             Options.Create(new GrainCollectionOptions
             {
-                CollectionGCMemoryThreshold = null
+                CollectionSystemMemoryFreeThreshold = null
             }));
 
         var result1 = guard1.ShouldCollect();
         var result2 = guard2.ShouldCollect();
         var result3 = guard3.ShouldCollect();
 
-        Assert.True(result1);
-        Assert.False(result2);
+        Assert.False(result1);
+        Assert.True(result2);
         Assert.True(result3);
     }
 
