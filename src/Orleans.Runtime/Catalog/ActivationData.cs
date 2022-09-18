@@ -23,16 +23,15 @@ namespace Orleans.Runtime
     internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, IAsyncDisposable
     {
         private readonly GrainTypeSharedContext _shared;
-        private readonly IServiceScope serviceScope;
+        private readonly IServiceScope _serviceScope;
         private readonly WorkItemGroup _workItemGroup;
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
         private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
-        private readonly GrainLifecycle lifecycle;
+        private readonly GrainLifecycle _lifecycle;
         private List<object> _pendingOperations;
         private Message _blockingRequest;
-        private Dictionary<Type, object> _components;
-        private bool isInWorkingSet;
+        private bool _isInWorkingSet;
         private CoarseStopwatch _busyDuration;
         private CoarseStopwatch _idleDuration;
         private GrainReference _selfReference;
@@ -56,10 +55,10 @@ namespace Orleans.Runtime
         {
             _shared = shared;
             Address = addr ?? throw new ArgumentNullException(nameof(addr));
-            lifecycle = new GrainLifecycle(_shared.Logger);
+            _lifecycle = new GrainLifecycle(_shared.Logger);
             State = ActivationState.Create;
-            serviceScope = applicationServices.CreateScope();
-            isInWorkingSet = true;
+            _serviceScope = applicationServices.CreateScope();
+            _isInWorkingSet = true;
             _workItemGroup = createWorkItemGroup(this);
             _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
         }
@@ -71,11 +70,11 @@ namespace Orleans.Runtime
         public ActivationState State { get; private set; }
         public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
         public DateTime CollectionTicket { get; set; }
-        public IServiceProvider ActivationServices => serviceScope.ServiceProvider;
+        public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
         public ActivationId ActivationId => Address.ActivationId;
-        public IServiceProvider ServiceProvider => serviceScope?.ServiceProvider;
-        public IGrainLifecycle ObservableLifecycle => lifecycle;
-        internal ILifecycleObserver Lifecycle => lifecycle;
+        public IServiceProvider ServiceProvider => _serviceScope?.ServiceProvider;
+        public IGrainLifecycle ObservableLifecycle => _lifecycle;
+        internal ILifecycleObserver Lifecycle => _lifecycle;
         public GrainId GrainId => Address.GrainId;
         public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
         public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
@@ -209,7 +208,7 @@ namespace Orleans.Runtime
             {
                 result = contextResult;
             }
-            else if (_components is not null && _components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_extras?.Components is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -233,14 +232,18 @@ namespace Orleans.Runtime
                 throw new ArgumentException("Cannot override a component which is implemented by this grain context");
             }
 
-            if (instance == null)
+            lock (this)
             {
-                _components?.Remove(typeof(TComponent));
-                return;
-            }
+                if (instance == null)
+                {
+                    _extras?.Components?.Remove(typeof(TComponent));
+                    return;
+                }
 
-            if (_components is null) _components = new Dictionary<Type, object>();
-            _components[typeof(TComponent)] = instance;
+                _extras ??= new();
+                var components = _extras.Components ??= new();
+                components[typeof(TComponent)] = instance;
+            }
         }
 
         internal void SetGrainInstance(object grainInstance)
@@ -594,7 +597,7 @@ namespace Orleans.Runtime
                 await activator.DisposeInstance(this, GrainInstance);
             }
 
-            switch (serviceScope)
+            switch (_serviceScope)
             {
                 case IAsyncDisposable asyncDisposable:
                     await asyncDisposable.DisposeAsync();
@@ -658,7 +661,7 @@ namespace Orleans.Runtime
                 var inactive = IsInactive;
 
                 // This instance will remain in the working set if it is either not pending removal or if it is currently active.
-                isInWorkingSet = !wouldRemove || !inactive;
+                _isInWorkingSet = !wouldRemove || !inactive;
                 return inactive;
             }
         }
@@ -991,9 +994,9 @@ namespace Orleans.Runtime
                     _idleDuration = CoarseStopwatch.StartNew();
                 }
 
-                if (!isInWorkingSet)
+                if (!_isInWorkingSet)
                 {
-                    isInWorkingSet = true;
+                    _isInWorkingSet = true;
                     _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
                 }
 
@@ -1402,7 +1405,7 @@ namespace Orleans.Runtime
             {
                 CatalogInstruments.ActiviationShutdownViaDeactivateStuckActivation();
             }
-            else if (isInWorkingSet)
+            else if (_isInWorkingSet)
             {
                 CatalogInstruments.ActiviationShutdownViaDeactivateOnIdle();
             }
@@ -1518,6 +1521,8 @@ namespace Orleans.Runtime
         /// </summary>
         private class ActivationDataExtra
         {
+            public Dictionary<Type, object> Components { get; set; }
+
             public HashSet<IGrainTimer> Timers { get; set; }
 
             /// <summary>

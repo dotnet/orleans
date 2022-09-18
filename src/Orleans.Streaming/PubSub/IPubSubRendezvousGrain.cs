@@ -7,11 +7,11 @@ namespace Orleans.Streams
 {
     internal interface IPubSubRendezvousGrain : IGrainWithStringKey
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer);
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task UnregisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer);
+        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData);
+        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
 
         Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
 
@@ -23,7 +23,7 @@ namespace Orleans.Streams
 
         Task Validate();
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer = null);
+        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
 
         Task FaultSubscription(GuidId subscriptionId);
     }
