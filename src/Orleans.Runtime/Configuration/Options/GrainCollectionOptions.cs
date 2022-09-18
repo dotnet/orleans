@@ -51,6 +51,17 @@ namespace Orleans.Configuration
         public float? CollectionSystemMemoryFreePercentThreshold { get; set; }
 
         /// <summary>
+        /// When collection starts, how often should we check if we should continue collection.
+        ///
+        /// Not entirely sure what a sensible number should be as it depends on the average
+        /// data size of the grains being collected.
+        ///
+        /// 0 means that guards will not be checked during collection. This is probably not ideal
+        /// if guards are in place because "a lot" of grains will be deactivated at once.
+        /// </summary>
+        public int CollectionGuardFrequency { get; set; } = 0;
+
+        /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
         /// </summary>
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();

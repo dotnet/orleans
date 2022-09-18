@@ -273,7 +273,9 @@ namespace Orleans.Runtime
             List<ICollectibleGrainContext> condemned = null;
             var now = DateTime.UtcNow;
             var reason = GetDeactivationReason();
-            foreach (var kv in buckets)
+
+            // Order the buckets by key, so that we can scan them in order of increasing age.
+            foreach (var kv in buckets.OrderBy(x => x.Key))
             {
                 var bucket = kv.Value;
                 foreach (var kvp in bucket.Items)
@@ -281,34 +283,15 @@ namespace Orleans.Runtime
                     var activation = kvp.Value;
                     lock (activation)
                     {
-                        if (!activation.IsValid)
+                        if (activation.IsValid
+                            && activation.KeepAliveUntil <= now
+                            && activation.IsInactive
+                            && activation.GetIdleness() >= ageLimit
+                            && bucket.TryRemove(activation))
                         {
-                            // Do nothing: don't collect, don't reschedule.
-                        }
-                        else if (activation.KeepAliveUntil > now)
-                        {
-                            // do nothing
-                        }
-                        else if (!activation.IsInactive)
-                        {
-                            // do nothing
-                        }
-                        else
-                        {
-                            if (activation.GetIdleness() >= ageLimit)
-                            {
-                                if (bucket.TryRemove(activation))
-                                {
-                                    // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.Deactivate(reason, cancellationToken: default);
-                                    AddActivationToList(activation, ref condemned);
-                                }
-                                // someone else has already deactivated the activation, so there's nothing to do.
-                            }
-                            else
-                            {
-                                // activation is not idle long enough for collection. do nothing.
-                            }
+                            // we removed the activation from the collector. it's our responsibility to deactivate it.
+                            activation.Deactivate(reason, cancellationToken: default);
+                            AddActivationToList(activation, ref condemned);
                         }
                     }
                 }
@@ -467,12 +450,9 @@ namespace Orleans.Runtime
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
         {
-            foreach (var collectionGuard in _collectionGuards)
+            if (CollectionGuarded() == true)
             {
-                if (collectionGuard.ShouldCollect() == false)
-                {
-                    return;
-                }
+                return;
             }
 
             var watch = ValueStopwatch.StartNew();
@@ -517,15 +497,39 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Check to see whether any of the collection guards are set.
+        /// </summary>
+        /// <returns>true if collection is guarded, false if collection should continue</returns>
+        private bool CollectionGuarded()
+        {
+            foreach (var collectionGuard in _collectionGuards)
+            {
+                if (collectionGuard.ShouldCollect() == false)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
+            if (_options.Value.CollectionGuardFrequency != 0)
+            {
+                await BatchDeactivateActivationsFromCollector(list);
+                return;
+            }
+
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1,
+                "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActiviationShutdownViaCollection();
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            Action<Task> signalCompletion = _ => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {
@@ -536,6 +540,44 @@ namespace Orleans.Runtime
             }
 
             await mtcs.Task;
+        }
+
+        /// <summary>
+        /// Deactivate grains in batches using the Options.CollectionGuardFrequency as batch size
+        /// </summary>
+        private async Task BatchDeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
+        {
+            var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
+            var i = 0;
+            var reason = GetDeactivationReason();
+
+            while (i < list.Count
+                   && CollectionGuarded() == false)
+            {
+                var batchSize = Math.Min(_options.Value.CollectionGuardFrequency, list.Count - i);
+                var multiTaskCompletionSource = new MultiTaskCompletionSource(batchSize);
+                for (var j = 0; j < batchSize; j++)
+                {
+                    _ = list[i + j]
+                        .DeactivateAsync(reason, cts.Token)
+                        .ContinueWith(
+                            _ => multiTaskCompletionSource.SetOneResult(),
+                            cts.Token);
+                }
+
+                i += batchSize;
+                await multiTaskCompletionSource.Task;
+
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("Collected {NumberOfActivations} activations", i);
+                }
+            }
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+            }
         }
 
         /// <inheritdoc/>
