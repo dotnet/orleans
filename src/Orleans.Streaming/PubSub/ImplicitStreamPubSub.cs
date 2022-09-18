@@ -23,12 +23,12 @@ namespace Orleans.Streams
             this.implicitTable = implicitPubSubTable;
         }
 
-        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
+        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace())) return Task.FromResult(result);
 
-            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
+            IDictionary<Guid, GrainId> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
@@ -37,12 +37,12 @@ namespace Orleans.Streams
             return Task.FromResult(result);
         }
 
-        public Task UnregisterProducer(QualifiedStreamId streamId, IStreamProducerExtension streamProducer)
+        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             return Task.CompletedTask;
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
         {
             // TODO BPETIT filter data?
             if (!IsImplicitSubscriber(streamConsumer, streamId))
@@ -71,34 +71,33 @@ namespace Orleans.Streams
             return Task.FromResult(0);
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default)
         {
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace()))
                 return Task.FromResult(new List<StreamSubscription>());
 
-            if (streamConsumer != null)
+            if (streamConsumer != default)
             {
                 var subscriptionId = CreateSubscriptionId(streamId, streamConsumer);
-                var grainId = streamConsumer as GrainReference;
                 return Task.FromResult(new List<StreamSubscription>
-                { new StreamSubscription(subscriptionId.Guid, streamId.ProviderName, streamId, grainId.GrainId) });
+                { new StreamSubscription(subscriptionId.Guid, streamId.ProviderName, streamId, streamConsumer) });
             }
             else
             {
                 var implicitConsumers = this.implicitTable.GetImplicitSubscribers(streamId, grainFactory);
                 var subscriptions = implicitConsumers.Select(consumer =>
                 {
-                    var grainRef = consumer.Value as GrainReference;
+                    var grainId = consumer.Value;
                     var subId = consumer.Key;
-                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainRef.GrainId);
+                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainId);
                 }).ToList();
                 return Task.FromResult(subscriptions);
             }   
         }
 
-        internal bool IsImplicitSubscriber(IAddressable addressable, QualifiedStreamId streamId)
+        internal bool IsImplicitSubscriber(GrainId grainId, QualifiedStreamId streamId)
         {
-            return implicitTable.IsImplicitSubscriber(addressable.GetGrainId(), streamId);
+            return implicitTable.IsImplicitSubscriber(grainId, streamId);
         }
 
         internal bool IsImplicitSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
@@ -106,9 +105,8 @@ namespace Orleans.Streams
             return SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
         }
 
-        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId grainId)
         {
-            GrainId grainId = streamConsumer.GetGrainId();
             Guid subscriptionGuid;
             if (!implicitTable.TryGetImplicitSubscriptionGuid(grainId, streamId, out subscriptionGuid))
             {
