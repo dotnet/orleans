@@ -127,7 +127,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field header.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadFieldHeader<TInput>(ref this Reader<TInput> reader, ref Field field)
+        public static void ReadFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
             var tag = reader.ReadByte();
 
@@ -177,7 +177,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        internal static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, ref Field field)
+        internal static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
             // If all of the field id delta bits are set and the field isn't an extended wiretype field, read the extended field id delta
             var notExtended = (field.Tag & (byte)WireType.Extended) != (byte)WireType.Extended;
@@ -287,7 +287,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ReadFieldHeaderForAnalysisSlow<TInput>(ref this Reader<TInput> reader, ref Field field, ref string type)
+        private static void ReadFieldHeaderForAnalysisSlow<TInput>(ref this Reader<TInput> reader, scoped ref Field field, scoped ref string type)
         {
             var notExtended = (field.Tag & (byte)WireType.Extended) != (byte)WireType.Extended;
             if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask && notExtended)
