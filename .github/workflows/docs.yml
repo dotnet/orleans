@@ -17,6 +17,8 @@ jobs:
         dotnet-version: '5.0.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v2
+      with:
+        include-prerelease: true
     - name: Build
       run: dotnet build src
     - name: Publish
