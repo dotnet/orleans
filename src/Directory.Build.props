@@ -13,7 +13,7 @@
 
   <PropertyGroup>
     <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
-    <DefaultTargetFrameworks>net6.0</DefaultTargetFrameworks>
+    <DefaultTargetFrameworks>net7.0</DefaultTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
