@@ -13,6 +13,6 @@ public interface IGrainCollectionGuard
     /// <summary>
     /// Decide whether the grain collection should be run.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>whether or not the system should start/continue collecting grains</returns>
     bool ShouldCollect();
 }

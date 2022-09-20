@@ -78,8 +78,10 @@ namespace Orleans.Runtime
         /// Collects all eligible grain activations which have been idle for at least <paramref name="ageLimit"/>.
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
+        /// <param name="forceCollection">if set to <c>true</c> forces collection.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
+        public Task CollectActivations(TimeSpan ageLimit, bool forceCollection = false)
+            => CollectActivationsImpl(false, ageLimit, forceCollection);
 
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
@@ -290,7 +292,7 @@ namespace Orleans.Runtime
                             && activation.GetIdleness() >= ageLimit
                             && bucket.TryRemove(activation))
                         {
-                            // we removed the activation from the collector. it's our responsibility to deactivate it.
+                            // We removed the activation from the collector. It's our responsibility to deactivate it.
                             activation.Deactivate(reason, cancellationToken: default);
                             AddActivationToList(activation, ref condemned);
                         }
@@ -449,9 +451,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        private async Task CollectActivationsImpl(bool scanStale,
+            TimeSpan ageLimit = default(TimeSpan),
+            bool forceCollection = false)
         {
-            if (CollectionGuarded() == true)
+            if (forceCollection == false
+                && CollectionGuarded() == true)
             {
                 return;
             }
@@ -478,7 +483,7 @@ namespace Orleans.Runtime
             {
                 count = list.Count;
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
-                await DeactivateActivationsFromCollector(list);
+                await DeactivateActivationsFromCollector(list, forceCollection);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -501,23 +506,15 @@ namespace Orleans.Runtime
         /// <summary>
         /// Check to see whether any of the collection guards are set.
         /// </summary>
-        /// <returns>true if collection is guarded, false if collection should continue</returns>
-        private bool CollectionGuarded()
-        {
-            foreach (var collectionGuard in _collectionGuards)
-            {
-                if (collectionGuard.ShouldCollect() == false)
-                {
-                    return true;
-                }
-            }
+        /// <returns>true if collection is guarded, false if collection should start/continue</returns>
+        private bool CollectionGuarded() => _collectionGuards
+            .Any(collectionGuard => collectionGuard.ShouldCollect() == false);
 
-            return false;
-        }
-
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list,
+            bool forceCollection)
         {
-            if (_options.Value.CollectionGuardFrequency != 0
+            if (forceCollection == false
+                && _options.Value.CollectionGuardFrequency != 0
                 && _collectionGuards.Count() != 0)
             {
                 await BatchDeactivateActivationsFromCollector(list);

@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
             logger.LogInformation("ForceActivationCollection");
-            return _activationCollector.CollectActivations(ageLimit);
+            return _activationCollector.CollectActivations(ageLimit, true);
         }
 
         public Task ForceRuntimeStatisticsCollection()
