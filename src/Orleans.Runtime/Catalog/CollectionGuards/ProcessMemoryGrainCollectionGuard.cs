@@ -22,9 +22,23 @@ public class ProcessMemoryGrainCollectionGuard : IGrainCollectionGuard
         _grainCollectionOptions = grainCollectionOptions;
     }
 
-    public bool ShouldCollect() =>
-        _appEnvironmentStatistics.MemoryUsage.HasValue == false
-        || _grainCollectionOptions.Value.CollectionGCMemoryThreshold.HasValue == false
-        || _appEnvironmentStatistics.MemoryUsage.Value
-           > _grainCollectionOptions.Value.CollectionGCMemoryThreshold;
+    public bool ShouldCollect()
+    {
+        var memoryUsage = _appEnvironmentStatistics.MemoryUsage;
+
+        // If we do not have memory usage stats, collect activations
+        if (memoryUsage.HasValue == false)
+        {
+            return true;
+        }
+
+        // If we do not have a GC limit, collect activations
+        if (_grainCollectionOptions.Value.CollectionGCMemoryThreshold.HasValue == false)
+        {
+            return true;
+        }
+
+        // Run collection if current usage is above the limit
+        return memoryUsage > _grainCollectionOptions.Value.CollectionGCMemoryThreshold;
+    }
 }
