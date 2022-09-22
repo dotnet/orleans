@@ -514,13 +514,19 @@ namespace Orleans.Runtime
             bool forceCollection)
         {
             if (forceCollection == false
-                && _options.Value.CollectionGuardFrequency != 0
+                && _options.Value.CollectionBatchSize != 0
                 && _collectionGuards.Count() != 0)
             {
                 await BatchDeactivateActivationsFromCollector(list);
-                return;
             }
+            else
+            {
+                await DeactivateAllIdleActivationsFromCollector(list);
+            }
+        }
 
+        private async Task DeactivateAllIdleActivationsFromCollector(List<ICollectibleGrainContext> list)
+        {
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
@@ -550,11 +556,11 @@ namespace Orleans.Runtime
             var i = 0;
             var reason = GetDeactivationReason();
 
-            while (i < list.Count
-                   && CollectionGuarded() == false)
+            while (i < list.Count)
             {
-                var batchSize = Math.Min(_options.Value.CollectionGuardFrequency, list.Count - i);
+                var batchSize = Math.Min(_options.Value.CollectionBatchSize, list.Count - i);
                 var multiTaskCompletionSource = new MultiTaskCompletionSource(batchSize);
+
                 for (var j = 0; j < batchSize; j++)
                 {
                     _ = list[i + j]
@@ -567,15 +573,23 @@ namespace Orleans.Runtime
                 i += batchSize;
                 await multiTaskCompletionSource.Task;
 
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (_options.Value.CollectionBatchDelay != 0)
                 {
-                    logger.LogDebug("Collected {NumberOfActivations} activations", i);
+                    await Task.Delay(_options.Value.CollectionBatchDelay, cts.Token);
+                }
+
+                if (CollectionGuarded() == true)
+                {
+                    break;
                 }
             }
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                logger.LogDebug("CollectActivations #{NumberOfActivations} {Activations}", i,
+                    list
+                        .Take(i)
+                        .ToStrings(d => d.GrainId.ToString() + d.ActivationId));
             }
         }
 

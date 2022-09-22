@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Orleans.Runtime.CollectionGuards;
 
 namespace Orleans.Configuration
@@ -51,15 +52,23 @@ namespace Orleans.Configuration
         public float? CollectionSystemMemoryFreePercentThreshold { get; set; }
 
         /// <summary>
-        /// When collection starts, how often should we check if we should continue collection.
-        ///
-        /// Not entirely sure what a sensible number should be as it depends on the average
-        /// data size of the grains being collected.
+        /// When collection starts, how often should we check if we should continue collection. This
+        /// value is only user if collection guards are enabled.
         ///
         /// 0 means that guards will not be checked during collection. This is probably not ideal
         /// if guards are in place because "a lot" of grains will be deactivated at once.
         /// </summary>
-        public int CollectionGuardFrequency { get; set; } = 0;
+        public int CollectionBatchSize { get; set; } = 0;
+
+        /// <summary>
+        /// When finished collecting a batch, optionally wait for a period of time before starting the next batch.
+        /// Typically this is used to allow the system to perform GC.
+        ///
+        /// This value will be used with a call to Task.Delay.
+        ///
+        /// If it is 0, no call to Task.Delay will be made.
+        /// </summary>
+        public int CollectionBatchDelay { get; set; } = 0;
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
