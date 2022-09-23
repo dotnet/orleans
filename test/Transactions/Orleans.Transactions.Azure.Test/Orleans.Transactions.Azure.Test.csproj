@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />

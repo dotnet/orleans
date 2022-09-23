@@ -11,7 +11,6 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
     <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="$(SystemDiagnosticsPerformanceCounterVersion)" />
   </ItemGroup>

@@ -1,0 +1,96 @@
+#
+# See https://docs.microsoft.com/azure/devops/pipelines/yaml-schema for details
+#
+
+variables:
+  - name: _TeamName
+    value: Orleans
+  - name: DOTNET_SKIP_FIRST_TIME_EXPERIENCE
+    value: true
+  - name: _PublishUsingPipelines
+    value: false
+  - name: _BuildConfig
+    value: Release
+
+    # used for post-build phases, internal builds only
+  - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+    - group: DotNet-AspNet-SDLValidation-Params
+
+# CI and PR triggers
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+    - 3.x/*
+
+pr:
+  autoCancel: true
+  branches:
+    include:
+    - '*'
+
+stages:
+- stage: build
+  displayName: Build
+  jobs:
+  - template: /eng/common/templates/jobs/jobs.yml
+    parameters:
+      enableMicrobuild: true
+      enablePublishTestResults: true
+      enablePublishUsingPipelines: ${{ variables._PublishUsingPipelines }}
+      enableTelemetry: true
+      mergeTestResults: true
+      jobs:
+      # - ${{ if and(eq(variables['System.TeamProject'], 'internal'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+      - job: Windows
+        pool:
+          ${{ if eq(variables['System.TeamProject'], 'public') }}:
+            name: NetCore1ESPool-Public
+            demands: ImageOverride -equals Build.Server.Amd64.VS2019.Open
+          ${{ if eq(variables['System.TeamProject'], 'internal') }}:
+            name: NetCore1ESPool-Internal
+            demands: ImageOverride -equals Build.Server.Amd64.VS2019
+        variables:
+          
+
+        # # Only enable publishing in official builds.
+        # - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        #   # Publish-Build-Assets provides: MaestroAccessToken, BotAccount-dotnet-maestro-bot-PAT
+        #   - group: Publish-Build-Assets
+          - name: _OfficialBuildArgs
+            value: /p:DotNetSignType=$(_SignType)
+                  /p:TeamName=$(_TeamName)
+                  /p:DotNetPublishUsingPipelines=$(_PublishUsingPipelines)
+                  /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
+          - name: _SignType
+            value: real
+        # else
+        # - ${{ if or(eq(variables['System.TeamProject'], 'public'), in(variables['Build.Reason'], 'PullRequest')) }}:
+          # - name: _OfficialBuildArgs
+          #   value: ''
+          # - name: _SignType
+          #   value: test
+                
+        steps:
+        - checkout: self
+          clean: true
+        - powershell: eng\common\build.ps1 -restore -build -sign -pack -ci -configuration $(_BuildConfig) -prepareMachine $(_OfficialBuildArgs) 
+          displayName: Build and Publish
+        # - task: PublishBuildArtifacts@1
+        #   displayName: Upload TestResults
+        #   condition: always()
+        #   continueOnError: true
+        #   inputs:
+        #     pathtoPublish: artifacts/TestResults/$(_BuildConfig)/
+        #     artifactName: $(Agent.Os)_$(Agent.JobName) TestResults
+        #     artifactType: Container
+        #     parallel: true
+        - task: PublishBuildArtifacts@1
+          displayName: Upload package artifacts
+          condition: and(succeeded(), eq(variables['system.pullrequest.isfork'], false), eq(variables['_BuildConfig'], 'Release'))
+          inputs:
+            pathtoPublish: artifacts/packages/
+            artifactName: artifacts
+            artifactType: Container
+            parallel: true

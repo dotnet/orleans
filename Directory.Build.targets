@@ -1,4 +1,17 @@
 <Project>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+
+  <PropertyGroup>
+    <Product>Microsoft Orleans</Product>
+    <RepositoryUrl>https://github.com/dotnet/orleans</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**</DefaultItemExcludes>
+    <SignAssembly>false</SignAssembly>
+    <PublicSign>false</PublicSign>
+  </PropertyGroup>
+
   <!-- Set InformationVersion here, since $(Version) is already set at this point. -->
   <PropertyGroup>
     <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
