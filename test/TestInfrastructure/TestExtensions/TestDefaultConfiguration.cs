@@ -74,8 +74,10 @@ namespace TestExtensions
             {
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
             });
-
-            AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
+            if (!TryAddJsonFileFromEnvironmentVariable(builder, "ORLEANS_SECRETFILE"))
+            {
+                TryAddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
+            }
             builder.AddEnvironmentVariables("Orleans");
         }
 
@@ -111,7 +113,7 @@ namespace TestExtensions
         }
 
         /// <summary>Try to find a file with specified name up the folder hierarchy, as some of our CI environments are configured this way.</summary>
-        private static void AddJsonFileInAncestorFolder(IConfigurationBuilder builder, string fileName)
+        private static bool TryAddJsonFileInAncestorFolder(IConfigurationBuilder builder, string fileName)
         {
             // There might be some other out-of-the-box way of doing this though.
             var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -121,11 +123,22 @@ namespace TestExtensions
                 if (File.Exists(filePath))
                 {
                     builder.AddJsonFile(new SerializablePhysicalFileProvider { Root = currentDir.FullName }, fileName, false, false);
-                    return;
+                    return true;
                 }
 
                 currentDir = currentDir.Parent;
             }
+            return false;
+        }
+
+        private static bool TryAddJsonFileFromEnvironmentVariable(IConfigurationBuilder builder, string envName)
+        {
+            var path = Environment.GetEnvironmentVariable(envName);
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                builder.AddJsonFile(new SerializablePhysicalFileProvider { Root = Path.GetDirectoryName(path) }, Path.GetFileName(path), false, false);
+            }
+            return false;
         }
 
         public static void ConfigureTestCluster(TestClusterBuilder builder)
