@@ -1,3 +1,12 @@
+using System;
+using System.Buffers;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
+
 namespace Orleans.Concurrency
 {
     /// <summary>
@@ -12,23 +21,17 @@ namespace Orleans.Concurrency
     /// then considerable savings in memory usage and message throughput can be obtained by marking that byte[] argument as <c>Immutable</c>.
     /// </remarks>
     /// <typeparam name="T">Type of data to be wrapped by this Immutable</typeparam>
-    [GenerateSerializer, Immutable]
+    [Immutable]
     public readonly struct Immutable<T>
     {
-        [Id(1)]
-        private readonly T value;
-
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
-        public T Value { get { return value; } }
+        public readonly T Value;
 
         /// <summary>
         /// Constructor to wrap the specified data object in new Immutable wrapper.
         /// </summary>
         /// <param name="value">Value to be wrapped and marked as immutable.</param>
-        public Immutable(T value)
-        {
-            this.value = value;
-        }
+        public Immutable(T value) => Value = value;
     }
 
     /// <summary>
@@ -43,9 +46,47 @@ namespace Orleans.Concurrency
         /// <param name="value">Value to be wrapped.</param>
         /// <returns>Immutable wrapper around the original object.</returns>
         /// <seealso cref="Immutable{T}"/>"/>
-        public static Immutable<T> AsImmutable<T>(this T value)
+        public static Immutable<T> AsImmutable<T>(this T value) => new(value);
+    }
+
+    [RegisterSerializer]
+    internal sealed class ImmutableCodec<T> : IFieldCodec<Immutable<T>>//, IValueSerializer<Immutable<T>>
+    {
+        private static readonly Type Type = typeof(T);
+        private readonly IFieldCodec<T> _codec;
+
+        public ImmutableCodec(ICodecProvider codecProvider) => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(this, codecProvider);
+
+        /*public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ref Immutable<T> instance) where TBufferWriter : IBufferWriter<byte>
+            => _codec.WriteField(ref writer, 0, Type, instance.Value);
+
+        public void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, ref Immutable<T> instance)
         {
-            return new Immutable<T>(value);
-        }
+            Field header = default;
+            var id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, 0);
+            if (id == 0)
+            {
+                instance = new(_codec.ReadValue(ref reader, header));
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
+
+            while (id >= 0)
+            {
+                reader.ConsumeUnknownField(header);
+                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+            }
+        }*/
+
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Immutable<T> @value) where TBufferWriter : IBufferWriter<byte>
+            => _codec.WriteField(ref writer, fieldIdDelta, Type, value.Value);
+
+        public Immutable<T> ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)
+            => new(_codec.ReadValue(ref reader, field));
+    }
+
+    [RegisterCopier]
+    internal sealed class ImmutableCopier<T> : IDeepCopier<Immutable<T>>
+    {
+        public Immutable<T> DeepCopy(Immutable<T> input, CopyContext context) => input;
     }
 }
