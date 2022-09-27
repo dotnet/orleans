@@ -191,13 +191,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// Serializes an unexpected value.
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
-        /// <typeparam name="TField">The value type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void SerializeUnexpectedType<TBufferWriter, TField>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public static void SerializeUnexpectedType<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
@@ -212,7 +211,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static TField DeserializeUnexpectedType<TInput, TField>(ref Reader<TInput> reader, Field field)
+        public static TField DeserializeUnexpectedType<TInput, TField>(ref Reader<TInput> reader, Field field) where TField : class
         {
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);
             return (TField)specificSerializer.ReadValue(ref reader, field);

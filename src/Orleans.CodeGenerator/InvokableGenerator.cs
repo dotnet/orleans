@@ -24,7 +24,7 @@ namespace Orleans.CodeGenerator
             INamedTypeSymbol baseClassType = GetBaseClassType(method);
             var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription);
             var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes);
-            var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, fieldDescriptions, baseClassType);
+            var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, baseClassType);
 
             Accessibility accessibility = GetAccessibility(interfaceDescription);
 
@@ -40,8 +40,10 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword), Token(SyntaxKind.PartialKeyword))
                 .AddAttributeLists(
                     AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
-                .AddMembers(fields)
-                .AddMembers(ctor);
+                .AddMembers(fields);
+
+            if (ctor != null)
+                classDeclaration = classDeclaration.AddMembers(ctor);
 
             classDeclaration = AddOptionalMembers(classDeclaration,
                     GenerateGetArgumentCount(libraryTypes, method),
@@ -503,28 +505,6 @@ namespace Orleans.CodeGenerator
                         break;
                 }
 
-                if (!description.IsSerializable)
-                {
-                    if (description.IsInstanceField)
-                        field = field.AddAttributeLists(
-                                AttributeList()
-                                    .AddAttributes(Attribute(libraryTypes.NonSerializedAttribute.ToNameSyntax())));
-                }
-                else if (description is MethodParameterFieldDescription parameter)
-                {
-                    field = field.AddAttributeLists(
-                        AttributeList()
-                            .AddAttributes(
-                                Attribute(
-                                    libraryTypes.IdAttributeTypes[0].ToNameSyntax(),
-                                    AttributeArgumentList()
-                                        .AddArguments(
-                                            AttributeArgument(
-                                                LiteralExpression(
-                                                    SyntaxKind.NumericLiteralExpression,
-                                                    Literal(parameter.FieldId)))))));
-                }
-
                 return field;
             }
         }
@@ -541,7 +521,6 @@ namespace Orleans.CodeGenerator
             LibraryTypes libraryTypes,
             string simpleClassName,
             MethodDescription method,
-            List<InvokerFieldDescripton> fieldDescriptions,
             INamedTypeSymbol baseClassType)
         {
             var parameters = new List<ParameterSyntax>();
@@ -580,6 +559,9 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(ThisExpression().Member(methodName), ArgumentList(SeparatedList(new[] { Argument(argumentExpression) })))));
             }
 
+            if (body.Count == 0 && parameters.Count == 0)
+                return default;
+
             var constructorDeclaration = ConstructorDeclaration(simpleClassName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters.ToArray())
@@ -587,7 +569,6 @@ namespace Orleans.CodeGenerator
                     ConstructorInitializer(
                         SyntaxKind.BaseConstructorInitializer,
                         ArgumentList(SeparatedList(baseConstructorArguments))))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(Attribute(libraryTypes.GeneratedActivatorConstructorAttribute.ToNameSyntax()))))
                 .AddBodyStatements(body.ToArray());
 
             return (constructorDeclaration, constructorArgumentTypes);

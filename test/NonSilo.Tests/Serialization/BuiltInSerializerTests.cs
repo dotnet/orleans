@@ -538,6 +538,18 @@ namespace UnitTests.Serialization
             raw = environment.DeepCopier.Copy<object>(test3);
             Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
             Assert.Same(test3.B.Value, ((EmbeddedImmutable)raw).B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+
+            var test4 = new ClassWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
+            raw = environment.DeepCopier.Copy<object>(test4);
+            Assert.IsAssignableFrom<ClassWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test4.Immutable, ((ClassWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test4.Mutable, ((ClassWithEmbeddedImmutable)raw).Mutable);
+
+            var test5 = new StructWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
+            raw = environment.DeepCopier.Copy<object>(test5);
+            Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test5.Immutable, ((StructWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test5.Mutable, ((StructWithEmbeddedImmutable)raw).Mutable);
         }
 
         [Fact, TestCategory("Functional")]

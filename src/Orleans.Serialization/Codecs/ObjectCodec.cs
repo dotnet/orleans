@@ -80,23 +80,22 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ObjectCopier : IDeepCopier<object>
     {
-        /// <inheritdoc/>
-        public object DeepCopy(object input, CopyContext context)
+        /// <summary>
+        /// Creates a deep copy of the provided input.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="context">The context.</param>
+        /// <returns>A copy of <paramref name="input" />.</returns>
+        public static object DeepCopy(object input, CopyContext context)
         {
             if (context.TryGetCopy<object>(input, out var result))
             {
                 return result;
             }
 
-            var type = input.GetType();
-            if (type != typeof(object))
-            {
-                return context.DeepCopy(input);
-            }
-
-            result = new object();
-            context.RecordCopy(input, result);
-            return result;
+            return input.GetType() == typeof(object) ? input : context.DeepCopy(input);
         }
+
+        object IDeepCopier<object>.DeepCopy(object input, CopyContext context) => DeepCopy(input, context);
     }
 }

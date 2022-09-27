@@ -117,7 +117,7 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
             AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
 
-            static void AddFromMetadata(IDictionary<Type, Type> resultCollection, IEnumerable<Type> metadataCollection, Type genericType)
+            static void AddFromMetadata(IDictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 

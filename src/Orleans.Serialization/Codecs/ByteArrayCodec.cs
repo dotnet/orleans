@@ -189,9 +189,7 @@ namespace Orleans.Serialization.Codecs
                 return default;
             }
 
-            var result = new byte[input.Length];
-            input.CopyTo(result.AsMemory());
-            return result;
+            return input.ToArray();
         }
     }
 
@@ -217,9 +215,7 @@ namespace Orleans.Serialization.Codecs
                 return default;
             }
 
-            var result = new byte[input.Count];
-            input.AsSpan().CopyTo(result.AsSpan());
-            return new ArraySegment<byte>(result);
+            return input.AsSpan().ToArray();
         }
     }
 
@@ -308,9 +304,7 @@ namespace Orleans.Serialization.Codecs
                 return default;
             }
 
-            var result = new byte[input.Length];
-            input.CopyTo(result.AsMemory());
-            return result;
+            return input.ToArray();
         }
     }
 }

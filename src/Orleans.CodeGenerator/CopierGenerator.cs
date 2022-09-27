@@ -244,16 +244,23 @@ namespace Orleans.CodeGenerator
         public static void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes, List<GeneratedFieldDescription> fields)
         {
             var fieldIndex = 0;
-            foreach (var member in members.Distinct(MemberDescriptionTypeComparer.Default))
+            var uniqueTypes = new HashSet<IMemberDescription>(MemberDescriptionTypeComparer.Default);
+            foreach (var member in members)
             {
                 var t = member.Type;
 
                 if (libraryTypes.IsShallowCopyable(t))
-                    goto skip;
+                    continue;
 
                 foreach (var c in libraryTypes.StaticCopiers)
                     if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t))
                         goto skip;
+
+                if (member.Symbol.HasAnyAttribute(libraryTypes.ImmutableAttributes))
+                    continue;
+
+                if (!uniqueTypes.Add(member))
+                    continue;
 
                 TypeSyntax copierType;
                 if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
