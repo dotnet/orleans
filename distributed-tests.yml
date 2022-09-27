@@ -2,7 +2,7 @@ variables:
   clusterId: '{{ "now" | date: "%s" }}'
   serviceId: '{{ "now" | date: "%s" }}'
   secretSource: KeyVault
-  framework: net5.0
+  framework: net7.0
 
 jobs:
   server:
@@ -10,23 +10,23 @@ jobs:
       localFolder: Artifacts/DistributedTests/DistributedTests.Server/{{framework}}
     executable: DistributedTests.Server.exe
     readyStateText: Orleans Silo started.
-    framework: net5.0
+    framework: net7.0
     arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
-    onConfigure: 
-      - if (job.endpoints.Count > 0) { 
-          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances); 
+    onConfigure:
+      - if (job.endpoints.Count > 0) {
+          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances);
         }
   client:
     source:
       localFolder: Artifacts/DistributedTests/DistributedTests.Client/{{framework}}
     executable: DistributedTests.Client.exe
     waitForExit: true
-    framework: net5.0
+    framework: net7.0
     arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{commandOptions}}"
-    onConfigure: 
-      - if (job.endpoints.Count > 0) { 
+    onConfigure:
+      - if (job.endpoints.Count > 0) {
           job.endpoints.Reverse();
-          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances); 
+          job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances);
         }
 
 scenarios:
@@ -61,7 +61,7 @@ scenarios:
     client:
       job: client
       variables:
-        command: counter 
+        command: counter
         instances: 1
         commandOptions: "requests errors"
   reliability:
@@ -129,15 +129,15 @@ profiles:
   local:
     variables:
       secretSource: File
-    jobs: 
+    jobs:
       server:
-        endpoints: 
+        endpoints:
           - http://localhost:5010
         variables:
           instances: 1
       client:
-        endpoints: 
+        endpoints:
           - http://localhost:5010
       chaosagent:
-        endpoints: 
+        endpoints:
           - http://localhost:5010

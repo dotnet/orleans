@@ -18,7 +18,7 @@
 
     <!-- Specify the assembly containing the code generator. -->
     <Orleans_GeneratorAssembly Condition="'$(OrleansCodeGenCoreAssembly)' != ''">$(OrleansCodeGenCoreAssembly)</Orleans_GeneratorAssembly>
-    <Orleans_GeneratorAssembly Condition="'$(Orleans_GeneratorAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net6.0\Orleans.CodeGenerator.MSBuild.dll</Orleans_GeneratorAssembly>
+    <Orleans_GeneratorAssembly Condition="'$(Orleans_GeneratorAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net7.0\Orleans.CodeGenerator.MSBuild.dll</Orleans_GeneratorAssembly>
   </PropertyGroup>
 
   <PropertyGroup>

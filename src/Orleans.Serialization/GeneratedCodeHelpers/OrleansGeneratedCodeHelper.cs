@@ -156,7 +156,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="id">The identifier.</param>
         /// <returns>The field id, if a new field header was written, otherwise <c>-1</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadHeader<TInput>(ref Reader<TInput> reader, ref Field header, int id)
+        public static int ReadHeader<TInput>(ref Reader<TInput> reader, scoped ref Field header, int id)
         {
             reader.ReadFieldHeader(ref header);
             if (header.IsEndBaseOrEndObject)
@@ -176,7 +176,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="id">The identifier.</param>
         /// <returns>The field id, if a new field header was written, otherwise <c>-1</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadHeaderExpectingEndBaseOrEndObject<TInput>(ref Reader<TInput> reader, ref Field header, int id)
+        public static int ReadHeaderExpectingEndBaseOrEndObject<TInput>(ref Reader<TInput> reader, scoped ref Field header, int id)
         {
             reader.ReadFieldHeader(ref header);
             if (header.IsEndBaseOrEndObject)

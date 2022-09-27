@@ -18,7 +18,7 @@
     <PrivateRepositoryUrl>$(RepositoryUrl)</PrivateRepositoryUrl>
     <RepositoryUrl>$(RepositoryUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <LangVersion>10</LangVersion>
+    <LangVersion>11</LangVersion>
     <Features>strict</Features>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -59,8 +59,8 @@
     <SystemMemoryDataVersion>1.0.1</SystemMemoryDataVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>17.2.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>4.2.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftBuildVersion>17.3.1</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>4.3.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 

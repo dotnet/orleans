@@ -305,7 +305,7 @@ namespace Orleans.Serialization.Buffers
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(ReadOnlySpan<byte> value)
+        public void Write(scoped ReadOnlySpan<byte> value)
         {
             // Fast path, try copying to the current buffer.
             if (value.Length <= _currentSpan.Length - _bufferPos)
@@ -315,12 +315,12 @@ namespace Orleans.Serialization.Buffers
             }
             else
             {
-                WriteMultiSegment(in value);
+                WriteMultiSegment(value);
             }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void WriteMultiSegment(in ReadOnlySpan<byte> source)
+        private void WriteMultiSegment(scoped ReadOnlySpan<byte> source)
         {
             var input = source;
             while (true)
