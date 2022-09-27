@@ -358,7 +358,7 @@ namespace Orleans.CodeGenerator
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)));
             }
 
             return MethodDeclaration(returnType, SerializeMethodName)
@@ -512,7 +512,7 @@ namespace Orleans.CodeGenerator
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)));
             }
 
             return MethodDeclaration(returnType, DeserializeMethodName)

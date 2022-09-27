@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Serializers
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="value">The value.</param>
-        void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ref T value) where TBufferWriter : IBufferWriter<byte>;
+        void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref T value) where TBufferWriter : IBufferWriter<byte>;
 
         /// <summary>
         /// Deserializes the specified type.
@@ -23,7 +23,7 @@ namespace Orleans.Serialization.Serializers
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
         /// <param name="value">The value.</param>
-        void Deserialize<TInput>(ref Reader<TInput> reader, ref T value);
+        void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref T value);
     }
 
     /// <summary>

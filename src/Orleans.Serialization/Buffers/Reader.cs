@@ -687,7 +687,7 @@ namespace Orleans.Serialization.Buffers
         /// <summary>
         /// Reads the specified number of bytes into the provided writer.
         /// </summary>
-        public void ReadBytes<TBufferWriter>(ref TBufferWriter writer, int count) where TBufferWriter : IBufferWriter<byte>
+        public void ReadBytes<TBufferWriter>(scoped ref TBufferWriter writer, int count) where TBufferWriter : IBufferWriter<byte>
         {
             int chunkSize;
             for (var remaining = count; remaining > 0; remaining -= chunkSize)
