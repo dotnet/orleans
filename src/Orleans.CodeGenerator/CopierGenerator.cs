@@ -167,7 +167,7 @@ namespace Orleans.CodeGenerator
                                 ThisExpression().Member(field.FieldName.ToIdentifierName()),
                                 Unwrapped(field.FieldName.ToIdentifierName()))));
                         break;
-                    case CopierFieldDescription:
+                    case CopierFieldDescription or BaseCopierFieldDescription when !field.IsInjected:
                         if (!codecProviderAdded)
                         {
                             parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
@@ -209,7 +209,7 @@ namespace Orleans.CodeGenerator
 
             if (serializableTypeDescription.HasComplexBaseType)
             {
-                fields.Add(new BaseCopierFieldDescription(libraryTypes.BaseCopier_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax), BaseTypeCopierFieldName));
+                fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
             }
 
             if (serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
@@ -243,6 +243,20 @@ namespace Orleans.CodeGenerator
             }
 
             return fields;
+        }
+
+        private static BaseCopierFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription, LibraryTypes libraryTypes)
+        {
+            var baseType = serializableTypeDescription.BaseType;
+            if (baseType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
+                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, libraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                && baseType is not INamedTypeSymbol { IsGenericType: true })
+            {
+                // Use the concrete generated type and avoid expensive interface dispatch (except for generic types that will fall back to IBaseCopier<T>)
+                return new(QualifiedName(ParseName(GetGeneratedNamespaceName(baseType)), IdentifierName(GetSimpleClassName(baseType.Name))), true);
+            }
+
+            return new(libraryTypes.BaseCopier_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
         public static void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes, List<GeneratedFieldDescription> fields)
@@ -615,13 +629,12 @@ skip:;
             }
         }
 
-        internal class BaseCopierFieldDescription : GeneratedFieldDescription
+        internal sealed class BaseCopierFieldDescription : GeneratedFieldDescription
         {
-            public BaseCopierFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
-            {
-            }
+            public BaseCopierFieldDescription(TypeSyntax fieldType, bool concreteType = false) : base(fieldType, BaseTypeCopierFieldName)
+                => IsInjected = !concreteType;
 
-            public override bool IsInjected => true;
+            public override bool IsInjected { get; }
         }
 
         internal sealed class CopierFieldDescription : GeneratedFieldDescription, ICopierDescription

@@ -55,8 +55,10 @@ namespace Orleans.CodeGenerator
                 .AddBaseListTypes(SimpleBaseType(libraryTypes.FieldCodec_1.ToTypeSyntax(type.TypeSyntax)))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
-                .AddMembers(fieldDeclarations)
-                .AddMembers(ctor);
+                .AddMembers(fieldDeclarations);
+
+            if (ctor != null)
+                classDeclaration = classDeclaration.AddMembers(ctor);
 
             if (type.IsEnumType)
             {
@@ -145,64 +147,55 @@ namespace Orleans.CodeGenerator
 
         private static ConstructorDeclarationSyntax GenerateConstructor(LibraryTypes libraryTypes, string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
         {
-            var injected = fieldDescriptions.Where(f => f.IsInjected).ToList();
-            var parameters = new List<ParameterSyntax>(injected.Select(f => Parameter(f.FieldName.ToIdentifier()).WithType(f.FieldType)));
-            const string CodecProviderParameterName = "codecProvider";
-            parameters.Add(Parameter(Identifier(CodecProviderParameterName)).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
-
-            var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-
-            List<StatementSyntax> GetStatements()
+            var codecProviderAdded = false;
+            var parameters = new List<ParameterSyntax>();
+            var statements = new List<StatementSyntax>();
+            foreach (var field in fieldDescriptions)
             {
-                var res = new List<StatementSyntax>();
-                foreach (var field in fieldDescriptions)
+                switch (field)
                 {
-                    switch (field)
-                    {
-                        case GetterFieldDescription getter:
-                            res.Add(getter.InitializationSyntax);
-                            break;
+                    case GetterFieldDescription getter:
+                        statements.Add(getter.InitializationSyntax);
+                        break;
 
-                        case SetterFieldDescription setter:
-                            res.Add(setter.InitializationSyntax);
-                            break;
+                    case SetterFieldDescription setter:
+                        statements.Add(setter.InitializationSyntax);
+                        break;
 
-                        case GeneratedFieldDescription _ when field.IsInjected:
-                            res.Add(ExpressionStatement(
-                                AssignmentExpression(
-                                    SyntaxKind.SimpleAssignmentExpression,
-                                    ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                    Unwrapped(field.FieldName.ToIdentifierName()))));
-                            break;
-                        case CodecFieldDescription codec when !field.IsInjected:
-                            res.Add(ExpressionStatement(
-                                    AssignmentExpression(
-                                        SyntaxKind.SimpleAssignmentExpression,
-                                        field.FieldName.ToIdentifierName(),
-                                        GetService(field.FieldType))));
-                            break;
-                    }
+                    case GeneratedFieldDescription _ when field.IsInjected:
+                        parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
+                        statements.Add(ExpressionStatement(
+                            AssignmentExpression(
+                                SyntaxKind.SimpleAssignmentExpression,
+                                ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                Unwrapped(field.FieldName.ToIdentifierName()))));
+                        break;
+                    case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
+                        if (!codecProviderAdded)
+                        {
+                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
+                            codecProviderAdded = true;
+                        }
+
+                        var codec = InvocationExpression(
+                            IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
+                            ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName("codecProvider")) })));
+
+                        statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), codec)));
+                        break;
                 }
-                return res;
             }
 
-            return ConstructorDeclaration(simpleClassName)
+            return statements.Count == 0 ? null : ConstructorDeclaration(simpleClassName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters.ToArray())
-                .AddBodyStatements(GetStatements().ToArray());
+                .AddBodyStatements(statements.ToArray());
 
             static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
             {
                 return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
+                    IdentifierName("OrleansGeneratedCodeHelper").Member("UnwrapService"),
                     ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
-            }
-
-            static ExpressionSyntax GetService(TypeSyntax type)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName(CodecProviderParameterName)) })));
             }
         }
 
@@ -217,7 +210,7 @@ namespace Orleans.CodeGenerator
 
             if (serializableTypeDescription.HasComplexBaseType)
             {
-                fields.Add(new BaseCodecFieldDescription(libraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax), BaseTypeSerializerFieldName));
+                fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
             }
 
             if (serializableTypeDescription.UseActivator)
@@ -295,6 +288,20 @@ namespace Orleans.CodeGenerator
 
                 return new CodecFieldDescription(codecType, $"_codec{index}", t);
             }
+        }
+
+        private static BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription, LibraryTypes libraryTypes)
+        {
+            var baseType = serializableTypeDescription.BaseType;
+            if (baseType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
+                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, libraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                && baseType is not INamedTypeSymbol { IsGenericType: true })
+            {
+                // Use the concrete generated type and avoid expensive interface dispatch (except for generic types that will fall back to IBaseCodec<T>)
+                return new(QualifiedName(ParseName(GetGeneratedNamespaceName(baseType)), IdentifierName(GetSimpleClassName(baseType.Name))), true);
+            }
+
+            return new(libraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
         private static MemberDeclarationSyntax GenerateSerializeMethod(
@@ -949,7 +956,7 @@ namespace Orleans.CodeGenerator
                                     Argument(fieldIdDeltaParam),
                                     Argument(expectedTypeParam),
                                     Argument(CastExpression(type.BaseTypeSyntax, valueParam)),
-                                    Argument(TypeOfExpression(type.TypeSyntax))
+                                    Argument(IdentifierName(CodecFieldTypeFieldName))
                                 })))));
 
             var parameters = new[]
@@ -1011,18 +1018,17 @@ namespace Orleans.CodeGenerator
                 FieldName = fieldName;
             }
 
-            public TypeSyntax FieldType { get; }
-            public string FieldName { get; }
+            public readonly TypeSyntax FieldType;
+            public readonly string FieldName;
             public abstract bool IsInjected { get; }
         }
 
-        internal class BaseCodecFieldDescription : GeneratedFieldDescription
+        internal sealed class BaseCodecFieldDescription : GeneratedFieldDescription
         {
-            public BaseCodecFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
-            {
-            }
+            public BaseCodecFieldDescription(TypeSyntax fieldType, bool concreteType = false) : base(fieldType, BaseTypeSerializerFieldName)
+                => IsInjected = !concreteType;
 
-            public override bool IsInjected => true;
+            public override bool IsInjected { get; }
         }
 
         internal class ActivatorFieldDescription : GeneratedFieldDescription 
