@@ -227,35 +227,10 @@ namespace Orleans.CodeGenerator
                             .AddArgumentListArguments(instanceArg, Argument(value));
                 }
 
-                public GetterFieldDescription GetGetterFieldDescription() => null;
+                public FieldAccessorDescription GetGetterFieldDescription() => null;
 
-                public SetterFieldDescription GetSetterFieldDescription()
-                {
-                    TypeSyntax fieldType;
-                    if (ContainingType != null && ContainingType.IsValueType)
-                    {
-                        fieldType = _libraryTypes.ValueTypeSetter_2.ToTypeSyntax(GetTypeSyntax(ContainingType), TypeSyntax);
-                    }
-                    else
-                    {
-                        fieldType = _libraryTypes.Action_2.ToTypeSyntax(GetTypeSyntax(ContainingType), TypeSyntax);
-                    }
-
-                    // Generate syntax to initialize the field in the constructor
-                    var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                    var fieldInfo = SerializableMember.GetGetFieldInfoExpression(ContainingType, FieldName);
-                    var isContainedByValueType = ContainingType != null && ContainingType.IsValueType;
-                    var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
-                    var accessorInvoke = CastExpression(
-                        fieldType,
-                        InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                            .AddArgumentListArguments(Argument(fieldInfo)));
-
-                    var initializationSyntax = ExpressionStatement(
-                        AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(SetterFieldName), accessorInvoke));
-
-                    return new SetterFieldDescription(fieldType, SetterFieldName, initializationSyntax);
-                }
+                public FieldAccessorDescription GetSetterFieldDescription()
+                    => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, FieldName, SetterFieldName, _libraryTypes, true);
             }
         }
 
@@ -365,35 +340,10 @@ namespace Orleans.CodeGenerator
                             .AddArgumentListArguments(instanceArg, Argument(value));
                 }
 
-                public GetterFieldDescription GetGetterFieldDescription() => null;
+                public FieldAccessorDescription GetGetterFieldDescription() => null;
 
-                public SetterFieldDescription GetSetterFieldDescription()
-                {
-                    TypeSyntax fieldType;
-                    if (ContainingType != null && ContainingType.IsValueType)
-                    {
-                        fieldType = _libraryTypes.ValueTypeSetter_2.ToTypeSyntax(GetTypeSyntax(ContainingType), TypeSyntax);
-                    }
-                    else
-                    {
-                        fieldType = _libraryTypes.Action_2.ToTypeSyntax(GetTypeSyntax(ContainingType), TypeSyntax);
-                    }
-
-                    // Generate syntax to initialize the field in the constructor
-                    var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                    var fieldInfo = SerializableMember.GetGetFieldInfoExpression(ContainingType, FieldName);
-                    var isContainedByValueType = ContainingType != null && ContainingType.IsValueType;
-                    var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
-                    var accessorInvoke = CastExpression(
-                        fieldType,
-                        InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                            .AddArgumentListArguments(Argument(fieldInfo)));
-
-                    var initializationSyntax = ExpressionStatement(
-                        AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(SetterFieldName), accessorInvoke));
-
-                    return new SetterFieldDescription(fieldType, SetterFieldName, initializationSyntax);
-                }
+                public FieldAccessorDescription GetSetterFieldDescription()
+                    => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, FieldName, SetterFieldName, _libraryTypes, true);
             }
         }
     }

@@ -42,13 +42,14 @@ namespace Orleans.CodeGenerator
                         Token(SyntaxKind.ReadOnlyKeyword)));
             }
 
-            members.Add(GenerateConstructor(simpleClassName, orderedFields));
+            if (orderedFields.Count > 0)
+                members.Add(GenerateConstructor(simpleClassName, orderedFields));
+
             members.Add(GenerateCreateMethod(libraryTypes, type, orderedFields));
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseInterface))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(Attribute(libraryTypes.RegisterActivatorAttribute.ToNameSyntax()))))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(members.ToArray());
 

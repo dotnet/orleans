@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -118,26 +117,11 @@ namespace Orleans.CodeGenerator
                                     SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                         .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                    case SetterFieldDescription setter:
-                        {
-                            var fieldSetterVariable = VariableDeclarator(setter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(setter.FieldType).AddVariables(fieldSetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
-                    case GetterFieldDescription getter:
-                        {
-                            var fieldGetterVariable = VariableDeclarator(getter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(getter.FieldType).AddVariables(fieldGetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
+                    case FieldAccessorDescription accessor:
+                        return
+                            FieldDeclaration(VariableDeclaration(accessor.FieldType,
+                                SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                     default:
                         return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
@@ -154,14 +138,6 @@ namespace Orleans.CodeGenerator
             {
                 switch (field)
                 {
-                    case GetterFieldDescription getter:
-                        statements.Add(getter.InitializationSyntax);
-                        break;
-
-                    case SetterFieldDescription setter:
-                        statements.Add(setter.InitializationSyntax);
-                        break;
-
                     case GeneratedFieldDescription _ when field.IsInjected:
                         parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
                         statements.Add(ExpressionStatement(
@@ -1031,7 +1007,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected { get; }
         }
 
-        internal class ActivatorFieldDescription : GeneratedFieldDescription 
+        internal sealed class ActivatorFieldDescription : GeneratedFieldDescription 
         {
             public ActivatorFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
             {
@@ -1040,7 +1016,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => true;
         }
 
-        internal class CodecFieldDescription : GeneratedFieldDescription, ICodecDescription
+        internal sealed class CodecFieldDescription : GeneratedFieldDescription, ICodecDescription
         {
             public CodecFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {
@@ -1051,7 +1027,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class TypeFieldDescription : GeneratedFieldDescription
+        internal sealed class TypeFieldDescription : GeneratedFieldDescription
         {
             public TypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax underlyingTypeSyntax, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {
@@ -1064,7 +1040,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class CodecFieldTypeFieldDescription : GeneratedFieldDescription
+        internal sealed class CodecFieldTypeFieldDescription : GeneratedFieldDescription
         {
             public CodecFieldTypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax codecFieldType) : base(fieldType, fieldName)
             {
@@ -1075,31 +1051,17 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class SetterFieldDescription : GeneratedFieldDescription
+        internal sealed class FieldAccessorDescription : GeneratedFieldDescription
         {
-            public SetterFieldDescription(TypeSyntax fieldType, string fieldName, StatementSyntax initializationSyntax) : base(fieldType, fieldName)
-            {
-                InitializationSyntax = initializationSyntax;
-            }
+            public FieldAccessorDescription(TypeSyntax fieldType, string fieldName, ExpressionSyntax initializationSyntax) : base(fieldType, fieldName)
+                => InitializationSyntax = initializationSyntax;
 
             public override bool IsInjected => false;
 
-            public StatementSyntax InitializationSyntax { get; }
+            public readonly ExpressionSyntax InitializationSyntax;
         }
 
-        internal class GetterFieldDescription : GeneratedFieldDescription
-        {
-            public GetterFieldDescription(TypeSyntax fieldType, string fieldName, StatementSyntax initializationSyntax) : base(fieldType, fieldName)
-            {
-                InitializationSyntax = initializationSyntax;
-            }
-
-            public override bool IsInjected => false;
-
-            public StatementSyntax InitializationSyntax { get; }
-        }
-
-        internal class SerializationHookFieldDescription : GeneratedFieldDescription
+        internal sealed class SerializationHookFieldDescription : GeneratedFieldDescription
         {
             public SerializationHookFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
             {
@@ -1136,8 +1098,8 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for setting the value of this field.</returns>
             ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value);
 
-            GetterFieldDescription GetGetterFieldDescription();
-            SetterFieldDescription GetSetterFieldDescription();
+            FieldAccessorDescription GetGetterFieldDescription();
+            FieldAccessorDescription GetSetterFieldDescription();
         }
 
         /// <summary>
@@ -1186,8 +1148,8 @@ namespace Orleans.CodeGenerator
                         instance.Member(_member.FieldName),
                         value);
 
-            public GetterFieldDescription GetGetterFieldDescription() => null;
-            public SetterFieldDescription GetSetterFieldDescription() => null;
+            public FieldAccessorDescription GetGetterFieldDescription() => null;
+            public FieldAccessorDescription GetSetterFieldDescription() => null;
         }
 
         /// <summary>
@@ -1372,63 +1334,34 @@ namespace Orleans.CodeGenerator
                         .AddArgumentListArguments(instanceArg, Argument(value));
             }
 
-            public GetterFieldDescription GetGetterFieldDescription()
+            public FieldAccessorDescription GetGetterFieldDescription()
             {
                 if (IsGettableField || IsGettableProperty) return null;
-
-                var isContainedByValueType = ContainingType?.IsValueType ?? false;
-
-                var getterType = (isContainedByValueType ? _libraryTypes.ValueTypeGetter_2: _libraryTypes.Func_2)
-                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
-
-                // Generate syntax to initialize the field in the constructor
-                var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
-                var accessorMethod = isContainedByValueType ? "GetValueGetter" : "GetGetter";
-                var accessorInvoke = CastExpression(
-                    getterType,
-                    InvocationExpression(fieldAccessorUtility.Member(accessorMethod)).AddArgumentListArguments(Argument(fieldInfo)));
-                var initializationSyntax = ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(GetterFieldName), accessorInvoke));
-
-                return new GetterFieldDescription(getterType, GetterFieldName, initializationSyntax);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, _libraryTypes, false);
             }
 
-            public SetterFieldDescription GetSetterFieldDescription()
+            public FieldAccessorDescription GetSetterFieldDescription()
             {
                 if (IsSettableField || IsSettableProperty) return null;
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, _libraryTypes, true);
+            }
 
-                var isContainedByValueType = ContainingType?.IsValueType ?? false;
+            public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter)
+            {
+                var valueType = containingType.IsValueType;
+                var containingTypeSyntax = containingType.ToTypeSyntax();
 
-                var fieldType = (isContainedByValueType ? _libraryTypes.ValueTypeSetter_2 : _libraryTypes.Action_2)
-                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
+                var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.Action_2) : (valueType ? library.ValueTypeGetter_2 : library.Func_2))
+                    .ToTypeSyntax(containingTypeSyntax, fieldType);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
-                var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
-                var accessorInvoke = CastExpression(
-                    fieldType,
+                var accessorMethod = setter ? (valueType ? "GetValueSetter" : "GetReferenceSetter") : (valueType ? "GetValueGetter" : "GetGetter");
+                var accessorInvoke = CastExpression(delegateType,
                     InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                        .AddArgumentListArguments(Argument(fieldInfo)));
+                        .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
 
-                var initializationSyntax = ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(SetterFieldName), accessorInvoke));
-
-                return new SetterFieldDescription(fieldType, SetterFieldName, initializationSyntax);
-            }
-
-            public static InvocationExpressionSyntax GetGetFieldInfoExpression(INamedTypeSymbol containingType, string fieldName)
-            {
-                var bindingFlags = SymbolSyntaxExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
-                    SyntaxKind.BitwiseOrExpression,
-                    BindingFlags.Instance,
-                    BindingFlags.NonPublic,
-                    BindingFlags.Public);
-                return InvocationExpression(TypeOfExpression(containingType.ToTypeSyntax()).Member("GetField"))
-                            .AddArgumentListArguments(
-                                Argument(fieldName.GetLiteralExpression()),
-                                Argument(bindingFlags));
+                return new(delegateType, accessorName, accessorInvoke);
             }
         }
     }

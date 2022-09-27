@@ -115,26 +115,11 @@ namespace Orleans.CodeGenerator
             {
                 switch (description)
                 {
-                    case SetterFieldDescription setter:
-                        {
-                            var fieldSetterVariable = VariableDeclarator(setter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(setter.FieldType).AddVariables(fieldSetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
-                    case GetterFieldDescription getter:
-                        {
-                            var fieldGetterVariable = VariableDeclarator(getter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(getter.FieldType).AddVariables(fieldGetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
+                    case FieldAccessorDescription accessor:
+                        return
+                            FieldDeclaration(VariableDeclaration(accessor.FieldType,
+                                SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                     default:
                         return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
@@ -151,14 +136,6 @@ namespace Orleans.CodeGenerator
             {
                 switch (field)
                 {
-                    case GetterFieldDescription getter:
-                        statements.Add(getter.InitializationSyntax);
-                        break;
-
-                    case SetterFieldDescription setter:
-                        statements.Add(setter.InitializationSyntax);
-                        break;
-
                     case GeneratedFieldDescription _ when field.IsInjected:
                         parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
                         statements.Add(ExpressionStatement(
