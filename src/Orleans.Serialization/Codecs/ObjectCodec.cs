@@ -56,8 +56,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
-            var fieldType = value?.GetType();
-            if (fieldType is null || fieldType == ObjectType)
+            if (value is null || value.GetType() == typeof(object))
             {
                 if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 {
@@ -69,7 +68,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
-            var specificSerializer = writer.Session.CodecProvider.GetCodec(fieldType);
+            var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
     }

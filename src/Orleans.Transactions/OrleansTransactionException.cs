@@ -28,14 +28,14 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionsDisabledException : OrleansTransactionException
+    public sealed class OrleansTransactionsDisabledException : OrleansTransactionException
     {
         public OrleansTransactionsDisabledException()
             : base("Orleans transactions have not been enabled. Transactions are disabled by default and must be configured to be used.")
         {
         }
 
-        public OrleansTransactionsDisabledException(SerializationInfo info, StreamingContext context)
+        private OrleansTransactionsDisabledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -46,14 +46,14 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansStartTransactionFailedException : OrleansTransactionException
+    public sealed class OrleansStartTransactionFailedException : OrleansTransactionException
     {
         public OrleansStartTransactionFailedException(Exception innerException)
             : base("Failed to start transaction. Check InnerException for details", innerException)
         {
         }
 
-        public OrleansStartTransactionFailedException(SerializationInfo info, StreamingContext context)
+        private OrleansStartTransactionFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -64,7 +64,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionOverloadException : OrleansTransactionException
+    public sealed class OrleansTransactionOverloadException : OrleansTransactionException
     {
         public OrleansTransactionOverloadException()
             : base("Transaction is overloaded on current silo, please try again later.")
@@ -78,7 +78,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionInDoubtException : OrleansTransactionException
+    public sealed class OrleansTransactionInDoubtException : OrleansTransactionException
     {
         [Id(0)]
         public string TransactionId { get; private set; }
@@ -98,7 +98,7 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
-        public OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
+        private OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.TransactionId = info.GetString(nameof(this.TransactionId));
@@ -140,7 +140,7 @@ namespace Orleans.Transactions
             TransactionId = transactionId;
         }
 
-        public OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
+        protected OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.TransactionId = info.GetString(nameof(this.TransactionId));
@@ -158,7 +158,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansCascadingAbortException : OrleansTransactionTransientFailureException
+    public sealed class OrleansCascadingAbortException : OrleansTransactionTransientFailureException
     {
         [Id(0)]
         public string DependentTransactionId { get; private set; }
@@ -179,7 +179,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
+        private OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.DependentTransactionId = info.GetString(nameof(this.DependentTransactionId));
@@ -197,7 +197,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansOrphanCallException : OrleansTransactionAbortedException
+    public sealed class OrleansOrphanCallException : OrleansTransactionAbortedException
     {
         public OrleansOrphanCallException(string transactionId, int pendingCalls)
             : base(
@@ -206,7 +206,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public OrleansOrphanCallException(SerializationInfo info, StreamingContext context)
+        private OrleansOrphanCallException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -217,14 +217,14 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansReadOnlyViolatedException : OrleansTransactionAbortedException
+    public sealed class OrleansReadOnlyViolatedException : OrleansTransactionAbortedException
     {
         public OrleansReadOnlyViolatedException(string transactionId)
             : base(transactionId, string.Format("Transaction {0} aborted because it attempted to write a grain", transactionId))
         {
         }
 
-        public OrleansReadOnlyViolatedException(SerializationInfo info, StreamingContext context)
+        private OrleansReadOnlyViolatedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -232,13 +232,13 @@ namespace Orleans.Transactions
 
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionServiceNotAvailableException : OrleansTransactionException
+    public sealed class OrleansTransactionServiceNotAvailableException : OrleansTransactionException
     {
         public OrleansTransactionServiceNotAvailableException() : base("Transaction service not available")
         {
         }
 
-        public OrleansTransactionServiceNotAvailableException(SerializationInfo info, StreamingContext context)
+        private OrleansTransactionServiceNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -249,7 +249,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansBrokenTransactionLockException : OrleansTransactionTransientFailureException
+    public sealed class OrleansBrokenTransactionLockException : OrleansTransactionTransientFailureException
     {
         public OrleansBrokenTransactionLockException(string transactionId, string situation)
             : base(transactionId, $"Transaction {transactionId} aborted because a broken lock was detected, {situation}")
@@ -261,7 +261,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
+        private OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -272,14 +272,14 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionLockUpgradeException : OrleansTransactionTransientFailureException
+    public sealed class OrleansTransactionLockUpgradeException : OrleansTransactionTransientFailureException
     {
         public OrleansTransactionLockUpgradeException(string transactionId) :
             base(transactionId, $"Transaction {transactionId} Aborted because it could not upgrade a lock, because of a higher-priority conflicting transaction")
         {
         }
 
-        public OrleansTransactionLockUpgradeException(SerializationInfo info, StreamingContext context)
+        private OrleansTransactionLockUpgradeException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -290,14 +290,14 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
+    public sealed class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
     {
         public OrleansTransactionPrepareTimeoutException(string transactionId, Exception innerException)
             : base(transactionId, $"Transaction {transactionId} Aborted because the prepare phase did not complete within the timeout limit", innerException)
         {
         }
 
-        public OrleansTransactionPrepareTimeoutException(SerializationInfo info, StreamingContext context)
+        private OrleansTransactionPrepareTimeoutException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -321,7 +321,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public OrleansTransactionTransientFailureException(SerializationInfo info, StreamingContext context)
+        protected OrleansTransactionTransientFailureException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

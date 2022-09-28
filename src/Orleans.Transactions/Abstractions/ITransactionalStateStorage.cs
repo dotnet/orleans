@@ -29,10 +29,8 @@ namespace Orleans.Transactions.Abstractions
         );
     }
 
-    [GenerateSerializer]
-    [Serializable]
-    [Immutable]
-    public class PendingTransactionState<TState>
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class PendingTransactionState<TState>
         where TState : class, new()
     {
         /// <summary>
@@ -71,10 +69,8 @@ namespace Orleans.Transactions.Abstractions
         public TState State { get; set; }
     }
 
-    [GenerateSerializer]
-    [Serializable]
-    [Immutable]
-    public class TransactionalStorageLoadResponse<TState>
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
         public TransactionalStorageLoadResponse() : this(null, new TState(), 0, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TState>>()) { }
@@ -118,7 +114,7 @@ namespace Orleans.Transactions.Abstractions
     /// </summary>
     [GenerateSerializer]
     [Serializable]
-    public class TransactionalStateMetaData
+    public sealed class TransactionalStateMetaData
     {
         [Id(0)]
         public DateTime TimeStamp { get; set; } = default;
@@ -127,10 +123,8 @@ namespace Orleans.Transactions.Abstractions
         public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = new Dictionary<Guid, CommitRecord>();
     }
 
-    [GenerateSerializer]
-    [Serializable]
-    [Immutable]
-    public class CommitRecord
+    [Serializable, GenerateSerializer, Immutable]
+    public sealed class CommitRecord
     {
         [Id(0)]
         public DateTime Timestamp { get; set; }

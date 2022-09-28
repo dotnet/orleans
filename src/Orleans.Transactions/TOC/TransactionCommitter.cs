@@ -155,7 +155,7 @@ namespace Orleans.Transactions
 
         [Serializable]
         [GenerateSerializer]
-        public class OperationState
+        public sealed class OperationState
         {
             [Id(0)]
             public ITransactionCommitOperation<TService> Operation { get; set; }
