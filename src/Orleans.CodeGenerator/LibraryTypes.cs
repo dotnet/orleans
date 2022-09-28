@@ -1,9 +1,9 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
 {
@@ -21,13 +21,11 @@ namespace Orleans.CodeGenerator
                 ITypeManifestProvider = Type("Orleans.Serialization.Configuration.ITypeManifestProvider"),
                 Field = Type("Orleans.Serialization.WireProtocol.Field"),
                 WireType = Type("Orleans.Serialization.WireProtocol.WireType"),
-                FieldCodec = Type("Orleans.Serialization.Codecs.IFieldCodec"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
                 IOptionalDeepCopier = Type("Orleans.Serialization.Cloning.IOptionalDeepCopier"),
                 CompoundTypeAliasAttribute = Type("Orleans.CompoundTypeAliasAttribute"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
-                CopyContextPool = Type("Orleans.Serialization.Cloning.CopyContextPool"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
                 Func_2 = Type("System.Func`2"),
                 GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute"),
@@ -39,7 +37,6 @@ namespace Orleans.CodeGenerator
                 ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToArray(),
                 AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
-                DefaultInvokeMethodNameAttribute = Type("Orleans.DefaultInvokeMethodNameAttribute"),
                 InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute"),
                 FormatterServices = Type("System.Runtime.Serialization.FormatterServices"),
                 InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute"),
@@ -64,9 +61,7 @@ namespace Orleans.CodeGenerator
                 ArrayCodec = Type("Orleans.Serialization.Codecs.ArrayCodec`1"),
                 ArrayCopier = Type("Orleans.Serialization.Codecs.ArrayCopier`1"),
                 Reader = Type("Orleans.Serialization.Buffers.Reader`1"),
-                ResponseCompletionSourcePool = Type("Orleans.Serialization.Invocation.ResponseCompletionSourcePool"),
                 TypeManifestOptions = Type("Orleans.Serialization.Configuration.TypeManifestOptions"),
-                SerializerSession = Type("Orleans.Serialization.Session.SerializerSession"),
                 Task = Type("System.Threading.Tasks.Task"),
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
                 Type = Type("System.Type"),
@@ -110,6 +105,7 @@ namespace Orleans.CodeGenerator
                 },
                 WellKnownCodecs = new WellKnownCodecDescription[]
                 {
+                    new(Type("System.Exception"), Type("Orleans.Serialization.ExceptionCodec")),
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
@@ -146,6 +142,7 @@ namespace Orleans.CodeGenerator
                 },
                 WellKnownCopiers = new WellKnownCopierDescription[]
                 {
+                    new(Type("System.Exception"), Type("Orleans.Serialization.ExceptionCodec")),
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
@@ -211,7 +208,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
         public INamedTypeSymbol IOptionalDeepCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
-        public INamedTypeSymbol FieldCodec { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }
         public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
         public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
@@ -228,9 +224,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ArrayCodec { get; private set; }
         public INamedTypeSymbol ArrayCopier { get; private set; }
         public INamedTypeSymbol Reader { get; private set; }
-        public INamedTypeSymbol ResponseCompletionSourcePool { get; private set; }
         public INamedTypeSymbol TypeManifestOptions { get; private set; }
-        public INamedTypeSymbol SerializerSession { get; private set; }
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
@@ -258,7 +252,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SuppressReferenceTrackingAttribute { get; private set; }
         public INamedTypeSymbol OmitDefaultMemberValuesAttribute { get; private set; }
         public INamedTypeSymbol CopyContext { get; private set; }
-        public INamedTypeSymbol CopyContextPool { get; private set; }
         public Compilation Compilation { get; private set; }
         private INamedTypeSymbol TimeSpan;
         private INamedTypeSymbol IPAddress;
@@ -274,7 +267,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol DefaultInvokableBaseTypeAttribute { get; private set; }
         public INamedTypeSymbol GenerateCodeForDeclaringAssemblyAttribute { get; private set; }
         public INamedTypeSymbol SerializationCallbacksAttribute { get; private set; }
-        public INamedTypeSymbol DefaultInvokeMethodNameAttribute { get; private set; }
         public INamedTypeSymbol GeneratedActivatorConstructorAttribute { get; private set; }
         public INamedTypeSymbol SerializerTransparentAttribute { get; private set; }
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
