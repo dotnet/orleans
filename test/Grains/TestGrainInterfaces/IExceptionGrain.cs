@@ -78,7 +78,6 @@ namespace UnitTests.GrainInterfaces
         public int Number { get; }
     }
 
-    [GenerateSerializer]
     public class UnserializableType
     {
     }
