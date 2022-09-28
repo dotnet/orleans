@@ -267,6 +267,10 @@ namespace Orleans.CodeGenerator
                     }
                     codecType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
+                else if (t is IArrayTypeSymbol { IsSZArray: true } array)
+                {
+                    codecType = libraryTypes.ArrayCodec.Construct(array.ElementType).ToTypeSyntax();
+                }
                 else if (libraryTypes.WellKnownCodecs.FindByUnderlyingType(t) is { } codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.

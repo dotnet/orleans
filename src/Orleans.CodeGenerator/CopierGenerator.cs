@@ -278,6 +278,10 @@ namespace Orleans.CodeGenerator
                     }
                     copierType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
+                else if (t is IArrayTypeSymbol { IsSZArray: true } array)
+                {
+                    copierType = libraryTypes.ArrayCopier.Construct(array.ElementType).ToTypeSyntax();
+                }
                 else if (libraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
                 {
                     // The copier is not a static copier and is also not a generic copiers.

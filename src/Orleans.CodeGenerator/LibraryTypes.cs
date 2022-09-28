@@ -61,6 +61,8 @@ namespace Orleans.CodeGenerator
                 ObsoleteAttribute = Type("System.ObsoleteAttribute"),
                 BaseCodec_1 = Type("Orleans.Serialization.Serializers.IBaseCodec`1"),
                 BaseCopier_1 = Type("Orleans.Serialization.Cloning.IBaseCopier`1"),
+                ArrayCodec = Type("Orleans.Serialization.Codecs.ArrayCodec`1"),
+                ArrayCopier = Type("Orleans.Serialization.Codecs.ArrayCopier`1"),
                 Reader = Type("Orleans.Serialization.Buffers.Reader`1"),
                 ResponseCompletionSourcePool = Type("Orleans.Serialization.Invocation.ResponseCompletionSourcePool"),
                 TypeManifestOptions = Type("Orleans.Serialization.Configuration.TypeManifestOptions"),
@@ -223,6 +225,8 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ObsoleteAttribute { get; private set; }
         public INamedTypeSymbol BaseCodec_1 { get; private set; }
         public INamedTypeSymbol BaseCopier_1 { get; private set; }
+        public INamedTypeSymbol ArrayCodec { get; private set; }
+        public INamedTypeSymbol ArrayCopier { get; private set; }
         public INamedTypeSymbol Reader { get; private set; }
         public INamedTypeSymbol ResponseCompletionSourcePool { get; private set; }
         public INamedTypeSymbol TypeManifestOptions { get; private set; }
