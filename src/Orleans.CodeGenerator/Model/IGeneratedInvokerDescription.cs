@@ -40,7 +40,7 @@ namespace Orleans.CodeGenerator
         public Accessibility Accessibility { get; }
         public TypeSyntax TypeSyntax => _typeSyntax ??= CreateTypeSyntax();
         public TypeSyntax OpenTypeSyntax => _openTypeSyntax ??= CreateOpenTypeSyntax();
-        public bool HasComplexBaseType => BaseType is not null;
+        public bool HasComplexBaseType => BaseType is { SpecialType: not SpecialType.System_Object };
         public bool SupportsPrimaryConstructorParameters => false;
         public INamedTypeSymbol BaseType { get; }
         public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_methodDescription.TypeParameterSubstitutions);
@@ -62,11 +62,13 @@ namespace Orleans.CodeGenerator
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _methodDescription.AllTypeParameters;
         public List<INamedTypeSymbol> SerializationHooks { get; }
         public bool IsShallowCopyable => false;
+        public bool IsUnsealedImmutable => false;
+        public bool IsExceptionType => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
         public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
 
-        public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax).WithArgumentList(ArgumentList());
+        public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
 
         private TypeSyntax CreateTypeSyntax()
         {

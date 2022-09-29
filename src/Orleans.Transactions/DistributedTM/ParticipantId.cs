@@ -41,8 +41,8 @@ namespace Orleans.Transactions
             return $"ParticipantId.{Name}.{Reference}";
         }
 
-        [GenerateSerializer]
-        public class IdComparer : IEqualityComparer<ParticipantId>
+        [GenerateSerializer, Immutable]
+        public sealed class IdComparer : IEqualityComparer<ParticipantId>
         {
             public bool Equals(ParticipantId x, ParticipantId y)
             {

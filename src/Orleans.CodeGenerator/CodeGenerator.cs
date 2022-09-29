@@ -226,7 +226,7 @@ namespace Orleans.CodeGenerator
                                 }
                                 else
                                 {
-                                    var annotatedConstructors = symbol.Constructors.Where(ctor => LibraryTypes.ConstructorAttributeTypes.Any(ctor.HasAttribute)).ToList();
+                                    var annotatedConstructors = symbol.Constructors.Where(ctor => ctor.HasAnyAttribute(LibraryTypes.ConstructorAttributeTypes)).ToList();
                                     if (annotatedConstructors.Count == 1)
                                     {
                                         constructorParameters = annotatedConstructors[0].Parameters;

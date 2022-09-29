@@ -31,6 +31,8 @@ namespace Orleans.CodeGenerator
         ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes);
         List<INamedTypeSymbol> SerializationHooks { get; }
         bool IsShallowCopyable { get; }
+        bool IsUnsealedImmutable { get; }
+        bool IsExceptionType { get; }
         List<TypeSyntax> ActivatorConstructorParameters { get; }
     }
 }

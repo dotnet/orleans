@@ -422,12 +422,21 @@ namespace Orleans
 
     /// <summary>
     /// Indicates that the type, type member, parameter, or return value which it is applied to should be treated as immutable and therefore that defensive copies are never required.
+    /// When applied to non-sealed classes, derived types are not guaranteed to be immutable.
     /// </summary>
     /// <seealso cref="System.Attribute" />
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.ReturnValue)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.ReturnValue, Inherited = false)]
     public sealed class ImmutableAttribute : Attribute
     {
     }
+
+    /// <summary>
+    /// Indicates that the specific type is invisible for serialization purposes.
+    /// Usable only on abstract types with no serialized fields and effectively removes it from the inheritance hierarchy.
+    /// Adding/removing this attribute from a type will cause serialization protocol level incompatibility (like type hierarchy changes).
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class SerializerTransparentAttribute : Attribute { }
 
     /// <summary>
     /// Specifies an assembly to be added as an application part.

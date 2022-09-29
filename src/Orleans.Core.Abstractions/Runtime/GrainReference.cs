@@ -436,7 +436,7 @@ namespace Orleans.Runtime
     /// Base type used for method requests.
     /// </summary>
     [SuppressReferenceTracking]
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class RequestBase : IInvokable
     {
         /// <summary>
@@ -533,7 +533,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Base class for requests for methods which return <see cref="ValueTask"/>.
     /// </summary>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class Request : RequestBase 
     {
         [DebuggerHidden]
@@ -581,7 +581,7 @@ namespace Orleans.Runtime
     /// <typeparam name="TResult">
     /// The underlying result type.
     /// </typeparam>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class Request<TResult> : RequestBase
     {
         /// <inheritdoc/>
@@ -632,7 +632,7 @@ namespace Orleans.Runtime
     /// <typeparam name="TResult">
     /// The underlying result type.
     /// </typeparam>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class TaskRequest<TResult> : RequestBase
     {
         /// <inheritdoc/>
@@ -681,7 +681,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Base class for requests for methods which return <see cref="ValueTask"/>.
     /// </summary>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class TaskRequest : RequestBase
     {
         /// <inheritdoc/>
@@ -731,7 +731,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Base class for requests for void-returning methods.
     /// </summary>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
         /// <inheritdoc/>

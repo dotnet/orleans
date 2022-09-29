@@ -13,17 +13,9 @@ namespace Orleans.Runtime
     /// Placement directors are associated with grains using a placement strategy.
     /// Grains indicate their preferred placement strategy using an attribute on the grain class.
     /// </remarks>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, SerializerTransparent]
     public abstract class PlacementStrategy
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlacementStrategy"/> class.
-        /// </summary>
-        protected PlacementStrategy()
-        {
-        }
-
         /// <summary>
         /// Gets a value indicating whether or not this placement strategy requires activations to be registered in
         /// the grain directory.

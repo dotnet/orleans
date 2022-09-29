@@ -77,6 +77,9 @@ namespace Orleans.CodeGenerator
                 }
             }
 
+            while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
+                baseClassType = baseClassType.BaseType;
+
             var invokerDescription = new GeneratedInvokerDescription(
                 interfaceDescription,
                 method,
@@ -403,7 +406,7 @@ namespace Orleans.CodeGenerator
 
             // C# base.Dispose();
             if (baseClassType is { }
-                && baseClassType.AllInterfaces.Contains(libraryTypes.IDisposable)
+                && baseClassType.AllInterfaces.Any(i => i.SpecialType == SpecialType.System_IDisposable)
                 && baseClassType.GetAllMembers<IMethodSymbol>("Dispose").FirstOrDefault(m => !m.IsAbstract && m.DeclaredAccessibility != Accessibility.Private) is { })
             {
                 body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
