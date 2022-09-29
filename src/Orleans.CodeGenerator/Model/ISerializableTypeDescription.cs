@@ -25,7 +25,6 @@ namespace Orleans.CodeGenerator
         bool UseActivator { get; }
         bool IsEmptyConstructable { get; }
         bool HasActivatorConstructor { get; }
-        bool IsPartial { get; }
         bool TrackReferences { get; }
         bool OmitDefaultMemberValues { get; }
         ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes);

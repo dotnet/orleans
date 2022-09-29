@@ -34,11 +34,9 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new(TypeTypeValueTupleComparer.Instance);
         private readonly ConcurrentDictionary<(Type, Type), IDeepCopier> _adaptedCopiers = new(TypeTypeValueTupleComparer.Instance);
 
-        private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCodecs = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedActivators = new();
-        private readonly ConcurrentDictionary<Type, object> _instantiatedConverters = new();
         private readonly Dictionary<Type, Type> _baseCodecs = new();
         private readonly Dictionary<Type, Type> _valueSerializers = new();
         private readonly Dictionary<Type, Type> _fieldCodecs = new();
@@ -117,7 +115,7 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
             AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
 
-            static void AddFromMetadata(IDictionary<Type, Type> resultCollection, IEnumerable<Type> metadataCollection, Type genericType)
+            static void AddFromMetadata(Dictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
@@ -649,8 +647,7 @@ namespace Orleans.Serialization.Serializers
 
             if (!_instantiatedValueSerializers.TryGetValue(serializerType, out var result))
             {
-                result = GetServiceOrCreateInstance(serializerType, constructorArguments);
-                _ = _instantiatedValueSerializers.TryAdd(serializerType, result);
+                result = _instantiatedValueSerializers.GetOrAdd(serializerType, GetServiceOrCreateInstance(serializerType, constructorArguments));
             }
 
             return (IValueSerializer<TField>)result;
@@ -679,8 +676,7 @@ namespace Orleans.Serialization.Serializers
 
             if (!_instantiatedBaseCopiers.TryGetValue(copierType, out var result))
             {
-                result = GetServiceOrCreateInstance(copierType, constructorArguments);
-                _ = _instantiatedBaseCopiers.TryAdd(copierType, result);
+                result = _instantiatedBaseCopiers.GetOrAdd(copierType, GetServiceOrCreateInstance(copierType, constructorArguments));
             }
 
             return (IBaseCopier<T>)result;
@@ -700,8 +696,7 @@ namespace Orleans.Serialization.Serializers
 
             if (!_instantiatedActivators.TryGetValue(activatorType, out var result))
             {
-                result = GetServiceOrCreateInstance(activatorType);
-                _ = _instantiatedActivators.TryAdd(activatorType, result);
+                result = _instantiatedActivators.GetOrAdd(activatorType, GetServiceOrCreateInstance(activatorType));
             }
 
             return (IActivator<T>)result;

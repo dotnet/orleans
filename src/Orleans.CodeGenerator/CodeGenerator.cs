@@ -84,7 +84,7 @@ namespace Orleans.CodeGenerator
                 var copier = CopierGenerator.GenerateCopier(LibraryTypes, type);
                 AddMember(ns, copier);
 
-                if (type.IsEmptyConstructable || type.HasActivatorConstructor)
+                if (!type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && type is not GeneratedInvokerDescription || type.HasActivatorConstructor))
                 {
                     metadataModel.ActivatableTypes.Add(type);
 
