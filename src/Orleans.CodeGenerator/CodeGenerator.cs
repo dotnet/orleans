@@ -485,7 +485,7 @@ namespace Orleans.CodeGenerator
         internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
         {
             return memberSymbol.GetAnyAttribute(libraryTypes.IdAttributeTypes) is { } attr
-                ? (ushort)attr.ConstructorArguments.First().Value
+                ? (uint)attr.ConstructorArguments.First().Value
                 : null;
         }
 

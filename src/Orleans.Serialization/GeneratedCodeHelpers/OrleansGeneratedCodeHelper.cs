@@ -1,15 +1,16 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.WireProtocol;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Activators;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.GeneratedCodeHelpers
 {
@@ -342,6 +343,36 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     reader.ConsumeUnknownField(header);
                 }
             }
+        }
+
+        /// <summary>
+        /// Default copier implementation for (rarely copied) exception classes
+        /// </summary>
+        public abstract class ExceptionCopier<T, B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
+        {
+            private readonly IActivator<T> _activator;
+            private readonly IBaseCopier<B> _baseTypeCopier;
+
+            protected ExceptionCopier(ICodecProvider codecProvider)
+            {
+                _activator = GetService<IActivator<T>>(this, codecProvider);
+                _baseTypeCopier = GetService<IBaseCopier<B>>(this, codecProvider);
+            }
+
+            public T DeepCopy(T original, CopyContext context)
+            {
+                if (original is null)
+                    return null;
+
+                if (original.GetType() != typeof(T))
+                    return context.DeepCopy(original);
+
+                var result = _activator.Create();
+                DeepCopy(original, result, context);
+                return result;
+            }
+
+            public virtual void DeepCopy(T input, T output, CopyContext context) => _baseTypeCopier.DeepCopy(input, output, context);
         }
     }
 }
