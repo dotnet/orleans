@@ -1,14 +1,13 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal class GeneratedInvokerDescription : ISerializableTypeDescription
+    internal sealed class GeneratedInvokerDescription : ISerializableTypeDescription
     {
         private readonly MethodDescription _methodDescription;
         private TypeSyntax _openTypeSyntax;
@@ -54,7 +53,6 @@ namespace Orleans.CodeGenerator
         public InvokableInterfaceDescription InterfaceDescription { get; }
         public SemanticModel SemanticModel => InterfaceDescription.SemanticModel;
         public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
-        public bool IsPartial => true;
         public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
         public bool TrackReferences => false;
         public bool OmitDefaultMemberValues => false;
@@ -62,7 +60,7 @@ namespace Orleans.CodeGenerator
         public List<INamedTypeSymbol> SerializationHooks { get; }
         public bool IsShallowCopyable => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
-        public bool HasActivatorConstructor => true;
+        public bool HasActivatorConstructor => UseActivator;
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax).WithArgumentList(ArgumentList());
 

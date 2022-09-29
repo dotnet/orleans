@@ -37,7 +37,7 @@ namespace Orleans.CodeGenerator
             };
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
-                .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword), Token(SyntaxKind.PartialKeyword))
+                .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
                     AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(fields);

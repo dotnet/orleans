@@ -2,13 +2,16 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <!-- Do not warn on errors caused by Protocol Buffers codegen, eg: "error CS8981: The type name 'pb' only contains lower-cased ascii characters. Such names may become reserved for the language." -->
+    <NoWarn>$(NoWarn);8981</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +29,12 @@
     <PackageReference Include="Hyperion" Version="$(HyperionVersion)" />
     <PackageReference Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
     <PackageReference Include="Grpc.Tools" Version="$(GrpcToolsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>

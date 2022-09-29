@@ -170,23 +170,6 @@ namespace Orleans.CodeGenerator
 
         public bool HasActivatorConstructor { get; }
 
-        public bool IsPartial
-        {
-            get
-            {
-                foreach (var reference in Type.DeclaringSyntaxReferences)
-                {
-                    var syntax = reference.GetSyntax();
-                    if (syntax is TypeDeclarationSyntax typeDeclaration && typeDeclaration.Modifiers.Any(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-        }
-
         public bool UseActivator => Type.HasAttribute(_libraryTypes.UseActivatorAttribute) || !IsEmptyConstructable || HasActivatorConstructor;
 
         public bool TrackReferences => !IsValueType && !Type.HasAttribute(_libraryTypes.SuppressReferenceTrackingAttribute);
