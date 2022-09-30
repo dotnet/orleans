@@ -90,12 +90,12 @@ namespace Orleans.Serialization.Codecs
                     case 1:
                         if (result is null)
                         {
-                            return ThrowLengthFieldMissing();
+                            ThrowLengthFieldMissing();
                         }
 
                         if (index >= length)
                         {
-                            return ThrowIndexOutOfRangeException(length);
+                            ThrowIndexOutOfRangeException(length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -113,13 +113,13 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        private static T[] ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(T[])}, {length}, is greater than total length of input.");
 
-        private static T[] ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
+using System.Collections.Immutable;
+using System.Linq;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -21,27 +21,12 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ImmutableArray<T> ConvertFromSurrogate(ref ImmutableArraySurrogate<T> surrogate) => surrogate.Values switch
-        {
-            null => default,
-            object => ImmutableArray.CreateRange(surrogate.Values)
-        };
+        public override ImmutableArray<T> ConvertFromSurrogate(ref ImmutableArraySurrogate<T> surrogate)
+            => surrogate.Values is { } v ? ImmutableArray.Create(v) : default;
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableArray<T> value, ref ImmutableArraySurrogate<T> surrogate)
-        {
-            if (value.IsDefault)
-            {
-                surrogate = default;
-            }
-            else
-            {
-                surrogate = new ImmutableArraySurrogate<T>
-                {
-                    Values = new List<T>(value)
-                };
-            }
-        }
+            => surrogate.Values = value.IsDefault ? null : value.ToArray();
     }
 
     /// <summary>
@@ -56,7 +41,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public T[] Values;
     }
 
     /// <summary>
@@ -66,7 +51,12 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableArrayCopier<T> : IDeepCopier<ImmutableArray<T>>
     {
+        private readonly IDeepCopier<T> _copier;
+
+        public ImmutableArrayCopier(IDeepCopier<T> copier) => _copier = copier;
+
         /// <inheritdoc/>
-        public ImmutableArray<T> DeepCopy(ImmutableArray<T> input, CopyContext context) => input;
+        public ImmutableArray<T> DeepCopy(ImmutableArray<T> input, CopyContext context)
+            => input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier.DeepCopy(i, s.context), (_copier, context));
     }
 }

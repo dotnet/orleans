@@ -22,43 +22,15 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableHashSet<T> ConvertFromSurrogate(ref ImmutableHashSetSurrogate<T> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                if (surrogate.KeyComparer is object)
-                {
-                    return ImmutableHashSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
-                }
-                else
-                {
-                    return ImmutableHashSet.CreateRange(surrogate.Values);
-                }
-            }
-        }
+            => surrogate.Values is null ? null : ImmutableHashSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableHashSet<T> value, ref ImmutableHashSetSurrogate<T> surrogate)
         {
-            if (value is null)
+            if (value != null)
             {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ImmutableHashSetSurrogate<T>
-                {
-                    Values = new List<T>(value)
-                };
-
-                if (!ReferenceEquals(value.KeyComparer, EqualityComparer<T>.Default))
-                {
-                    surrogate.KeyComparer = value.KeyComparer;
-                }
+                surrogate.Values = new(value);
+                surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
             }
         }
     }
@@ -92,7 +64,24 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableHashSetCopier<T> : IDeepCopier<ImmutableHashSet<T>>
     {
+        private readonly IDeepCopier<T> _copier;
+
+        public ImmutableHashSetCopier(IDeepCopier<T> copier) => _copier = copier;
+
         /// <inheritdoc/>
-        public ImmutableHashSet<T> DeepCopy(ImmutableHashSet<T> input, CopyContext context) => input;
+        public ImmutableHashSet<T> DeepCopy(ImmutableHashSet<T> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableHashSet<T>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty)
+                return input;
+
+            var items = new List<T>(input.Count);
+            foreach (var item in input)
+                items.Add(_copier.DeepCopy(item, context));
+
+            return ImmutableHashSet.CreateRange(input.KeyComparer, items);
+        }
     }
 }

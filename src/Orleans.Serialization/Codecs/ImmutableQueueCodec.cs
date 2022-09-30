@@ -21,21 +21,12 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ImmutableQueue<T> ConvertFromSurrogate(ref ImmutableQueueSurrogate<T> surrogate) => surrogate.Values switch
-        {
-            null => null,
-            object => ImmutableQueue.CreateRange(surrogate.Values)
-        };
+        public override ImmutableQueue<T> ConvertFromSurrogate(ref ImmutableQueueSurrogate<T> surrogate)
+            => surrogate.Values is { } v ? ImmutableQueue.CreateRange(v) : null;
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ImmutableQueue<T> value, ref ImmutableQueueSurrogate<T> surrogate) => surrogate = value switch
-        {
-            null => default, 
-            object => new ImmutableQueueSurrogate<T>
-            {
-                Values = new List<T>(value)
-            }
-        };
+        public override void ConvertToSurrogate(ImmutableQueue<T> value, ref ImmutableQueueSurrogate<T> surrogate)
+            => surrogate.Values = value is null ? null : new(value);
     }
 
     /// <summary>
@@ -60,7 +51,24 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableQueueCopier<T> : IDeepCopier<ImmutableQueue<T>>
     {
+        private readonly IDeepCopier<T> _copier;
+
+        public ImmutableQueueCopier(IDeepCopier<T> copier) => _copier = copier;
+
         /// <inheritdoc/>
-        public ImmutableQueue<T> DeepCopy(ImmutableQueue<T> input, CopyContext _) => input;
+        public ImmutableQueue<T> DeepCopy(ImmutableQueue<T> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableQueue<T>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty)
+                return input;
+
+            var items = new List<T>();
+            foreach (var item in input)
+                items.Add(_copier.DeepCopy(item, context));
+
+            return ImmutableQueue.CreateRange(items);
+        }
     }
 }

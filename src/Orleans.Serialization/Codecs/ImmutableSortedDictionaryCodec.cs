@@ -23,52 +23,16 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableSortedDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableSortedDictionarySurrogate<TKey, TValue> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                var result = ImmutableSortedDictionary.CreateRange(surrogate.Values);
-
-                if (surrogate.KeyComparer is object && surrogate.ValueComparer is object)
-                {
-                    result = result.WithComparers(surrogate.KeyComparer, surrogate.ValueComparer);
-                }
-                else if (surrogate.KeyComparer is object)
-                {
-                    result = result.WithComparers(surrogate.KeyComparer);
-                }
-
-                return result;
-            }
-        }
+            => surrogate.Values is null ? null : ImmutableSortedDictionary.CreateRange(surrogate.KeyComparer, surrogate.ValueComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableSortedDictionary<TKey, TValue> value, ref ImmutableSortedDictionarySurrogate<TKey, TValue> surrogate)
         {
-            if (value is null)
+            if (value != null)
             {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ImmutableSortedDictionarySurrogate<TKey, TValue>
-                {
-                    Values = new List<KeyValuePair<TKey, TValue>>(value)
-                };
-
-                if (!ReferenceEquals(value.KeyComparer, Comparer<TKey>.Default))
-                {
-                    surrogate.KeyComparer = value.KeyComparer;
-                }
-
-                if (!ReferenceEquals(value.ValueComparer, EqualityComparer<TKey>.Default))
-                {
-                    surrogate.ValueComparer = value.ValueComparer;
-                }
+                surrogate.Values = new(value);
+                surrogate.KeyComparer = value.KeyComparer != Comparer<TKey>.Default ? value.KeyComparer : null;
+                surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TKey>.Default ? value.ValueComparer : null;
             }
         }
     }
@@ -106,7 +70,29 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableSortedDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableSortedDictionary<TKey, TValue>>
     {
+        private readonly IDeepCopier<TKey> _keyCopier;
+        private readonly IDeepCopier<TValue> _valueCopier;
+
+        public ImmutableSortedDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
+        {
+            _keyCopier = keyCopier;
+            _valueCopier = valueCopier;
+        }
+
         /// <inheritdoc/>
-        public ImmutableSortedDictionary<TKey, TValue> DeepCopy(ImmutableSortedDictionary<TKey, TValue> input, CopyContext _) => input;
+        public ImmutableSortedDictionary<TKey, TValue> DeepCopy(ImmutableSortedDictionary<TKey, TValue> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableSortedDictionary<TKey, TValue>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty)
+                return input;
+
+            var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
+            foreach (var item in input)
+                items.Add(new(_keyCopier.DeepCopy(item.Key, context), _valueCopier.DeepCopy(item.Value, context)));
+
+            return ImmutableSortedDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
+        }
     }
 }

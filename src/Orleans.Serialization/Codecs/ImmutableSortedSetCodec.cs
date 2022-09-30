@@ -22,43 +22,15 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableSortedSet<T> ConvertFromSurrogate(ref ImmutableSortedSetSurrogate<T> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                if (surrogate.KeyComparer is object)
-                {
-                    return ImmutableSortedSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
-                }
-                else
-                {
-                    return ImmutableSortedSet.CreateRange(surrogate.Values);
-                }
-            }
-        }
+            => surrogate.Values is null ? null : ImmutableSortedSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableSortedSet<T> value, ref ImmutableSortedSetSurrogate<T> surrogate)
         {
-            if (value is null)
+            if (value != null)
             {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ImmutableSortedSetSurrogate<T>
-                {
-                    Values = new List<T>(value)
-                };
-
-                if (!ReferenceEquals(value.KeyComparer, Comparer<T>.Default))
-                {
-                    surrogate.KeyComparer = value.KeyComparer;
-                }
+                surrogate.Values = new(value);
+                surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
             }
         }
     }
@@ -92,7 +64,24 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableSortedSetCopier<T> : IDeepCopier<ImmutableSortedSet<T>>
     {
+        private readonly IDeepCopier<T> _copier;
+
+        public ImmutableSortedSetCopier(IDeepCopier<T> copier) => _copier = copier;
+
         /// <inheritdoc/>
-        public ImmutableSortedSet<T> DeepCopy(ImmutableSortedSet<T> input, CopyContext _) => input;
+        public ImmutableSortedSet<T> DeepCopy(ImmutableSortedSet<T> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableSortedSet<T>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty)
+                return input;
+
+            var items = new List<T>(input.Count);
+            foreach (var item in input)
+                items.Add(_copier.DeepCopy(item, context));
+
+            return ImmutableSortedSet.CreateRange(input.KeyComparer, items);
+        }
     }
 }

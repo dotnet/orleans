@@ -22,21 +22,12 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ImmutableDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableDictionarySurrogate<TKey, TValue> surrogate) => surrogate.Values switch
-        {
-            null => default,
-            object => ImmutableDictionary.CreateRange(surrogate.Values)
-        };
+        public override ImmutableDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableDictionarySurrogate<TKey, TValue> surrogate)
+            => surrogate.Values is { } v ? ImmutableDictionary.CreateRange(v.Comparer, v) : null;
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ImmutableDictionary<TKey, TValue> value, ref ImmutableDictionarySurrogate<TKey, TValue> surrogate) => surrogate = value switch
-        {
-            null => default,
-            _ => new ImmutableDictionarySurrogate<TKey, TValue>
-            {
-                Values = new Dictionary<TKey, TValue>(value)
-            },
-        };
+        public override void ConvertToSurrogate(ImmutableDictionary<TKey, TValue> value, ref ImmutableDictionarySurrogate<TKey, TValue> surrogate)
+            => surrogate.Values = value is null ? null : new(value, value.KeyComparer);
     }
 
     /// <summary>
@@ -63,7 +54,29 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>
     {
+        private readonly IDeepCopier<TKey> _keyCopier;
+        private readonly IDeepCopier<TValue> _valueCopier;
+
+        public ImmutableDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
+        {
+            _keyCopier = keyCopier;
+            _valueCopier = valueCopier;
+        }
+
         /// <inheritdoc/>
-        public ImmutableDictionary<TKey, TValue> DeepCopy(ImmutableDictionary<TKey, TValue> input, CopyContext _) => input;
+        public ImmutableDictionary<TKey, TValue> DeepCopy(ImmutableDictionary<TKey, TValue> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableDictionary<TKey, TValue>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty)
+                return input;
+
+            var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
+            foreach (var item in input)
+                items.Add(new(_keyCopier.DeepCopy(item.Key, context), _valueCopier.DeepCopy(item.Value, context)));
+
+            return ImmutableDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
+        }
     }
 }
