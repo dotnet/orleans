@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans
@@ -10,7 +11,6 @@ namespace Orleans
     {
         private readonly TaskCompletionSource<bool> tcs;
         private int count;
-        private readonly object lockable;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiTaskCompletionSource"/> class.
@@ -29,7 +29,6 @@ namespace Orleans
             }
             tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.count = count;
-            lockable = new object();
         }
 
         /// <summary>
@@ -46,17 +45,16 @@ namespace Orleans
         /// <exception cref="InvalidOperationException">This method was called more times than the initially specified count argument allows.</exception>
         public void SetOneResult()
         {
-            lock (lockable)
+            int current = Interlocked.Decrement(ref count);
+            if (current < 0)
             {
-                if (count <= 0)
-                {
-                    throw new InvalidOperationException("SetOneResult was called more times than initially specified by the count argument.");
-                }
-                count--;
-                if (count == 0)
-                {
-                    tcs.SetResult(true);
-                }
+                throw new InvalidOperationException(
+                    "SetOneResult was called more times than initially specified by the count argument.");
+            }
+
+            if (current == 0)
+            {
+                tcs.SetResult(true);
             }
         }
     }
