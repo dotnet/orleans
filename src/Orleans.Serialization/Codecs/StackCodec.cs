@@ -40,12 +40,15 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
+            if (value.Count > 0)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
+                Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -67,8 +70,6 @@ namespace Orleans.Serialization.Codecs
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             Stack<T> result = null;
             uint fieldId = 0;
-            var length = 0;
-            var index = 0;
             while (true)
             {
                 var header = reader.ReadFieldHeader();
@@ -81,13 +82,13 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        var length = Int32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
                         }
 
-                        result = new Stack<T>(length);
+                        result = new(length);
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                         break;
                     case 1:
@@ -96,17 +97,18 @@ namespace Orleans.Serialization.Codecs
                             ThrowLengthFieldMissing();
                         }
 
-                        if (index >= length)
-                        {
-                            ThrowIndexOutOfRangeException(length);
-                        }
                         result.Push(_fieldCodec.ReadValue(ref reader, header));
-                        ++index;
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
                 }
+            }
+
+            if (result is null)
+            {
+                result = new();
+                ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
             return result;
@@ -115,13 +117,10 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(Stack<T>)} with declared length {length}.");
-
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Stack<T>)}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
     }
 
     /// <summary>

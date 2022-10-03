@@ -37,12 +37,15 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Length);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
+            if (value.Length > 0)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
+                Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Length);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -105,6 +108,12 @@ namespace Orleans.Serialization.Codecs
                         reader.ConsumeUnknownField(header);
                         break;
                 }
+            }
+
+            if (result is null)
+            {
+                result = Array.Empty<T>();
+                ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
             return result;

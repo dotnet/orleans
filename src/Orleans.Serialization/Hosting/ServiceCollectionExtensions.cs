@@ -50,8 +50,6 @@ namespace Orleans.Serialization
                 services.AddSingleton<IConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
                 services.AddSingleton<TypeResolver, CachedTypeResolver>();
                 services.AddSingleton<TypeConverter>();
-                services.TryAddSingleton(typeof(ListActivator<>));
-                services.TryAddSingleton(typeof(DictionaryActivator<,>));
                 services.TryAddSingleton<CodecProvider>();
                 services.TryAddSingleton<ICodecProvider>(sp => sp.GetRequiredService<CodecProvider>());
                 services.TryAddSingleton<IDeepCopierProvider>(sp => sp.GetRequiredService<CodecProvider>());

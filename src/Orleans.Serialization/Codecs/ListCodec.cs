@@ -1,12 +1,11 @@
-using Orleans.Serialization.Activators;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.GeneratedCodeHelpers;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -20,17 +19,14 @@ namespace Orleans.Serialization.Codecs
         private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<T> _fieldCodec;
-        private readonly ListActivator<T> _activator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ListCodec{T}"/> class.
         /// </summary>
         /// <param name="fieldCodec">The field codec.</param>
-        /// <param name="activator">The activator.</param>
-        public ListCodec(IFieldCodec<T> fieldCodec, ListActivator<T> activator)
+        public ListCodec(IFieldCodec<T> fieldCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
-            _activator = activator;
         }
 
         /// <inheritdoc/>
@@ -44,12 +40,15 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
+            if (value.Count > 0)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
+                Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -71,8 +70,6 @@ namespace Orleans.Serialization.Codecs
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             List<T> result = null;
             uint fieldId = 0;
-            var length = 0;
-            var index = 0;
             while (true)
             {
                 var header = reader.ReadFieldHeader();
@@ -85,14 +82,13 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        var length = Int32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
                         }
 
-                        result = _activator.Create(length);
-                        result.Capacity = length;
+                        result = new(length);
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                         break;
                     case 1:
@@ -101,12 +97,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowLengthFieldMissing();
                         }
 
-                        if (index >= length)
-                        {
-                            ThrowIndexOutOfRangeException(length);
-                        }
                         result.Add(_fieldCodec.ReadValue(ref reader, header));
-                        ++index;
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -114,14 +105,17 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
+            if (result is null)
+            {
+                result = new();
+                ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+            }
+
             return result;
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
-
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(List<T>)} with declared length {length}.");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(List<T>)}, {length}, is greater than total length of input.");

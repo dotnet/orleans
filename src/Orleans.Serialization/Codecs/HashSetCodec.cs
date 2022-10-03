@@ -47,13 +47,15 @@ namespace Orleans.Serialization.Codecs
                 _comparerCodec.WriteField(ref writer, 0, typeof(IEqualityComparer<T>), value.Comparer);
             }
 
-            Int32Codec.WriteField(ref writer, 1, typeof(int), value.Count);
-
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
+            if (value.Count > 0)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
+                Int32Codec.WriteField(ref writer, 1, typeof(int), value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -91,15 +93,18 @@ namespace Orleans.Serialization.Codecs
                         comparer = _comparerCodec.ReadValue(ref reader, header);
                         break;
                     case 1:
-                        int length = Int32Codec.ReadValue(ref reader, header);
+                        var length = Int32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
                         }
 
+                        result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
                         break;
                     case 2:
-                        result ??= CreateInstance(comparer, reader.Session, placeholderReferenceId);
+                        if (result is null)
+                            ThrowLengthFieldMissing();
+
                         result.Add(_fieldCodec.ReadValue(ref reader, header));
                         break;
                     default:
@@ -108,13 +113,13 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            result ??= CreateInstance(comparer, reader.Session, placeholderReferenceId);
+            result ??= CreateInstance(0, comparer, reader.Session, placeholderReferenceId);
             return result;
         }
 
-        private HashSet<T> CreateInstance(IEqualityComparer<T> comparer, SerializerSession session, uint placeholderReferenceId)
+        private HashSet<T> CreateInstance(int length, IEqualityComparer<T> comparer, SerializerSession session, uint placeholderReferenceId)
         {
-            var result = new HashSet<T>(comparer);
+            var result = new HashSet<T>(length, comparer);
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
@@ -124,6 +129,8 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(HashSet<T>)}, {length}, is greater than total length of input.");
+
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
     }
 
     /// <summary>
