@@ -29,7 +29,7 @@ namespace Orleans.Serialization.Codecs
         public override void ConvertToSurrogate(ImmutableSortedSet<T> value, ref ImmutableSortedSetSurrogate<T> surrogate)
         {
             surrogate.Values = new(value);
-            surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
+            surrogate.KeyComparer = value.KeyComparer != Comparer<T>.Default ? value.KeyComparer : null;
         }
     }
 
