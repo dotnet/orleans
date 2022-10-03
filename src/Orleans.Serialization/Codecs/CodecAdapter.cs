@@ -36,9 +36,10 @@ namespace Orleans.Serialization.Codecs
                 _codec = codec;
             }
 
-            void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) => _codec.WriteField(ref writer, fieldIdDelta, expectedType, (TField)value);
+            public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+                => _codec.WriteField(ref writer, fieldIdDelta, expectedType, (TField)value);
 
-            object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
+            public object ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
 
             public object Inner => _codec;
         }
@@ -54,9 +55,10 @@ namespace Orleans.Serialization.Codecs
 
             public object Inner => _codec;
 
-            void IFieldCodec<TField>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+            public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+                => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
 
-            TField IFieldCodec<TField>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)_codec.ReadValue(ref reader, field);
+            public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)_codec.ReadValue(ref reader, field);
         }
     }
 

@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="byte"/> arrays.
     /// </summary>
     [RegisterSerializer]
-    public sealed class ByteArrayCodec : TypedCodecBase<byte[], ByteArrayCodec>, IFieldCodec<byte[]>
+    public sealed class ByteArrayCodec : TypedCodecBase<byte[]>, IFieldCodec<byte[]>
     {
         /// <summary>
         /// The codec field type
@@ -105,7 +105,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="ReadOnlyMemory{Byte}"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class ReadOnlyMemoryOfByteCodec : TypedCodecBase<ReadOnlyMemory<byte>, ReadOnlyMemoryOfByteCodec>, IFieldCodec<ReadOnlyMemory<byte>>
+    public sealed class ReadOnlyMemoryOfByteCodec : TypedCodecBase<ReadOnlyMemory<byte>>, IFieldCodec<ReadOnlyMemory<byte>>
     {
         /// <summary>
         /// The codec field type
@@ -227,7 +227,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="Memory{Byte}"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class MemoryOfByteCodec : TypedCodecBase<Memory<byte>, MemoryOfByteCodec>, IFieldCodec<Memory<byte>>
+    public sealed class MemoryOfByteCodec : TypedCodecBase<Memory<byte>>, IFieldCodec<Memory<byte>>
     {
         private static readonly Type CodecFieldType = typeof(Memory<byte>);
 

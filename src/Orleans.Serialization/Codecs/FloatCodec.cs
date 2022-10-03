@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="float"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class FloatCodec : TypedCodecBase<float, FloatCodec>, IFieldCodec<float>
+    public sealed class FloatCodec : TypedCodecBase<float>, IFieldCodec<float>
     {
         private static readonly Type CodecFieldType = typeof(float);
 
@@ -103,7 +103,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="double"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class DoubleCodec : TypedCodecBase<double, DoubleCodec>, IFieldCodec<double>
+    public sealed class DoubleCodec : TypedCodecBase<double>, IFieldCodec<double>
     {
         private static readonly Type CodecFieldType = typeof(double);
 
@@ -182,7 +182,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="decimal"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class DecimalCodec : TypedCodecBase<decimal, DecimalCodec>, IFieldCodec<decimal>
+    public sealed class DecimalCodec : TypedCodecBase<decimal>, IFieldCodec<decimal>
     {
         private const int Width = 16;
         private static readonly Type CodecFieldType = typeof(decimal);
