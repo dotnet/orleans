@@ -29,7 +29,7 @@ namespace Orleans.Serialization.Codecs
         public HashSetCodec(IFieldCodec<T> fieldCodec, IFieldCodec<IEqualityComparer<T>> comparerCodec)
         {
             _fieldCodec = OrleansGeneratedCodeHelper.UnwrapService(this, fieldCodec);
-            _comparerCodec = comparerCodec;
+            _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
         }
 
         /// <inheritdoc/>

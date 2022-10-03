@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 
@@ -34,9 +35,9 @@ namespace Orleans.Serialization.Codecs
             IFieldCodec<TValue> valueCodec,
             IFieldCodec<IEqualityComparer<TKey>> comparerCodec)
         {
-            _keyCodec = keyCodec;
-            _valueCodec = valueCodec;
-            _comparerCodec = comparerCodec;
+            _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
+            _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
+            _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
         }
 
         /// <inheritdoc/>
