@@ -60,7 +60,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="BitVector32"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class BitVector32Copier : IDeepCopier<BitVector32>
+    public sealed class BitVector32Copier : IDeepCopier<BitVector32>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public BitVector32 DeepCopy(BitVector32 input, CopyContext _) => new(input);

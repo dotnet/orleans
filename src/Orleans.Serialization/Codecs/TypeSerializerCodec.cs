@@ -169,7 +169,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="Type"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class TypeCopier : IDeepCopier<Type>, IDerivedTypeCopier
+    public sealed class TypeCopier : IDeepCopier<Type>, IDerivedTypeCopier, IOptionalDeepCopier
     {
         /// <inheritdoc />
         public Type DeepCopy(Type input, CopyContext context) => input;

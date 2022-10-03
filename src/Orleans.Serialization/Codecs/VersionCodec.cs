@@ -89,7 +89,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="Version"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class VersionCopier : IDeepCopier<Version>
+    public sealed class VersionCopier : IDeepCopier<Version>, IOptionalDeepCopier
     {
         /// <inheritdoc />
         public Version DeepCopy(Version input, CopyContext context) => input;

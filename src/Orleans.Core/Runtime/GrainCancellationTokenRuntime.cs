@@ -92,7 +92,7 @@ namespace Orleans.Runtime
     }
 
     [RegisterCopier]
-    internal class GrainCancellationTokenCopier : IDeepCopier<GrainCancellationToken>
+    internal sealed class GrainCancellationTokenCopier : IDeepCopier<GrainCancellationToken>, IOptionalDeepCopier
     {
         public GrainCancellationToken DeepCopy(GrainCancellationToken input, CopyContext context) => input;
     }

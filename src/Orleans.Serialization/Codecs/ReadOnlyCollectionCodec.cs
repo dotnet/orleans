@@ -73,6 +73,10 @@ namespace Orleans.Serialization.Codecs
                 return context.DeepCopy(input);
             }
 
+            // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
+            // Mitigate that by returning a shallow-copy in such a case.
+            context.RecordCopy(input, input);
+
             var tempResult = new T[input.Count];
             for (var i = 0; i < tempResult.Length; i++)
             {

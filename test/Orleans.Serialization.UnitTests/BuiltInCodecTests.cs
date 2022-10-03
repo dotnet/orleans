@@ -1908,6 +1908,27 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
+    public sealed class ImmutableHashSetMutableCopierTests : CopierTester<ImmutableHashSet<object>, ImmutableHashSetCopier<object>>
+    {
+        protected override ImmutableHashSet<object> CreateValue()
+        {
+            var rand = new Random(Guid.NewGuid().GetHashCode());
+            var hashSet = new HashSet<object>();
+            for (var i = 0; i < rand.Next(17) + 5; i++)
+            {
+                _ = hashSet.Add(rand.Next());
+            }
+
+            return hashSet.ToImmutableHashSet();
+        }
+
+        protected override ImmutableHashSet<object>[] TestValues => new[] { null, ImmutableHashSet.Create<object>(), CreateValue(), CreateValue(), CreateValue() };
+
+        protected override bool Equals(ImmutableHashSet<object> left, ImmutableHashSet<object> right) => ReferenceEquals(left, right) || left.SetEquals(right);
+
+        protected override bool IsImmutable => false;
+    }
+
     public class UriTests : FieldCodecTester<Uri, UriCodec>
     {
         protected override int[] MaxSegmentSizes => new[] { 128 };

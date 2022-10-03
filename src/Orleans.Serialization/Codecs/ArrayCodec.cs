@@ -305,8 +305,11 @@ namespace Orleans.Serialization.Codecs
             // Note that there is a possibility for unbounded recursion if the underlying object in the input is
             // able to take part in a cyclic reference. If we could get that object then we could prevent that cycle.
             // It is also possible that an IMemoryOwner<T> is the backing object, in which case this will not work.
-            if (MemoryMarshal.TryGetArray(input, out var segment))
+            if (MemoryMarshal.TryGetArray(input, out var segment) && segment.Array.Length == result.Length)
             {
+                if (context.TryGetCopy(segment.Array, out T[] existing))
+                    return existing;
+
                 context.RecordCopy(segment.Array, result);
             }
 
@@ -459,10 +462,19 @@ namespace Orleans.Serialization.Codecs
                 return input;
             }
 
-            // Note that there is a possibility for infinite recursion here if the underlying object in the input is
-            // able to take part in a cyclic reference. If we could get that object then we could prevent that cycle.
             var inputSpan = input.Span;
             var result = new T[inputSpan.Length];
+
+            // Note that there is a possibility for unbounded recursion if the underlying object in the input is
+            // able to take part in a cyclic reference. If we could get that object then we could prevent that cycle.
+            // It is also possible that an IMemoryOwner<T> is the backing object, in which case this will not work.
+            if (MemoryMarshal.TryGetArray<T>(input, out var segment) && segment.Array.Length == result.Length)
+            {
+                if (context.TryGetCopy(segment.Array, out T[] existing))
+                    return existing;
+
+                context.RecordCopy(segment.Array, result);
+            }
 
             for (var i = 0; i < inputSpan.Length; i++)
             {

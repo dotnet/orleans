@@ -43,7 +43,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="Uri"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class UriCopier : IDeepCopier<Uri>, IGeneralizedCopier
+    public sealed class UriCopier : IDeepCopier<Uri>, IGeneralizedCopier, IOptionalDeepCopier
     {
         /// <inheritdoc />
         public Uri DeepCopy(Uri input, CopyContext context) => input;

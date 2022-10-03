@@ -65,6 +65,17 @@ namespace Orleans.Serialization.Cloning
     public interface IDeepCopier { }
 
     /// <summary>
+    /// Marker interface for deep copiers of types that could optionally be shallow-copyable.
+    /// </summary>
+    public interface IOptionalDeepCopier
+    {
+        /// <summary>
+        /// Returns true if the type is shallow-copyable.
+        /// </summary>
+        public virtual bool IsShallowCopyable() => true;
+    }
+
+    /// <summary>
     /// Provides functionality for creating clones of objects of type <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The type of objects which this instance can copy.</typeparam>
@@ -294,7 +305,7 @@ namespace Orleans.Serialization.Cloning
         }
     }
 
-    /// <summary>throw new NotImplementedException();
+    /// <summary>
     /// Methods for adapting typed and untyped copiers.
     /// </summary>
     internal static class CopierAdapter
@@ -302,43 +313,51 @@ namespace Orleans.Serialization.Cloning
         /// <summary>
         /// Converts a strongly-typed copier into an untyped copier.
         /// </summary>
-        public static IDeepCopier<object> CreateUntypedFromTyped<T, TCopier>(TCopier typedCodec) where TCopier : IDeepCopier<T> => new TypedCopierWrapper<T, TCopier>(typedCodec);
+        public static IDeepCopier<object> CreateUntypedFromTyped<T>(IDeepCopier<T> typedCopier) => new TypedCopierWrapper<T>(typedCopier);
 
         /// <summary>
-        /// Converts an untyped codec into a strongly-typed codec.
+        /// Converts an untyped copier into a strongly-typed copier.
         /// </summary>
-        public static IDeepCopier<T> CreateTypedFromUntyped<T>(IDeepCopier<object> untypedCodec) => new UntypedCopierWrapper<T>(untypedCodec);
+        public static IDeepCopier<T> CreateTypedFromUntyped<T>(IDeepCopier<object> untypedCopier) => new UntypedCopierWrapper<T>(untypedCopier);
 
-        private sealed class TypedCopierWrapper<T, TCopier> : IDeepCopier<object>, IWrappedCodec where TCopier : IDeepCopier<T>
+        private sealed class TypedCopierWrapper<T> : IDeepCopier<object>, IWrappedCodec, IOptionalDeepCopier
         {
-            private readonly TCopier _copier;
+            private readonly IDeepCopier<T> _copier;
+            private readonly bool _shallow;
 
-            public TypedCopierWrapper(TCopier codec)
+            public TypedCopierWrapper(IDeepCopier<T> copier)
             {
-                _copier = codec;
+                _copier = copier;
+                _shallow = (copier as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
             }
 
-            object IDeepCopier<object>.DeepCopy(object original, CopyContext context) => _copier.DeepCopy((T)original, context);
+            public object DeepCopy(object original, CopyContext context) => _shallow ? original : _copier.DeepCopy((T)original, context);
 
             public object Inner => _copier;
+
+            public bool IsShallowCopyable() => _shallow;
         }
 
-        private sealed class UntypedCopierWrapper<T> : IWrappedCodec, IDeepCopier<T>
+        private sealed class UntypedCopierWrapper<T> : IWrappedCodec, IDeepCopier<T>, IOptionalDeepCopier
         {
-            private readonly IDeepCopier<object> _codec;
+            private readonly IDeepCopier<object> _copier;
+            private readonly bool _shallow;
 
-            public UntypedCopierWrapper(IDeepCopier<object> codec)
+            public UntypedCopierWrapper(IDeepCopier<object> copier)
             {
-                _codec = codec;
+                _copier = copier;
+                _shallow = (copier as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
             }
 
-            public object Inner => _codec;
+            public T DeepCopy(T original, CopyContext context) => _shallow ? original : (T)_copier.DeepCopy(original, context);
 
-            T IDeepCopier<T>.DeepCopy(T original, CopyContext context) => (T)_codec.DeepCopy(original, context);
+            public object Inner => _copier;
+
+            public bool IsShallowCopyable() => _shallow;
         }
     }
 
-    internal sealed class ShallowCopyableTypeCopier<T> : IDeepCopier<T>
+    internal sealed class ShallowCopyableTypeCopier<T> : IDeepCopier<T>, IOptionalDeepCopier
     {
         public T DeepCopy(T input, CopyContext context) => input;
     }

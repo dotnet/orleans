@@ -25,6 +25,7 @@ namespace Orleans.CodeGenerator
                 FieldCodec = Type("Orleans.Serialization.Codecs.IFieldCodec"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
+                IOptionalDeepCopier = Type("Orleans.Serialization.Cloning.IOptionalDeepCopier"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
                 CopyContextPool = Type("Orleans.Serialization.Cloning.CopyContextPool"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
@@ -231,6 +232,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Field { get; private set; }
         public INamedTypeSymbol WireType { get; private set; }
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
+        public INamedTypeSymbol IOptionalDeepCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
         public INamedTypeSymbol FieldCodec { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }

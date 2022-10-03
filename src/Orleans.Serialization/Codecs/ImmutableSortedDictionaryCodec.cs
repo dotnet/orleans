@@ -1,4 +1,5 @@
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -65,16 +66,18 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableSortedDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableSortedDictionary<TKey, TValue>>
+    public sealed class ImmutableSortedDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableSortedDictionary<TKey, TValue>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;
 
         public ImmutableSortedDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
-            _keyCopier = keyCopier;
-            _valueCopier = valueCopier;
+            _keyCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(keyCopier);
+            _valueCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(valueCopier);
         }
+
+        public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
         /// <inheritdoc/>
         public ImmutableSortedDictionary<TKey, TValue> DeepCopy(ImmutableSortedDictionary<TKey, TValue> input, CopyContext context)
@@ -82,14 +85,21 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy<ImmutableSortedDictionary<TKey, TValue>>(input, out var result))
                 return result;
 
-            if (input.IsEmpty)
+            if (input.IsEmpty || _keyCopier is null && _valueCopier is null)
                 return input;
+
+            // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
+            // Mitigate that by returning a shallow-copy in such a case.
+            context.RecordCopy(input, input);
 
             var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
             foreach (var item in input)
-                items.Add(new(_keyCopier.DeepCopy(item.Key, context), _valueCopier.DeepCopy(item.Value, context)));
+                items.Add(new(_keyCopier is null ? item.Key : _keyCopier.DeepCopy(item.Key, context),
+                    _valueCopier is null ? item.Value : _valueCopier.DeepCopy(item.Value, context)));
 
-            return ImmutableSortedDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
+            var res = ImmutableSortedDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
+            context.RecordCopy(input, res);
+            return res;
         }
     }
 }

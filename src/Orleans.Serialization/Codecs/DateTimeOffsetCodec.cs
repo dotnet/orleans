@@ -74,7 +74,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="DateTimeOffset"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class DateTimeOffsetCopier : IDeepCopier<DateTimeOffset>
+    public sealed class DateTimeOffsetCopier : IDeepCopier<DateTimeOffset>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public DateTimeOffset DeepCopy(DateTimeOffset input, CopyContext _) => input;

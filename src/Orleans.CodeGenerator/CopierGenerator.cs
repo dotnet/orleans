@@ -55,6 +55,7 @@ namespace Orleans.CodeGenerator
             {
                 var copyMethod = GenerateImmutableTypeCopyMethod(type, libraryTypes);
                 classDeclaration = classDeclaration.AddMembers(copyMethod);
+                classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(libraryTypes.IOptionalDeepCopier.ToTypeSyntax()));
             }
             else
             {

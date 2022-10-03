@@ -120,7 +120,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="string"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class StringCopier : IDeepCopier<string>
+    public sealed class StringCopier : IDeepCopier<string>, IOptionalDeepCopier
     {
         /// <summary>
         /// Creates a copy of the provided input.

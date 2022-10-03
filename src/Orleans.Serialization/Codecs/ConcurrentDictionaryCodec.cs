@@ -81,8 +81,7 @@ namespace Orleans.Serialization.Codecs
                 return context.DeepCopy(input);
             }
 
-            // Note that this cannot propagate the input's key comparer, since it is not exposed from ConcurrentDictionary.
-            result = new ConcurrentDictionary<TKey, TValue>();
+            result = new(input.Comparer);
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {

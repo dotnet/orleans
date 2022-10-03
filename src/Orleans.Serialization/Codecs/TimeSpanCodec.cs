@@ -64,7 +64,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="TimeSpan"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class TimeSpanCopier : IDeepCopier<TimeSpan>
+    public sealed class TimeSpanCopier : IDeepCopier<TimeSpan>, IOptionalDeepCopier
     {
         /// <inheritdoc />
         public TimeSpan DeepCopy(TimeSpan input, CopyContext _) => input;

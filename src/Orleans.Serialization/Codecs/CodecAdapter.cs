@@ -15,10 +15,9 @@ namespace Orleans.Serialization.Codecs
         /// Converts a strongly-typed codec into an untyped codec.
         /// </summary>
         /// <typeparam name="TField">The underlying field type.</typeparam>
-        /// <typeparam name="TCodec">The type of the codec being adapted.</typeparam>
         /// <param name="typedCodec">The typed codec.</param>
         /// <returns>The adapted codec.</returns>
-        public static IFieldCodec<object> CreateUntypedFromTyped<TField, TCodec>(TCodec typedCodec) where TCodec : IFieldCodec<TField> => new TypedCodecWrapper<TField, TCodec>(typedCodec);
+        public static IFieldCodec<object> CreateUntypedFromTyped<TField>(IFieldCodec<TField> typedCodec) => new TypedCodecWrapper<TField>(typedCodec);
 
         /// <summary>
         /// Converts an untyped codec into a strongly-typed codec.
@@ -28,11 +27,11 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The adapted coded.</returns>
         public static IFieldCodec<TField> CreateTypedFromUntyped<TField>(IFieldCodec<object> untypedCodec) => new UntypedCodecWrapper<TField>(untypedCodec);
 
-        private sealed class TypedCodecWrapper<TField, TCodec> : IFieldCodec<object>, IWrappedCodec where TCodec : IFieldCodec<TField>
+        private sealed class TypedCodecWrapper<TField> : IFieldCodec<object>, IWrappedCodec
         {
-            private readonly TCodec _codec;
+            private readonly IFieldCodec<TField> _codec;
 
-            public TypedCodecWrapper(TCodec codec)
+            public TypedCodecWrapper(IFieldCodec<TField> codec)
             {
                 _codec = codec;
             }
@@ -70,10 +69,9 @@ namespace Orleans.Serialization.Codecs
         /// Converts a strongly-typed codec into an untyped base codec.
         /// </summary>
         /// <typeparam name="TField">The field type.</typeparam>
-        /// <typeparam name="TCodec">The codec type.</typeparam>
         /// <param name="typedCodec">The typed codec.</param>
         /// <returns>The adapted codec.</returns>
-        public static IBaseCodec<object> CreateUntypedFromTyped<TField, TCodec>(TCodec typedCodec) where TCodec : IBaseCodec<TField> where TField : class => new TypedBaseCodecWrapper<TField, TCodec>(typedCodec);
+        public static IBaseCodec<object> CreateUntypedFromTyped<TField>(IBaseCodec<TField> typedCodec) where TField : class => new TypedBaseCodecWrapper<TField>(typedCodec);
 
         /// <summary>
         /// Converts an untyped codec into a strongly-typed base codec.
@@ -83,18 +81,11 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The adapted codec.</returns>
         public static IBaseCodec<TField> CreateTypedFromUntyped<TField>(IBaseCodec<object> untypedCodec) where TField : class => new UntypedBaseCodecWrapper<TField>(untypedCodec);
 
-        private sealed class TypedBaseCodecWrapper<TField, TCodec> : IBaseCodec<object>, IWrappedCodec where TCodec : IBaseCodec<TField> where TField : class
+        private sealed class TypedBaseCodecWrapper<TField> : IBaseCodec<object>, IWrappedCodec where TField : class
         {
-            private readonly TCodec _codec;
+            private readonly IBaseCodec<TField> _codec;
 
-            /// <summary>
-            /// Initializes a new instance of the <see cref="TypedBaseCodecWrapper{TField, TCodec}"/> class.
-            /// </summary>
-            /// <param name="codec">The codec.</param>
-            public TypedBaseCodecWrapper(TCodec codec)
-            {
-                _codec = codec;
-            }
+            public TypedBaseCodecWrapper(IBaseCodec<TField> codec) => _codec = codec;
 
             /// <inheritdoc />
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte> => _codec.Serialize(ref writer, (TField)value);

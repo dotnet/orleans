@@ -129,7 +129,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="Guid"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class GuidCopier : IDeepCopier<Guid>
+    public sealed class GuidCopier : IDeepCopier<Guid>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public Guid DeepCopy(Guid input, CopyContext _) => input;

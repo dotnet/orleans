@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Orleans.Serialization.Cloning;
 
 namespace Orleans.Serialization.GeneratedCodeHelpers
 {
@@ -140,6 +141,11 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             return null;
         }
+
+        /// <summary>
+        /// Returns the provided copier if it's not shallow-copyable.
+        /// </summary>
+        public static IDeepCopier<T> GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
 
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.

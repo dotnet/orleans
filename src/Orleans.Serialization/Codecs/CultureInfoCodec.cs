@@ -43,7 +43,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="CultureInfo"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class CultureInfoCopier : IDeepCopier<CultureInfo>
+    public sealed class CultureInfoCopier : IDeepCopier<CultureInfo>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public CultureInfo DeepCopy(CultureInfo input, CopyContext _) => input;

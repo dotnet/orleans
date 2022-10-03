@@ -93,7 +93,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="float"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class FloatCopier : IDeepCopier<float>
+    public sealed class FloatCopier : IDeepCopier<float>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public float DeepCopy(float input, CopyContext _) => input;
@@ -172,7 +172,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="double"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class DoubleCopier : IDeepCopier<double>
+    public sealed class DoubleCopier : IDeepCopier<double>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public double DeepCopy(double input, CopyContext _) => input;
@@ -286,7 +286,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="decimal"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class DecimalCopier : IDeepCopier<decimal>
+    public sealed class DecimalCopier : IDeepCopier<decimal>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public decimal DeepCopy(decimal input, CopyContext _) => input;

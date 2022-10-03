@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Linq;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs
@@ -49,14 +50,16 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableArrayCopier<T> : IDeepCopier<ImmutableArray<T>>
+    public sealed class ImmutableArrayCopier<T> : IDeepCopier<ImmutableArray<T>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T> _copier;
 
-        public ImmutableArrayCopier(IDeepCopier<T> copier) => _copier = copier;
+        public ImmutableArrayCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+
+        public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>
         public ImmutableArray<T> DeepCopy(ImmutableArray<T> input, CopyContext context)
-            => input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier.DeepCopy(i, s.context), (_copier, context));
+            => _copier is null || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier.DeepCopy(i, s.context), (_copier, context));
     }
 }

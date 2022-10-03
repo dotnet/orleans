@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class BoolCodec : TypedCodecBase<bool, BoolCodec>, IFieldCodec<bool>, IDeepCopier<bool>
+    public sealed class BoolCodec : TypedCodecBase<bool, BoolCodec>, IFieldCodec<bool>, IDeepCopier<bool>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(bool);
 
@@ -63,7 +63,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class CharCodec : TypedCodecBase<char, CharCodec>, IFieldCodec<char>, IDeepCopier<char>
+    public sealed class CharCodec : TypedCodecBase<char, CharCodec>, IFieldCodec<char>, IDeepCopier<char>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(char);
 
@@ -114,7 +114,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class ByteCodec : TypedCodecBase<byte, ByteCodec>, IFieldCodec<byte>, IDeepCopier<byte>
+    public sealed class ByteCodec : TypedCodecBase<byte, ByteCodec>, IFieldCodec<byte>, IDeepCopier<byte>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(byte);
 
@@ -181,7 +181,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class SByteCodec : TypedCodecBase<sbyte, SByteCodec>, IFieldCodec<sbyte>, IDeepCopier<sbyte>
+    public sealed class SByteCodec : TypedCodecBase<sbyte, SByteCodec>, IFieldCodec<sbyte>, IDeepCopier<sbyte>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(sbyte);
 
@@ -248,7 +248,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class UInt16Codec : TypedCodecBase<ushort, UInt16Codec>, IFieldCodec<ushort>, IDeepCopier<ushort>
+    public sealed class UInt16Codec : TypedCodecBase<ushort, UInt16Codec>, IFieldCodec<ushort>, IDeepCopier<ushort>, IOptionalDeepCopier
     {
         /// <summary>
         /// The codec field type
@@ -318,7 +318,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class Int16Codec : TypedCodecBase<short, Int16Codec>, IFieldCodec<short>, IDeepCopier<short>
+    public sealed class Int16Codec : TypedCodecBase<short, Int16Codec>, IFieldCodec<short>, IDeepCopier<short>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(short);
 
@@ -385,7 +385,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class UInt32Codec : TypedCodecBase<uint, UInt32Codec>, IFieldCodec<uint>, IDeepCopier<uint>
+    public sealed class UInt32Codec : TypedCodecBase<uint, UInt32Codec>, IFieldCodec<uint>, IDeepCopier<uint>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(uint);
 
@@ -468,7 +468,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class Int32Codec : TypedCodecBase<int, Int32Codec>, IFieldCodec<int>, IDeepCopier<int>
+    public sealed class Int32Codec : TypedCodecBase<int, Int32Codec>, IFieldCodec<int>, IDeepCopier<int>, IOptionalDeepCopier
     {
         /// <summary>
         /// The codec field type
@@ -576,7 +576,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class Int64Codec : TypedCodecBase<long, Int64Codec>, IFieldCodec<long>, IDeepCopier<long>
+    public sealed class Int64Codec : TypedCodecBase<long, Int64Codec>, IFieldCodec<long>, IDeepCopier<long>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(long);
 
@@ -682,7 +682,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class UInt64Codec : TypedCodecBase<ulong, UInt64Codec>, IFieldCodec<ulong>, IDeepCopier<ulong>
+    public sealed class UInt64Codec : TypedCodecBase<ulong, UInt64Codec>, IFieldCodec<ulong>, IDeepCopier<ulong>, IOptionalDeepCopier
     {
         private static readonly Type CodecFieldType = typeof(ulong);
 

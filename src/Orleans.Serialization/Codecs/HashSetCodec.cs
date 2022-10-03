@@ -157,7 +157,7 @@ namespace Orleans.Serialization.Codecs
                 return context.DeepCopy(input);
             }
 
-            result = new HashSet<T>(input.Comparer);
+            result = new(input.Count, input.Comparer);
             context.RecordCopy(input, result);
             foreach (var item in input)
             {

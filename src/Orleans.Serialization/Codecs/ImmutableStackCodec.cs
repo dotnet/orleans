@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs
@@ -47,11 +48,13 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableStackCopier<T> : IDeepCopier<ImmutableStack<T>>
+    public sealed class ImmutableStackCopier<T> : IDeepCopier<ImmutableStack<T>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T> _copier;
 
-        public ImmutableStackCopier(IDeepCopier<T> copier) => _copier = copier;
+        public ImmutableStackCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+
+        public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>
         public ImmutableStack<T> DeepCopy(ImmutableStack<T> input, CopyContext context)
@@ -59,14 +62,20 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy<ImmutableStack<T>>(input, out var result))
                 return result;
 
-            if (input.IsEmpty)
+            if (input.IsEmpty || _copier is null)
                 return input;
+
+            // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
+            // Mitigate that by returning a shallow-copy in such a case.
+            context.RecordCopy(input, input);
 
             var items = new List<T>();
             foreach (var item in input)
                 items.Add(_copier.DeepCopy(item, context));
 
-            return ImmutableStack.CreateRange(items);
+            var res = ImmutableStack.CreateRange(items);
+            context.RecordCopy(input, res);
+            return res;
         }
     }
 }
