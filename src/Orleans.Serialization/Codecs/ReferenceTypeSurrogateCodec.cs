@@ -1,11 +1,9 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -16,7 +14,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TSurrogate">The surrogate type serialized in place of <typeparamref name="TField"/>.</typeparam>
     public abstract class ReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField> where TSurrogate : struct
     {
-        private static readonly Type CodecFieldType = typeof(TField);
+        private readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
 
         /// <summary>
@@ -49,13 +47,7 @@ namespace Orleans.Serialization.Codecs
 
             // The type is a descendant, not an exact match, so get the specific serializer for it.
             var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer != null)
-            {
-                return (TField)specificSerializer.ReadValue(ref reader, field);
-            }
-
-            ThrowSerializerNotFoundException(fieldType);
-            return default;
+            return (TField)specificSerializer.ReadValue(ref reader, field);
         }
 
         /// <inheritdoc/>
@@ -77,21 +69,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value, fieldType);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void SerializeUnexpectedType<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value, Type fieldType) where TBufferWriter : IBufferWriter<byte>
-        {
-            var specificSerializer = writer.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer != null)
-            {
-                specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
-            }
-            else
-            {
-                ThrowSerializerNotFoundException(fieldType);
+                OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
             }
         }
 
@@ -108,8 +86,5 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         /// <param name="surrogate">The surrogate.</param>
         public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate); 
-
-        [DoesNotReturn]
-        private static void ThrowSerializerNotFoundException(Type type) => throw new KeyNotFoundException($"Could not find a serializer of type {type}.");
     }
 }

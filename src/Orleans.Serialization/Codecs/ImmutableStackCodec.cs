@@ -21,12 +21,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ImmutableStack<T> ConvertFromSurrogate(ref ImmutableStackSurrogate<T> surrogate)
-            => surrogate.Values is { } v ? ImmutableStack.CreateRange(v) : null;
+        public override ImmutableStack<T> ConvertFromSurrogate(ref ImmutableStackSurrogate<T> surrogate) => ImmutableStack.CreateRange(surrogate.Values);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ImmutableStack<T> value, ref ImmutableStackSurrogate<T> surrogate)
-            => surrogate.Values = value is null ? null : new(value);
+        public override void ConvertToSurrogate(ImmutableStack<T> value, ref ImmutableStackSurrogate<T> surrogate) => surrogate.Values = new(value);
     }
 
     /// <summary>
@@ -41,7 +39,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
     }
 
     /// <summary>

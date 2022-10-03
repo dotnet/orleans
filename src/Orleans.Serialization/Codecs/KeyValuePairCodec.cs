@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -17,8 +18,8 @@ namespace Orleans.Serialization.Codecs
     {
         private readonly IFieldCodec<TKey> _keyCodec;
         private readonly IFieldCodec<TValue> _valueCodec;
-        private static readonly Type CodecKeyType = typeof(TKey);
-        private static readonly Type CodecValueType = typeof(TValue);
+        private readonly Type CodecKeyType = typeof(TKey);
+        private readonly Type CodecValueType = typeof(TValue);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyValuePairCodec{TKey, TValue}"/> class.
@@ -32,10 +33,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<KeyValuePair<TKey, TValue>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
-            KeyValuePair<TKey, TValue> value)
+            KeyValuePair<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);

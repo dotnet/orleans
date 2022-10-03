@@ -22,43 +22,25 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public override NameValueCollection ConvertFromSurrogate(ref NameValueCollectionSurrogate surrogate)
         {
-            if (surrogate.Values is null)
+            var result = new NameValueCollection(surrogate.Values.Count);
+            foreach (var value in surrogate.Values)
             {
-                return null;
+                result.Add(value.Key, value.Value);
             }
-            else
-            {
-                var result = new NameValueCollection(surrogate.Values.Count);
-                foreach (var value in surrogate.Values)
-                {
-                    result.Add(value.Key, value.Value);
-                }
 
-                return result;
-            }
+            return result;
         }
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(NameValueCollection value, ref NameValueCollectionSurrogate surrogate)
         {
-            if (value is null)
+            var result = new Dictionary<string, string>(value.Count);
+            for (var i = 0; i < value.Count; i++)
             {
-                surrogate = default;
-                return;
+                result.Add(value.GetKey(i), value.Get(i));
             }
-            else
-            {
-                var result = new Dictionary<string, string>(value.Count);
-                for (var i = 0; i < value.Count; i++)
-                {
-                    result.Add(value.GetKey(i), value.Get(i));
-                }
 
-                surrogate = new NameValueCollectionSurrogate
-                {
-                    Values = result 
-                };
-            }
+            surrogate.Values = result;
         }
     }
 
@@ -73,7 +55,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public Dictionary<string, string> Values { get; set; }
+        public Dictionary<string, string> Values;
     }
 
     /// <summary>

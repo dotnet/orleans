@@ -1,7 +1,6 @@
+using System;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
-using System;
-using System.ComponentModel;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -11,8 +10,6 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UriCodec : GeneralizedReferenceTypeSurrogateCodec<Uri, UriSurrogate>
     {
-        private readonly TypeConverter _uriConverter = TypeDescriptor.GetConverter(typeof(Uri));
-
         /// <summary>
         /// Initializes a new instance of the <see cref="UriCodec"/> class.
         /// </summary>
@@ -22,21 +19,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public override Uri ConvertFromSurrogate(ref UriSurrogate surrogate) => surrogate.Value switch
-        {
-            null => null,
-            _ => (Uri)_uriConverter.ConvertFromInvariantString(surrogate.Value)
-        };
+        public override Uri ConvertFromSurrogate(ref UriSurrogate surrogate) => new(surrogate.Value, UriKind.RelativeOrAbsolute);
 
         /// <inheritdoc />
-        public override void ConvertToSurrogate(Uri value, ref UriSurrogate surrogate) => surrogate = value switch
-        {
-            null => default,
-            _ => new UriSurrogate
-            {
-                Value = _uriConverter.ConvertToInvariantString(value)
-            },
-        };
+        public override void ConvertToSurrogate(Uri value, ref UriSurrogate surrogate) => surrogate.Value = value.OriginalString;
     }
 
     /// <summary>
@@ -50,7 +36,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The value.</value>
         [Id(1)]
-        public string Value { get; set; }
+        public string Value;
     }
 
     /// <summary>

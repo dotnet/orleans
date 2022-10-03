@@ -22,16 +22,13 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableSortedSet<T> ConvertFromSurrogate(ref ImmutableSortedSetSurrogate<T> surrogate)
-            => surrogate.Values is null ? null : ImmutableSortedSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
+            => ImmutableSortedSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableSortedSet<T> value, ref ImmutableSortedSetSurrogate<T> surrogate)
         {
-            if (value != null)
-            {
-                surrogate.Values = new(value);
-                surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
-            }
+            surrogate.Values = new(value);
+            surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
         }
     }
 
@@ -47,14 +44,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(2)]
-        public IComparer<T> KeyComparer { get; set; }
+        public IComparer<T> KeyComparer;
     }
 
     /// <summary>

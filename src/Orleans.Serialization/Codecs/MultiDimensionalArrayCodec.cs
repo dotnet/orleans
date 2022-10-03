@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -14,7 +15,7 @@ namespace Orleans.Serialization.Codecs
     internal sealed class MultiDimensionalArrayCodec<T> : IGeneralizedCodec
     {
         private static readonly Type DimensionFieldType = typeof(int[]);
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<int[]> _intArrayCodec;
         private readonly IFieldCodec<T> _elementCodec;
@@ -31,7 +32,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -83,7 +84,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {
@@ -182,7 +183,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        object IDeepCopier<object>.DeepCopy(object original, CopyContext context)
+        public object DeepCopy(object original, CopyContext context)
         {
             if (context.TryGetCopy<Array>(original, out var result))
             {

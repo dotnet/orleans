@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ArrayCodec<T> : IFieldCodec<T[]>
     {
         private readonly IFieldCodec<T> _fieldCodec;
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ArrayCodec{T}"/> class.
@@ -166,7 +166,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ReadOnlyMemoryCodec<T> : IFieldCodec<ReadOnlyMemory<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class MemoryCodec<T> : IFieldCodec<Memory<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
         /// <summary>
@@ -480,7 +480,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ArraySegmentCodec<T> : IFieldCodec<ArraySegment<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
         /// <summary>

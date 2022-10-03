@@ -21,34 +21,10 @@ namespace Orleans.Serialization.Codecs
         }
         
         /// <inheritdoc/>
-        public override ConcurrentQueue<T> ConvertFromSurrogate(ref ConcurrentQueueSurrogate<T> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                return new ConcurrentQueue<T>(surrogate.Values);
-            }
-        }
+        public override ConcurrentQueue<T> ConvertFromSurrogate(ref ConcurrentQueueSurrogate<T> surrogate) => new(surrogate.Values);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ConcurrentQueue<T> value, ref ConcurrentQueueSurrogate<T> surrogate)
-        {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ConcurrentQueueSurrogate<T>
-                {
-                    Values = new Queue<T>(value)
-                };
-            }
-        }
+        public override void ConvertToSurrogate(ConcurrentQueue<T> value, ref ConcurrentQueueSurrogate<T> surrogate) => surrogate.Values = new(value);
     }
 
     /// <summary>
@@ -63,7 +39,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public Queue<T> Values { get; set; }
+        public Queue<T> Values;
     }
 
     /// <summary>

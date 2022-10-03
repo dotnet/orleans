@@ -41,8 +41,13 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public override void ConvertToSurrogate(Version value, ref VersionSurrogate surrogate) => 
-            surrogate = new VersionSurrogate { Major = value.Major, Minor = value.Minor, Build = value.Build, Revision = value.Revision };
+        public override void ConvertToSurrogate(Version value, ref VersionSurrogate surrogate)
+        {
+            surrogate.Major = value.Major;
+            surrogate.Minor = value.Minor;
+            surrogate.Build = value.Build;
+            surrogate.Revision = value.Revision;
+        }
     }
 
     /// <summary>
@@ -56,28 +61,28 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The major version component.</value>
         [Id(0)]
-        public int Major { get; set; }
+        public int Major;
 
         /// <summary>
         /// Gets or sets the minor version component.
         /// </summary>
         /// <value>The minor version component.</value>
         [Id(1)]
-        public int Minor { get; set; }
+        public int Minor;
 
         /// <summary>
         /// Gets or sets the build number.
         /// </summary>
         /// <value>The build number.</value>
         [Id(2)]
-        public int Build { get; set; }
+        public int Build;
 
         /// <summary>
         /// Gets or sets the revision.
         /// </summary>
         /// <value>The revision.</value>
         [Id(3)]
-        public int Revision { get; set; }
+        public int Revision;
     }
 
     /// <summary>

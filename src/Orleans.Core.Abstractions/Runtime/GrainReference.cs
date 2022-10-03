@@ -109,11 +109,8 @@ namespace Orleans.Runtime
         public override void ConvertToSurrogate(IAddressable value, ref GrainReferenceSurrogate surrogate)
         {
             var refValue = value.AsReference();
-            surrogate = new GrainReferenceSurrogate
-            {
-                GrainId = refValue.GrainId,
-                GrainInterfaceType = refValue.InterfaceType
-            };
+            surrogate.GrainId = refValue.GrainId;
+            surrogate.GrainInterfaceType = refValue.InterfaceType;
         }
     }
 
@@ -227,11 +224,8 @@ namespace Orleans.Runtime
                 refValue = (GrainReference)(object)value.AsReference<T>();
             }
 
-            surrogate = new GrainReferenceSurrogate
-            {
-                GrainId = refValue.GrainId,
-                GrainInterfaceType = refValue.InterfaceType
-            };
+            surrogate.GrainId = refValue.GrainId;
+            surrogate.GrainInterfaceType = refValue.InterfaceType;
         }
     }
 

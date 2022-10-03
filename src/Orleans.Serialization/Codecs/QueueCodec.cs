@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -17,7 +18,7 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// The codec element type
         /// </summary>
-        public static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
         /// <summary>
@@ -30,7 +31,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<Queue<T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Queue<T> value)
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Queue<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -51,7 +52,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        Queue<T> IFieldCodec<Queue<T>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        public Queue<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {

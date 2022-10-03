@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<T> _fieldCodec;
 

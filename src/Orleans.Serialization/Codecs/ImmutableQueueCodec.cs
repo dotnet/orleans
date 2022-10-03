@@ -21,12 +21,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ImmutableQueue<T> ConvertFromSurrogate(ref ImmutableQueueSurrogate<T> surrogate)
-            => surrogate.Values is { } v ? ImmutableQueue.CreateRange(v) : null;
+        public override ImmutableQueue<T> ConvertFromSurrogate(ref ImmutableQueueSurrogate<T> surrogate) => ImmutableQueue.CreateRange(surrogate.Values);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ImmutableQueue<T> value, ref ImmutableQueueSurrogate<T> surrogate)
-            => surrogate.Values = value is null ? null : new(value);
+        public override void ConvertToSurrogate(ImmutableQueue<T> value, ref ImmutableQueueSurrogate<T> surrogate) => surrogate.Values = new(value);
     }
 
     /// <summary>
@@ -41,7 +39,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
     }
 
     /// <summary>

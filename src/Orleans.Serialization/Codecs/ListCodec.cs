@@ -17,7 +17,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ListCodec<T> : IFieldCodec<List<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly ListActivator<T> _activator;

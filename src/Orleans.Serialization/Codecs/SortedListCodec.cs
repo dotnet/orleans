@@ -29,16 +29,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                SortedList<TKey, TValue> result;
-                if (surrogate.Comparer is object)
-                {
-                    result = new SortedList<TKey, TValue>(surrogate.Comparer);
-                }
-                else
-                {
-                    result = new SortedList<TKey, TValue>();
-                }
-
+                var result = new SortedList<TKey, TValue>(surrogate.Comparer);
                 foreach (var kvp in surrogate.Values)
                 {
                     result.Add(kvp.Key, kvp.Value);
@@ -51,23 +42,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public override void ConvertToSurrogate(SortedList<TKey, TValue> value, ref SortedListSurrogate<TKey, TValue> surrogate)
         {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new SortedListSurrogate<TKey, TValue>
-                {
-                    Values = new List<KeyValuePair<TKey, TValue>>(value)
-                };
-
-                if (!ReferenceEquals(value.Comparer, Comparer<TKey>.Default))
-                {
-                    surrogate.Comparer = value.Comparer;
-                }
-            }
+            surrogate.Values = new(value);
+            surrogate.Comparer = value.Comparer == Comparer<TKey>.Default ? null : value.Comparer;
         }
     }
 
@@ -84,14 +60,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<KeyValuePair<TKey, TValue>> Values { get; set; }
+        public List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(2)]
-        public IComparer<TKey> Comparer { get; set; }
+        public IComparer<TKey> Comparer;
     }
 
     /// <summary>

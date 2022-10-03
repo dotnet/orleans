@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class HashSetCodec<T> : IFieldCodec<HashSet<T>>
     {
-        private static readonly Type CodecElementType = typeof(T);
+        private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly IFieldCodec<IEqualityComparer<T>> _comparerCodec;

@@ -23,17 +23,14 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableSortedDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableSortedDictionarySurrogate<TKey, TValue> surrogate)
-            => surrogate.Values is null ? null : ImmutableSortedDictionary.CreateRange(surrogate.KeyComparer, surrogate.ValueComparer, surrogate.Values);
+            => ImmutableSortedDictionary.CreateRange(surrogate.KeyComparer, surrogate.ValueComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableSortedDictionary<TKey, TValue> value, ref ImmutableSortedDictionarySurrogate<TKey, TValue> surrogate)
         {
-            if (value != null)
-            {
-                surrogate.Values = new(value);
-                surrogate.KeyComparer = value.KeyComparer != Comparer<TKey>.Default ? value.KeyComparer : null;
-                surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TKey>.Default ? value.ValueComparer : null;
-            }
+            surrogate.Values = new(value);
+            surrogate.KeyComparer = value.KeyComparer != Comparer<TKey>.Default ? value.KeyComparer : null;
+            surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TKey>.Default ? value.ValueComparer : null;
         }
     }
 
@@ -50,16 +47,16 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<KeyValuePair<TKey, TValue>> Values { get; set; }
+        public List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(2)]
-        public IComparer<TKey> KeyComparer { get; set; }
+        public IComparer<TKey> KeyComparer;
         [Id(3)]
-        public IEqualityComparer<TValue> ValueComparer { get; set; }
+        public IEqualityComparer<TValue> ValueComparer;
     }
 
     /// <summary>

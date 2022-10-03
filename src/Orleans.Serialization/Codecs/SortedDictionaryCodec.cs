@@ -23,51 +23,20 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public override SortedDictionary<TKey, TValue> ConvertFromSurrogate(ref SortedDictionarySurrogate<TKey, TValue> surrogate)
         {
-            if (surrogate.Values is null)
+            var result = new SortedDictionary<TKey, TValue>(surrogate.Comparer);
+            foreach (var kvp in surrogate.Values)
             {
-                return null;
+                result.Add(kvp.Key, kvp.Value);
             }
-            else
-            {
-                SortedDictionary<TKey, TValue> result;
-                if (surrogate.Comparer is object)
-                {
-                    result = new SortedDictionary<TKey, TValue>(surrogate.Comparer);
-                }
-                else
-                {
-                    result = new SortedDictionary<TKey, TValue>();
-                }
 
-                foreach (var kvp in surrogate.Values)
-                {
-                    result.Add(kvp.Key, kvp.Value);
-                }
-
-                return result;
-            }
+            return result;
         }
 
         /// <inheritdoc />
         public override void ConvertToSurrogate(SortedDictionary<TKey, TValue> value, ref SortedDictionarySurrogate<TKey, TValue> surrogate)
         {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new SortedDictionarySurrogate<TKey, TValue>
-                {
-                    Values = new List<KeyValuePair<TKey, TValue>>(value)
-                };
-
-                if (!ReferenceEquals(value.Comparer, Comparer<TKey>.Default))
-                {
-                    surrogate.Comparer = value.Comparer;
-                }
-            }
+            surrogate.Values = new(value);
+            surrogate.Comparer = value.Comparer == Comparer<TKey>.Default ? null : value.Comparer;
         }
     }
 
@@ -84,14 +53,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<KeyValuePair<TKey, TValue>> Values { get; set; }
+        public List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(2)]
-        public IComparer<TKey> Comparer { get; set; }
+        public IComparer<TKey> Comparer;
     }
 
     /// <summary>

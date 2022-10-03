@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,40 +12,16 @@ namespace Orleans.Serialization.Codecs
         {
         }
 
-        public override ReadOnlyDictionary<TKey, TValue> ConvertFromSurrogate(ref ReadOnlyDictionarySurrogate<TKey, TValue> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                return new ReadOnlyDictionary<TKey, TValue>(surrogate.Values);
-            }
-        }
+        public override ReadOnlyDictionary<TKey, TValue> ConvertFromSurrogate(ref ReadOnlyDictionarySurrogate<TKey, TValue> surrogate) => new(surrogate.Values);
 
-        public override void ConvertToSurrogate(ReadOnlyDictionary<TKey, TValue> value, ref ReadOnlyDictionarySurrogate<TKey, TValue> surrogate)
-        {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ReadOnlyDictionarySurrogate<TKey, TValue>
-                {
-                    Values = new Dictionary<TKey, TValue>(value)
-                };
-            }
-        }
+        public override void ConvertToSurrogate(ReadOnlyDictionary<TKey, TValue> value, ref ReadOnlyDictionarySurrogate<TKey, TValue> surrogate) => surrogate.Values = new(value);
     }
 
     [GenerateSerializer]
     public struct ReadOnlyDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public Dictionary<TKey, TValue> Values { get; set; }
+        public Dictionary<TKey, TValue> Values;
     }
 
     [RegisterCopier]

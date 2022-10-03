@@ -17,7 +17,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class DictionaryCodec<TKey, TValue> : IFieldCodec<Dictionary<TKey, TValue>>
     {
-        private static readonly Type CodecFieldType = typeof(KeyValuePair<TKey, TValue>);
+        private readonly Type CodecFieldType = typeof(KeyValuePair<TKey, TValue>);
 
         private readonly IFieldCodec<KeyValuePair<TKey, TValue>> _pairCodec;
         private readonly IFieldCodec<IEqualityComparer<TKey>> _comparerCodec;
