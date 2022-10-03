@@ -241,6 +241,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create<string>(string.Empty),
             Tuple.Create<string>("foobar")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple2Tests : FieldCodecTester<Tuple<string, string>, TupleCodec<string, string>>
@@ -269,6 +271,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create<string, string>("foo", "bar"),
             Tuple.Create<string, string>("foo", "foo"),
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple3Tests : FieldCodecTester<Tuple<string, string, string>, TupleCodec<string, string, string>>
@@ -303,6 +307,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create("foo", "bar", "baz"),
             Tuple.Create("foo", "foo", "foo")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple4Tests : FieldCodecTester<Tuple<string, string, string, string>, TupleCodec<string, string, string, string>>
@@ -339,6 +345,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create("foo", "bar", "baz", "4"),
             Tuple.Create("foo", "foo", "foo", "foo")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple5Tests : FieldCodecTester<Tuple<string, string, string, string, string>, TupleCodec<string, string, string, string, string>>
@@ -377,6 +385,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create("foo", "bar", "baz", "4", "5"),
             Tuple.Create("foo", "foo", "foo", "foo", "foo")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple6Tests : FieldCodecTester<Tuple<string, string,string, string, string, string>, TupleCodec<string, string, string, string, string, string>>
@@ -417,6 +427,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create("foo", "bar", "baz", "4", "5", "6"),
             Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple7Tests : FieldCodecTester<Tuple<string, string, string, string, string, string, string>, TupleCodec<string, string, string, string, string, string, string>>
@@ -459,6 +471,8 @@ namespace Orleans.Serialization.UnitTests
             Tuple.Create("foo", "bar", "baz", "4", "5", "6", "7"),
             Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo", "foo")
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class Tuple8Tests : FieldCodecTester<Tuple<string, string, string, string, string, string, string, Tuple<string>>, TupleCodec<string, string, string, string, string, string, string, Tuple<string>>>
@@ -503,6 +517,8 @@ namespace Orleans.Serialization.UnitTests
             new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "bar", "baz", "4", "5", "6", "7", Tuple.Create("8")),
             new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", Tuple.Create("foo"))
         };
+
+        protected override bool IsImmutable => true;
     }
 
     public class ValueTuple1Tests : FieldCodecTester<ValueTuple<string>, ValueTupleCodec<string>>
