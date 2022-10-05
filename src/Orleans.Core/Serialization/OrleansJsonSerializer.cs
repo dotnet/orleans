@@ -9,6 +9,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+    using Microsoft.Extensions.Options;
     using Orleans.Providers;
 
     public class OrleansJsonSerializer : IExternalSerializer
@@ -16,15 +17,23 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
+        private readonly OrleansJsonSerializerOptions jsonSerializerOptions;
         private readonly Lazy<JsonSerializerSettings> settings;
 
-        public OrleansJsonSerializer(IServiceProvider services)
+        public OrleansJsonSerializer(
+            IServiceProvider services,
+            IOptions<OrleansJsonSerializerOptions> jsonSerializerOptions)
         {
+            this.jsonSerializerOptions = jsonSerializerOptions.Value;
+
             this.settings = new Lazy<JsonSerializerSettings>(() =>
             {
                 var typeResolver = services.GetRequiredService<ITypeResolver>();
                 var grainFactory = services.GetRequiredService<IGrainFactory>();
-                return GetDefaultSerializerSettings(typeResolver, grainFactory);
+                JsonSerializerSettings settings = GetDefaultSerializerSettings(typeResolver, grainFactory);
+
+                this.jsonSerializerOptions.ConfigureSerializer(settings);
+                return settings;
             });
         }
 
