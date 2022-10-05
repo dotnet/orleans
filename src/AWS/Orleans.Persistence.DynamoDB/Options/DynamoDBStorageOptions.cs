@@ -2,10 +2,11 @@ using System;
 using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBStorageOptions : DynamoDBClientOptions
+    public class DynamoDBStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
@@ -54,17 +55,12 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        public bool UseJson { get; set; }
-        public bool UseFullAssemblyNames { get; set; }
-        public bool IndentJson { get; set; }
-        public TypeNameHandling? TypeNameHandling { get; set; }
-
         /// <summary>
         /// Specifies a time span in which the item would be expired in the future
         /// every StateWrite will increase the TTL of the grain
         /// </summary>
         public TimeSpan? TimeToLive { get; set; }
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
 
     /// <summary>

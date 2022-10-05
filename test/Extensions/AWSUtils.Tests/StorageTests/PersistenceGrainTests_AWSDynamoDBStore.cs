@@ -184,6 +184,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             var options = new DynamoDBStorageOptions();
             options.Service = AWSTestConstants.DynamoDbService;
+            options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<OrleansGrainStorageSerializer>(runtime.ServiceProvider);
 
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, "PersistenceGrainTests", options);
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
