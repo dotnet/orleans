@@ -1,4 +1,5 @@
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -22,44 +23,13 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableHashSet<T> ConvertFromSurrogate(ref ImmutableHashSetSurrogate<T> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                if (surrogate.KeyComparer is object)
-                {
-                    return ImmutableHashSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
-                }
-                else
-                {
-                    return ImmutableHashSet.CreateRange(surrogate.Values);
-                }
-            }
-        }
+            => ImmutableHashSet.CreateRange(surrogate.KeyComparer, surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableHashSet<T> value, ref ImmutableHashSetSurrogate<T> surrogate)
         {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ImmutableHashSetSurrogate<T>
-                {
-                    Values = new List<T>(value)
-                };
-
-                if (!ReferenceEquals(value.KeyComparer, EqualityComparer<T>.Default))
-                {
-                    surrogate.KeyComparer = value.KeyComparer;
-                }
-            }
+            surrogate.Values = new(value);
+            surrogate.KeyComparer = value.KeyComparer != EqualityComparer<T>.Default ? value.KeyComparer : null;
         }
     }
 
@@ -75,14 +45,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(2)]
-        public IEqualityComparer<T> KeyComparer { get; set; }
+        public IEqualityComparer<T> KeyComparer;
     }
 
     /// <summary>
@@ -90,9 +60,34 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableHashSetCopier<T> : IDeepCopier<ImmutableHashSet<T>>
+    public sealed class ImmutableHashSetCopier<T> : IDeepCopier<ImmutableHashSet<T>>, IOptionalDeepCopier
     {
+        private readonly IDeepCopier<T> _copier;
+
+        public ImmutableHashSetCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+
+        public bool IsShallowCopyable() => _copier is null;
+
         /// <inheritdoc/>
-        public ImmutableHashSet<T> DeepCopy(ImmutableHashSet<T> input, CopyContext context) => input;
+        public ImmutableHashSet<T> DeepCopy(ImmutableHashSet<T> input, CopyContext context)
+        {
+            if (context.TryGetCopy<ImmutableHashSet<T>>(input, out var result))
+                return result;
+
+            if (input.IsEmpty || _copier is null)
+                return input;
+
+            // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
+            // Mitigate that by returning a shallow-copy in such a case.
+            context.RecordCopy(input, input);
+
+            var items = new List<T>(input.Count);
+            foreach (var item in input)
+                items.Add(_copier.DeepCopy(item, context));
+
+            var res = ImmutableHashSet.CreateRange(input.KeyComparer, items);
+            context.RecordCopy(input, res);
+            return res;
+        }
     }
 }

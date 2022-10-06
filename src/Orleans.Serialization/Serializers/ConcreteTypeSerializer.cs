@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Serializers
     /// <typeparam name="TBaseCodec">The partial serializer implementation type.</typeparam>
     public sealed class ConcreteTypeSerializer<TField, TBaseCodec> : IFieldCodec<TField> where TField : class where TBaseCodec : IBaseCodec<TField>
     {
-        private static readonly Type CodecFieldType = typeof(TField);
+        private readonly Type CodecFieldType = typeof(TField);
         private readonly IActivator<TField> _activator;
         private readonly TBaseCodec _serializer;
 

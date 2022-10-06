@@ -109,11 +109,8 @@ namespace Orleans.Runtime
         public override void ConvertToSurrogate(IAddressable value, ref GrainReferenceSurrogate surrogate)
         {
             var refValue = value.AsReference();
-            surrogate = new GrainReferenceSurrogate
-            {
-                GrainId = refValue.GrainId,
-                GrainInterfaceType = refValue.InterfaceType
-            };
+            surrogate.GrainId = refValue.GrainId;
+            surrogate.GrainInterfaceType = refValue.InterfaceType;
         }
     }
 
@@ -121,7 +118,7 @@ namespace Orleans.Runtime
     /// Copier implementation for <see cref="GrainReference"/> and derived classes.
     /// </summary>
     [RegisterCopier]
-    internal class GrainReferenceCopier : IDeepCopier<GrainReference>, IDerivedTypeCopier
+    internal sealed class GrainReferenceCopier : IDeepCopier<GrainReference>, IDerivedTypeCopier, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public GrainReference DeepCopy(GrainReference input, CopyContext context) => input;
@@ -227,11 +224,8 @@ namespace Orleans.Runtime
                 refValue = (GrainReference)(object)value.AsReference<T>();
             }
 
-            surrogate = new GrainReferenceSurrogate
-            {
-                GrainId = refValue.GrainId,
-                GrainInterfaceType = refValue.InterfaceType
-            };
+            surrogate.GrainId = refValue.GrainId;
+            surrogate.GrainInterfaceType = refValue.InterfaceType;
         }
     }
 

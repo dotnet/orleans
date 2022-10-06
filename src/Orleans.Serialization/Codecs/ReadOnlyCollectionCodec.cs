@@ -17,7 +17,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
     }
 
     /// <summary>
@@ -36,28 +36,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ReadOnlyCollection<T> ConvertFromSurrogate(ref ReadOnlyCollectionSurrogate<T> surrogate) => surrogate.Values switch
-        {
-            object => new ReadOnlyCollection<T>(surrogate.Values),
-            _ => null
-        };
+        public override ReadOnlyCollection<T> ConvertFromSurrogate(ref ReadOnlyCollectionSurrogate<T> surrogate) => new(surrogate.Values);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ReadOnlyCollection<T> value, ref ReadOnlyCollectionSurrogate<T> surrogate)
-        {
-            switch (value)
-            {
-                case object:
-                    surrogate = new ReadOnlyCollectionSurrogate<T>
-                    {
-                        Values = new List<T>(value)
-                    };
-                    break;
-                default:
-                    surrogate = default;
-                    break;
-            }
-        }
+        public override void ConvertToSurrogate(ReadOnlyCollection<T> value, ref ReadOnlyCollectionSurrogate<T> surrogate) => surrogate.Values = new(value);
     }
 
     /// <summary>
@@ -90,6 +72,10 @@ namespace Orleans.Serialization.Codecs
             {
                 return context.DeepCopy(input);
             }
+
+            // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
+            // Mitigate that by returning a shallow-copy in such a case.
+            context.RecordCopy(input, input);
 
             var tempResult = new T[input.Count];
             for (var i = 0; i < tempResult.Length; i++)

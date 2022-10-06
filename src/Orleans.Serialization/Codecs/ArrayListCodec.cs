@@ -1,7 +1,6 @@
+using System.Collections;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -20,33 +19,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ArrayList ConvertFromSurrogate(ref ArrayListSurrogate surrogate) => surrogate.Values switch
-        {
-            null => default,
-            object => new ArrayList(surrogate.Values)
-        };
+        public override ArrayList ConvertFromSurrogate(ref ArrayListSurrogate surrogate) => new(surrogate.Values);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ArrayList value, ref ArrayListSurrogate surrogate)
-        {
-            if (value is null)
-            {
-                surrogate = default;
-            }
-            else
-            {
-                var result = new List<object>(value.Count);
-                foreach (var item in value)
-                {
-                    result.Add(item);
-                }
-
-                surrogate = new ArrayListSurrogate
-                {
-                    Values = result
-                };
-            }
-        }
+        public override void ConvertToSurrogate(ArrayList value, ref ArrayListSurrogate surrogate) => surrogate.Values = value.ToArray();
     }
 
     /// <summary>
@@ -60,7 +36,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<object> Values { get; set; }
+        public object[] Values;
     }
 
     /// <summary>

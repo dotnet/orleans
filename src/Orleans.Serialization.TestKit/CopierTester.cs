@@ -84,7 +84,11 @@ namespace Orleans.Serialization.TestKit
             var arrayCopy = arrayCopier.Copy(array);
             Assert.Same(arrayCopy[0], arrayCopy[1]);
 
-            if (!IsImmutable)
+            if (IsImmutable)
+            {
+                Assert.Same(value, arrayCopy[0]);
+            }
+            else
             {
                 Assert.NotSame(value, arrayCopy[0]);
             }

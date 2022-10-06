@@ -91,7 +91,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="IPEndPoint"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class IPEndPointCopier : IDeepCopier<IPEndPoint>
+    public sealed class IPEndPointCopier : IDeepCopier<IPEndPoint>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public IPEndPoint DeepCopy(IPEndPoint input, CopyContext _) => input;
@@ -101,7 +101,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="EndPoint"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class EndPointCopier : IDeepCopier<EndPoint>, IDerivedTypeCopier
+    public sealed class EndPointCopier : IDeepCopier<EndPoint>, IDerivedTypeCopier, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public EndPoint DeepCopy(EndPoint input, CopyContext _) => input;

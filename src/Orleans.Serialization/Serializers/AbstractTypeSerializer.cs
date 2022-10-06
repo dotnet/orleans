@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -13,7 +14,7 @@ namespace Orleans.Serialization.Serializers
     public sealed class AbstractTypeSerializer<TField> : IFieldCodec<TField> where TField : class
     {
         /// <inheritdoc/>
-        void IFieldCodec<TField>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value)
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
         {
             // If the value is null then we will not be able to get its type in order to get a concrete codec for it.
             // Therefore write the null reference and exit.

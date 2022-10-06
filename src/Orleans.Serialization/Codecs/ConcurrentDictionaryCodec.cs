@@ -23,34 +23,11 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ConcurrentDictionary<TKey, TValue> ConvertFromSurrogate(ref ConcurrentDictionarySurrogate<TKey, TValue> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                // Order of the key-value pairs in the return value may not match the order of the key-value pairs in the surrogate
-                return new ConcurrentDictionary<TKey, TValue>(surrogate.Values);
-            }
-        }
+            => new(surrogate.Values, surrogate.Values.Comparer);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ConcurrentDictionary<TKey, TValue> value, ref ConcurrentDictionarySurrogate<TKey, TValue> surrogate)
-        {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new ConcurrentDictionarySurrogate<TKey, TValue>
-                {
-                    Values = new Dictionary<TKey, TValue>(value)
-                };
-            }
-        }
+            => surrogate.Values = new(value, value.Comparer);
     }
 
     /// <summary>
@@ -66,7 +43,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public Dictionary<TKey, TValue> Values { get; set; }
+        public Dictionary<TKey, TValue> Values;
     }
 
     /// <summary>
@@ -104,8 +81,7 @@ namespace Orleans.Serialization.Codecs
                 return context.DeepCopy(input);
             }
 
-            // Note that this cannot propagate the input's key comparer, since it is not exposed from ConcurrentDictionary.
-            result = new ConcurrentDictionary<TKey, TValue>();
+            result = new(input.Comparer);
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {

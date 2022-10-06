@@ -1,9 +1,9 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 
@@ -17,26 +17,27 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class DictionaryCodec<TKey, TValue> : IFieldCodec<Dictionary<TKey, TValue>>
     {
-        private static readonly Type CodecFieldType = typeof(KeyValuePair<TKey, TValue>);
+        private readonly Type _keyFieldType = typeof(TKey);
+        private readonly Type _valueFieldType = typeof(TValue);
 
-        private readonly IFieldCodec<KeyValuePair<TKey, TValue>> _pairCodec;
+        private readonly IFieldCodec<TKey> _keyCodec;
+        private readonly IFieldCodec<TValue> _valueCodec;
         private readonly IFieldCodec<IEqualityComparer<TKey>> _comparerCodec;
-        private readonly DictionaryActivator<TKey, TValue> _activator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DictionaryCodec{TKey, TValue}"/> class.
         /// </summary>
-        /// <param name="pairCodec">The key value pair codec.</param>
+        /// <param name="keyCodec">The key codec.</param>
+        /// <param name="valueCodec">The value codec.</param>
         /// <param name="comparerCodec">The comparer codec.</param>
-        /// <param name="activator">The activator.</param>
         public DictionaryCodec(
-            IFieldCodec<KeyValuePair<TKey, TValue>> pairCodec,
-            IFieldCodec<IEqualityComparer<TKey>> comparerCodec,
-            DictionaryActivator<TKey, TValue> activator)
+            IFieldCodec<TKey> keyCodec,
+            IFieldCodec<TValue> valueCodec,
+            IFieldCodec<IEqualityComparer<TKey>> comparerCodec)
         {
-            _pairCodec = pairCodec;
-            _comparerCodec = comparerCodec;
-            _activator = activator;
+            _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
+            _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
+            _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
         }
 
         /// <inheritdoc/>
@@ -54,13 +55,16 @@ namespace Orleans.Serialization.Codecs
                 _comparerCodec.WriteField(ref writer, 0, typeof(IEqualityComparer<TKey>), value.Comparer);
             }
 
-            Int32Codec.WriteField(ref writer, 1, typeof(int), value.Count);
-
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
+            if (value.Count > 0)
             {
-                _pairCodec.WriteField(ref writer, innerFieldIdDelta, CodecFieldType, element);
-                innerFieldIdDelta = 0;
+                Int32Codec.WriteField(ref writer, 1, typeof(int), value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _keyCodec.WriteField(ref writer, innerFieldIdDelta, _keyFieldType, element.Key);
+                    _valueCodec.WriteField(ref writer, 0, _valueFieldType, element.Value);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -80,7 +84,8 @@ namespace Orleans.Serialization.Codecs
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            int length = 0;
+            TKey key = default;
+            var valueExpected = false;
             Dictionary<TKey, TValue> result = null;
             IEqualityComparer<TKey> comparer = null;
             uint fieldId = 0;
@@ -99,17 +104,28 @@ namespace Orleans.Serialization.Codecs
                         comparer = _comparerCodec.ReadValue(ref reader, header);
                         break;
                     case 1:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        var length = Int32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
                         }
 
+                        result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
                         break;
                     case 2:
-                        result ??= CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
-                        var pair = _pairCodec.ReadValue(ref reader, header);
-                        result.Add(pair.Key, pair.Value);
+                        if (result is null)
+                            ThrowLengthFieldMissing();
+
+                        if (!valueExpected)
+                        {
+                            key = _keyCodec.ReadValue(ref reader, header);
+                            valueExpected = true;
+                        }
+                        else
+                        {
+                            result.Add(key, _valueCodec.ReadValue(ref reader, header));
+                            valueExpected = false;
+                        }
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -117,7 +133,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            result ??= CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
+            result ??= CreateInstance(0, comparer, reader.Session, placeholderReferenceId);
             return result;
         }
 
@@ -133,6 +149,8 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
+
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
     }
 
     /// <summary>

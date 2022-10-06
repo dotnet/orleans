@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Serialization
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>, IDeepCopier<SiloAddress>
+    public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>, IDeepCopier<SiloAddress>, IOptionalDeepCopier
     {
         private static readonly Type _codecFieldType = typeof(SiloAddress);
 

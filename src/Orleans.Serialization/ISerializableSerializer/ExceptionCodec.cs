@@ -466,10 +466,7 @@ namespace Orleans.Serialization
                 surrogate.Data = _baseCodec.GetDataProperty(value);
             }
 
-            if (value.InnerExceptions is { } iexs)
-            {
-                surrogate.InnerExceptions = value.InnerExceptions;
-            }
+            surrogate.InnerExceptions = value.InnerExceptions;
         }
     }
 
@@ -480,18 +477,18 @@ namespace Orleans.Serialization
     public struct AggregateExceptionSurrogate
     {        
         [Id(0)]
-        public string Message { get; set; }
+        public string Message;
 
         [Id(1)]
-        public string StackTrace { get; set; }
+        public string StackTrace;
 
         [Id(2)]
-        public Dictionary<object, object> Data { get; set; }
+        public Dictionary<object, object> Data;
 
         [Id(3)]
-        public int HResult { get; set; }
+        public int HResult;
 
         [Id(4)]
-        public ReadOnlyCollection<Exception> InnerExceptions { get; set; }
+        public ReadOnlyCollection<Exception> InnerExceptions;
     }
 }

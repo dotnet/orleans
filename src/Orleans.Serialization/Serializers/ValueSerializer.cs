@@ -2,6 +2,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
 using System;
+using System.Buffers;
 
 namespace Orleans.Serialization.Serializers
 {
@@ -25,7 +26,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<TField>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value)
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteStartObject(fieldIdDelta, expectedType, CodecFieldType);
@@ -34,7 +35,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        TField IFieldCodec<TField>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
             var value = default(TField);

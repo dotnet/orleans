@@ -20,45 +20,13 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public override SortedSet<T> ConvertFromSurrogate(ref SortedSetSurrogate<T> surrogate)
-        {
-            if (surrogate.Values is null)
-            {
-                return null;
-            }
-            else
-            {
-                if (surrogate.Comparer is object)
-                {
-                    return new SortedSet<T>(surrogate.Values, surrogate.Comparer);
-                }
-                else
-                {
-                    return new SortedSet<T>(surrogate.Values);
-                }
-            }
-        }
+        public override SortedSet<T> ConvertFromSurrogate(ref SortedSetSurrogate<T> surrogate) => new(surrogate.Values, surrogate.Comparer);
 
         /// <inheritdoc />
         public override void ConvertToSurrogate(SortedSet<T> value, ref SortedSetSurrogate<T> surrogate)
         {
-            if (value is null)
-            {
-                surrogate = default;
-                return;
-            }
-            else
-            {
-                surrogate = new SortedSetSurrogate<T>
-                {
-                    Values = new List<T>(value)
-                };
-
-                if (!ReferenceEquals(value.Comparer, Comparer<T>.Default))
-                {
-                    surrogate.Comparer = value.Comparer;
-                }
-            }
+            surrogate.Values = new(value);
+            surrogate.Comparer = value.Comparer == Comparer<T>.Default ? null : value.Comparer;
         }
     }
 
@@ -74,14 +42,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(1)]
-        public List<T> Values { get; set; }
+        public List<T> Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(2)]
-        public IComparer<T> Comparer { get; set; }
+        public IComparer<T> Comparer;
     }
 
     /// <summary>

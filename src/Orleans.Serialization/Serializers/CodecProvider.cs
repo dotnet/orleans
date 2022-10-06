@@ -281,7 +281,7 @@ namespace Orleans.Serialization.Serializers
                             && OpenGenericCodecType.IsAssignableFrom(@interface.GetGenericTypeDefinition()))
                         {
                             // Convert the typed codec provider into a wrapped object codec provider.
-                            return TypedCodecWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()[0], codecType).Invoke(null, new[] { rawCodec }) as IFieldCodec<TField>;
+                            return TypedCodecWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()).Invoke(null, new[] { rawCodec }) as IFieldCodec<TField>;
                         }
                     }
                 }
@@ -418,7 +418,7 @@ namespace Orleans.Serialization.Serializers
                             && OpenGenericCodecType.IsAssignableFrom(@interface.GetGenericTypeDefinition()))
                         {
                             // Convert the typed codec provider into a wrapped object codec provider.
-                            return TypedBaseCodecWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()[0], codecType).Invoke(null, new[] { rawCodec }) as IBaseCodec<TField>;
+                            return TypedBaseCodecWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()).Invoke(null, new[] { rawCodec }) as IBaseCodec<TField>;
                         }
                     }
                 }
@@ -611,7 +611,7 @@ namespace Orleans.Serialization.Serializers
                             && OpenGenericCopierType.IsAssignableFrom(@interface.GetGenericTypeDefinition()))
                         {
                             // Convert the typed copier provider into a wrapped object copier provider.
-                            return TypedCopierWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()[0], copierType).Invoke(null, new[] { rawCopier }) as IDeepCopier<T>;
+                            return TypedCopierWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()).Invoke(null, new[] { rawCopier }) as IDeepCopier<T>;
                         }
                     }
                 }

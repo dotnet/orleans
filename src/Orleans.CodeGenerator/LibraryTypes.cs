@@ -25,6 +25,7 @@ namespace Orleans.CodeGenerator
                 FieldCodec = Type("Orleans.Serialization.Codecs.IFieldCodec"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
+                IOptionalDeepCopier = Type("Orleans.Serialization.Cloning.IOptionalDeepCopier"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
                 CopyContextPool = Type("Orleans.Serialization.Cloning.CopyContextPool"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
@@ -178,25 +179,33 @@ namespace Orleans.CodeGenerator
                     IPAddress = Type("System.Net.IPAddress"),
                     IPEndPoint = Type("System.Net.IPEndPoint"),
                     CancellationToken = Type("System.Threading.CancellationToken"),
-            TupleTypes = new[]
-            {
-                Type("System.Tuple`1"),
-                Type("System.Tuple`2"),
-                Type("System.Tuple`3"),
-                Type("System.Tuple`4"),
-                Type("System.Tuple`5"),
-                Type("System.Tuple`6"),
-                Type("System.Tuple`7"),
-                Type("System.Tuple`8"),
-                Type("System.ValueTuple`1"),
-                Type("System.ValueTuple`2"),
-                Type("System.ValueTuple`3"),
-                Type("System.ValueTuple`4"),
-                Type("System.ValueTuple`5"),
-                Type("System.ValueTuple`6"),
-                Type("System.ValueTuple`7"),
-                Type("System.ValueTuple`8"),
-            },
+                TupleTypes = new[]
+                {
+                    Type("System.Tuple`1"),
+                    Type("System.Tuple`2"),
+                    Type("System.Tuple`3"),
+                    Type("System.Tuple`4"),
+                    Type("System.Tuple`5"),
+                    Type("System.Tuple`6"),
+                    Type("System.Tuple`7"),
+                    Type("System.Tuple`8"),
+                    Type("System.ValueTuple`1"),
+                    Type("System.ValueTuple`2"),
+                    Type("System.ValueTuple`3"),
+                    Type("System.ValueTuple`4"),
+                    Type("System.ValueTuple`5"),
+                    Type("System.ValueTuple`6"),
+                    Type("System.ValueTuple`7"),
+                    Type("System.ValueTuple`8"),
+                    Type("System.Collections.Immutable.ImmutableArray`1"),
+                    Type("System.Collections.Immutable.ImmutableDictionary`2"),
+                    Type("System.Collections.Immutable.ImmutableHashSet`1"),
+                    Type("System.Collections.Immutable.ImmutableList`1"),
+                    Type("System.Collections.Immutable.ImmutableQueue`1"),
+                    Type("System.Collections.Immutable.ImmutableSortedDictionary`2"),
+                    Type("System.Collections.Immutable.ImmutableSortedSet`1"),
+                    Type("System.Collections.Immutable.ImmutableStack`1"),
+                },
             };
 
             INamedTypeSymbol Type(string metadataName)
@@ -223,6 +232,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Field { get; private set; }
         public INamedTypeSymbol WireType { get; private set; }
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
+        public INamedTypeSymbol IOptionalDeepCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
         public INamedTypeSymbol FieldCodec { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }

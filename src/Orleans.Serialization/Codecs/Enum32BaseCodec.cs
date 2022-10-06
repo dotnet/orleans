@@ -14,7 +14,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T"></typeparam>
     /// <seealso cref="Orleans.Serialization.Codecs.IFieldCodec{T}" />
     /// <seealso cref="Orleans.Serialization.Cloning.IDeepCopier{T}" />
-    public class Enum32BaseCodec<T> : IFieldCodec<T>, IDeepCopier<T> where T : Enum
+    public abstract class Enum32BaseCodec<T> : IFieldCodec<T>, IDeepCopier<T>, IOptionalDeepCopier where T : Enum
     {
         /// <summary>
         /// The codec field type

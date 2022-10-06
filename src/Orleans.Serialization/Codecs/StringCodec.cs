@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="string"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class StringCodec : TypedCodecBase<string, StringCodec>, IFieldCodec<string>
+    public sealed class StringCodec : TypedCodecBase<string>, IFieldCodec<string>
     {
         /// <summary>
         /// The codec field type
@@ -120,7 +120,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="string"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class StringCopier : IDeepCopier<string>
+    public sealed class StringCopier : IDeepCopier<string>, IOptionalDeepCopier
     {
         /// <summary>
         /// Creates a copy of the provided input.

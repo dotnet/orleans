@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="CompareInfo"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class CompareInfoCopier : IDeepCopier<CompareInfo>, IGeneralizedCopier
+    public sealed class CompareInfoCopier : IDeepCopier<CompareInfo>, IGeneralizedCopier, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public CompareInfo DeepCopy(CompareInfo input, CopyContext context) => input;

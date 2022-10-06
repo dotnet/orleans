@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -26,7 +27,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<T?>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T? value)
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T? value) where TBufferWriter : IBufferWriter<byte>
         {
             // If the value is null, write it as the null reference.
             if (!value.HasValue && ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, null))
@@ -39,7 +40,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        T? IFieldCodec<T?>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        public T? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             // This will only be true if the value is null.
             if (field.WireType == WireType.Reference)
@@ -57,7 +58,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class NullableCopier<T> : IDeepCopier<T?> where T : struct
+    public sealed class NullableCopier<T> : IDeepCopier<T?>, IOptionalDeepCopier where T : struct
     {
         private readonly IDeepCopier<T> _copier;
 
@@ -65,15 +66,14 @@ namespace Orleans.Serialization.Codecs
         /// Initializes a new instance of the <see cref="NullableCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The copier.</param>
-        public NullableCopier(IDeepCopier<T> copier)
-        {
-            _copier = copier;
-        }
+        public NullableCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+
+        public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>
         public T? DeepCopy(T? input, CopyContext context)
         {
-            if (!input.HasValue)
+            if (input is null || _copier is null)
             {
                 return input;
             }

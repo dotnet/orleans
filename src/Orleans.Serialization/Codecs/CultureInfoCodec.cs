@@ -19,18 +19,10 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override CultureInfo ConvertFromSurrogate(ref CultureInfoSurrogate surrogate) => surrogate.Name switch
-        {
-            string name => new CultureInfo(name),
-            null => null
-        };
+        public override CultureInfo ConvertFromSurrogate(ref CultureInfoSurrogate surrogate) => new(surrogate.Name);
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(CultureInfo value, ref CultureInfoSurrogate surrogate) => surrogate = value switch
-        {
-            CultureInfo info => new CultureInfoSurrogate { Name = info.Name },
-            null => default
-        };
+        public override void ConvertToSurrogate(CultureInfo value, ref CultureInfoSurrogate surrogate) => surrogate.Name = value.Name;
     }
 
     /// <summary>
@@ -44,14 +36,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The name.</value>
         [Id(0)]
-        public string Name { get; set; }
+        public string Name;
     }
 
     /// <summary>
     /// Copier for <see cref="CultureInfo"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class CultureInfoCopier : IDeepCopier<CultureInfo>
+    public sealed class CultureInfoCopier : IDeepCopier<CultureInfo>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public CultureInfo DeepCopy(CultureInfo input, CopyContext _) => input;

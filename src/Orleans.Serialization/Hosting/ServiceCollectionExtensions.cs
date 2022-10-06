@@ -50,8 +50,6 @@ namespace Orleans.Serialization
                 services.AddSingleton<IConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
                 services.AddSingleton<TypeResolver, CachedTypeResolver>();
                 services.AddSingleton<TypeConverter>();
-                services.TryAddSingleton(typeof(ListActivator<>));
-                services.TryAddSingleton(typeof(DictionaryActivator<,>));
                 services.TryAddSingleton<CodecProvider>();
                 services.TryAddSingleton<ICodecProvider>(sp => sp.GetRequiredService<CodecProvider>());
                 services.TryAddSingleton<IDeepCopierProvider>(sp => sp.GetRequiredService<CodecProvider>());
@@ -193,7 +191,7 @@ namespace Orleans.Serialization
             public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
         }
 
-        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>
+        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IDeepCopier<T> _copier;
@@ -204,6 +202,8 @@ namespace Orleans.Serialization
             }
 
             public T DeepCopy(T original, CopyContext context) => Value.DeepCopy(original, context);
+
+            public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
         }
