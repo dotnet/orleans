@@ -194,7 +194,8 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal(iteration * 4, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
                 iteration++;
             }
-            Assert.Equal(iteration, TestBlockSize / 2);
+
+            Assert.Equal(TestBlockSize / 2, iteration);
 
             // get index of first stream
             Assert.True(block.TryFindFirstMessage(StreamId.Create(streams[1]), dataAdapter, out streamIndex));
@@ -209,7 +210,8 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal(iteration * 4 + 2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
                 iteration++;
             }
-            Assert.Equal(iteration, TestBlockSize / 2);
+
+            Assert.Equal(TestBlockSize / 2, iteration);
         }
 
         private void AddAndCheck(CachedMessageBlock block, ICacheDataAdapter dataAdapter, int first, int last, int sequenceNumber = 1)

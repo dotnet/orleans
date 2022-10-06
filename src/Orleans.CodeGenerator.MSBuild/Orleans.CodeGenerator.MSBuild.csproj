@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Build" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
@@ -40,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
+    <PackageReference Update="@(PackageReference)" PrivateAssets="all" Publish="true" />
   </ItemGroup>
 
   <Target Name="PostBuildPublish" AfterTargets="Build" DependsOnTargets="ResolveAssemblyReferences;Publish" Inputs="@(PostBuildPublishInputs)" Outputs="$(PublishCacheFile)" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''">

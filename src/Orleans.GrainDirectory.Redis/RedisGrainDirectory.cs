@@ -128,7 +128,6 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.ConnectionFailed += this.LogConnectionFailed;
             this.redis.ErrorMessage += this.LogErrorMessage;
             this.redis.InternalError += this.LogInternalError;
-            this.redis.IncludeDetailInExceptions = true;
 
             this.database = this.redis.GetDatabase();
 
