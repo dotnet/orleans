@@ -3,11 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams.Core;
-using Orleans.Concurrency;
 
 namespace Orleans.Streams
 {
@@ -84,9 +83,9 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out _);
         }
 
-        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            return DeliverMutable(subscriptionId, streamId, item.Value, currentToken, handshakeToken);
+            return DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken);
         }
 
         public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
@@ -128,14 +127,14 @@ namespace Orleans.Streams
             return default(StreamHandshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch.Value, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
             {
-                return await observer.DeliverBatch(batch.Value, handshakeToken);
+                return await observer.DeliverBatch(batch, handshakeToken);
             }
             else if(this.streamSubscriptionObserver != null)
             {
@@ -147,7 +146,7 @@ namespace Orleans.Streams
                     // check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
-                        return await observer.DeliverBatch(batch.Value, handshakeToken);
+                        return await observer.DeliverBatch(batch, handshakeToken);
                     }
                 }
             }

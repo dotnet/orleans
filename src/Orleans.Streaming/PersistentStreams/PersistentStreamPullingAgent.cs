@@ -727,7 +727,7 @@ namespace Orleans.Streams
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), consumerData.LastToken);
+                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, consumerData.LastToken);
             }
             finally
             {

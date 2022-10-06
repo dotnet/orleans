@@ -207,4 +207,18 @@ public class ClassWithEnumTestData
             list = new Immutable<List<int>>(l);
         }
     }
+
+    [GenerateSerializer]
+    public sealed class ClassWithEmbeddedImmutable
+    {
+        [Id(1), Immutable] public IEnumerable<byte> Immutable;
+        [Id(2)] public object Mutable;
+    }
+
+    [GenerateSerializer]
+    public struct StructWithEmbeddedImmutable
+    {
+        [Id(1), Immutable] public byte[] Immutable;
+        [Id(2)] public byte[] Mutable;
+    }
 }

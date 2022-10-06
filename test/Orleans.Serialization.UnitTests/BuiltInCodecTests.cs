@@ -835,6 +835,7 @@ namespace Orleans.Serialization.UnitTests
         protected override object CreateValue() => new();
         protected override bool Equals(object left, object right) => ReferenceEquals(left, right) || typeof(object) == left?.GetType() && typeof(object) == right?.GetType();
         protected override object[] TestValues => new[] { null, new object() };
+        protected override bool IsImmutable => true;
     }
 
     public class ByteArrayCodecTests : FieldCodecTester<byte[], ByteArrayCodec>

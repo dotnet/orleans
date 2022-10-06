@@ -15,20 +15,15 @@ namespace Orleans.Concurrency
     [GenerateSerializer, Immutable]
     public readonly struct Immutable<T>
     {
-        [Id(1)]
-        private readonly T value;
-
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
-        public T Value { get { return value; } }
+        [Id(1)]
+        public readonly T Value;
 
         /// <summary>
         /// Constructor to wrap the specified data object in new Immutable wrapper.
         /// </summary>
         /// <param name="value">Value to be wrapped and marked as immutable.</param>
-        public Immutable(T value)
-        {
-            this.value = value;
-        }
+        public Immutable(T value) => Value = value;
     }
 
     /// <summary>
@@ -43,9 +38,6 @@ namespace Orleans.Concurrency
         /// <param name="value">Value to be wrapped.</param>
         /// <returns>Immutable wrapper around the original object.</returns>
         /// <seealso cref="Immutable{T}"/>"/>
-        public static Immutable<T> AsImmutable<T>(this T value)
-        {
-            return new Immutable<T>(value);
-        }
+        public static Immutable<T> AsImmutable<T>(this T value) => new(value);
     }
 }
