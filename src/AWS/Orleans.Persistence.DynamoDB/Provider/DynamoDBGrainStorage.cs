@@ -26,21 +26,18 @@ namespace Orleans.Storage
     {
         private const int MAX_DATA_SIZE = 400 * 1024;
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
-        private const string STRING_STATE_PROPERTY_NAME = "StringState";
-        private const string BINARY_STATE_PROPERTY_NAME = "BinaryState";
+        private const string BINARY_STATE_PROPERTY_NAME = "GrainState";
         private const string GRAIN_TYPE_PROPERTY_NAME = "GrainType";
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string GRAIN_TTL_PROPERTY_NAME = "GrainTtl";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
 
         private readonly DynamoDBStorageOptions options;
-        private readonly Serializer serializer;
         private readonly ILogger logger;
         private readonly IServiceProvider serviceProvider;
         private readonly string name;
 
         private DynamoDBStorage storage;
-        private JsonSerializerSettings jsonSettings;
 
         /// <summary>
         /// Default Constructor
@@ -48,14 +45,12 @@ namespace Orleans.Storage
         public DynamoDBGrainStorage(
             string name,
             DynamoDBStorageOptions options,
-            Serializer serializer,
             IServiceProvider serviceProvider,
             ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
             this.logger = logger;
             this.options = options;
-            this.serializer = serializer;
             this.serviceProvider = serviceProvider;
         }
 
@@ -73,11 +68,6 @@ namespace Orleans.Storage
             {
                 var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                         this.name, this.options.ServiceId, this.options.TableName, this.options.DeleteStateOnClear);
-
-                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
-                    OrleansJsonSerializer.GetDefaultSerializerSettings(this.serviceProvider),
-                    this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
-                this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
 
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
@@ -153,8 +143,7 @@ namespace Orleans.Storage
                         GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
                         GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
                         ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N),
-                        BinaryState = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B?.ToArray() : null,
-                        StringState = fields.ContainsKey(STRING_STATE_PROPERTY_NAME) ? fields[STRING_STATE_PROPERTY_NAME].S : null
+                        State = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B?.ToArray() : null,
                     };
                 }).ConfigureAwait(false);
 
@@ -211,22 +200,13 @@ namespace Orleans.Storage
                 fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
             }
 
-            if (record.BinaryState != null && record.BinaryState.Length > 0)
+            if (record.State != null && record.State.Length > 0)
             {
-                fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { B = new MemoryStream(record.BinaryState) });
+                fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { B = new MemoryStream(record.State) });
             }
             else
             {
                 fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { NULL = true });
-            }
-
-            if (!string.IsNullOrWhiteSpace(record.StringState))
-            {
-                fields.Add(STRING_STATE_PROPERTY_NAME, new AttributeValue(record.StringState));
-            }
-            else
-            {
-                fields.Add(STRING_STATE_PROPERTY_NAME, new AttributeValue { NULL = true });
             }
 
             int newEtag = 0;
@@ -337,8 +317,7 @@ namespace Orleans.Storage
         {
             public string GrainReference { get; set; } = "";
             public string GrainType { get; set; } = "";
-            public byte[] BinaryState { get; set; }
-            public string StringState { get; set; }
+            public byte[] State { get; set; }
             public int ETag { get; set; }
         }
 
@@ -350,35 +329,15 @@ namespace Orleans.Storage
 
         internal T ConvertFromStorageFormat<T>(GrainStateRecord entity)
         {
-            var binaryData = entity.BinaryState;
-            var stringData = entity.StringState;
-
             T dataValue = default;
             try
             {
-                if (binaryData is { Length: > 0 })
-                {
-                    // Rehydrate
-                    dataValue = this.serializer.Deserialize<T>(binaryData);
-                }
-                else if (!string.IsNullOrEmpty(stringData))
-                {
-                    dataValue = JsonConvert.DeserializeObject<T>(stringData, this.jsonSettings);
-                }
-
-                // Else, no data found
+                dataValue = this.options.GrainStorageSerializer.Deserialize<T>(entity.State);
             }
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                if (binaryData is { Length: > 0 })
-                {
-                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", binaryData);
-                }
-                else if (!string.IsNullOrEmpty(stringData))
-                {
-                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
-                }
+                sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
 
                 if (dataValue != null)
                 {
@@ -396,30 +355,12 @@ namespace Orleans.Storage
         internal void ConvertToStorageFormat(object grainState, GrainStateRecord entity)
         {
             int dataSize;
-            if (this.options.UseJson)
-            {
-                // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-                entity.StringState = JsonConvert.SerializeObject(grainState, this.jsonSettings);
-                entity.BinaryState = null;
-                dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
+            // Convert to binary format
+            entity.State = this.options.GrainStorageSerializer.Serialize(grainState).ToArray();
+            dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.State.Length;
 
-                if (this.logger.IsEnabled(LogLevel.Trace))
-                    this.logger.LogTrace(
-                        "Writing JSON data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
-                        dataSize,
-                        entity.GrainReference,
-                        entity.GrainType);
-            }
-            else
-            {
-                // Convert to binary format
-                entity.BinaryState = this.serializer.SerializeToArray(grainState);
-                entity.StringState = null;
-                dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
-
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
-                    dataSize, entity.GrainReference, entity.GrainType);
-            }
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
+                dataSize, entity.GrainReference, entity.GrainType);
 
             var pkSize = GRAIN_REFERENCE_PROPERTY_NAME.Length + entity.GrainReference.Length;
             var rkSize = GRAIN_TYPE_PROPERTY_NAME.Length + entity.GrainType.Length;

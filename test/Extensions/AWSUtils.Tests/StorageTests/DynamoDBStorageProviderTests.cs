@@ -165,6 +165,7 @@ namespace AWSUtils.Tests.StorageTests
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
+            options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(this.providerRuntime.ServiceProvider);
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, "StorageProviderTests", options);
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
@@ -177,7 +178,6 @@ namespace AWSUtils.Tests.StorageTests
             var options = new DynamoDBStorageOptions
             {
                 Service = AWSTestConstants.DynamoDbService,
-                UseJson = useJson
             };
             return InitDynamoDBGrainStorage(options);
         }
