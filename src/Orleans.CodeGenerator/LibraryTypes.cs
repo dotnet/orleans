@@ -179,7 +179,7 @@ namespace Orleans.CodeGenerator
                     IPAddress = Type("System.Net.IPAddress"),
                     IPEndPoint = Type("System.Net.IPEndPoint"),
                     CancellationToken = Type("System.Threading.CancellationToken"),
-                TupleTypes = new[]
+                ImmutableContainerTypes = new[]
                 {
                     Type("System.Tuple`1"),
                     Type("System.Tuple`2"),
@@ -294,7 +294,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol IPAddress { get; private set; }
         public INamedTypeSymbol IPEndPoint { get; private set; }
         public INamedTypeSymbol CancellationToken { get; private set; }
-        public INamedTypeSymbol[] TupleTypes { get; private set; }
+        public INamedTypeSymbol[] ImmutableContainerTypes { get; private set; }
         public INamedTypeSymbol ValueTuple { get; private set; }
         public List<INamedTypeSymbol> ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
@@ -382,7 +382,7 @@ namespace Orleans.CodeGenerator
                     return _shallowCopyableTypes[type] = IsShallowCopyable(namedType.TypeArguments.Single());
                 }
 
-                foreach (var t in TupleTypes)
+                foreach (var t in ImmutableContainerTypes)
                 {
                     if (SymbolEqualityComparer.Default.Equals(t, def))
                         return _shallowCopyableTypes[type] = namedType.TypeArguments.All(IsShallowCopyable);
