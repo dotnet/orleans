@@ -100,7 +100,7 @@
     <!-- Test related packages -->
     <FluentAssertionsVersion>6.4.0</FluentAssertionsVersion>
     <MoqVersion>4.16.0</MoqVersion>
-    <MicrosoftTestSdkVersion>17.5.0-preview-20221003-04</MicrosoftTestSdkVersion>
+    <MicrosoftTestSdkVersion>17.3.2</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.13.2</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
     <xUnitVersion>2.4.2</xUnitVersion>
