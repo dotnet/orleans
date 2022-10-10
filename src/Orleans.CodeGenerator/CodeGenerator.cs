@@ -465,7 +465,7 @@ namespace Orleans.CodeGenerator
         // Returns descriptions of all data members (fields and properties)
         private IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
         {
-            var members = new Dictionary<(ushort, bool), IMemberDescription>();
+            var members = new Dictionary<(uint, bool), IMemberDescription>();
 
             foreach (var member in fieldIdAssignmentHelper.Members)
             {
@@ -491,9 +491,9 @@ namespace Orleans.CodeGenerator
             return members.Values;
         }
 
-        public ushort? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
+        public uint? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
 
-        internal static ushort? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
+        internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
         {
             var idAttr = memberSymbol.GetAttributes().FirstOrDefault(attr => libraryTypes.IdAttributeTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, attr.AttributeClass)));
             if (idAttr is null)
@@ -501,7 +501,7 @@ namespace Orleans.CodeGenerator
                 return null;
             }
 
-            var id = (ushort)idAttr.ConstructorArguments.First().Value;
+            var id = (uint)idAttr.ConstructorArguments.First().Value;
             return id;
         }
 

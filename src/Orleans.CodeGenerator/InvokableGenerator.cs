@@ -612,7 +612,7 @@ namespace Orleans.CodeGenerator
         {
             var fields = new List<InvokerFieldDescripton>();
 
-            ushort fieldId = 0;
+            uint fieldId = 0;
             foreach (var parameter in method.Method.Parameters)
             {
                 fields.Add(new MethodParameterFieldDescription(method, parameter, $"arg{fieldId}", fieldId));
@@ -649,7 +649,7 @@ namespace Orleans.CodeGenerator
 
         internal sealed class MethodParameterFieldDescription : InvokerFieldDescripton, IMemberDescription
         {
-            public MethodParameterFieldDescription(MethodDescription method, IParameterSymbol parameter, string fieldName, ushort fieldId)
+            public MethodParameterFieldDescription(MethodDescription method, IParameterSymbol parameter, string fieldName, uint fieldId)
                 : base(parameter.Type, fieldName)
             {
                 Method = method;
@@ -672,7 +672,7 @@ namespace Orleans.CodeGenerator
             public ISymbol Symbol { get; }
             public MethodDescription Method { get; }
             public int ParameterOrdinal => Parameter.Ordinal;
-            public ushort FieldId { get; }
+            public uint FieldId { get; }
             public ISymbol Member => Parameter;
             public ITypeSymbol Type => FieldType;
             public INamedTypeSymbol ContainingType => Parameter.ContainingType;

@@ -12,7 +12,7 @@ namespace Orleans.CodeGenerator
 
     internal class PropertyDescription : IPropertyDescription
     {
-        public PropertyDescription(ushort fieldId, bool isPrimaryConstructorParameter, IPropertySymbol property)
+        public PropertyDescription(uint fieldId, bool isPrimaryConstructorParameter, IPropertySymbol property)
         {
             FieldId = fieldId;
             IsPrimaryConstructorParameter = isPrimaryConstructorParameter;
@@ -28,7 +28,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public ushort FieldId { get; }
+        public uint FieldId { get; }
         public ISymbol Symbol => Property;
         public ITypeSymbol Type => Property.Type;
         public INamedTypeSymbol ContainingType => Property.ContainingType;

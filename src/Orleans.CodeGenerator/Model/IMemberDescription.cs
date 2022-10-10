@@ -7,7 +7,7 @@ namespace Orleans.CodeGenerator
 {
     internal interface IMemberDescription
     {
-        ushort FieldId { get; }
+        uint FieldId { get; }
         ISymbol Symbol { get; }
         ITypeSymbol Type { get; }
         INamedTypeSymbol ContainingType { get; }

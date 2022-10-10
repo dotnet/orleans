@@ -267,7 +267,7 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="IdAttribute"/> class.
         /// </summary>
         /// <param name="id">The identifier.</param>
-        public IdAttribute(ushort id)
+        public IdAttribute(uint id)
         {
             Id = id;
         }
@@ -276,7 +276,7 @@ namespace Orleans
         /// Gets the identifier.
         /// </summary>
         /// <value>The identifier.</value>
-        public ushort Id { get; }
+        public uint Id { get; }
     }
 
     /// <summary>
