@@ -1,7 +1,7 @@
 $resourceGroup = "votingapp"
 $location = "westus"
 $clusterName = "votingapp"
-$containerRegistry = "votingapp2acr"
+$containerRegistry = "dncvotingapp"
 
 az login
 
@@ -24,6 +24,6 @@ az acr create --name $containerRegistry --resource-group $resourceGroup --sku St
 $acrId = $(az acr show --name $containerRegistry --query id --output tsv)
 $acrServicePrincipalName = "$($containerRegistry)-aks-service-principal"
 $acrSpPw = $(az ad sp create-for-rbac --name http://$acrServicePrincipalName --scopes $acrId --role acrpull --query password --output tsv)
-$acrSpAppId = $(az ad sp show --id http://$acrServicePrincipalName --query appId --output tsv)
+$acrSpAppId = $(az ad sp list --display-name http://$acrServicePrincipalName --query [].appId --output tsv)
 $acrLoginServer = $(az acr show --name $containerRegistry --resource-group $resourceGroup --query loginServer).Trim('"')
 kubectl create secret docker-registry $containerRegistry --namespace default --docker-server=$acrLoginServer --docker-username=$acrSpAppId --docker-password=$acrSpPw
