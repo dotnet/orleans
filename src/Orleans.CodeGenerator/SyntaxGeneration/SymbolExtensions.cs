@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -16,6 +17,18 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
         private static readonly ConcurrentDictionary<ITypeSymbol, TypeSyntax> TypeCache = new(SymbolEqualityComparer.Default);
         private static readonly ConcurrentDictionary<ISymbol, string> NameCache = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024 // Compare symbols correctly
+
+        public struct DisplayNameOptions
+        {
+            public DisplayNameOptions()
+            {
+                Substitutions = null;
+            }
+
+            public Dictionary<ITypeParameterSymbol, string>? Substitutions { get; set; }
+            public bool IncludeGlobalSpecifier { get; set; } = true;
+            public bool IncludeNamespace { get; set; } = true;
+        }
 
         public static TypeSyntax ToTypeSyntax(this ITypeSymbol typeSymbol)
         {
@@ -45,12 +58,21 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
 
             var res = new StringBuilder();
-            ToTypeSyntaxInner(typeSymbol, substitutions, res);
+            var options = new DisplayNameOptions
+            {
+                Substitutions = substitutions,
+            };
+            ToTypeSyntaxInner(typeSymbol, res, options);
             var result = ParseTypeName(res.ToString());
             return result;
         }
 
-        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, bool includeGlobalSpecifier = true, bool includeNamespace = true)
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string>? substitutions, bool includeGlobalSpecifier = true, bool includeNamespace = true)
+        {
+            return ToDisplayName(typeSymbol, new DisplayNameOptions { Substitutions = substitutions, IncludeGlobalSpecifier = includeGlobalSpecifier, IncludeNamespace = includeNamespace });
+        }
+
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options) 
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
             {
@@ -58,7 +80,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
 
             var result = new StringBuilder();
-            ToTypeSyntaxInner(typeSymbol, substitutions, result, includeGlobalSpecifier, includeNamespace);
+            ToTypeSyntaxInner(typeSymbol, result, options);
             return result.ToString();
         }
 
@@ -92,7 +114,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return result;
         }
 
-        private static void ToTypeSyntaxInner(ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier = true, bool includeNamespace = true)
+        private static void ToTypeSyntaxInner(ITypeSymbol typeSymbol, StringBuilder res, DisplayNameOptions options)
         {
             switch (typeSymbol)
             {
@@ -100,7 +122,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     res.Append("dynamic");
                     break;
                 case IArrayTypeSymbol a:
-                    ToTypeSyntaxInner(a.ElementType, substitutions, res, includeGlobalSpecifier, includeNamespace);
+                    ToTypeSyntaxInner(a.ElementType, res, options);
                     res.Append('[');
                     if (a.Rank > 1)
                     {
@@ -110,7 +132,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     res.Append(']');
                     break;
                 case ITypeParameterSymbol tp:
-                    if (substitutions.TryGetValue(tp, out var sub))
+                    if (options.Substitutions is { } substitutions && substitutions.TryGetValue(tp, out var sub))
                     {
                         res.Append(sub);
                     }
@@ -120,21 +142,21 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     }
                     break;
                 case INamedTypeSymbol n:
-                    OnNamedTypeSymbol(n, substitutions, res, includeGlobalSpecifier, includeNamespace);
+                    OnNamedTypeSymbol(n, res, options);
                     break;
                 default:
                     throw new NotSupportedException($"Symbols of type {typeSymbol?.GetType().ToString() ?? "null"} are not supported");
             }
 
-            static void OnNamedTypeSymbol(INamedTypeSymbol symbol, Dictionary<ITypeParameterSymbol, string> substitutions, StringBuilder res, bool includeGlobalSpecifier, bool includeNamespace)
+            static void OnNamedTypeSymbol(INamedTypeSymbol symbol, StringBuilder res, DisplayNameOptions options)
             {
                 switch (symbol.ContainingSymbol)
                 {
-                    case INamespaceSymbol ns when includeNamespace:
-                        AddFullNamespace(ns, res, includeGlobalSpecifier);
+                    case INamespaceSymbol ns when options.IncludeNamespace:
+                        AddFullNamespace(ns, res, options.IncludeGlobalSpecifier);
                         break;
                     case INamedTypeSymbol containingType:
-                        OnNamedTypeSymbol(containingType, substitutions, res, includeGlobalSpecifier, includeNamespace);
+                        OnNamedTypeSymbol(containingType, res, options);
                         res.Append('.');
                         break;
                 }
@@ -151,7 +173,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                             res.Append(',');
                         }
 
-                        ToTypeSyntaxInner(typeParameter, substitutions, res, includeGlobalSpecifier, includeNamespace);
+                        ToTypeSyntaxInner(typeParameter, res, options);
                         first = false;
                     }
                     res.Append('>');
@@ -194,8 +216,8 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                 case GenericNameSyntax g:
                     return WithGenericParameters(g);
                 default:
-                    ThrowInvalidOperationException();
-                    return default;
+                    throw new InvalidOperationException(
+                        $"Attempted to add generic parameters to non-generic type {displayString} ({nameSyntax.GetType()}, adding parameters {string.Join(", ", genericParameters.Select(n => n.ToFullString()))}");
             }
 
             SimpleNameSyntax WithGenericParameters(SimpleNameSyntax simpleNameSyntax)
@@ -205,12 +227,6 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     return generic.WithTypeArgumentList(TypeArgumentList(SeparatedList(genericParameters)));
                 }
 
-                ThrowInvalidOperationException();
-                return default;
-            }
-
-            void ThrowInvalidOperationException()
-            {
                 throw new InvalidOperationException(
                     $"Attempted to add generic parameters to non-generic type {displayString} ({nameSyntax.GetType()}, adding parameters {string.Join(", ", genericParameters.Select(n => n.ToFullString()))}");
             }
@@ -254,9 +270,10 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
         public static bool HasBaseType(this ITypeSymbol typeSymbol, INamedTypeSymbol baseType)
         {
-            for (; typeSymbol != null; typeSymbol = typeSymbol.BaseType)
+            var current = typeSymbol;
+            for (; current != null; current = current.BaseType)
             {
-                if (SymbolEqualityComparer.Default.Equals(baseType, typeSymbol))
+                if (SymbolEqualityComparer.Default.Equals(baseType, current))
                 {
                     return true;
                 }
@@ -294,12 +311,12 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
         /// <summary>
         /// Gets all attributes which are assignable to the specified attribute type.
         /// </summary>
-        public static bool GetAttributes(this ISymbol symbol, INamedTypeSymbol attributeType, out AttributeData[] attributes)
+        public static bool GetAttributes(this ISymbol symbol, INamedTypeSymbol attributeType, out AttributeData[]? attributes)
         {
             var result = default(List<AttributeData>);
             foreach (var attr in symbol.GetAttributes())
             {
-                if (!attr.AttributeClass.HasBaseType(attributeType))
+                if (attr.AttributeClass is { } attrClass && !attrClass.HasBaseType(attributeType))
                 {
                     continue;
                 }

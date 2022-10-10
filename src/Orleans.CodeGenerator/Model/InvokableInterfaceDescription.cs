@@ -86,19 +86,14 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var idCounter = 1;
             var res = new List<MethodDescription>();
             foreach (var pair in methods.OrderBy(kv => kv.Key, MethodSignatureComparer.Default))
             {
                 var method = pair.Key;
-                var id = CodeGenerator.GetId(method) ?? idCounter;
-                if (id >= idCounter)
-                {
-                    idCounter = id + 1;
-                }
-
-                res.Add(new(this, method, id.ToString(CultureInfo.InvariantCulture), hasCollision: pair.Value));
+                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.CreateHashedMethodId(method);
+                res.Add(new(this, method, methodId, hasCollision: pair.Value));
             }
+
             return res;
 
             IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)

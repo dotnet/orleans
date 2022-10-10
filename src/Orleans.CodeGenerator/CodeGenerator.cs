@@ -8,6 +8,9 @@ using System.Linq;
 using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System.Collections.Immutable;
+using Orleans.CodeGenerator.Hashing;
+using System.Text;
+using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator
 {
@@ -500,6 +503,61 @@ namespace Orleans.CodeGenerator
 
             var id = (ushort)idAttr.ConstructorArguments.First().Value;
             return id;
+        }
+
+        internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
+        {
+            var methodSignature = Format(methodSymbol);
+            var hash = XxHash32.Hash(Encoding.UTF8.GetBytes(methodSignature));
+            return $"{HexConverter.ToString(hash)}";
+
+            static string Format(IMethodSymbol methodInfo)
+            {
+                var result = new StringBuilder(methodInfo.Name);
+
+                if (methodInfo.IsGenericMethod)
+                {
+                    result.Append('<');
+                    var first = true;
+                    foreach (var typeArgument in methodInfo.TypeArguments)
+                    {
+                        if (!first) result.Append(',');
+                        else first = false;
+                        result.Append(typeArgument.Name);
+                    }
+
+                    result.Append('>');
+                }
+
+                {
+                    result.Append('(');
+                    var parameters = methodInfo.Parameters;
+                    var first = true;
+                    foreach (var parameter in parameters)
+                    {
+                        if (!first)
+                        {
+                            result.Append(',');
+                        }
+
+                        var parameterType = parameter.Type;
+                        switch (parameterType)
+                        {
+                            case ITypeParameterSymbol _:
+                                result.Append(parameterType.Name);
+                                break;
+                            default:
+                                result.Append(parameterType.ToDisplayName());
+                                break;
+                        }
+
+                        first = false;
+                    }
+                }
+
+                result.Append(')');
+                return result.ToString();
+            }
         }
 
         private uint? GetWellKnownTypeId(ISymbol symbol)
