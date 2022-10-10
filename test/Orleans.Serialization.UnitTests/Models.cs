@@ -252,7 +252,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
-    [WellKnownId(3201)]
+    [Id(3201)]
     public class SomeClassWithSerializers
     {
         [Id(0)]
@@ -273,7 +273,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
-    [WellKnownAlias("sercla1")]
+    [Alias("sercla1")]
     public class SerializableClassWithCompiledBase : List<int>
     {
         [Id(0)]
@@ -281,7 +281,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
-    [WellKnownAlias("gpoco`1")]
+    [Alias("gpoco`1")]
     public class GenericPoco<T>
     {
         [Id(0)]

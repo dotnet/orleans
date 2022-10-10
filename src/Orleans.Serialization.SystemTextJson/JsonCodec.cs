@@ -16,7 +16,7 @@ namespace Orleans.Serialization;
 /// <summary>
 /// A serialization codec which uses <see cref="JsonSerializer"/>.
 /// </summary>
-[WellKnownAlias(WellKnownAlias)]
+[Alias(WellKnownAlias)]
 public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {
     private static readonly Type SelfType = typeof(JsonCodec);

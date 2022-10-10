@@ -14,7 +14,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Serializer for types which implement the <see cref="ISerializable"/> pattern.
     /// </summary>
-    [WellKnownAlias("ISerializable")]
+    [Alias("ISerializable")]
     public class DotNetSerializableCodec : IGeneralizedCodec
     {
         public static readonly Type CodecType = typeof(DotNetSerializableCodec);

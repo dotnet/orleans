@@ -13,7 +13,7 @@ public interface IHasNoNamespace : IMyInvokableBaseType
 
 namespace Orleans.Serialization.UnitTests
 {
-    [WellKnownAlias("_my_proxy_base_")]
+    [Alias("_my_proxy_base_")]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
@@ -48,7 +48,7 @@ namespace Orleans.Serialization.UnitTests
         protected CodecProvider CodecProvider { get; }
     }
 
-    [WellKnownAlias("groan")]
+    [Alias("groan")]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
@@ -67,20 +67,26 @@ namespace Orleans.Serialization.UnitTests
         protected CodecProvider CodecProvider { get; }
     }
 
-    [WellKnownAlias("my_interface")]
+    [Alias("my_interface")]
     [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
     public interface IMyInvokableBaseType
     {
     }
 
-    [WellKnownAlias("_proxy_alias_test_")]
+    [Alias("_proxy_alias_test_")]
     [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
     public interface IProxyAliasTestGrain
     {
         [Id(125)]
         ValueTask Method();
+
+        [Alias("Method")]
         ValueTask Method(int a);
+
+        [Alias("StringMethod")]
         ValueTask Method(string a);
+
+        [Alias("MyOtherMethod")]
         ValueTask OtherMethod();
     }
 

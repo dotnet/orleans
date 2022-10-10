@@ -552,21 +552,11 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private uint? GetWellKnownTypeId(ISymbol symbol)
-        {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownIdAttribute, attr.AttributeClass));
-            if (attr is null)
-            {
-                return null;
-            }
-
-            var id = (uint)attr.ConstructorArguments.First().Value;
-            return id;
-        }
+        private uint? GetWellKnownTypeId(ISymbol symbol) => GetId(symbol);
 
         public string GetAlias(ISymbol symbol)
         {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.AliasAttribute, attr.AttributeClass));
             if (attr is null)
             {
                 return null;

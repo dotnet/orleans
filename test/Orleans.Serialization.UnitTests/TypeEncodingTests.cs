@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
-using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Utilities;
 using Xunit;
 
@@ -55,13 +54,25 @@ namespace Orleans.Serialization.UnitTests
             var calls = new Queue<IInvokable>();
             instanceAsBase.OnInvoke = body => calls.Enqueue(body);
 
-            var res = instanceAsInterface.Method();
-            Assert.True(res.IsCompletedSuccessfully);
-            var method = calls.Dequeue();
-            var (payload, bitStream) = SerializePayload(method);
-            var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"125\")";
-            var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
-            Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
+            {
+                var res = instanceAsInterface.Method();
+                Assert.True(res.IsCompletedSuccessfully);
+                var method = calls.Dequeue();
+                var (payload, bitStream) = SerializePayload(method);
+                var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"125\")";
+                var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
+                Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
+            }
+
+            {
+                var res = instanceAsInterface.OtherMethod();
+                Assert.True(res.IsCompletedSuccessfully);
+                var method = calls.Dequeue();
+                var (payload, bitStream) = SerializePayload(method);
+                var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"MyOtherMethod\")";
+                var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
+                Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
+            }
         }
 
         [Fact]
@@ -94,7 +105,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    [WellKnownAlias("_custom_type_alias_")]
+    [Alias("_custom_type_alias_")]
     public class MyTypeAliasClass
     {
     }

@@ -38,8 +38,7 @@ namespace Orleans.CodeGenerator
                 IBufferWriter = Type("System.Buffers.IBufferWriter`1"),
                 IdAttributeTypes = options.IdAttributes.Select(Type).ToList(),
                 ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToList(),
-                WellKnownAliasAttribute = Type("Orleans.WellKnownAliasAttribute"),
-                WellKnownIdAttribute = Type("Orleans.WellKnownIdAttribute"),
+                AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
                 DefaultInvokeMethodNameAttribute = Type("Orleans.DefaultInvokeMethodNameAttribute"),
                 InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute"),
@@ -273,8 +272,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Writer { get; private set; }
         public List<INamedTypeSymbol> IdAttributeTypes { get; private set; }
         public List<INamedTypeSymbol> ConstructorAttributeTypes { get; private set; }
-        public INamedTypeSymbol WellKnownAliasAttribute { get; private set; }
-        public INamedTypeSymbol WellKnownIdAttribute { get; private set; }
+        public INamedTypeSymbol AliasAttribute { get; private set; }
         public List<WellKnownCodecDescription> StaticCodecs { get; private set; }
         public List<WellKnownCodecDescription> WellKnownCodecs { get; private set; }
         public List<WellKnownCopierDescription> StaticCopiers { get; private set; }

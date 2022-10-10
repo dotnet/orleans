@@ -22,7 +22,7 @@ namespace Orleans.Serialization
     /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
-    [WellKnownAlias("Exception")]
+    [Alias("Exception")]
     internal class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
     {
         private readonly StreamingContext _streamingContext;
