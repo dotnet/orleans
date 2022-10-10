@@ -61,17 +61,6 @@ namespace Orleans.CodeGenerator
                     }
 
                     AddMember(ns, invokable);
-
-                    var methodSymbol = method.Method;
-                    if (GetWellKnownTypeId(methodSymbol) is uint wellKnownTypeId)
-                    {
-                        metadataModel.WellKnownTypeIds.Add((generatedInvokerDescription.OpenTypeSyntax, wellKnownTypeId));
-                    }
-
-                    if (GetTypeAlias(methodSymbol) is string typeAlias)
-                    {
-                        metadataModel.TypeAliases.Add((generatedInvokerDescription.OpenTypeSyntax, typeAlias));
-                    }
                 }
 
                 var (proxy, generatedProxyDescription) = ProxyGenerator.Generate(LibraryTypes, type, metadataModel);
@@ -195,7 +184,7 @@ namespace Orleans.CodeGenerator
                         metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
                     }
 
-                    if (GetTypeAlias(symbol) is string typeAlias)
+                    if (GetAlias(symbol) is string typeAlias)
                     {
                         metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
                     }
@@ -284,7 +273,7 @@ namespace Orleans.CodeGenerator
                                 this,
                                 semanticModel,
                                 symbol,
-                                GetTypeAlias(symbol) ?? symbol.Name,
+                                GetAlias(symbol) ?? symbol.Name,
                                 baseClass,
                                 isExtension,
                                 invokableBaseTypes);
@@ -513,7 +502,10 @@ namespace Orleans.CodeGenerator
 
             static string Format(IMethodSymbol methodInfo)
             {
-                var result = new StringBuilder(methodInfo.Name);
+                var result = new StringBuilder();
+                result.Append(methodInfo.ContainingType.ToDisplayName());
+                result.Append('.');
+                result.Append(methodInfo.Name);
 
                 if (methodInfo.IsGenericMethod)
                 {
@@ -572,7 +564,7 @@ namespace Orleans.CodeGenerator
             return id;
         }
 
-        private string GetTypeAlias(ISymbol symbol)
+        public string GetAlias(ISymbol symbol)
         {
             var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
             if (attr is null)

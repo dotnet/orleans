@@ -3,8 +3,6 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.CodeGenerator
 {
@@ -76,7 +74,7 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
                 {
-                    if (methods.TryGetValue(method, out var description))
+                    if (methods.TryGetValue(method, out _))
                     {
                         methods[method] = true;
                         continue;
@@ -87,10 +85,12 @@ namespace Orleans.CodeGenerator
             }
 
             var res = new List<MethodDescription>();
-            foreach (var pair in methods.OrderBy(kv => kv.Key, MethodSignatureComparer.Default))
+            foreach (var pair in methods)
             {
                 var method = pair.Key;
-                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.CreateHashedMethodId(method);
+                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
+                    ?? CodeGenerator.GetAlias(method)
+                    ?? CodeGenerator.CreateHashedMethodId(method);
                 res.Add(new(this, method, methodId, hasCollision: pair.Value));
             }
 
