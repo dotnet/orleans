@@ -60,8 +60,8 @@
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>17.3.1</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>4.3.0</MicrosoftCodeAnalysisVersion>
-    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
+    <MicrosoftCodeAnalysisVersion>4.4.0-2.final</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.4-beta1.22403.2</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>6.0.1</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
