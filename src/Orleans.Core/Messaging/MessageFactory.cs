@@ -23,11 +23,6 @@ namespace Orleans.Runtime
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
             var (requestContextData, runningRequest) = RequestContextExtensions.ExportInternal(this.deepCopier);
-            var callChainId = runningRequest switch
-            {
-                Message msg when msg.CallChainId != Guid.Empty => msg.CallChainId,
-                _ => Guid.NewGuid(),
-            };
 
             var message = new Message
             {
@@ -38,8 +33,16 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
                 RequestContextData = requestContextData,
-                CallChainId = callChainId,
             };
+
+            if (runningRequest is Message msg && msg.CallChainId != Guid.Empty)
+            {
+                message.CallChainId = msg.CallChainId;
+            }
+            else if (RequestContext.PropagateActivityId)
+            {
+                message.CallChainId = Guid.NewGuid();
+            }
 
             messagingTrace.OnCreateMessage(message);
             return message;

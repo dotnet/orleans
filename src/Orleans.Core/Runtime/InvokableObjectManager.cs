@@ -220,7 +220,11 @@ namespace Orleans
                             continue;
                         }
 
-                        RequestContextExtensions.Import(message.RequestContextData, message);
+                        if (message.RequestContextData is { Count: > 0 } || message.CallChainId != Guid.Empty)
+                        {
+                            RequestContextExtensions.Import(message.RequestContextData, message);
+                        }
+
                         IInvokable request = null;
                         try
                         {
@@ -260,10 +264,6 @@ namespace Orleans
                         _manager.logger.LogWarning(
                             outerException,
                             "Exception in " + nameof(LocalObjectMessagePumpAsync));
-                    }
-                    finally
-                    {
-                        RequestContext.Clear();
                     }
                 }
             }

@@ -1250,10 +1250,6 @@ namespace Orleans.Runtime
 
                     return false;
                 }
-                finally
-                {
-                    RequestContext.Clear();
-                }
             }
         }
 

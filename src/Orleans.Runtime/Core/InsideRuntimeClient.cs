@@ -252,7 +252,10 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContextExtensions.Import(message.RequestContextData, message);
+                if (message.RequestContextData is { Count: > 0 } || message.CallChainId != Guid.Empty)
+                {
+                    RequestContextExtensions.Import(message.RequestContextData, message);
+                }
 
                 Response response;
                 try
@@ -326,10 +329,6 @@ namespace Orleans.Runtime
                 {
                     SafeSendExceptionResponse(message, exc2);
                 }
-            }
-            finally
-            {
-                RequestContext.Clear();
             }
         }
 

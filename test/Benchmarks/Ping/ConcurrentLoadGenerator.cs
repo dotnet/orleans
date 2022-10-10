@@ -162,7 +162,7 @@ namespace Benchmarks.Ping
                 }
 
                 workBlock.EndTimestamp = Stopwatch.GetTimestamp();
-                await completedBlockWriter.WriteAsync(workBlock);
+                await completedBlockWriter.WriteAsync(workBlock).ConfigureAwait(false);
                 --numBlocks;
             }
         }
