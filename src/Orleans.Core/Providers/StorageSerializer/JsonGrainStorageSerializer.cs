@@ -47,8 +47,8 @@ namespace Orleans.Storage
         /// <param name="services">The service provider.</param>
         public JsonGrainStorageSerializer(IOptions<JsonGrainStorageSerializerOptions> options, IServiceProvider services)
         {
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
-                OrleansJsonSerializer.GetDefaultSerializerSettings(services),
+            this.jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(
+                OrleansJsonSerializerSettings.GetDefaultSerializerSettings(services),
                 options.Value.UseFullAssemblyNames,
                 options.Value.IndentJson,
                 options.Value.TypeNameHandling);

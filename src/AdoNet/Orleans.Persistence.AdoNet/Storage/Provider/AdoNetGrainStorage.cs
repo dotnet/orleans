@@ -624,7 +624,7 @@ namespace Orleans.Storage
             var deserializers = new List<IStorageDeserializer>();
             if(options.UseJsonFormat)
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(providerRuntime.ServiceProvider), options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
+                var jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(OrleansJsonSerializerSettings.GetDefaultSerializerSettings(providerRuntime.ServiceProvider), options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
                 options.ConfigureJsonSerializerSettings?.Invoke(jsonSettings);
 
                 deserializers.Add(new OrleansStorageDefaultJsonDeserializer(jsonSettings, JsonFormatSerializerTag));
@@ -649,7 +649,7 @@ namespace Orleans.Storage
             var serializers = new List<IStorageSerializer>();
             if(options.UseJsonFormat)
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(providerRuntime.ServiceProvider),
+                var jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(OrleansJsonSerializerSettings.GetDefaultSerializerSettings(providerRuntime.ServiceProvider),
                     options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
                 options.ConfigureJsonSerializerSettings?.Invoke(jsonSettings);
                 serializers.Add(new OrleansStorageDefaultJsonSerializer(jsonSettings, JsonFormatSerializerTag));

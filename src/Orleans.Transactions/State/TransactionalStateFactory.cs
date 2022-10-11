@@ -25,7 +25,7 @@ namespace Orleans.Transactions
 
         public static JsonSerializerSettings GetJsonSerializerSettings(IServiceProvider serviceProvider)
         {
-            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(serviceProvider);
+            var serializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(serviceProvider);
             serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
             return serializerSettings;
         }
