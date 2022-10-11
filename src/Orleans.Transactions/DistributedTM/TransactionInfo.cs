@@ -8,7 +8,7 @@ using Orleans.Transactions.Abstractions;
 namespace Orleans.Transactions
 {
     [GenerateSerializer]
-    public class TransactionInfo
+    public sealed class TransactionInfo
     {
         public TransactionInfo()
         {

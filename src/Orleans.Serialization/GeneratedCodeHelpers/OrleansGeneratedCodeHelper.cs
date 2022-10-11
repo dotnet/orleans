@@ -300,5 +300,48 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         {
             public T DeepCopy(T input, CopyContext _) => input;
         }
+
+        /// <summary>
+        /// Default codec implementation for abstract classes
+        /// </summary>
+        public abstract class AbstractCodec<T> : IFieldCodec<T>, IBaseCodec<T> where T : class
+        {
+            public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>
+            {
+                if (value is null)
+                {
+                    ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType);
+                }
+                else
+                {
+                    writer.Session.CodecProvider.GetCodec(value.GetType()).WriteField(ref writer, fieldIdDelta, expectedType, value);
+                }
+            }
+
+            public T ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)
+            {
+                if (field.WireType == WireType.Reference)
+                    return ReferenceCodec.ReadReference<T, TReaderInput>(ref reader, field);
+
+                return (T)reader.Session.CodecProvider.GetCodec(field.FieldType).ReadValue(ref reader, field);
+            }
+
+            public virtual void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, T instance) where TBufferWriter : IBufferWriter<byte> { }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public virtual void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, T instance)
+            {
+                var id = 0;
+                Field header = default;
+                while (true)
+                {
+                    id = ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+                    if (id == -1)
+                        break;
+
+                    reader.ConsumeUnknownField(header);
+                }
+            }
+        }
     }
 }

@@ -152,82 +152,81 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IFieldCodec<TField> TryGetCodec<TField>() => TryGetCodecInner<TField>(typeof(TField));
+        public IFieldCodec<TField> TryGetCodec<TField>()
+        {
+            return _adaptedCodecs.TryGetValue((typeof(TField), typeof(TField)), out var existing)
+                ? (IFieldCodec<TField>)existing : TryCreateCodec<TField>(typeof(TField));
+        }
 
         /// <inheritdoc/>
         public IFieldCodec<object> GetCodec(Type fieldType) => TryGetCodec(fieldType) ?? ThrowCodecNotFound<object>(fieldType);
 
         /// <inheritdoc/>
-        public IFieldCodec<object> TryGetCodec(Type fieldType) => TryGetCodecInner<object>(fieldType);
+        public IFieldCodec<object> TryGetCodec(Type fieldType)
+        {
+            // If the field type is unavailable, return the void codec which can at least handle references.
+            if (fieldType is null)
+                return _voidCodec;
+
+            return _adaptedCodecs.TryGetValue((fieldType, typeof(object)), out var existing)
+                ? (IFieldCodec<object>)existing : TryCreateCodec<object>(fieldType);
+        }
 
         /// <inheritdoc/>
         public IFieldCodec<TField> GetCodec<TField>() => TryGetCodec<TField>() ?? ThrowCodecNotFound<TField>(typeof(TField));
 
-        private IFieldCodec<TField> TryGetCodecInner<TField>(Type fieldType)
+        private IFieldCodec<TField> TryCreateCodec<TField>(Type fieldType)
         {
             if (!_initialized)
             {
                 Initialize();
             }
 
-            var resultFieldType = typeof(TField);
-            var wasCreated = false;
-
             // Try to find the codec from the configured codecs.
             IFieldCodec untypedResult;
 
-            // If the field type is unavailable, return the void codec which can at least handle references.
-            if (fieldType is null)
+            ThrowIfUnsupportedType(fieldType);
+
+            if (fieldType.IsConstructedGenericType)
             {
-                untypedResult = _voidCodec;
+                untypedResult = CreateCodecInstance(fieldType, fieldType.GetGenericTypeDefinition());
             }
-            else if (!_adaptedCodecs.TryGetValue((fieldType, resultFieldType), out untypedResult))
+            else
             {
-                ThrowIfUnsupportedType(fieldType);
+                untypedResult = CreateCodecInstance(fieldType, fieldType);
+            }
 
-                if (fieldType.IsConstructedGenericType)
+            if (untypedResult is null)
+            {
+                foreach (var specializableCodec in _specializableCodecs)
                 {
-                    untypedResult = CreateCodecInstance(fieldType, fieldType.GetGenericTypeDefinition());
-                }
-                else
-                {
-                    untypedResult = CreateCodecInstance(fieldType, fieldType);
-                }
-
-                if (untypedResult is null)
-                {
-                    foreach (var specializableCodec in _specializableCodecs)
+                    if (specializableCodec.IsSupportedType(fieldType))
                     {
-                        if (specializableCodec.IsSupportedType(fieldType))
-                        {
-                            untypedResult = specializableCodec.GetSpecializedCodec(fieldType);
-                        }
+                        untypedResult = specializableCodec.GetSpecializedCodec(fieldType);
                     }
                 }
+            }
 
-                if (untypedResult is null)
+            if (untypedResult is null)
+            {
+                foreach (var dynamicCodec in _generalizedCodecs)
                 {
-                    foreach (var dynamicCodec in _generalizedCodecs)
+                    if (dynamicCodec.IsSupportedType(fieldType))
                     {
-                        if (dynamicCodec.IsSupportedType(fieldType))
-                        {
-                            untypedResult = dynamicCodec;
-                            break;
-                        }
+                        untypedResult = dynamicCodec;
+                        break;
                     }
                 }
-
-                if (untypedResult is null && (fieldType.IsInterface || fieldType.IsAbstract))
-                {
-                    untypedResult = (IFieldCodec)GetServiceOrCreateInstance(typeof(AbstractTypeSerializer<>).MakeGenericType(fieldType));
-                }
-
-                wasCreated = untypedResult != null;
             }
+
+            if (untypedResult is null && (fieldType.IsInterface || fieldType.IsAbstract))
+            {
+                untypedResult = (IFieldCodec)GetServiceOrCreateInstance(typeof(AbstractTypeSerializer<>).MakeGenericType(fieldType));
+            }
+
 
             // Attempt to adapt the codec if it's not already adapted.
             IFieldCodec<TField> typedResult;
-            var wasAdapted = false;
             switch (untypedResult)
             {
                 case null:
@@ -237,40 +236,18 @@ namespace Orleans.Serialization.Serializers
                     break;
                 case IWrappedCodec wrapped when wrapped.Inner is IFieldCodec<TField> typedCodec:
                     typedResult = typedCodec;
-                    wasAdapted = true;
                     break;
                 case IFieldCodec<object> objectCodec:
                     typedResult = CodecAdapter.CreateTypedFromUntyped<TField>(objectCodec);
-                    wasAdapted = true;
                     break;
                 default:
-                    typedResult = TryWrapCodec(untypedResult);
-                    wasAdapted = true;
+                    typedResult = WrapCodec(untypedResult);
                     break;
             }
 
-            // Store the results or throw if adaptation failed.
-            if (typedResult != null && (wasCreated || wasAdapted))
-            {
-                untypedResult = typedResult;
-                var key = (fieldType, resultFieldType);
-                if (_adaptedCodecs.TryGetValue(key, out var existing))
-                {
-                    typedResult = (IFieldCodec<TField>)existing;
-                }
-                else if (!_adaptedCodecs.TryAdd(key, untypedResult))
-                {
-                    typedResult = (IFieldCodec<TField>)_adaptedCodecs[key];
-                }
-            }
-            else if (typedResult is null)
-            {
-                ThrowCannotConvert(untypedResult);
-            }
+            return (IFieldCodec<TField>)_adaptedCodecs.GetOrAdd((fieldType, typeof(TField)), typedResult);
 
-            return typedResult;
-
-            static IFieldCodec<TField> TryWrapCodec(object rawCodec)
+            static IFieldCodec<TField> WrapCodec(IFieldCodec rawCodec)
             {
                 var codecType = rawCodec.GetType();
                 if (typeof(TField) == ObjectType)
@@ -286,12 +263,7 @@ namespace Orleans.Serialization.Serializers
                     }
                 }
 
-                return null;
-            }
-
-            static void ThrowCannotConvert(object rawCodec)
-            {
-                throw new InvalidOperationException($"Cannot convert codec of type {rawCodec.GetType()} to codec of type {typeof(IFieldCodec<TField>)}.");
+                throw new InvalidOperationException($"Cannot convert codec of type {rawCodec.GetType()} to codec of type IFieldCodec<{typeof(TField)}>.");
             }
         }
 
