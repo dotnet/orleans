@@ -5,6 +5,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
     <PackageDescription>Code generator for projects using Orleans.Serialization with MSBuild</PackageDescription>
+    <IsPackable>false</IsPackable>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
