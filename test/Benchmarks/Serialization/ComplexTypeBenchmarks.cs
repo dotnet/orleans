@@ -18,7 +18,9 @@ namespace Benchmarks
     {
         private static SingleSegmentBuffer Buffer = new(new byte[1000]);
         private readonly Serializer<SimpleStruct> _structSerializer;
+        private readonly DeepCopier<SimpleStruct> _structCopier;
         private readonly Serializer<ComplexClass> _serializer;
+        private readonly DeepCopier<ComplexClass> _copier;
         private readonly SerializerSessionPool _sessionPool;
         private readonly ComplexClass _value;
         private readonly SerializerSession _session;
@@ -33,7 +35,9 @@ namespace Benchmarks
                 .AddSerializer();
             var serviceProvider = services.BuildServiceProvider();
             _serializer = serviceProvider.GetRequiredService<Serializer<ComplexClass>>();
+            _copier = serviceProvider.GetRequiredService<DeepCopier<ComplexClass>>();
             _structSerializer = serviceProvider.GetRequiredService<Serializer<SimpleStruct>>();
+            _structCopier = serviceProvider.GetRequiredService<DeepCopier<SimpleStruct>>();
             _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
             _value = new ComplexClass
             {
@@ -73,6 +77,18 @@ namespace Benchmarks
             var reader = Reader.Create(writer.Output.GetReadOnlySequence(), _session);
             _ = _serializer.Deserialize(ref reader);
             Buffer.Reset();
+        }
+
+        [Fact]
+        public void CopyComplex()
+        {
+            _copier.Copy(_value); 
+        }
+
+        [Fact]
+        public void CopyComplexStruct()
+        {
+            _structCopier.Copy(_structValue); 
         }
 
         [Fact]

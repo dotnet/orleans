@@ -29,27 +29,21 @@ namespace Orleans.Serialization.Utilities
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
-        /// <param name="field">
-        /// The field.
-        /// </param>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetGetter(FieldInfo field) => GetGetter(field, false);
+        public static Delegate GetGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, false);
 
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
-        /// <param name="field">
-        /// The field.
-        /// </param>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetValueGetter(FieldInfo field) => GetGetter(field, true);
+        public static Delegate GetValueGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, true);
 
-        private static Delegate GetGetter(FieldInfo field, bool byref)
+        private static Delegate GetGetter(Type declaringType, string fieldName, bool byref)
         {
-            var declaringType = field.DeclaringType ?? throw new InvalidOperationException($"Field {field.Name} does not have a declaring type.");
+            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType };
 
-            var method = new DynamicMethod(field.Name + "Get", field.FieldType, parameterTypes, typeof(FieldAccessor).Module, true);
+            var method = new DynamicMethod(fieldName + "Get", field.FieldType, parameterTypes, typeof(FieldAccessor).Module, true);
 
             var emitter = method.GetILGenerator();
             // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
@@ -64,20 +58,20 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetReferenceSetter(FieldInfo field) => GetSetter(field, false);
+        public static Delegate GetReferenceSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, false);
 
         /// <summary>
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetValueSetter(FieldInfo field) => GetSetter(field, true);
+        public static Delegate GetValueSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, true);
 
-        private static Delegate GetSetter(FieldInfo field, bool byref)
+        private static Delegate GetSetter(Type declaringType, string fieldName, bool byref)
         {
-            var declaringType = field.DeclaringType ?? throw new InvalidOperationException($"Field {field.Name} does not have a declaring type.");
+            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType, field.FieldType };
 
-            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, typeof(FieldAccessor).Module, true);
+            var method = new DynamicMethod(fieldName + "Set", null, parameterTypes, typeof(FieldAccessor).Module, true);
 
             var emitter = method.GetILGenerator();
             // arg0 is unused for better delegate performance (avoids argument shuffling thunk)

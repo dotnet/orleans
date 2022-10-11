@@ -81,14 +81,14 @@ namespace Orleans.CodeGenerator
                 AddMember(ns, serializer);
 
                 // Generate a copier for each serializable type.
-                var copier = CopierGenerator.GenerateCopier(LibraryTypes, type);
-                AddMember(ns, copier);
+                if (CopierGenerator.GenerateCopier(LibraryTypes, type, metadataModel.DefaultCopiers) is { } copier)
+                    AddMember(ns, copier);
 
-                if (!type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && type is not GeneratedInvokerDescription || type.HasActivatorConstructor))
+                if (!type.IsEnumType && (type.IsEmptyConstructable || type.HasActivatorConstructor))
                 {
                     metadataModel.ActivatableTypes.Add(type);
 
-                    // Generate a partial serializer class for each serializable type.
+                    // Generate an activator class for types with default constructor or activator constructor.
                     var activator = ActivatorGenerator.GenerateActivator(LibraryTypes, type);
                     AddMember(ns, activator);
                 }

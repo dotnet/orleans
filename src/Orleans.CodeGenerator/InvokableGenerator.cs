@@ -54,7 +54,7 @@ namespace Orleans.CodeGenerator
                     GenerateGetMethod(libraryTypes),
                     GenerateSetTargetMethod(libraryTypes, interfaceDescription, targetField),
                     GenerateGetTargetMethod(libraryTypes, targetField),
-                    GenerateDisposeMethod(libraryTypes, method, fieldDescriptions, baseClassType),
+                    GenerateDisposeMethod(libraryTypes, fieldDescriptions, baseClassType),
                     GenerateGetArgumentMethod(libraryTypes, method, fieldDescriptions),
                     GenerateSetArgumentMethod(libraryTypes, method, fieldDescriptions),
                     GenerateInvokeInnerMethod(libraryTypes, method, fieldDescriptions, targetField));
@@ -324,13 +324,13 @@ namespace Orleans.CodeGenerator
             var args = SeparatedList(
                 fields.OfType<MethodParameterFieldDescription>()
                     .OrderBy(p => p.ParameterOrdinal)
-                    .Select(p => Argument(ThisExpression().Member(p.FieldName))));
+                    .Select(p => Argument(IdentifierName(p.FieldName))));
             ExpressionSyntax methodCall;
             if (method.MethodTypeParameters.Count > 0)
             {
                 methodCall = MemberAccessExpression(
                     SyntaxKind.SimpleMemberAccessExpression,
-                    ThisExpression().Member(target.FieldName),
+                    IdentifierName(target.FieldName),
                     GenericName(
                         Identifier(method.Method.Name),
                         TypeArgumentList(
@@ -339,7 +339,7 @@ namespace Orleans.CodeGenerator
             }
             else
             {
-                methodCall = ThisExpression().Member(target.FieldName).Member(method.Method.Name);
+                methodCall = IdentifierName(target.FieldName).Member(method.Method.Name);
             }
 
             return MethodDeclaration(method.Method.ReturnType.ToTypeSyntax(method.TypeParameterSubstitutions), "InvokeInner")
@@ -351,7 +351,6 @@ namespace Orleans.CodeGenerator
 
         private static MemberDeclarationSyntax GenerateDisposeMethod(
             LibraryTypes libraryTypes,
-            MethodDescription methodDescription,
             List<InvokerFieldDescripton> fields,
             INamedTypeSymbol baseClassType)
         {
@@ -364,8 +363,8 @@ namespace Orleans.CodeGenerator
                         ExpressionStatement(
                             AssignmentExpression(
                                 SyntaxKind.SimpleAssignmentExpression,
-                                ThisExpression().Member(field.FieldName),
-                                DefaultExpression(field.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions)))));
+                                IdentifierName(field.FieldName),
+                                LiteralExpression(SyntaxKind.DefaultLiteralExpression))));
                 }
             }
 
@@ -556,7 +555,7 @@ namespace Orleans.CodeGenerator
             foreach (var (methodName, methodArgument) in method.CustomInitializerMethods)
             {
                 var argumentExpression = methodArgument.ToExpression();
-                body.Add(ExpressionStatement(InvocationExpression(ThisExpression().Member(methodName), ArgumentList(SeparatedList(new[] { Argument(argumentExpression) })))));
+                body.Add(ExpressionStatement(InvocationExpression(IdentifierName(methodName), ArgumentList(SeparatedList(new[] { Argument(argumentExpression) })))));
             }
 
             if (body.Count == 0 && parameters.Count == 0)

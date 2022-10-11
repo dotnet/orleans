@@ -131,6 +131,7 @@ namespace Orleans.CodeGenerator
 
         public bool IsValueType => Type.IsValueType;
         public bool IsSealedType => Type.IsSealed;
+        public bool IsAbstractType => Type.IsAbstract;
         public bool IsEnumType => Type.EnumUnderlyingType != null;
 
         public bool IsGenericType => Type.IsGenericType;

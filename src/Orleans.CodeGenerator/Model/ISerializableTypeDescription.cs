@@ -17,6 +17,7 @@ namespace Orleans.CodeGenerator
         string Name { get; }
         bool IsValueType { get; }
         bool IsSealedType { get; }
+        bool IsAbstractType { get; }
         bool IsEnumType { get; }
         bool IsGenericType { get; }
         List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }

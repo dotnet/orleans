@@ -1,13 +1,12 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using static Orleans.CodeGenerator.InvokableGenerator;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.InvokableGenerator;
 
 namespace Orleans.CodeGenerator
 {
@@ -55,8 +54,10 @@ namespace Orleans.CodeGenerator
                 .AddBaseListTypes(SimpleBaseType(libraryTypes.FieldCodec_1.ToTypeSyntax(type.TypeSyntax)))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
-                .AddMembers(fieldDeclarations)
-                .AddMembers(ctor);
+                .AddMembers(fieldDeclarations);
+
+            if (ctor != null)
+                classDeclaration = classDeclaration.AddMembers(ctor);
 
             if (type.IsEnumType)
             {
@@ -116,26 +117,11 @@ namespace Orleans.CodeGenerator
                                     SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                         .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                    case SetterFieldDescription setter:
-                        {
-                            var fieldSetterVariable = VariableDeclarator(setter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(setter.FieldType).AddVariables(fieldSetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
-                    case GetterFieldDescription getter:
-                        {
-                            var fieldGetterVariable = VariableDeclarator(getter.FieldName);
-
-                            return
-                                FieldDeclaration(VariableDeclaration(getter.FieldType).AddVariables(fieldGetterVariable))
-                                    .AddModifiers(
-                                        Token(SyntaxKind.PrivateKeyword),
-                                        Token(SyntaxKind.ReadOnlyKeyword));
-                        }
+                    case FieldAccessorDescription accessor:
+                        return
+                            FieldDeclaration(VariableDeclaration(accessor.FieldType,
+                                SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                     default:
                         return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
@@ -145,64 +131,47 @@ namespace Orleans.CodeGenerator
 
         private static ConstructorDeclarationSyntax GenerateConstructor(LibraryTypes libraryTypes, string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
         {
-            var injected = fieldDescriptions.Where(f => f.IsInjected).ToList();
-            var parameters = new List<ParameterSyntax>(injected.Select(f => Parameter(f.FieldName.ToIdentifier()).WithType(f.FieldType)));
-            const string CodecProviderParameterName = "codecProvider";
-            parameters.Add(Parameter(Identifier(CodecProviderParameterName)).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
-
-            var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-
-            List<StatementSyntax> GetStatements()
+            var codecProviderAdded = false;
+            var parameters = new List<ParameterSyntax>();
+            var statements = new List<StatementSyntax>();
+            foreach (var field in fieldDescriptions)
             {
-                var res = new List<StatementSyntax>();
-                foreach (var field in fieldDescriptions)
+                switch (field)
                 {
-                    switch (field)
-                    {
-                        case GetterFieldDescription getter:
-                            res.Add(getter.InitializationSyntax);
-                            break;
+                    case GeneratedFieldDescription _ when field.IsInjected:
+                        parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
+                        statements.Add(ExpressionStatement(
+                            AssignmentExpression(
+                                SyntaxKind.SimpleAssignmentExpression,
+                                ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                Unwrapped(field.FieldName.ToIdentifierName()))));
+                        break;
+                    case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
+                        if (!codecProviderAdded)
+                        {
+                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
+                            codecProviderAdded = true;
+                        }
 
-                        case SetterFieldDescription setter:
-                            res.Add(setter.InitializationSyntax);
-                            break;
+                        var codec = InvocationExpression(
+                            IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
+                            ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName("codecProvider")) })));
 
-                        case GeneratedFieldDescription _ when field.IsInjected:
-                            res.Add(ExpressionStatement(
-                                AssignmentExpression(
-                                    SyntaxKind.SimpleAssignmentExpression,
-                                    ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                    Unwrapped(field.FieldName.ToIdentifierName()))));
-                            break;
-                        case CodecFieldDescription codec when !field.IsInjected:
-                            res.Add(ExpressionStatement(
-                                    AssignmentExpression(
-                                        SyntaxKind.SimpleAssignmentExpression,
-                                        ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                        GetService(field.FieldType))));
-                            break;
-                    }
+                        statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), codec)));
+                        break;
                 }
-                return res;
             }
 
-            return ConstructorDeclaration(simpleClassName)
+            return statements.Count == 0 ? null : ConstructorDeclaration(simpleClassName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters.ToArray())
-                .AddBodyStatements(GetStatements().ToArray());
+                .AddBodyStatements(statements.ToArray());
 
             static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
             {
                 return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
+                    IdentifierName("OrleansGeneratedCodeHelper").Member("UnwrapService"),
                     ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
-            }
-
-            static ExpressionSyntax GetService(TypeSyntax type)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName(CodecProviderParameterName)) })));
             }
         }
 
@@ -212,15 +181,12 @@ namespace Orleans.CodeGenerator
             LibraryTypes libraryTypes)
         {
             var fields = new List<GeneratedFieldDescription>();
-            fields.AddRange(serializableTypeDescription.Members
-                .Distinct(MemberDescriptionTypeComparer.Default)
-                .Select(member => GetTypeDescription(member)));
 
             fields.Add(new CodecFieldTypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, serializableTypeDescription.TypeSyntax)); 
 
             if (serializableTypeDescription.HasComplexBaseType)
             {
-                fields.Add(new BaseCodecFieldDescription(libraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax), BaseTypeSerializerFieldName));
+                fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
             }
 
             if (serializableTypeDescription.UseActivator)
@@ -228,11 +194,15 @@ namespace Orleans.CodeGenerator
                 fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
             }
 
-            // Add a codec field for any field in the target which does not have a static codec.
-            fields.AddRange(serializableTypeDescription.Members
-                .Distinct(MemberDescriptionTypeComparer.Default)
-                .Where(t => !libraryTypes.StaticCodecs.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t.Type)))
-                .Select(member => GetCodecDescription(member)));
+            int typeIndex = 0;
+            foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
+            {
+                fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+                // Add a codec field for any field in the target which does not have a static codec.
+                if (!libraryTypes.StaticCodecs.Exists(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                    fields.Add(GetCodecDescription(member, typeIndex));
+                typeIndex++;
+            }
 
             foreach (var member in members)
             {
@@ -255,32 +225,33 @@ namespace Orleans.CodeGenerator
 
             return fields;
 
-            CodecFieldDescription GetCodecDescription(IMemberDescription member)
+            CodecFieldDescription GetCodecDescription(IMemberDescription member, int index)
             {
+                var t = member.Type;
                 TypeSyntax codecType = null;
-                if (member.Type.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    && (!SymbolEqualityComparer.Default.Equals(member.Type.ContainingAssembly, libraryTypes.Compilation.Assembly) || member.Type.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute)))
+                if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
+                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                    && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
-                    // Use the concrete generated type and avoid expensive interface dispatch
-                    if (member.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
+                    // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IFieldCodec<TField>)
+                    SimpleNameSyntax name;
+                    if (t is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
                     {
                         // Construct the full generic type name
-                        var ns = ParseName(GetGeneratedNamespaceName(member.Type));
-                        var name = GenericName(Identifier(GetSimpleClassName(member.Type.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => member.GetTypeSyntax(arg)))));
-                        codecType = QualifiedName(ns, name);
+                        name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => member.GetTypeSyntax(arg)))));
                     }
                     else
                     {
-                        var simpleName = $"{GetGeneratedNamespaceName(member.Type)}.{GetSimpleClassName(member.Type.Name)}";
-                        codecType = ParseTypeName(simpleName);
+                        name = IdentifierName(GetSimpleClassName(t.Name));
                     }
+                    codecType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
-                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)) is WellKnownCodecDescription codec)
+                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCodecDescription codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.
                     codecType = codec.CodecType.ToTypeSyntax();
                 }
-                else if (member.Type is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => member.Type is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
+                else if (t is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => t is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
                 {
                     // Construct the generic codec type using the field's type arguments.
                     codecType = genericCodec.CodecType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -291,17 +262,22 @@ namespace Orleans.CodeGenerator
                     codecType = libraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Codec";
-                return new CodecFieldDescription(codecType, fieldName, member.Type);
+                return new CodecFieldDescription(codecType, $"_codec{index}", t);
             }
+        }
 
-            TypeFieldDescription GetTypeDescription(IMemberDescription member)
+        private static BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription, LibraryTypes libraryTypes)
+        {
+            var baseType = serializableTypeDescription.BaseType;
+            if (baseType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
+                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, libraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Type";
-                return new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), fieldName, member.TypeSyntax, member.Type);
+                // Use the concrete generated type and avoid expensive interface dispatch (except for generic types that will fall back to IBaseCodec<T>)
+                return new(QualifiedName(ParseName(GetGeneratedNamespaceName(baseType)), IdentifierName(GetSimpleClassName(baseType.Name))), true);
             }
 
-            static string ToLowerCamelCase(string input) => char.IsLower(input, 0) ? input : char.ToLowerInvariant(input[0]) + input.Substring(1);
+            return new(libraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
         private static MemberDeclarationSyntax GenerateSerializeMethod(
@@ -321,7 +297,7 @@ namespace Orleans.CodeGenerator
                 body.Add(
                     ExpressionStatement(
                         InvocationExpression(
-                            ThisExpression().Member(BaseTypeSerializerFieldName.ToIdentifierName()).Member(SerializeMethodName),
+                            BaseTypeSerializerFieldName.ToIdentifierName().Member(SerializeMethodName),
                             ArgumentList(SeparatedList(new[] { Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam) })))));
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
@@ -401,7 +377,7 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
-                    codecExpression = ThisExpression().Member(instanceCodec.FieldName);
+                    codecExpression = IdentifierName(instanceCodec.FieldName);
                 }
 
                 var expectedType = serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType));
@@ -472,11 +448,11 @@ namespace Orleans.CodeGenerator
 
             if (type.HasComplexBaseType)
             {
-                // C#: this.baseTypeSerializer.Deserialize(ref reader, instance);
+                // C#: _baseTypeSerializer.Deserialize(ref reader, instance);
                 body.Add(
                     ExpressionStatement(
                         InvocationExpression(
-                            ThisExpression().Member(BaseTypeSerializerFieldName.ToIdentifierName()).Member(DeserializeMethodName),
+                            BaseTypeSerializerFieldName.ToIdentifierName().Member(DeserializeMethodName),
                             ArgumentList(SeparatedList(new[]
                             {
                                 Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
@@ -570,7 +546,7 @@ namespace Orleans.CodeGenerator
                     else
                     {
                         var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-                        codecExpression = ThisExpression().Member(instanceCodec.FieldName);
+                        codecExpression = IdentifierName(instanceCodec.FieldName);
                     }
 
                     ExpressionSyntax readValueExpression = InvocationExpression(
@@ -640,7 +616,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 body.Add(ExpressionStatement(InvocationExpression(
-                    ThisExpression().Member($"_hook{hookIndex}").Member(callbackMethodName),
+                    IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
                     ArgumentList(SeparatedList(new[] { argument })))));
             }
         }
@@ -737,7 +713,7 @@ namespace Orleans.CodeGenerator
             innerBody.Add(
                 ExpressionStatement(
                     InvocationExpression(
-                        ThisExpression().Member(SerializeMethodName),
+                        IdentifierName(SerializeMethodName),
                         ArgumentList(
                             SeparatedList(
                                 new[]
@@ -841,11 +817,12 @@ namespace Orleans.CodeGenerator
                 false => type.GetObjectCreationExpression(libraryTypes)
             };
 
-            // C#: TField result = _activator.Create();
-            // or C#: TField result = new TField();
+            // C#: var result = _activator.Create();
+            // or C#: var result = new TField();
+            // or C#: var result = default(TField);
             innerBody.Add(LocalDeclarationStatement(
                 VariableDeclaration(
-                    type.TypeSyntax,
+                    IdentifierName("var"),
                     SingletonSeparatedList(VariableDeclarator(resultVar.Identifier)
                     .WithInitializer(EqualsValueClause(createValueExpression))))));
 
@@ -869,7 +846,7 @@ namespace Orleans.CodeGenerator
             innerBody.Add(
                 ExpressionStatement(
                     InvocationExpression(
-                        ThisExpression().Member(DeserializeMethodName),
+                        IdentifierName(DeserializeMethodName),
                         ArgumentList(
                             SeparatedList(
                                 new[]
@@ -955,7 +932,7 @@ namespace Orleans.CodeGenerator
                                     Argument(fieldIdDeltaParam),
                                     Argument(expectedTypeParam),
                                     Argument(CastExpression(type.BaseTypeSyntax, valueParam)),
-                                    Argument(TypeOfExpression(type.TypeSyntax))
+                                    Argument(IdentifierName(CodecFieldTypeFieldName))
                                 })))));
 
             var parameters = new[]
@@ -1017,21 +994,20 @@ namespace Orleans.CodeGenerator
                 FieldName = fieldName;
             }
 
-            public TypeSyntax FieldType { get; }
-            public string FieldName { get; }
+            public readonly TypeSyntax FieldType;
+            public readonly string FieldName;
             public abstract bool IsInjected { get; }
         }
 
-        internal class BaseCodecFieldDescription : GeneratedFieldDescription
+        internal sealed class BaseCodecFieldDescription : GeneratedFieldDescription
         {
-            public BaseCodecFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
-            {
-            }
+            public BaseCodecFieldDescription(TypeSyntax fieldType, bool concreteType = false) : base(fieldType, BaseTypeSerializerFieldName)
+                => IsInjected = !concreteType;
 
-            public override bool IsInjected => true;
+            public override bool IsInjected { get; }
         }
 
-        internal class ActivatorFieldDescription : GeneratedFieldDescription 
+        internal sealed class ActivatorFieldDescription : GeneratedFieldDescription 
         {
             public ActivatorFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
             {
@@ -1040,7 +1016,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => true;
         }
 
-        internal class CodecFieldDescription : GeneratedFieldDescription, ICodecDescription
+        internal sealed class CodecFieldDescription : GeneratedFieldDescription, ICodecDescription
         {
             public CodecFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {
@@ -1051,7 +1027,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class TypeFieldDescription : GeneratedFieldDescription
+        internal sealed class TypeFieldDescription : GeneratedFieldDescription
         {
             public TypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax underlyingTypeSyntax, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {
@@ -1064,7 +1040,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class CodecFieldTypeFieldDescription : GeneratedFieldDescription
+        internal sealed class CodecFieldTypeFieldDescription : GeneratedFieldDescription
         {
             public CodecFieldTypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax codecFieldType) : base(fieldType, fieldName)
             {
@@ -1075,31 +1051,17 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => false;
         }
 
-        internal class SetterFieldDescription : GeneratedFieldDescription
+        internal sealed class FieldAccessorDescription : GeneratedFieldDescription
         {
-            public SetterFieldDescription(TypeSyntax fieldType, string fieldName, StatementSyntax initializationSyntax) : base(fieldType, fieldName)
-            {
-                InitializationSyntax = initializationSyntax;
-            }
+            public FieldAccessorDescription(TypeSyntax fieldType, string fieldName, ExpressionSyntax initializationSyntax) : base(fieldType, fieldName)
+                => InitializationSyntax = initializationSyntax;
 
             public override bool IsInjected => false;
 
-            public StatementSyntax InitializationSyntax { get; }
+            public readonly ExpressionSyntax InitializationSyntax;
         }
 
-        internal class GetterFieldDescription : GeneratedFieldDescription
-        {
-            public GetterFieldDescription(TypeSyntax fieldType, string fieldName, StatementSyntax initializationSyntax) : base(fieldType, fieldName)
-            {
-                InitializationSyntax = initializationSyntax;
-            }
-
-            public override bool IsInjected => false;
-
-            public StatementSyntax InitializationSyntax { get; }
-        }
-
-        internal class SerializationHookFieldDescription : GeneratedFieldDescription
+        internal sealed class SerializationHookFieldDescription : GeneratedFieldDescription
         {
             public SerializationHookFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
             {
@@ -1136,8 +1098,8 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for setting the value of this field.</returns>
             ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value);
 
-            GetterFieldDescription GetGetterFieldDescription();
-            SetterFieldDescription GetSetterFieldDescription();
+            FieldAccessorDescription GetGetterFieldDescription();
+            FieldAccessorDescription GetSetterFieldDescription();
         }
 
         /// <summary>
@@ -1186,8 +1148,8 @@ namespace Orleans.CodeGenerator
                         instance.Member(_member.FieldName),
                         value);
 
-            public GetterFieldDescription GetGetterFieldDescription() => null;
-            public SetterFieldDescription GetSetterFieldDescription() => null;
+            public FieldAccessorDescription GetGetterFieldDescription() => null;
+            public FieldAccessorDescription GetSetterFieldDescription() => null;
         }
 
         /// <summary>
@@ -1372,63 +1334,34 @@ namespace Orleans.CodeGenerator
                         .AddArgumentListArguments(instanceArg, Argument(value));
             }
 
-            public GetterFieldDescription GetGetterFieldDescription()
+            public FieldAccessorDescription GetGetterFieldDescription()
             {
                 if (IsGettableField || IsGettableProperty) return null;
-
-                var isContainedByValueType = ContainingType?.IsValueType ?? false;
-
-                var getterType = (isContainedByValueType ? _libraryTypes.ValueTypeGetter_2: _libraryTypes.Func_2)
-                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
-
-                // Generate syntax to initialize the field in the constructor
-                var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
-                var accessorMethod = isContainedByValueType ? "GetValueGetter" : "GetGetter";
-                var accessorInvoke = CastExpression(
-                    getterType,
-                    InvocationExpression(fieldAccessorUtility.Member(accessorMethod)).AddArgumentListArguments(Argument(fieldInfo)));
-                var initializationSyntax = ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(GetterFieldName), accessorInvoke));
-
-                return new GetterFieldDescription(getterType, GetterFieldName, initializationSyntax);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, _libraryTypes, false);
             }
 
-            public SetterFieldDescription GetSetterFieldDescription()
+            public FieldAccessorDescription GetSetterFieldDescription()
             {
                 if (IsSettableField || IsSettableProperty) return null;
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, _libraryTypes, true);
+            }
 
-                var isContainedByValueType = ContainingType?.IsValueType ?? false;
+            public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter)
+            {
+                var valueType = containingType.IsValueType;
+                var containingTypeSyntax = containingType.ToTypeSyntax();
 
-                var fieldType = (isContainedByValueType ? _libraryTypes.ValueTypeSetter_2 : _libraryTypes.Action_2)
-                    .ToTypeSyntax(_member.GetTypeSyntax(ContainingType), TypeSyntax);
+                var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.Action_2) : (valueType ? library.ValueTypeGetter_2 : library.Func_2))
+                    .ToTypeSyntax(containingTypeSyntax, fieldType);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
-                var fieldInfo = GetGetFieldInfoExpression(ContainingType, MemberName);
-                var accessorMethod = isContainedByValueType ? "GetValueSetter" : "GetReferenceSetter";
-                var accessorInvoke = CastExpression(
-                    fieldType,
+                var accessorMethod = setter ? (valueType ? "GetValueSetter" : "GetReferenceSetter") : (valueType ? "GetValueGetter" : "GetGetter");
+                var accessorInvoke = CastExpression(delegateType,
                     InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                        .AddArgumentListArguments(Argument(fieldInfo)));
+                        .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
 
-                var initializationSyntax = ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(SetterFieldName), accessorInvoke));
-
-                return new SetterFieldDescription(fieldType, SetterFieldName, initializationSyntax);
-            }
-
-            public static InvocationExpressionSyntax GetGetFieldInfoExpression(INamedTypeSymbol containingType, string fieldName)
-            {
-                var bindingFlags = SymbolSyntaxExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
-                    SyntaxKind.BitwiseOrExpression,
-                    BindingFlags.Instance,
-                    BindingFlags.NonPublic,
-                    BindingFlags.Public);
-                return InvocationExpression(TypeOfExpression(containingType.ToTypeSyntax()).Member("GetField"))
-                            .AddArgumentListArguments(
-                                Argument(fieldName.GetLiteralExpression()),
-                                Argument(bindingFlags));
+                return new(delegateType, accessorName, accessorInvoke);
             }
         }
     }

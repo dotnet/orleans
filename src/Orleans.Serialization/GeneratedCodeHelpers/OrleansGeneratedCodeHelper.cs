@@ -68,21 +68,17 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     }
                 }
 
-                return Unwrap(ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services));
-            }
-            finally
-            {
-                state.Exit();
-            }
-
-            static TService Unwrap(TService val)
-            {
+                var val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
                 }
 
                 return val;
+            }
+            finally
+            {
+                state.Exit();
             }
         }
 
@@ -295,6 +291,14 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Default copier for shallow-copyable types
+        /// </summary>
+        public sealed class DefaultShallowCopier<T> : IDeepCopier<T>
+        {
+            public T DeepCopy(T input, CopyContext _) => input;
         }
     }
 }
