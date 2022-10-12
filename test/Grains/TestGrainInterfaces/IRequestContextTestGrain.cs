@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 
@@ -15,8 +15,6 @@ namespace UnitTests.GrainInterfaces
         Task<string> TraceIdDelayedEcho2();
 
         Task<Guid> E2EActivityId();
-
-        Task<Guid> E2ELegacyActivityId();
     }
 
     public interface IRequestContextTaskGrain : IGrainWithIntegerKey

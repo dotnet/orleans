@@ -880,8 +880,9 @@ namespace Orleans.Runtime
 
                 // Handle call-chain reentrancy
                 if (_shared.SchedulingOptions.AllowCallChainReentrancy
-                    && incoming.CallChainId == _blockingRequest.CallChainId
-                    && incoming.CallChainId != Guid.Empty)
+                    && incoming.GetCallChainId() is Guid callChainId
+                    && callChainId == _blockingRequest.GetCallChainId()
+                    && callChainId != Guid.Empty)
                 {
                     return true;
                 }

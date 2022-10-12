@@ -20,32 +20,47 @@ namespace Orleans.Runtime
     /// </remarks>
     public static class RequestContext
     {
-        /// <summary>
-        /// Gets or sets a value indicating whether <c>Trace.CorrelationManager.ActivityId</c> settings should be propagated into grain calls.
-        /// </summary>
-        public static bool PropagateActivityId { get; set; }
-
-        internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
-        internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
+        internal const string CALL_CHAIN_ID_HEADER = "#CCID";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
         internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
 
-        /// <summary>Gets or sets an activity ID that can be used for correlation.</summary>
-        public static Guid ActivityId
+        public static Guid CallChainId
         {
-            get { return (Guid)(Get(E2_E_TRACING_ACTIVITY_ID_HEADER) ?? Guid.Empty); }
+            get => Get(CALL_CHAIN_ID_HEADER) is Guid guid ? guid : Guid.Empty;
             set
             {
                 if (value == Guid.Empty)
                 {
-                    Remove(E2_E_TRACING_ACTIVITY_ID_HEADER);
+                    Remove(CALL_CHAIN_ID_HEADER);
                 }
                 else
-                { 
-                    Set(E2_E_TRACING_ACTIVITY_ID_HEADER, value);
+                {
+                    Set(CALL_CHAIN_ID_HEADER, value);
                 }
             }
+        }
+
+        public static ConfiguredCallChain AllowCallChainReentrancy()
+        {
+            var originalCallChainId = CallChainId;
+            if (originalCallChainId == Guid.Empty)
+            {
+                CallChainId = Guid.NewGuid();
+            }
+
+            return new ConfiguredCallChain(originalCallChainId);
+        }
+
+        public static ConfiguredCallChain SuppressCallChainReentrancy()
+        {
+            var originalCallChainId = CallChainId;
+            if (originalCallChainId != Guid.Empty)
+            {
+                CallChainId = Guid.Empty;
+            }
+
+            return new ConfiguredCallChain(originalCallChainId);
         }
 
         /// <summary>
@@ -100,7 +115,6 @@ namespace Orleans.Runtime
             values[key] = value;
             CallContextData.Value = new ContextProperties
             {
-                RequestObject = properties.RequestObject,
                 Values = values
             };
         }
@@ -124,7 +138,6 @@ namespace Orleans.Runtime
             {
                 CallContextData.Value = new ContextProperties
                 {
-                    RequestObject = properties.RequestObject,
                     Values = null
                 };
                 return true;
@@ -135,7 +148,6 @@ namespace Orleans.Runtime
                 newValues.Remove(key);
                 CallContextData.Value = new ContextProperties
                 {
-                    RequestObject = properties.RequestObject,
                     Values = newValues
                 };
                 return true;
@@ -154,18 +166,22 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <summary>
-        /// Gets the currently executing request.
-        /// </summary>
-        internal static object RequestObject => CallContextData.Value.RequestObject;
-
         internal readonly struct ContextProperties
         {
-            public object RequestObject { get; init; }
-
             public Dictionary<string, object> Values { get; init; }
+            public bool IsDefault => Values is null;
+        }
 
-            public bool IsDefault => RequestObject is null && Values is null;
+        public readonly struct ConfiguredCallChain : IDisposable
+        {
+            private readonly Guid _originalCallChainId;
+
+            public ConfiguredCallChain(Guid originalCallChainId)
+            {
+                _originalCallChainId = originalCallChainId;
+            }
+
+            public void Dispose() => CallChainId = _originalCallChainId;
         }
     }
 }

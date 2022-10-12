@@ -208,11 +208,6 @@ namespace Orleans.Runtime.Messaging
                 writer.WriteVarUInt32(value.InterfaceVersion);
             }
 
-            if (headers.HasFlag(MessageFlags.HasCallChainId))
-            {
-                GuidCodec.WriteRaw(ref writer, value.CallChainId);
-            }
-
             if (headers.HasFlag(MessageFlags.HasCacheInvalidationHeader))
             {
                 WriteCacheInvalidationHeaders(ref writer, value.CacheInvalidationHeader);
@@ -256,11 +251,6 @@ namespace Orleans.Runtime.Messaging
             if (headers.HasFlag(MessageFlags.HasInterfaceVersion))
             {
                 result.InterfaceVersion = (ushort)reader.ReadVarUInt32();
-            }
-
-            if (headers.HasFlag(MessageFlags.HasCallChainId))
-            {
-                result.CallChainId = GuidCodec.ReadRaw(ref reader);
             }
 
             if (headers.HasFlag(MessageFlags.HasCacheInvalidationHeader))

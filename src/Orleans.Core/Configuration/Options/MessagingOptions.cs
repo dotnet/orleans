@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -37,12 +36,6 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>Messages are dropped once they expire, by default.</value>
         public bool DropExpiredMessages { get; set; } = true;
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the current activity id should be propagated into grain calls.
-        /// </summary>
-        /// <value>Activity ids are not propagates into grain calls by default.</value>
-        public bool PropagateActivityId { get; set; } = false;
 
         /// <summary>
         /// The maximum number of times a message send attempt will be retried.

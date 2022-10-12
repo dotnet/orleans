@@ -252,9 +252,9 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (message.RequestContextData is { Count: > 0 } || message.CallChainId != Guid.Empty)
+                if (message.RequestContextData is { Count: > 0 })
                 {
-                    RequestContextExtensions.Import(message.RequestContextData, message);
+                    RequestContextExtensions.Import(message.RequestContextData);
                 }
 
                 Response response;

@@ -22,8 +22,6 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
-            var (requestContextData, runningRequest) = RequestContextExtensions.ExportInternal(this.deepCopier);
-
             var message = new Message
             {
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
@@ -32,17 +30,8 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
-                RequestContextData = requestContextData,
+                RequestContextData = RequestContextExtensions.Export(this.deepCopier),
             };
-
-            if (runningRequest is Message msg && msg.CallChainId != Guid.Empty)
-            {
-                message.CallChainId = msg.CallChainId;
-            }
-            else if (RequestContext.PropagateActivityId)
-            {
-                message.CallChainId = Guid.NewGuid();
-            }
 
             messagingTrace.OnCreateMessage(message);
             return message;
@@ -58,7 +47,6 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
-                CallChainId = request.CallChainId,
                 TargetGrain = request.SendingGrain,
                 SendingSilo = request.TargetSilo,
                 SendingGrain = request.TargetGrain,

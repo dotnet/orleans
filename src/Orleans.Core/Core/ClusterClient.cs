@@ -36,9 +36,6 @@ namespace Orleans
             _logger = loggerFactory.CreateLogger<ClusterClient>();
             _clusterClientLifecycle = new ClusterClientLifecycle(_logger);
 
-            //set PropagateActivityId flag from node config
-            RequestContext.PropagateActivityId |= clientMessagingOptions.Value.PropagateActivityId;
-
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
             foreach (var participant in lifecycleParticipants)
