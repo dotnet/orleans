@@ -8,6 +8,9 @@ using System.Linq;
 using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System.Collections.Immutable;
+using Orleans.CodeGenerator.Hashing;
+using System.Text;
+using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator
 {
@@ -52,18 +55,12 @@ namespace Orleans.CodeGenerator
                     var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(LibraryTypes, type, method);
                     metadataModel.SerializableTypes.Add(generatedInvokerDescription);
                     metadataModel.GeneratedInvokables[method] = generatedInvokerDescription;
+                    if (generatedInvokerDescription.CompoundTypeAliasArguments is { Length: > 0 } compoundTypeAliasArguments)
+                    {
+                        metadataModel.CompoundTypeAliases.Add(compoundTypeAliasArguments, generatedInvokerDescription.OpenTypeSyntax);
+                    }
+
                     AddMember(ns, invokable);
-
-                    var methodSymbol = method.Method;
-                    if (GetWellKnownTypeId(methodSymbol) is uint wellKnownTypeId)
-                    {
-                        metadataModel.WellKnownTypeIds.Add((generatedInvokerDescription.OpenTypeSyntax, wellKnownTypeId));
-                    }
-
-                    if (GetTypeAlias(methodSymbol) is string typeAlias)
-                    {
-                        metadataModel.TypeAliases.Add((generatedInvokerDescription.OpenTypeSyntax, typeAlias));
-                    }
                 }
 
                 var (proxy, generatedProxyDescription) = ProxyGenerator.Generate(LibraryTypes, type, metadataModel);
@@ -187,9 +184,14 @@ namespace Orleans.CodeGenerator
                         metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
                     }
 
-                    if (GetTypeAlias(symbol) is string typeAlias)
+                    if (GetAlias(symbol) is string typeAlias)
                     {
                         metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
+                    }
+
+                    if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
+                    {
+                        metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
                     }
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
@@ -271,7 +273,7 @@ namespace Orleans.CodeGenerator
                                 this,
                                 semanticModel,
                                 symbol,
-                                GetTypeAlias(symbol) ?? symbol.Name,
+                                GetAlias(symbol) ?? symbol.Name,
                                 baseClass,
                                 isExtension,
                                 invokableBaseTypes);
@@ -452,7 +454,7 @@ namespace Orleans.CodeGenerator
         // Returns descriptions of all data members (fields and properties)
         private IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
         {
-            var members = new Dictionary<(ushort, bool), IMemberDescription>();
+            var members = new Dictionary<(uint, bool), IMemberDescription>();
 
             foreach (var member in fieldIdAssignmentHelper.Members)
             {
@@ -478,9 +480,9 @@ namespace Orleans.CodeGenerator
             return members.Values;
         }
 
-        public ushort? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
+        public uint? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
 
-        internal static ushort? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
+        internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
         {
             var idAttr = memberSymbol.GetAttributes().FirstOrDefault(attr => libraryTypes.IdAttributeTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, attr.AttributeClass)));
             if (idAttr is null)
@@ -488,25 +490,73 @@ namespace Orleans.CodeGenerator
                 return null;
             }
 
-            var id = (ushort)idAttr.ConstructorArguments.First().Value;
+            var id = (uint)idAttr.ConstructorArguments.First().Value;
             return id;
         }
 
-        private uint? GetWellKnownTypeId(ISymbol symbol)
+        internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
         {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownIdAttribute, attr.AttributeClass));
-            if (attr is null)
+            var methodSignature = Format(methodSymbol);
+            var hash = XxHash32.Hash(Encoding.UTF8.GetBytes(methodSignature));
+            return $"{HexConverter.ToString(hash)}";
+
+            static string Format(IMethodSymbol methodInfo)
             {
-                return null;
-            }
+                var result = new StringBuilder();
+                result.Append(methodInfo.ContainingType.ToDisplayName());
+                result.Append('.');
+                result.Append(methodInfo.Name);
 
-            var id = (uint)attr.ConstructorArguments.First().Value;
-            return id;
+                if (methodInfo.IsGenericMethod)
+                {
+                    result.Append('<');
+                    var first = true;
+                    foreach (var typeArgument in methodInfo.TypeArguments)
+                    {
+                        if (!first) result.Append(',');
+                        else first = false;
+                        result.Append(typeArgument.Name);
+                    }
+
+                    result.Append('>');
+                }
+
+                {
+                    result.Append('(');
+                    var parameters = methodInfo.Parameters;
+                    var first = true;
+                    foreach (var parameter in parameters)
+                    {
+                        if (!first)
+                        {
+                            result.Append(',');
+                        }
+
+                        var parameterType = parameter.Type;
+                        switch (parameterType)
+                        {
+                            case ITypeParameterSymbol _:
+                                result.Append(parameterType.Name);
+                                break;
+                            default:
+                                result.Append(parameterType.ToDisplayName());
+                                break;
+                        }
+
+                        first = false;
+                    }
+                }
+
+                result.Append(')');
+                return result.ToString();
+            }
         }
 
-        private string GetTypeAlias(ISymbol symbol)
+        private uint? GetWellKnownTypeId(ISymbol symbol) => GetId(symbol);
+
+        public string GetAlias(ISymbol symbol)
         {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.AliasAttribute, attr.AttributeClass));
             if (attr is null)
             {
                 return null;
@@ -514,6 +564,41 @@ namespace Orleans.CodeGenerator
 
             var value = (string)attr.ConstructorArguments.First().Value;
             return value;
+        }
+
+        private CompoundTypeAliasComponent[] GetCompoundTypeAlias(ISymbol symbol)
+        {
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.CompoundTypeAliasAttribute, attr.AttributeClass));
+            if (attr is null)
+            {
+                return null;
+            }
+
+            var allArgs = attr.ConstructorArguments;
+            if (allArgs.Length != 1 || allArgs[0].Values.Length == 0)
+            {
+                throw new ArgumentException($"Unsupported arguments in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
+            }
+
+            var args = allArgs[0].Values;
+            var result = new CompoundTypeAliasComponent[args.Length];
+            for (var i = 0; i < args.Length; i++)
+            {
+                var arg = args[i];
+                if (arg.IsNull)
+                {
+                    throw new ArgumentNullException($"Unsupported null argument in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
+                }
+
+                result[i] = arg.Value switch
+                {
+                    ITypeSymbol type => new CompoundTypeAliasComponent(type),
+                    string str => new CompoundTypeAliasComponent(str),
+                    _ => throw new ArgumentException($"Unrecognized argument type for argument {arg.ToCSharpString()} in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]"),
+                };
+            }
+
+            return result;
         }
 
         // Returns true if the type declaration has the specified attribute.

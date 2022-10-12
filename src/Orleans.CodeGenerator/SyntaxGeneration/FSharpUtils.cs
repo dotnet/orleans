@@ -117,7 +117,7 @@ namespace Orleans.CodeGenerator
 
                 dataMembers.Sort(FSharpUnionCasePropertyNameComparer.Default);
 
-                ushort id = 0;
+                uint id = 0;
                 foreach (var field in dataMembers)
                 {
                     yield return new FSharpUnionCaseFieldDescription(libraryTypes, field, id);
@@ -152,14 +152,14 @@ namespace Orleans.CodeGenerator
                 private readonly LibraryTypes _libraryTypes;
                 private readonly IPropertySymbol _property;
 
-                public FSharpUnionCaseFieldDescription(LibraryTypes libraryTypes, IPropertySymbol property, ushort ordinal)
+                public FSharpUnionCaseFieldDescription(LibraryTypes libraryTypes, IPropertySymbol property, uint ordinal)
                 {
                     _libraryTypes = libraryTypes;
                     FieldId = ordinal;
                     _property = property;
                 }
 
-                public ushort FieldId { get; }
+                public uint FieldId { get; }
 
                 public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
@@ -242,7 +242,7 @@ namespace Orleans.CodeGenerator
 
             private static IEnumerable<IMemberDescription> GetRecordDataMembers(LibraryTypes libraryTypes, INamedTypeSymbol symbol)
             {
-                List<(IPropertySymbol, ushort)> dataMembers = new();
+                List<(IPropertySymbol, uint)> dataMembers = new();
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
                     var id = CodeGenerator.GetId(libraryTypes, property);
@@ -265,14 +265,14 @@ namespace Orleans.CodeGenerator
                 private readonly LibraryTypes _libraryTypes;
                 private readonly IPropertySymbol _property;
 
-                public FSharpRecordPropertyDescription(LibraryTypes libraryTypes, IPropertySymbol property, ushort ordinal)
+                public FSharpRecordPropertyDescription(LibraryTypes libraryTypes, IPropertySymbol property, uint ordinal)
                 {
                     _libraryTypes = libraryTypes;
                     FieldId = ordinal;
                     _property = property;
                 }
 
-                public ushort FieldId { get; }
+                public uint FieldId { get; }
 
                 public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 

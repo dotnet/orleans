@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for well-known <see cref="StringComparer"/> types.
     /// </summary>
-    [WellKnownAlias("StringComparer")]
+    [Alias("StringComparer")]
     public sealed class WellKnownStringComparerCodec : IGeneralizedCodec
     {
         private static readonly Type CodecType = typeof(WellKnownStringComparerCodec);

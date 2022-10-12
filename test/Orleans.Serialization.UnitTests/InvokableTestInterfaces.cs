@@ -13,6 +13,7 @@ public interface IHasNoNamespace : IMyInvokableBaseType
 
 namespace Orleans.Serialization.UnitTests
 {
+    [Alias("_my_proxy_base_")]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
@@ -20,21 +21,34 @@ namespace Orleans.Serialization.UnitTests
     [DefaultInvokableBaseType(typeof(void), typeof(UnitTestVoidRequest))]
     public abstract class MyInvokableProxyBase
     {
-        protected void SendRequest(IResponseCompletionSource callback, IInvokable body)
+        public Action<IInvokable> OnInvoke { get; set; }
+
+        protected MyInvokableProxyBase(CopyContextPool copyContextPool, CodecProvider codecProvider)
         {
+            CopyContextPool = copyContextPool;
+            CodecProvider = codecProvider;
         }
         
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
-        protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+        protected ValueTask<T> InvokeAsync<T>(IInvokable body)
+        {
+            OnInvoke?.Invoke(body);
+            return default;
+        }
 
-        protected ValueTask InvokeAsync(IInvokable body) => default;
+        protected ValueTask InvokeAsync(IInvokable body)
+        {
+            OnInvoke?.Invoke(body);
+            return default;
+        }
 
         protected CopyContextPool CopyContextPool { get; }
 
         protected CodecProvider CodecProvider { get; }
     }
 
+    [Alias("groan")]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(UnitTestRequest))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(UnitTestTaskRequest<>))]
@@ -42,10 +56,6 @@ namespace Orleans.Serialization.UnitTests
     [DefaultInvokableBaseType(typeof(void), typeof(UnitTestVoidRequest))]
     public abstract class AltInvokableProxyBase
     {
-        protected void InvokeVoid(IInvokable body)
-        {
-        }
-
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
         protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
@@ -57,8 +67,35 @@ namespace Orleans.Serialization.UnitTests
         protected CodecProvider CodecProvider { get; }
     }
 
+    [Alias("my_interface")]
     [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
-    public interface IMyInvokableBaseType { }
+    public interface IMyInvokableBaseType
+    {
+    }
+
+    [Alias("_proxy_alias_test_")]
+    [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
+    public interface IProxyAliasTestGrain
+    {
+        [Id(125)]
+        ValueTask Method();
+
+        [Alias("Method")]
+        ValueTask Method(int a);
+
+        [Alias("StringMethod")]
+        ValueTask Method(string a);
+
+        [Alias("MyOtherMethod")]
+        ValueTask OtherMethod();
+    }
+
+    [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
+    public interface IGenericProxyAliasTestGrain<T, U, V>
+    {
+        [Id(777)]
+        ValueTask Method<W, X, Y>();
+    }
 
     public interface IG2<T1, T2> : IMyInvokableBaseType 
     { }

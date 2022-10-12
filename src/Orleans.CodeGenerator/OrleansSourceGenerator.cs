@@ -71,6 +71,8 @@ namespace Orleans.CodeGenerator
 
             static bool HandleException(GeneratorExecutionContext context, Exception exception)
             {
+                Console.WriteLine(exception);
+
                 if (exception is OrleansGeneratorDiagnosticAnalysisException analysisException)
                 {
                     context.ReportDiagnostic(analysisException.Diagnostic);

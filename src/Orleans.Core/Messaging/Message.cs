@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    [WellKnownId(101)]
+    [Id(101)]
     internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;

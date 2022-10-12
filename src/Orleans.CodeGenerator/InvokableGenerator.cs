@@ -15,7 +15,7 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal static class InvokableGenerator
     {
-        public static (ClassDeclarationSyntax, GeneratedInvokerDescription) Generate(
+        public static (ClassDeclarationSyntax Syntax, GeneratedInvokerDescription InvokerDescription) Generate(
             LibraryTypes libraryTypes,
             InvokableInterfaceDescription interfaceDescription,
             MethodDescription method)
@@ -35,11 +35,13 @@ namespace Orleans.CodeGenerator
                 Accessibility.Public => SyntaxKind.PublicKeyword,
                 _ => SyntaxKind.InternalKeyword,
             };
+            var compoundTypeAliasArgs = GetCompoundTypeAliasAttributeArguments(method);
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())),
+                    AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(libraryTypes, compoundTypeAliasArgs))))
                 .AddMembers(fields);
 
             if (ctor != null)
@@ -83,7 +85,8 @@ namespace Orleans.CodeGenerator
                 fieldDescriptions.OfType<IMemberDescription>().ToList(),
                 serializationHooks,
                 baseClassType,
-                ctorArgs);
+                ctorArgs,
+                compoundTypeAliasArgs);
             return (classDeclaration, invokerDescription);
 
             static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)
@@ -106,6 +109,36 @@ namespace Orleans.CodeGenerator
 
         private static ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
             => decl.WithMembers(decl.Members.AddRange(items.Where(i => i != null)));
+
+        internal static AttributeSyntax GetCompoundTypeAliasAttribute(LibraryTypes libraryTypes, CompoundTypeAliasComponent[] argValues)
+        {
+            var args = new AttributeArgumentSyntax[argValues.Length];
+            for (var i = 0; i < argValues.Length; i++)
+            {
+                ExpressionSyntax value;
+                value = argValues[i].Value switch
+                {
+                    string stringValue => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringValue)),
+                    ITypeSymbol typeValue => TypeOfExpression(typeValue.ToOpenTypeSyntax()),
+                    _ => throw new InvalidOperationException($"Unsupported value")
+                };
+
+                args[i] = AttributeArgument(value);
+            }
+
+            return Attribute(libraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
+        }
+
+        internal static CompoundTypeAliasComponent[] GetCompoundTypeAliasAttributeArguments(MethodDescription methodDescription)
+        {
+            return new CompoundTypeAliasComponent[4]
+            {
+                    new CompoundTypeAliasComponent("inv"),
+                    new CompoundTypeAliasComponent(methodDescription.ContainingInterface.ProxyBaseType),
+                    new CompoundTypeAliasComponent(methodDescription.ContainingInterface.InterfaceType),
+                    new CompoundTypeAliasComponent(methodDescription.MethodId)
+            };
+        }
 
         private static INamedTypeSymbol GetBaseClassType(MethodDescription method)
         {
@@ -455,7 +488,7 @@ namespace Orleans.CodeGenerator
         {
             var genericArity = method.AllTypeParameters.Count;
             var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
-            return $"Invokable_{interfaceDescription.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.Name}{typeArgs}";
+            return $"Invokable_{interfaceDescription.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
         }
 
         private static MemberDeclarationSyntax[] GetFieldDeclarations(
@@ -579,7 +612,7 @@ namespace Orleans.CodeGenerator
         {
             var fields = new List<InvokerFieldDescripton>();
 
-            ushort fieldId = 0;
+            uint fieldId = 0;
             foreach (var parameter in method.Method.Parameters)
             {
                 fields.Add(new MethodParameterFieldDescription(method, parameter, $"arg{fieldId}", fieldId));
@@ -616,7 +649,7 @@ namespace Orleans.CodeGenerator
 
         internal sealed class MethodParameterFieldDescription : InvokerFieldDescripton, IMemberDescription
         {
-            public MethodParameterFieldDescription(MethodDescription method, IParameterSymbol parameter, string fieldName, ushort fieldId)
+            public MethodParameterFieldDescription(MethodDescription method, IParameterSymbol parameter, string fieldName, uint fieldId)
                 : base(parameter.Type, fieldName)
             {
                 Method = method;
@@ -639,7 +672,7 @@ namespace Orleans.CodeGenerator
             public ISymbol Symbol { get; }
             public MethodDescription Method { get; }
             public int ParameterOrdinal => Parameter.Ordinal;
-            public ushort FieldId { get; }
+            public uint FieldId { get; }
             public ISymbol Member => Parameter;
             public ITypeSymbol Type => FieldType;
             public INamedTypeSymbol ContainingType => Parameter.ContainingType;

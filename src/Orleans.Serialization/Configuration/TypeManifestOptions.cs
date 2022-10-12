@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization.Configuration
 {
@@ -74,6 +75,11 @@ namespace Orleans.Serialization.Configuration
         /// Gets the mapping of allowed type names.
         /// </summary>
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Gets the mapping from compound type aliases to types.
+        /// </summary>
+        public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
 
         /// <summary>
         /// Gets or sets a value indicating whether to allow all types by default.

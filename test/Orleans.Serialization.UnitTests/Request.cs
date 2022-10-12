@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.Invocation
 {
+    [GenerateSerializer]
     public abstract class UnitTestRequestBase : IInvokable
     {
         public virtual int GetArgumentCount() => 0;
@@ -23,6 +24,7 @@ namespace Orleans.Serialization.Invocation
         public abstract MethodInfo GetMethod();
     }
 
+    [GenerateSerializer]
     public abstract class UnitTestRequest : UnitTestRequestBase
     {
         [DebuggerHidden]
@@ -64,6 +66,7 @@ namespace Orleans.Serialization.Invocation
         protected abstract ValueTask InvokeInner();
     }
 
+    [GenerateSerializer]
     public abstract class UnitTestRequest<TResult> : UnitTestRequestBase
     {
         [DebuggerHidden]
@@ -104,6 +107,7 @@ namespace Orleans.Serialization.Invocation
         protected abstract ValueTask<TResult> InvokeInner();
     }
 
+    [GenerateSerializer]
     public abstract class UnitTestTaskRequest<TResult> : UnitTestRequestBase
     {
         [DebuggerHidden]
@@ -145,6 +149,7 @@ namespace Orleans.Serialization.Invocation
         protected abstract Task<TResult> InvokeInner();
     }
 
+    [GenerateSerializer]
     public abstract class UnitTestTaskRequest : UnitTestRequestBase
     {
         [DebuggerHidden]
@@ -187,6 +192,7 @@ namespace Orleans.Serialization.Invocation
         protected abstract Task InvokeInner();
     }
 
+    [GenerateSerializer]
     public abstract class UnitTestVoidRequest : UnitTestRequestBase
     {
         [DebuggerHidden]

@@ -58,7 +58,7 @@ namespace Orleans.Utilities
                 typeSpecs[i] = RuntimeTypeNameParser.Parse(formatter.Format(typeArguments[i]));
             }
 
-            var constructed = new ConstructedGenericTypeSpec(new NamedTypeSpec(null, unconstructed.ToString(), typeArguments.Length), typeSpecs).Format();
+            var constructed = new ConstructedGenericTypeSpec(new NamedTypeSpec(null, unconstructed.ToString(), typeArguments.Length), typeArguments.Length, typeSpecs).Format();
             return IdSpan.Create(constructed);
         }
 

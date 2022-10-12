@@ -18,7 +18,7 @@ internal class FieldIdAssignmentHelper
     private readonly ImmutableArray<IParameterSymbol> _constructorParameters;
     private readonly LibraryTypes _libraryTypes;
     private readonly ISymbol[] _memberSymbols;
-    private readonly Dictionary<ISymbol, (ushort, bool)> _symbols = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, (uint, bool)> _symbols = new(SymbolEqualityComparer.Default);
 
     public bool IsValidForSerialization { get; }
     public string? FailureReason { get; private set; }
@@ -35,7 +35,7 @@ internal class FieldIdAssignmentHelper
         IsValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation() ? GenerateImplicitFieldIds() : ExtractFieldIdAnnotations();
     }
 
-    public bool TryGetSymbolKey(ISymbol symbol, out (ushort, bool) key) => _symbols.TryGetValue(symbol, out key);
+    public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
     private bool HasMemberWithIdAnnotation() => _memberSymbols.Any(member => _libraryTypes.IdAttributeTypes.Any(member.HasAttribute));
 
@@ -95,7 +95,7 @@ internal class FieldIdAssignmentHelper
                         var constructorParameter = _constructorParameters.FirstOrDefault(x => x.Name.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
                         if (constructorParameter is not null)
                         {
-                            id = (ushort)_constructorParameters.IndexOf(constructorParameter);
+                            id = (uint)_constructorParameters.IndexOf(constructorParameter);
                             isConstructorParameter = true;
                         }
                     }
@@ -110,14 +110,14 @@ internal class FieldIdAssignmentHelper
         return true;
     }
 
-    private (string, ushort) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
+    private (string, uint) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
     {
         name = PropertyUtility.GetCanonicalName(name);
 
         // compute the hash from the type name (without namespace, to allow it to move around) and name
         var typeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var hashCode = ComputeHash($"{typeName}%{name}");
-        return (name, (ushort)hashCode);
+        return (name, (uint)hashCode);
 
         static unsafe uint ComputeHash(string data)
         {
@@ -130,7 +130,7 @@ internal class FieldIdAssignmentHelper
 
     private bool GenerateImplicitFieldIds()
     {
-        var constructorFieldIds = new Dictionary<string, ushort>();
+        var constructorFieldIds = new Dictionary<string, uint>();
         foreach (var parameter in _constructorParameters)
         {
             var (canonicalName, fieldId) = GetCanonicalNameAndFieldId(parameter.Type, parameter.Name);

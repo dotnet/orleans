@@ -26,6 +26,7 @@ namespace Orleans.CodeGenerator
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
                 IOptionalDeepCopier = Type("Orleans.Serialization.Cloning.IOptionalDeepCopier"),
+                CompoundTypeAliasAttribute = Type("Orleans.CompoundTypeAliasAttribute"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
                 CopyContextPool = Type("Orleans.Serialization.Cloning.CopyContextPool"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
@@ -37,8 +38,7 @@ namespace Orleans.CodeGenerator
                 IBufferWriter = Type("System.Buffers.IBufferWriter`1"),
                 IdAttributeTypes = options.IdAttributes.Select(Type).ToList(),
                 ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToList(),
-                WellKnownAliasAttribute = Type("Orleans.WellKnownAliasAttribute"),
-                WellKnownIdAttribute = Type("Orleans.WellKnownIdAttribute"),
+                AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
                 DefaultInvokeMethodNameAttribute = Type("Orleans.DefaultInvokeMethodNameAttribute"),
                 InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute"),
@@ -236,6 +236,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
         public INamedTypeSymbol FieldCodec { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }
+        public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
         public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
         public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
         public INamedTypeSymbol IActivator_1 { get; private set; }
@@ -271,8 +272,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Writer { get; private set; }
         public List<INamedTypeSymbol> IdAttributeTypes { get; private set; }
         public List<INamedTypeSymbol> ConstructorAttributeTypes { get; private set; }
-        public INamedTypeSymbol WellKnownAliasAttribute { get; private set; }
-        public INamedTypeSymbol WellKnownIdAttribute { get; private set; }
+        public INamedTypeSymbol AliasAttribute { get; private set; }
         public List<WellKnownCodecDescription> StaticCodecs { get; private set; }
         public List<WellKnownCodecDescription> WellKnownCodecs { get; private set; }
         public List<WellKnownCopierDescription> StaticCopiers { get; private set; }

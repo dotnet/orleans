@@ -24,9 +24,11 @@ namespace Orleans.Serialization.TypeSystem
         private readonly ITypeNameFilter[] _typeNameFilters;
         private readonly ITypeFilter[] _typeFilters;
         private readonly bool _allowAllTypes;
+        private readonly CompoundTypeAliasTree _compoundTypeAliases;
         private readonly TypeResolver _resolver;
         private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
         private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
+        private readonly RuntimeTypeNameRewriter.CompoundAliasResolver<ValidationResult> _compoundAliasResolver;
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
         private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
@@ -75,8 +77,10 @@ namespace Orleans.Serialization.TypeSystem
             _typeNameFilters = typeNameFilters.ToArray();
             _typeFilters = typeFilters.ToArray();
             _allowAllTypes = options.Value.AllowAllTypes;
+            _compoundTypeAliases = options.Value.CompoundTypeAliases;
             _convertToDisplayName = ConvertToDisplayName;
             _convertFromDisplayName = ConvertFromDisplayName;
+            _compoundAliasResolver = ResolveCompoundAliasType;
 
             _wellKnownAliasToType = new Dictionary<QualifiedType, QualifiedType>();
             _wellKnownTypeToAlias = new Dictionary<QualifiedType, QualifiedType>();
@@ -204,7 +208,7 @@ namespace Orleans.Serialization.TypeSystem
 
                 // Use the type name rewriter to visit every component of the type.
                 var converter = this;
-                _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType, ref converter);
+                _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType, ResolveCompoundAliasType, ref converter);
                 static QualifiedType AddQualifiedType(in QualifiedType type, ref TypeConverter self)
                 {
                     self._allowedTypes[type] = true;
@@ -281,7 +285,7 @@ namespace Orleans.Serialization.TypeSystem
 
             var runtimeTypeSpec = RuntimeTypeNameParser.Parse(runtimeType);
             ValidationResult validationState = default;
-            var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName, ref validationState);
+            var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName, compoundAliasRewriter: null, ref validationState);
             if (rewriter is not null)
             {
                 displayTypeSpec = rewriter(displayTypeSpec);
@@ -308,13 +312,18 @@ namespace Orleans.Serialization.TypeSystem
         private bool ParseInternal(string formatted, out Type type)
         {
             var parsed = RuntimeTypeNameParser.Parse(formatted);
+            return ParseInternal(parsed, out type);
+        }
+
+        private bool ParseInternal(TypeSpec parsed, out Type type)
+        {
             ValidationResult validationState = default;
-            var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName, ref validationState);
+            var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName, _compoundAliasResolver, ref validationState);
             var runtimeType = runtimeTypeSpec.Format();
 
             if (validationState.IsTypeNameAllowed == false)
             {
-                ThrowTypeNotAllowed(formatted, validationState.ErrorTypes);
+                ThrowTypeNotAllowed(parsed.Format(), validationState.ErrorTypes);
             }
 
             foreach (var converter in _converters)
@@ -534,6 +543,45 @@ namespace Orleans.Serialization.TypeSystem
 
                 return null;
             }
+        }
+
+        private TypeSpec ResolveCompoundAliasType<TState>(TupleTypeSpec input, ref TState state)
+        {
+            var resolvedElements = new object[input.Elements.Length];
+            for (var i = 0; i < input.Elements.Length; i++)
+            {
+                var inputElement = input.Elements[i];
+                if (inputElement is LiteralTypeSpec literal)
+                {
+                    resolvedElements[i] = literal.Value;
+                }
+                else
+                {
+                    if (!ParseInternal(inputElement, out var type))
+                    {
+                        throw new TypeLoadException($"Unable to parse or load type \"{inputElement.Format()}\".");
+                    }
+
+                    resolvedElements[i] = type;
+                }
+            }
+
+            var tree = _compoundTypeAliases;
+            foreach (var element in resolvedElements)
+            {
+                tree = tree?.GetChildOrDefault(element);
+                if (tree is null) break;
+            }
+
+            var resultType = tree?.Value;
+            if (resultType is null)
+            {
+                throw new TypeLoadException($"Unable to resolve type alias \"{input.Format()}\".");
+            }
+
+            var formatted = RuntimeTypeNameFormatter.FormatInternalNoCache(resultType, allowAliases: false);
+            var parsed = RuntimeTypeNameParser.Parse(formatted);
+            return parsed;
         }
     }
 }

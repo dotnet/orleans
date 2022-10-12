@@ -13,7 +13,7 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization;
 
-[WellKnownAlias(WellKnownAlias)]
+[Alias(WellKnownAlias)]
 public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {
     private static readonly Type SelfType = typeof(NewtonsoftJsonCodec);

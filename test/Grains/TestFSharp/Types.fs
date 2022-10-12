@@ -9,21 +9,21 @@ type SingleCaseDU =
     static member ofInt i = SingleCaseDU i
 
 [<Immutable; GenerateSerializer>]
-type Record = {  [<Id(1us)>] A: SingleCaseDU } with
+type Record = {  [<Id(1u)>] A: SingleCaseDU } with
     static member ofInt x = { A = SingleCaseDU.ofInt x }
 
 [<Immutable; GenerateSerializer>]
-type RecordOfIntOption = {  [<Id(1us)>] A: int option } with
+type RecordOfIntOption = {  [<Id(1u)>] A: int option } with
     static member Empty = { A = None }
     static member ofInt x = { A = Some x}
 
 [<Immutable; GenerateSerializer>]
-type RecordOfIntOptionWithNoAttributes = {  [<Id(1us)>] A: int option } with
+type RecordOfIntOptionWithNoAttributes = {  [<Id(1u)>] A: int option } with
     static member Empty = { A = None }
     static member ofInt x = { A = Some x}
 
 [<Immutable; GenerateSerializer>]
-type GenericRecord<'T> = { [<Id(1us)>] Value: 'T } with
+type GenericRecord<'T> = { [<Id(1u)>] Value: 'T } with
     static member ofT x = { Value = x }
 
 [<Immutable; GenerateSerializer>]

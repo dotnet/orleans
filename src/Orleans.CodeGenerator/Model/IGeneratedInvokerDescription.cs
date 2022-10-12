@@ -22,7 +22,8 @@ namespace Orleans.CodeGenerator
             List<IMemberDescription> members,
             List<INamedTypeSymbol> serializationHooks,
             INamedTypeSymbol baseType,
-            List<TypeSyntax> constructorArguments)
+            List<TypeSyntax> constructorArguments,
+            CompoundTypeAliasComponent[] compoundTypeAliasArguments)
         {
             InterfaceDescription = interfaceDescription;
             _methodDescription = methodDescription;
@@ -33,6 +34,7 @@ namespace Orleans.CodeGenerator
             Accessibility = accessibility;
             SerializationHooks = serializationHooks;
             ActivatorConstructorParameters = constructorArguments;
+            CompoundTypeAliasArguments = compoundTypeAliasArguments;
         }
 
         public Accessibility Accessibility { get; }
@@ -62,6 +64,7 @@ namespace Orleans.CodeGenerator
         public bool IsShallowCopyable => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
+        public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax).WithArgumentList(ArgumentList());
 

@@ -267,7 +267,7 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="IdAttribute"/> class.
         /// </summary>
         /// <param name="id">The identifier.</param>
-        public IdAttribute(ushort id)
+        public IdAttribute(uint id)
         {
             Id = id;
         }
@@ -276,7 +276,7 @@ namespace Orleans
         /// Gets the identifier.
         /// </summary>
         /// <value>The identifier.</value>
-        public ushort Id { get; }
+        public uint Id { get; }
     }
 
     /// <summary>
@@ -298,42 +298,6 @@ namespace Orleans
     }
 
     /// <summary>
-    /// When applied to a type or method, indicates that a well-known numeric identifier can be used to uniquely identify that type or method.
-    /// </summary>
-    /// <remarks>
-    /// In the case of a type, the numeric id must be globally unique. In the case of a method, the numeric id must be unique to the declaring type.
-    /// </remarks>
-    /// <seealso cref="System.Attribute" />
-    [AttributeUsage(
-        AttributeTargets.Class
-        | AttributeTargets.Interface
-        | AttributeTargets.Struct
-        | AttributeTargets.Enum
-        | AttributeTargets.Method)]
-    public sealed class WellKnownIdAttribute : Attribute
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="WellKnownIdAttribute"/> class.
-        /// </summary>
-        /// <param name="id">The identifier.</param>
-        /// <remarks>
-        /// In the case of a type, the numeric id must be globally unique. In the case of a method, the numeric id must be unique to the declaring type.
-        /// </remarks>
-        public WellKnownIdAttribute(uint id)
-        {
-            Id = id;
-        }
-
-        /// <summary>
-        /// Gets the identifier.
-        /// </summary>
-        /// <remarks>
-        /// In the case of a type, the numeric id must be globally unique. In the case of a method, the numeric id must be unique to the declaring type.
-        /// </remarks>
-        public uint Id { get; }
-    }
-
-    /// <summary>
     /// When applied to a type or method, specifies a well-known name which can be used to identify that type or method.
     /// </summary>
     /// <remarks>
@@ -346,16 +310,16 @@ namespace Orleans
         | AttributeTargets.Struct
         | AttributeTargets.Enum
         | AttributeTargets.Method)]
-    public sealed class WellKnownAliasAttribute : Attribute
+    public sealed class AliasAttribute : Attribute
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="WellKnownAliasAttribute"/> class.
+        /// Initializes a new instance of the <see cref="AliasAttribute"/> class.
         /// </summary>
         /// <param name="alias">The alias.</param>
         /// <remarks>
         /// In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type.
         /// </remarks>
-        public WellKnownAliasAttribute(string alias)
+        public AliasAttribute(string alias)
         {
             Alias = alias;
         }
@@ -367,6 +331,32 @@ namespace Orleans
         /// In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type.
         /// </remarks>
         public string Alias { get; }
+    }
+
+    /// <summary>
+    /// When applied to a type, indicates that the type should be encoded as a relation from a specified type.
+    /// </summary>
+    /// <seealso cref="Attribute" />
+    [AttributeUsage(
+        AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Struct
+        | AttributeTargets.Enum)]
+    public sealed class CompoundTypeAliasAttribute : Attribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CompoundTypeAliasAttribute"/> class.
+        /// </summary>
+        /// <param name="components">The alias components, each of which must be a <see cref="Components"/> or a <see cref="string"/>.</param>
+        public CompoundTypeAliasAttribute(params object[] components)
+        {
+            Components = components;
+        }
+
+        /// <summary>
+        /// Gets the alias components.
+        /// </summary>
+        public object[] Components { get; }
     }
 
     /// <summary>
