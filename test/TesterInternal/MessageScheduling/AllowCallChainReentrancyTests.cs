@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -48,6 +49,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_1()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_1();
         }
 
@@ -55,6 +57,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task CallChainReentrancy_2()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_2();
         }
 
@@ -62,6 +65,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task CallChainReentrancy_3()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_3();
         }
 
@@ -69,6 +73,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task CallChainReentrancy_4()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_4();
         }
 
@@ -76,6 +81,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task CallChainReentrancy_5()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_5();
         }
 
@@ -83,6 +89,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task CallChainReentrancy_6()
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             await _testHelper.CallChainReentrancy_6();
         }
     }
