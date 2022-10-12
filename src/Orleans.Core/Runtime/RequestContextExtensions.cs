@@ -45,13 +45,13 @@ namespace Orleans.Runtime
             return resultValues;
         }
 
-        internal static Guid GetCallChainId(this Message message) => GetCallChainId(message?.RequestContextData);
+        internal static Guid GetReentrancyId(this Message message) => GetReentrancyId(message?.RequestContextData);
 
-        internal static Guid GetCallChainId(Dictionary<string, object>? contextData)
+        internal static Guid GetReentrancyId(Dictionary<string, object>? contextData)
         {
             if (contextData is not { Count: > 0 }) return Guid.Empty;
-            _ = contextData.TryGetValue(RequestContext.CALL_CHAIN_ID_HEADER, out var callChainId);
-            return callChainId is Guid guid ? guid : Guid.Empty;
+            _ = contextData.TryGetValue(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, out var reentrancyId);
+            return reentrancyId is Guid guid ? guid : Guid.Empty;
         }
     }
 }

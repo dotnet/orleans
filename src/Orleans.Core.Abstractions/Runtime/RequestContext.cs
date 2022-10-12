@@ -20,33 +20,33 @@ namespace Orleans.Runtime
     /// </remarks>
     public static class RequestContext
     {
-        internal const string CALL_CHAIN_ID_HEADER = "#CCID";
+        internal const string CALL_CHAIN_REENTRANCY_HEADER = "#CCR";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
         internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
 
-        public static Guid CallChainId
+        public static Guid ReentrancyId
         {
-            get => Get(CALL_CHAIN_ID_HEADER) is Guid guid ? guid : Guid.Empty;
+            get => Get(CALL_CHAIN_REENTRANCY_HEADER) is Guid guid ? guid : Guid.Empty;
             set
             {
                 if (value == Guid.Empty)
                 {
-                    Remove(CALL_CHAIN_ID_HEADER);
+                    Remove(CALL_CHAIN_REENTRANCY_HEADER);
                 }
                 else
                 {
-                    Set(CALL_CHAIN_ID_HEADER, value);
+                    Set(CALL_CHAIN_REENTRANCY_HEADER, value);
                 }
             }
         }
 
         public static ConfiguredCallChain AllowCallChainReentrancy()
         {
-            var originalCallChainId = CallChainId;
+            var originalCallChainId = ReentrancyId;
             if (originalCallChainId == Guid.Empty)
             {
-                CallChainId = Guid.NewGuid();
+                ReentrancyId = Guid.NewGuid();
             }
 
             return new ConfiguredCallChain(originalCallChainId);
@@ -54,10 +54,10 @@ namespace Orleans.Runtime
 
         public static ConfiguredCallChain SuppressCallChainReentrancy()
         {
-            var originalCallChainId = CallChainId;
+            var originalCallChainId = ReentrancyId;
             if (originalCallChainId != Guid.Empty)
             {
-                CallChainId = Guid.Empty;
+                ReentrancyId = Guid.Empty;
             }
 
             return new ConfiguredCallChain(originalCallChainId);
@@ -181,7 +181,7 @@ namespace Orleans.Runtime
                 _originalCallChainId = originalCallChainId;
             }
 
-            public void Dispose() => CallChainId = _originalCallChainId;
+            public void Dispose() => ReentrancyId = _originalCallChainId;
         }
     }
 }

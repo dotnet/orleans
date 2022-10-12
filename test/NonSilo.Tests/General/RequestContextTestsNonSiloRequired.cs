@@ -77,18 +77,18 @@ namespace UnitTests.General
                 {
                     headers.Add(kvp.Key, kvp.Value);
                 };
-            Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_ID_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
+            Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
-            RequestContext.CallChainId = activityId;
+            RequestContext.ReentrancyId = activityId;
             msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
                 };
-            Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_ID_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
-            object result = headers[RequestContext.CALL_CHAIN_ID_HEADER];
+            Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
+            object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// ActivityId #1 should not be null
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
             Assert.Equal(activityId, RequestContextTestUtils.GetActivityId());  // "Original E2E ActivityId #1 should not have changed"
@@ -101,7 +101,7 @@ namespace UnitTests.General
                 {
                     headers.Add(kvp.Key, kvp.Value);
                 };
-            Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_ID_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
+            Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(activityId2);
@@ -111,8 +111,8 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_ID_HEADER), "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
-            result = headers[RequestContext.CALL_CHAIN_ID_HEADER];
+            Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
+            result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result); // ActivityId #2 should not be null
             Assert.Equal(activityId2, result);  // "E2E ActivityId #2 not propagated correctly"
 
@@ -131,7 +131,7 @@ namespace UnitTests.General
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
-            var actId = RequestContext.Get(RequestContext.CALL_CHAIN_ID_HEADER);
+            var actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             Assert.Null(actId);
             TestCleanup();
 
@@ -140,13 +140,13 @@ namespace UnitTests.General
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
-            actId = RequestContext.Get(RequestContext.CALL_CHAIN_ID_HEADER);
+            actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
                 };
             Assert.NotNull(actId); // "ActivityId #1 should be present " + headers.ToStrings(separator: ",")
-            object result = headers[RequestContext.CALL_CHAIN_ID_HEADER];
+            object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// "ActivityId #1 should not be null"
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
             Assert.Equal(activityId, RequestContextTestUtils.GetActivityId());  // "Original E2E ActivityId #1 should not have changed"
@@ -157,7 +157,7 @@ namespace UnitTests.General
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
-            actId = RequestContext.Get(RequestContext.CALL_CHAIN_ID_HEADER);
+            actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             Assert.Null(actId);
             TestCleanup();
 
@@ -166,13 +166,13 @@ namespace UnitTests.General
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
-            actId = RequestContext.Get(RequestContext.CALL_CHAIN_ID_HEADER);
+            actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
                 };
             Assert.NotNull(actId); // "ActivityId #2 should be present " + headers.ToStrings(separator: ",")
-            result = headers[RequestContext.CALL_CHAIN_ID_HEADER];
+            result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result); // "ActivityId #2 should not be null"
             Assert.Equal(activityId2, result);// "E2E ActivityId #2 not propagated correctly
 
