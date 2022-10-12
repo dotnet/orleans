@@ -79,11 +79,11 @@ namespace Orleans.Streams
             _storage = null!;
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            LogPubSubCounts("OnActivateAsync");
             _storage = _storageFactory.GetStorage(this);
-            return ReadStateAsync();
+            await ReadStateAsync();
+            LogPubSubCounts("OnActivateAsync");
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
