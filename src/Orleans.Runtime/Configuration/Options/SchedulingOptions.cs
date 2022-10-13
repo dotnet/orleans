@@ -38,7 +38,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="TurnWarningLengthThreshold"/>.
         /// </summary>
-        public static readonly TimeSpan DEFAULT_TURN_WARNING_THRESHOLD = TimeSpan.FromMilliseconds(200);
+        public static readonly TimeSpan DEFAULT_TURN_WARNING_THRESHOLD = TimeSpan.FromMilliseconds(1_000);
 
         /// <summary>
         /// Gets or sets the per work group limit of how many items can be queued up before warnings are generated.
