@@ -56,6 +56,24 @@ namespace UnitTests.Serialization
             TestSerializationRoundTrip(serializer);
         }
 
+        [Fact]
+        public void OrleansJsonSerializer_CanModifySerializerSettings()
+        {
+            var silo = new HostBuilder()
+                .UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                    .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")
+                    .Configure<OrleansJsonSerializerOptions>(options => options.JsonSerializerSettings.DefaultValueHandling = DefaultValueHandling.Include)
+                    .UseLocalhostClustering();
+                })
+                .Build();
+            var serializer = silo.Services.GetRequiredService<OrleansJsonSerializer>();
+            var data = new JsonPoco();
+            var serialized = serializer.Serialize(data, typeof(JsonPoco));
+            Assert.Contains("some_flag", serialized);
+        }
+
         private static void TestSerializationRoundTrip(Serializer serializer)
         {
             var data = new JsonPoco {Prop = "some data"};
@@ -78,7 +96,8 @@ namespace UnitTests.Serialization
                 result.Append($"{b:x2}");
             }
 
-            return result.ToString();
+            var str = result.ToString();
+            return str;
         }
 
         /// <summary>
@@ -94,6 +113,9 @@ namespace UnitTests.Serialization
         {
             [JsonProperty("crazy_name")]
             public string Prop { get; set; }
+
+            [JsonProperty("some_flag")]
+            public bool Flag { get; set; }
         }
     }
 }
