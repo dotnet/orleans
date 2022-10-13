@@ -283,7 +283,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
         public static bool HasAnyAttribute(this ISymbol symbol, INamedTypeSymbol[] attributeTypes) => GetAnyAttribute(symbol, attributeTypes) != null;
 
-        public static AttributeData GetAnyAttribute(this ISymbol symbol, INamedTypeSymbol[] attributeTypes)
+        public static AttributeData? GetAnyAttribute(this ISymbol symbol, INamedTypeSymbol[] attributeTypes)
         {
             foreach (var attr in symbol.GetAttributes())
             {
@@ -300,7 +300,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
         public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeType) => GetAttribute(symbol, attributeType) != null;
 
-        public static AttributeData GetAttribute(this ISymbol symbol, INamedTypeSymbol attributeType)
+        public static AttributeData? GetAttribute(this ISymbol symbol, INamedTypeSymbol attributeType)
         {
             foreach (var attr in symbol.GetAttributes())
             {

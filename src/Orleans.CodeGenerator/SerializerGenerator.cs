@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -214,9 +215,13 @@ namespace Orleans.CodeGenerator
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
                 fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+
                 // Add a codec field for any field in the target which does not have a static codec.
-                if (!libraryTypes.StaticCodecs.Exists(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                if (!Array.Exists(libraryTypes.StaticCodecs, c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                {
                     fields.Add(GetCodecDescription(member, typeIndex));
+                }
+
                 typeIndex++;
             }
 

@@ -353,8 +353,14 @@ skip:;
                     body.Add(IfStatement(exactTypeMatch, ReturnStatement(contextCopy)));
                 }
 
-                // C#: result = _activator.Create();
-                body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, resultVar, GetCreateValueExpression(type, copierFields, libraryTypes))));
+                // C#: var result = _activator.Create();
+                body.Add(LocalDeclarationStatement(
+                    VariableDeclaration(
+                        IdentifierName("var"),
+                        SingletonSeparatedList(VariableDeclarator(
+                            resultVar.Identifier,
+                            argumentList: null,
+                            initializer: EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
 
                 // C#: context.RecordCopy(original, result);
                 body.Add(ExpressionStatement(InvocationExpression(contextParam.Member("RecordCopy"), ArgumentList(SeparatedList(new[]
