@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Core.Internal
 {
     /// <summary>
     /// Provides functionality for performing management operations on a grain activation.

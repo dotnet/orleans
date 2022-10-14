@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Internal;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Scheduler;

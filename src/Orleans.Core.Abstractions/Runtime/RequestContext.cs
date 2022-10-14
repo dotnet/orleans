@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
+using Orleans.Core.Internal;
 
 namespace Orleans.Runtime
 {
@@ -41,27 +44,20 @@ namespace Orleans.Runtime
             }
         }
 
-        public static ConfiguredCallChain AllowCallChainReentrancy()
+        /// <summary>
+        /// Allows reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// </summary>
+        public static ReentrancySection AllowCallChainReentrancy()
         {
             var originalCallChainId = ReentrancyId;
-            if (originalCallChainId == Guid.Empty)
-            {
-                ReentrancyId = Guid.NewGuid();
-            }
-
-            return new ConfiguredCallChain(originalCallChainId);
+            var newCallChainId = originalCallChainId == Guid.Empty ? Guid.NewGuid() : originalCallChainId;
+            return new ReentrancySection(originalCallChainId, newCallChainId);
         }
 
-        public static ConfiguredCallChain SuppressCallChainReentrancy()
-        {
-            var originalCallChainId = ReentrancyId;
-            if (originalCallChainId != Guid.Empty)
-            {
-                ReentrancyId = Guid.Empty;
-            }
-
-            return new ConfiguredCallChain(originalCallChainId);
-        }
+        /// <summary>
+        /// Suppresses reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// </summary>
+        public static ReentrancySection SuppressCallChainReentrancy() => new(ReentrancyId, Guid.Empty);
 
         /// <summary>
         /// Retrieves a value from the request context.
@@ -172,16 +168,41 @@ namespace Orleans.Runtime
             public bool IsDefault => Values is null;
         }
 
-        public readonly struct ConfiguredCallChain : IDisposable
+        public readonly struct ReentrancySection : IDisposable
         {
-            private readonly Guid _originalCallChainId;
+            private readonly Guid _originalReentrancyId;
+            private readonly Guid _newReentrancyId;
 
-            public ConfiguredCallChain(Guid originalCallChainId)
+            public ReentrancySection(Guid originalReentrancyId, Guid newReentrancyId)
             {
-                _originalCallChainId = originalCallChainId;
+                _originalReentrancyId = originalReentrancyId;
+                _newReentrancyId = newReentrancyId;
+
+                if (newReentrancyId != originalReentrancyId)
+                {
+                    ReentrancyId = newReentrancyId;
+                }
+
+                if (newReentrancyId != Guid.Empty)
+                {
+                    var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
+                    grain?.OnEnterReentrantSection(_newReentrancyId);
+                }
             }
 
-            public void Dispose() => ReentrancyId = _originalCallChainId;
+            public void Dispose()
+            {
+                if (_newReentrancyId != Guid.Empty)
+                {
+                    var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
+                    grain?.OnExitReentrantSection(_newReentrancyId);
+                }
+
+                if (_newReentrancyId != _originalReentrancyId)
+                {
+                    ReentrancyId = _originalReentrancyId;
+                }
+            }
         }
     }
 }

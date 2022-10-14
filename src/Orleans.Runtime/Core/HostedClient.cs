@@ -130,13 +130,13 @@ namespace Orleans.Runtime
             }
         }
 
-        public TComponent GetComponent<TComponent>()
+        public TComponent GetComponent<TComponent>() where TComponent : class
         {
             if (this is TComponent component) return component;
             return default;
         }
 
-        public void SetComponent<TComponent>(TComponent instance)
+        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
             throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");
         }
@@ -259,8 +259,8 @@ namespace Orleans.Runtime
         public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
 
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             (TExtension, TExtensionInterface) result;
             if (this.TryGetExtension(out result))
@@ -284,8 +284,8 @@ namespace Orleans.Runtime
         }
 
         private bool TryGetExtension<TExtension, TExtensionInterface>(out (TExtension, TExtensionInterface) result)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
             {
@@ -316,7 +316,7 @@ namespace Orleans.Runtime
         }
 
         public TExtensionInterface GetExtension<TExtensionInterface>()
-            where TExtensionInterface : IGrainExtension
+            where TExtensionInterface : class, IGrainExtension
         {
             if (this.TryGetExtension<TExtensionInterface>(out var result))
             {
@@ -343,7 +343,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
+        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
         public Task Deactivated => Task.CompletedTask;

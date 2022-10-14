@@ -85,7 +85,7 @@ namespace Orleans.Streams
             if (batchObserver is GrainReference)
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(batchObserver));
 
-            _ = RequestContext.SuppressCallChainReentrancy();
+            using var _ = RequestContext.SuppressCallChainReentrancy();
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe Token={Token}", token);
             await BindExtensionLazy();
@@ -143,7 +143,7 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T> batchObserver,
             StreamSequenceToken token = null)
         {
-            _ = RequestContext.SuppressCallChainReentrancy();
+            using var _ = RequestContext.SuppressCallChainReentrancy();
 
             StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
 
@@ -166,7 +166,7 @@ namespace Orleans.Streams
 
         public async Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
         {
-            _ = RequestContext.SuppressCallChainReentrancy();
+            using var _ = RequestContext.SuppressCallChainReentrancy();
 
             await BindExtensionLazy();
 
@@ -187,7 +187,7 @@ namespace Orleans.Streams
 
         public async Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions()
         {
-            _ = RequestContext.SuppressCallChainReentrancy();
+            using var _ = RequestContext.SuppressCallChainReentrancy();
 
             await BindExtensionLazy();
 
@@ -198,7 +198,7 @@ namespace Orleans.Streams
 
         public async Task Cleanup()
         {
-            _ = RequestContext.SuppressCallChainReentrancy();
+            using var _ = RequestContext.SuppressCallChainReentrancy();
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
             if (myExtension == null)

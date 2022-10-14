@@ -105,15 +105,15 @@ namespace Orleans.Runtime
 
         public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
 
-        public TComponent GetComponent<TComponent>() => this switch
+        public TComponent GetComponent<TComponent>() where TComponent : class => this switch
         {
             TComponent contextResult => contextResult,
             _ => _shared.GetComponent<TComponent>()
         };
 
-        public void SetComponent<TComponent>(TComponent instance) => throw new ArgumentException($"Cannot set a component on a {nameof(StatelessWorkerGrainContext)}");
+        public void SetComponent<TComponent>(TComponent instance) where TComponent : class => throw new ArgumentException($"Cannot set a component on a {nameof(StatelessWorkerGrainContext)}");
 
-        public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
+        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
 
         private async Task RunMessageLoop()
         {

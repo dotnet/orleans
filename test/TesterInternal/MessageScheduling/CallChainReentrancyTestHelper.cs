@@ -1,9 +1,12 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Channels;
 using System.Threading.Tasks;
-using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -72,6 +75,7 @@ namespace UnitTests.General
                     (grainId + 1000, false),
                     (grainId, true)
                 };
+
                 await firstGrain.CallNext_1(callChain, 1);
             }
         }
@@ -129,6 +133,90 @@ namespace UnitTests.General
                     (grainId, true)
                 };
                 await firstGrain.CallNext_1(callChain, 1);
+            }
+        }
+
+        /// <summary>
+        /// Suppresses call chain reentrancy within a reentrant call chain, to ensure that the subsequent call chain is not reentrant.
+        /// </summary>
+        public async Task CallChainReentrancy_WithSuppression()
+        {
+            var aId = $"A-{Random.Shared.Next()}";
+            var bId = $"B-{Random.Shared.Next()}";
+            var a = Fixture.GrainFactory.GetGrain<ICallChainReentrancyGrain>(aId);
+
+            var chain = new List<(string, ReentrancyCallType)>
+            {
+                // 1. a->a: Start a new call chain, allowing reentrancy back into 'a'
+                (aId, ReentrancyCallType.AllowCallChainReentrancy),
+
+                // 2. a->b: Wont allow reentrancy into 'b', since 'b' has not excxplicitly requested it.
+                (bId, ReentrancyCallType.Regular),
+
+                // 3. b->a: Ensure that reentrancy into 'a' is allowed.
+                (aId, ReentrancyCallType.Regular),
+
+                // 4. a->b: Suppress call chain reentrancy from 'a' to 'b'. The call to 'b' should block (until we explicitly unblock it later), since 'b' is waiting already.
+                (bId, ReentrancyCallType.SuppressCallChainReentrancy),
+            };
+
+            var observer = new CallChainObserver();
+            var observerRef = Fixture.GrainFactory.CreateObjectReference<ICallChainObserver>(observer);
+
+            var aTask = a.CallChain(observerRef, chain, 0);
+
+            // Wait for 'a' to receive the call from 'b'
+            await observer.WaitForOperationAsync(CallChainOperation.Enter, aId, 3);
+
+            // Tell 'a' to stop waiting for 'b to return, allowing the final call (step 4) to enter 'b' and complete the call chain.
+            await a.UnblockWaiters();
+
+            await aTask;
+
+            // Wait for 'b' to complete its final call
+            await observer.WaitForOperationAsync(CallChainOperation.Exit, bId, 4);
+        }
+
+        public enum CallChainOperation
+        {
+            Enter,
+            Exit,
+        }
+
+        public class CallChainObserver : ICallChainObserver
+        {
+            public Channel<(CallChainOperation Operation, string Grain, int CallIndex)> Operations { get; } = Channel.CreateUnbounded<(CallChainOperation Operation, string Grain, int CallIndex)>();
+
+            public async Task OnEnter(string grain, int callIndex)
+            {
+                await Operations.Writer.WriteAsync((CallChainOperation.Enter, grain, callIndex));
+            }
+
+            public async Task OnExit(string grain, int callIndex)
+            {
+                await Operations.Writer.WriteAsync((CallChainOperation.Exit, grain, callIndex));
+            }
+
+            public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex)
+            {
+                List<(CallChainOperation Operation, string Grain, int CallIndex)> ops = new();
+                var operations = Operations.Reader;
+                while (await operations.WaitToReadAsync())
+                {
+                    Assert.True(operations.TryRead(out var operation));
+                    ops.Add(operation);
+
+                    if (operation.Operation == operationType && operation.Grain.Equals(grain) && operation.CallIndex == callIndex)
+                    {
+                        return;
+                    }
+                    if (operation.CallIndex > callIndex)
+                    {
+                        break;
+                    }
+                }
+
+                Assert.Fail($"Expected to find operation ({operationType}, {grain}, {callIndex}) in {string.Join(", ", ops.Select(op => $"({op.Operation}, {op.Grain}, {op.CallIndex})"))}");
             }
         }
     }

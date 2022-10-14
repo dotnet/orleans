@@ -11,6 +11,7 @@ using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using System.Collections.Generic;
 using Orleans;
+using Orleans.Core;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -46,11 +47,11 @@ namespace UnitTests.SchedulerTests
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose() => (Scheduler as IDisposable)?.Dispose();
-        public TComponent GetComponent<TComponent>() => throw new NotImplementedException();
-        public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
+        public TComponent GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
+        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
 
-        public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();
+        public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
     }

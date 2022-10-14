@@ -1,5 +1,9 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -41,16 +45,18 @@ namespace UnitTests.Grains
         public DeadlockNonReentrantGrain(ILoggerFactory loggerFactory) => this.logger = loggerFactory.CreateLogger(this.Id);
         private string Id { get { return String.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
 
-        public Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
+        public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             this.logger.LogInformation("Inside grain {Id} CallNext_1().", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
-        public Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
+        public async Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             this.logger.LogInformation("Inside grain {Id} CallNext_2().", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }
 
@@ -61,16 +67,72 @@ namespace UnitTests.Grains
         public DeadlockReentrantGrain(ILoggerFactory loggerFactory) => this.logger = loggerFactory.CreateLogger(this.Id);
         private string Id => $"DeadlockReentrantGrain {base.IdentityString}";
 
-        public Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
+        public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             this.logger.LogInformation("Inside grain {Id} CallNext_1()", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
-        public Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
+        public async Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
+            using var _ = RequestContext.AllowCallChainReentrancy();
             this.logger.LogInformation("Inside grain {Id} CallNext_2()", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+        }
+    }
+
+    public class CallChainReentrancyGrain : Grain, ICallChainReentrancyGrain
+    {
+        private TaskCompletionSource _unblocker = new();
+
+        private string Id => this.GetPrimaryKeyString();
+
+        public async Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex)
+        {
+            await observer.OnEnter(Id, callIndex);
+            try
+            {
+                if (callChain.Count == 0)
+                {
+                    return;
+                }
+
+                var op = callChain[0];
+                var target = GrainFactory.GetGrain<ICallChainReentrancyGrain>(op.TargetGrain);
+                var newChain = callChain.Skip(1).ToList();
+                var nextCallIndex = callIndex + 1;
+                switch (op.CallType)
+                {
+                    case ReentrancyCallType.Regular:
+                        await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                        break;
+                    case ReentrancyCallType.AllowCallChainReentrancy:
+                        {
+                            using var _ = RequestContext.AllowCallChainReentrancy();
+                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                            break;
+                        }
+
+                    case ReentrancyCallType.SuppressCallChainReentrancy:
+                        {
+                            using var _ = RequestContext.SuppressCallChainReentrancy();
+                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                            break;
+                        }
+                }
+            }
+            finally
+            {
+                await observer.OnExit(Id, callIndex);
+            }
+        }
+
+        public Task UnblockWaiters()
+        {
+            _unblocker?.SetResult();
+            _unblocker = new();
+            return Task.CompletedTask;
         }
     }
 }
