@@ -189,14 +189,17 @@ namespace Orleans.CodeGenerator
                 fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
             }
 
-            if (serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
+            if (!serializableTypeDescription.IsImmutable)
             {
-                onlyDeepFields = false;
-                fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
-            }
+                if (serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
+                {
+                    onlyDeepFields = false;
+                    fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
+                }
 
-            // Add a copier field for any field in the target which does not have a static copier.
-            GetCopierFieldDescriptions(serializableTypeDescription.Members, libraryTypes, fields);
+                // Add a copier field for any field in the target which does not have a static copier.
+                GetCopierFieldDescriptions(serializableTypeDescription.Members, libraryTypes, fields);
+            }
 
             foreach (var member in members)
             {
@@ -275,12 +278,12 @@ namespace Orleans.CodeGenerator
                     }
                     copierType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
-                else if (libraryTypes.WellKnownCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCopierDescription copier)
+                else if (libraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
                 {
                     // The copier is not a static copier and is also not a generic copiers.
                     copierType = copier.CopierType.ToTypeSyntax();
                 }
-                else if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && libraryTypes.WellKnownCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is { } genericCopier)
+                else if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && libraryTypes.WellKnownCopiers.FindByUnderlyingType(unboundFieldType) is { } genericCopier)
                 {
                     // Construct the generic copier type using the field's type arguments.
                     copierType = genericCopier.CopierType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -315,7 +318,16 @@ skip:;
             if (type.IsAbstractType)
             {
                 // C#: return context.DeepCopy(original)
-                body.Add(ReturnStatement(InvocationExpression(contextParam.Member("DeepCopy")).WithArgumentList(ArgumentList(SingletonSeparatedList(Argument(originalParam))))));
+                body.Add(ReturnStatement(InvocationExpression(contextParam.Member("DeepCopy"), ArgumentList(SingletonSeparatedList(Argument(originalParam))))));
+                membersCopied = true;
+            }
+            else if (type.IsUnsealedImmutable)
+            {
+                // C#: return original is null || original.GetType() == typeof(T) ? original : context.DeepCopy(original);
+                var exactTypeMatch = BinaryExpression(SyntaxKind.EqualsExpression, InvocationExpression(originalParam.Member("GetType")), TypeOfExpression(type.TypeSyntax));
+                var nullOrTypeMatch = BinaryExpression(SyntaxKind.LogicalOrExpression, BinaryExpression(SyntaxKind.IsExpression, originalParam, LiteralExpression(SyntaxKind.NullLiteralExpression)), exactTypeMatch);
+                var contextCopy = InvocationExpression(contextParam.Member("DeepCopy"), ArgumentList(SingletonSeparatedList(Argument(originalParam))));
+                body.Add(ReturnStatement(ConditionalExpression(nullOrTypeMatch, originalParam, contextCopy)));
                 membersCopied = true;
             }
             else if (!type.IsValueType)
@@ -337,13 +349,18 @@ skip:;
                 {
                     // C#: if (original.GetType() != typeof(T)) { return context.DeepCopy(original); }
                     var exactTypeMatch = BinaryExpression(SyntaxKind.NotEqualsExpression, InvocationExpression(originalParam.Member("GetType")), TypeOfExpression(type.TypeSyntax));
-                    var contextCopy = InvocationExpression(contextParam.Member("DeepCopy")).WithArgumentList(ArgumentList(SingletonSeparatedList(Argument(originalParam))));
+                    var contextCopy = InvocationExpression(contextParam.Member("DeepCopy"), ArgumentList(SingletonSeparatedList(Argument(originalParam))));
                     body.Add(IfStatement(exactTypeMatch, ReturnStatement(contextCopy)));
                 }
 
                 // C#: var result = _activator.Create();
-                body.Add(LocalDeclarationStatement(VariableDeclaration(IdentifierName("var"), SingletonSeparatedList(VariableDeclarator("result")
-                    .WithInitializer(EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
+                body.Add(LocalDeclarationStatement(
+                    VariableDeclaration(
+                        IdentifierName("var"),
+                        SingletonSeparatedList(VariableDeclarator(
+                            resultVar.Identifier,
+                            argumentList: null,
+                            initializer: EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
 
                 // C#: context.RecordCopy(original, result);
                 body.Add(ExpressionStatement(InvocationExpression(contextParam.Member("RecordCopy"), ArgumentList(SeparatedList(new[]
@@ -475,7 +492,7 @@ skip:;
         {
             AddSerializationCallbacks(type, sourceVar, destinationVar, "OnCopying", body);
 
-            var copiers = copierFields.OfType<ICopierDescription>()
+            var copiers = type.IsUnsealedImmutable ? null : copierFields.OfType<ICopierDescription>()
                     .Concat(libraryTypes.StaticCopiers)
                     .ToList();
 
@@ -506,7 +523,7 @@ skip:;
             List<ICopierDescription> copiers,
             ISerializableMember member)
         {
-            if (member.IsShallowCopyable)
+            if (copiers is null || member.IsShallowCopyable)
                 return inputValue;
 
             var description = member.Member;
@@ -526,7 +543,7 @@ skip:;
             else
             {
                 ExpressionSyntax copierExpression;
-                var staticCopier = libraryTypes.StaticCopiers.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                var staticCopier = libraryTypes.StaticCopiers.FindByUnderlyingType(memberType);
                 if (staticCopier != null)
                 {
                     copierExpression = staticCopier.CopierType.ToNameSyntax();

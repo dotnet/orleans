@@ -2,12 +2,12 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
-    internal class LibraryTypes
+    internal sealed class LibraryTypes
     {
         private LibraryTypes() { }
 
@@ -36,8 +36,8 @@ namespace Orleans.CodeGenerator
                 SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute"),
                 IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1"),
                 IBufferWriter = Type("System.Buffers.IBufferWriter`1"),
-                IdAttributeTypes = options.IdAttributes.Select(Type).ToList(),
-                ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToList(),
+                IdAttributeTypes = options.IdAttributes.Select(Type).ToArray(),
+                ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToArray(),
                 AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
                 DefaultInvokeMethodNameAttribute = Type("Orleans.DefaultInvokeMethodNameAttribute"),
@@ -49,6 +49,7 @@ namespace Orleans.CodeGenerator
                 InvokableBaseTypeAttribute = Type("Orleans.InvokableBaseTypeAttribute"),
                 RegisterSerializerAttribute = Type("Orleans.RegisterSerializerAttribute"),
                 GeneratedActivatorConstructorAttribute = Type("Orleans.GeneratedActivatorConstructorAttribute"),
+                SerializerTransparentAttribute = Type("Orleans.SerializerTransparentAttribute"),
                 RegisterActivatorAttribute = Type("Orleans.RegisterActivatorAttribute"),
                 RegisterConverterAttribute = Type("Orleans.RegisterConverterAttribute"),
                 RegisterCopierAttribute = Type("Orleans.RegisterCopierAttribute"),
@@ -82,10 +83,9 @@ namespace Orleans.CodeGenerator
                 ValueTypeSetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeSetter`2"),
                 Void = compilation.GetSpecialType(SpecialType.System_Void),
                 Writer = Type("Orleans.Serialization.Buffers.Writer`1"),
-                IDisposable = Type("System.IDisposable"),
                 FSharpSourceConstructFlagsOrDefault = TypeOrDefault("Microsoft.FSharp.Core.SourceConstructFlags"),
                 FSharpCompilationMappingAttributeOrDefault = TypeOrDefault("Microsoft.FSharp.Core.CompilationMappingAttribute"),
-                StaticCodecs = new List<WellKnownCodecDescription>
+                StaticCodecs = new WellKnownCodecDescription[]
                 {
                     new(compilation.GetSpecialType(SpecialType.System_Object), Type("Orleans.Serialization.Codecs.ObjectCodec")),
                     new(compilation.GetSpecialType(SpecialType.System_Boolean), Type("Orleans.Serialization.Codecs.BoolCodec")),
@@ -99,7 +99,6 @@ namespace Orleans.CodeGenerator
                     new(compilation.GetSpecialType(SpecialType.System_UInt32), Type("Orleans.Serialization.Codecs.UInt32Codec")),
                     new(compilation.GetSpecialType(SpecialType.System_UInt64), Type("Orleans.Serialization.Codecs.UInt64Codec")),
                     new(compilation.GetSpecialType(SpecialType.System_String), Type("Orleans.Serialization.Codecs.StringCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Object), Type("Orleans.Serialization.Codecs.ObjectCodec")),
                     new(compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Byte), 1), Type("Orleans.Serialization.Codecs.ByteArrayCodec")),
                     new(compilation.GetSpecialType(SpecialType.System_Single), Type("Orleans.Serialization.Codecs.FloatCodec")),
                     new(compilation.GetSpecialType(SpecialType.System_Double), Type("Orleans.Serialization.Codecs.DoubleCodec")),
@@ -114,12 +113,12 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Net.IPAddress"), Type("Orleans.Serialization.Codecs.IPAddressCodec")),
                     new(Type("System.Net.IPEndPoint"), Type("Orleans.Serialization.Codecs.IPEndPointCodec")),
                 },
-                WellKnownCodecs = new List<WellKnownCodecDescription>
+                WellKnownCodecs = new WellKnownCodecDescription[]
                 {
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                 },
-                StaticCopiers = new List<WellKnownCopierDescription>
+                StaticCopiers = new WellKnownCopierDescription[]
                 {
                     new(compilation.GetSpecialType(SpecialType.System_Object), Type("Orleans.Serialization.Codecs.ObjectCopier")),
                     new(compilation.GetSpecialType(SpecialType.System_Boolean), Type("Orleans.Serialization.Codecs.BoolCodec")),
@@ -147,38 +146,17 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Net.IPAddress"), Type("Orleans.Serialization.Codecs.IPAddressCopier")),
                     new(Type("System.Net.IPEndPoint"), Type("Orleans.Serialization.Codecs.IPEndPointCopier")),
                 },
-                WellKnownCopiers = new List<WellKnownCopierDescription>
+                WellKnownCopiers = new WellKnownCopierDescription[]
                 {
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                 },
-                ImmutableTypes = new List<ITypeSymbol>
-                {
-                    compilation.GetSpecialType(SpecialType.System_Boolean),
-                    compilation.GetSpecialType(SpecialType.System_Char),
-                    compilation.GetSpecialType(SpecialType.System_Byte),
-                    compilation.GetSpecialType(SpecialType.System_SByte),
-                    compilation.GetSpecialType(SpecialType.System_Int16),
-                    compilation.GetSpecialType(SpecialType.System_Int32),
-                    compilation.GetSpecialType(SpecialType.System_Int64),
-                    compilation.GetSpecialType(SpecialType.System_UInt16),
-                    compilation.GetSpecialType(SpecialType.System_UInt32),
-                    compilation.GetSpecialType(SpecialType.System_UInt64),
-                    compilation.GetSpecialType(SpecialType.System_String),
-                    compilation.GetSpecialType(SpecialType.System_Single),
-                    compilation.GetSpecialType(SpecialType.System_Double),
-                    compilation.GetSpecialType(SpecialType.System_Decimal),
-                    compilation.GetSpecialType(SpecialType.System_DateTime),
-                },
-                    Exception = Type("System.Exception"),
-                    ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToList(),
-                    ValueTuple = Type("System.ValueTuple"),
-                    TimeSpan = Type("System.TimeSpan"),
-                    DateTimeOffset = Type("System.DateTimeOffset"),
-                    Guid = Type("System.Guid"),
-                    IPAddress = Type("System.Net.IPAddress"),
-                    IPEndPoint = Type("System.Net.IPEndPoint"),
-                    CancellationToken = Type("System.Threading.CancellationToken"),
+                Exception = Type("System.Exception"),
+                ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray(),
+                TimeSpan = Type("System.TimeSpan"),
+                IPAddress = Type("System.Net.IPAddress"),
+                IPEndPoint = Type("System.Net.IPEndPoint"),
+                CancellationToken = Type("System.Threading.CancellationToken"),
                 ImmutableContainerTypes = new[]
                 {
                     Type("System.Tuple`1"),
@@ -270,13 +248,13 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ValueTypeSetter_2 { get; private set; }
         public INamedTypeSymbol Void { get; private set; }
         public INamedTypeSymbol Writer { get; private set; }
-        public List<INamedTypeSymbol> IdAttributeTypes { get; private set; }
-        public List<INamedTypeSymbol> ConstructorAttributeTypes { get; private set; }
+        public INamedTypeSymbol[] IdAttributeTypes { get; private set; }
+        public INamedTypeSymbol[] ConstructorAttributeTypes { get; private set; }
         public INamedTypeSymbol AliasAttribute { get; private set; }
-        public List<WellKnownCodecDescription> StaticCodecs { get; private set; }
-        public List<WellKnownCodecDescription> WellKnownCodecs { get; private set; }
-        public List<WellKnownCopierDescription> StaticCopiers { get; private set; }
-        public List<WellKnownCopierDescription> WellKnownCopiers { get; private set; }
+        public WellKnownCodecDescription[] StaticCodecs { get; private set; }
+        public WellKnownCodecDescription[] WellKnownCodecs { get; private set; }
+        public WellKnownCopierDescription[] StaticCopiers { get; private set; }
+        public WellKnownCopierDescription[] WellKnownCopiers { get; private set; }
         public INamedTypeSymbol RegisterCopierAttribute { get; private set; }
         public INamedTypeSymbol RegisterSerializerAttribute { get; private set; }
         public INamedTypeSymbol RegisterConverterAttribute { get; private set; }
@@ -287,16 +265,12 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol CopyContext { get; private set; }
         public INamedTypeSymbol CopyContextPool { get; private set; }
         public Compilation Compilation { get; private set; }
-        public List<ITypeSymbol> ImmutableTypes { get; private set; }
-        public INamedTypeSymbol TimeSpan { get; private set; }
-        public INamedTypeSymbol DateTimeOffset { get; private set; }
-        public INamedTypeSymbol Guid { get; private set; }
-        public INamedTypeSymbol IPAddress { get; private set; }
-        public INamedTypeSymbol IPEndPoint { get; private set; }
-        public INamedTypeSymbol CancellationToken { get; private set; }
-        public INamedTypeSymbol[] ImmutableContainerTypes { get; private set; }
-        public INamedTypeSymbol ValueTuple { get; private set; }
-        public List<INamedTypeSymbol> ImmutableAttributes { get; private set; }
+        private INamedTypeSymbol TimeSpan;
+        private INamedTypeSymbol IPAddress;
+        private INamedTypeSymbol IPEndPoint;
+        private INamedTypeSymbol CancellationToken;
+        private INamedTypeSymbol[] ImmutableContainerTypes;
+        public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
         public INamedTypeSymbol ApplicationPartAttribute { get; private set; }
         public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
@@ -307,7 +281,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SerializationCallbacksAttribute { get; private set; }
         public INamedTypeSymbol DefaultInvokeMethodNameAttribute { get; private set; }
         public INamedTypeSymbol GeneratedActivatorConstructorAttribute { get; private set; }
-        public INamedTypeSymbol IDisposable { get; private set; }
+        public INamedTypeSymbol SerializerTransparentAttribute { get; private set; }
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
         public INamedTypeSymbol FormatterServices { get; private set; }
@@ -352,12 +326,9 @@ namespace Orleans.CodeGenerator
                 return result;
             }
 
-            foreach (var attr in ImmutableAttributes)
+            if (type.IsSealed && type.HasAnyAttribute(ImmutableAttributes))
             {
-                if (type.HasAttribute(attr))
-                {
-                    return _shallowCopyableTypes[type] = true;
-                }
+                return _shallowCopyableTypes[type] = true;
             }
 
             if (type.HasBaseType(Exception))
@@ -372,20 +343,20 @@ namespace Orleans.CodeGenerator
 
             if (namedType.IsTupleType)
             {
-                return _shallowCopyableTypes[type] = namedType.TupleElements.All(f => IsShallowCopyable(f.Type));
+                return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TupleElements);
             }
             else if (namedType.IsGenericType)
             {
                 var def = namedType.ConstructedFrom;
                 if (def.SpecialType == SpecialType.System_Nullable_T)
                 {
-                    return _shallowCopyableTypes[type] = IsShallowCopyable(namedType.TypeArguments.Single());
+                    return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);
                 }
 
                 foreach (var t in ImmutableContainerTypes)
                 {
                     if (SymbolEqualityComparer.Default.Equals(t, def))
-                        return _shallowCopyableTypes[type] = namedType.TypeArguments.All(IsShallowCopyable);
+                        return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);
                 }
             }
             else
@@ -425,6 +396,45 @@ namespace Orleans.CodeGenerator
             }
 
             return true;
+        }
+
+        private bool AreShallowCopyable(ImmutableArray<ITypeSymbol> types)
+        {
+            foreach (var t in types)
+                if (!IsShallowCopyable(t))
+                    return false;
+
+            return true;
+        }
+
+        private bool AreShallowCopyable(ImmutableArray<IFieldSymbol> fields)
+        {
+            foreach (var f in fields)
+                if (!IsShallowCopyable(f.Type))
+                    return false;
+
+            return true;
+        }
+    }
+
+    internal static class LibraryExtensions
+    {
+        public static WellKnownCodecDescription FindByUnderlyingType(this WellKnownCodecDescription[] values, ISymbol type)
+        {
+            foreach (var c in values)
+                if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type))
+                    return c;
+
+            return null;
+        }
+
+        public static WellKnownCopierDescription FindByUnderlyingType(this WellKnownCopierDescription[] values, ISymbol type)
+        {
+            foreach (var c in values)
+                if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type))
+                    return c;
+
+            return null;
         }
     }
 }

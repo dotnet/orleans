@@ -21,8 +21,7 @@ namespace Orleans.Versions.Selector
     /// <summary>
     /// Base class for all grain interface version selector strategies.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, SerializerTransparent]
     public abstract class VersionSelectorStrategy
     {
     }

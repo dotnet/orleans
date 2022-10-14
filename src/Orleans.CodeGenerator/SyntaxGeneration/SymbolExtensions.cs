@@ -281,31 +281,36 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return false;
         }
 
-        public static bool HasAnyAttribute(this ISymbol symbol, List<INamedTypeSymbol> attributeType)
+        public static bool HasAnyAttribute(this ISymbol symbol, INamedTypeSymbol[] attributeTypes) => GetAnyAttribute(symbol, attributeTypes) != null;
+
+        public static AttributeData? GetAnyAttribute(this ISymbol symbol, INamedTypeSymbol[] attributeTypes)
         {
-            foreach (var t in attributeType)
+            foreach (var attr in symbol.GetAttributes())
             {
-                if (symbol.HasAttribute(t))
+                foreach (var t in attributeTypes)
                 {
-                    return true;
+                    if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, t))
+                    {
+                        return attr;
+                    }
                 }
             }
-
-            return false;
+            return null;
         }
 
-        public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeType)
+        public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeType) => GetAttribute(symbol, attributeType) != null;
+
+        public static AttributeData? GetAttribute(this ISymbol symbol, INamedTypeSymbol attributeType)
         {
-            var attributes = symbol.GetAttributes();
-            foreach (var attr in attributes)
+            foreach (var attr in symbol.GetAttributes())
             {
                 if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType))
                 {
-                    return true;
+                    return attr;
                 }
             }
 
-            return false;
+            return null;
         }
 
         /// <summary>

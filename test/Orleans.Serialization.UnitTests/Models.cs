@@ -3,8 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.FSharp.Core;
 using Newtonsoft.Json;
 using Orleans;
+using Orleans.Serialization.UnitTests;
 
 [GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
@@ -42,6 +44,93 @@ public record Person4(int Age, string Name);
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
 {
+}
+
+interface IMyBase
+{
+    MyValue BaseValue { get; set; }
+}
+
+interface IMySub : IMyBase
+{
+    MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+public class MyValue : IEquatable<MyValue>
+{
+    [Id(0)]
+    public int Value { get; set; }
+
+    public MyValue(int value) => Value = value;
+
+    public static implicit operator int(MyValue value) => value.Value;
+    public static implicit operator MyValue(int value) => new(value);
+
+    public bool Equals(MyValue other)
+    {
+        return other is not null && Value == other.Value;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return Equals(obj as MyValue);
+    }
+
+    public override int GetHashCode() => Value;
+} 
+
+[GenerateSerializer]
+[Immutable]
+public class MyImmutableBase : IMyBase
+{
+    [Id(0)]
+    public MyValue BaseValue { get; set; }
+}
+
+[GenerateSerializer]
+public sealed class MyMutableSub : MyImmutableBase, IMySub
+{
+    [Id(0)]
+    public MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+[Immutable]
+public sealed class MyImmutableSub : MyImmutableBase, IMySub
+{
+    [Id(0)]
+    public MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+public class MyMutableBase : IMyBase
+{
+    [Id(0)]
+    public MyValue BaseValue { get; set; }
+}
+
+[GenerateSerializer]
+public sealed class MySealedSub : MyMutableBase, IMySub
+{
+    [Id(0)]
+    public MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+[Immutable]
+public sealed class MySealedImmutableSub : MyMutableBase, IMySub
+{
+    [Id(0)]
+    public MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+[Immutable]
+public class MyUnsealedImmutableSub : MyMutableBase, IMySub
+{
+    [Id(0)]
+    public MyValue SubValue { get; set; }
 }
 
 [GenerateSerializer]

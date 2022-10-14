@@ -17,7 +17,7 @@ namespace Orleans.Serialization.UnitTests
     public class GeneratedSerializerTests : IDisposable
     {
         private readonly ServiceProvider _serviceProvider;
-        private readonly IFieldCodecProvider _codecProvider;
+        private readonly CodecProvider _codecProvider;
         private readonly SerializerSessionPool _sessionPool;
 
         public GeneratedSerializerTests()
@@ -25,7 +25,7 @@ namespace Orleans.Serialization.UnitTests
             _serviceProvider = new ServiceCollection()
                 .AddSerializer()
                 .BuildServiceProvider();
-            _codecProvider = _serviceProvider.GetRequiredService<IFieldCodecProvider>();
+            _codecProvider = _serviceProvider.GetRequiredService<CodecProvider>();
             _sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         }
 
@@ -342,6 +342,31 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.EnumValue, result.EnumValue);
         }
 
+        [Fact]
+        public void CopyImmutableAndSealedTypes()
+        {
+            DoTest<MyImmutableSub, MyImmutableBase>(new MyImmutableSub { BaseValue = 1, SubValue = 2 });
+            DoTest<MyMutableSub, MyImmutableBase>(new MyMutableSub { BaseValue = 1, SubValue = 2 });
+            DoTest<MySealedSub, MyMutableBase>(new MySealedSub { BaseValue = 1, SubValue = 2 });
+            DoTest<MySealedImmutableSub, MyMutableBase>(new MySealedImmutableSub { BaseValue = 1, SubValue = 2 });
+            DoTest<MyUnsealedImmutableSub, MyMutableBase>(new MyUnsealedImmutableSub { BaseValue = 1, SubValue = 2 });
+
+            void DoTest<T, TBase>(T original) where T : TBase, IMySub
+            {
+                var res1 = Copy(original);
+                Assert.Equal(original.BaseValue, res1.BaseValue);
+                Assert.Equal(original.SubValue, res1.SubValue);
+
+                var res2 = Assert.IsType<T>(Copy<object>(original));
+                Assert.Equal(original.BaseValue, res2.BaseValue);
+                Assert.Equal(original.SubValue, res2.SubValue);
+
+                var res3 = Assert.IsType<T>(Copy<TBase>(original));
+                Assert.Equal(original.BaseValue, res3.BaseValue);
+                Assert.Equal(original.SubValue, res3.SubValue);
+            }
+        }
+
         public void Dispose() => _serviceProvider?.Dispose();
 
         private T RoundTripThroughCodec<T>(T original)
@@ -375,6 +400,12 @@ namespace Orleans.Serialization.UnitTests
             }
 
             return result;
+        }
+
+        private T Copy<T>(T original)
+        {
+            var copier = _serviceProvider.GetRequiredService<DeepCopier<T>>();
+            return copier.Copy(original);
         }
 
         private object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)

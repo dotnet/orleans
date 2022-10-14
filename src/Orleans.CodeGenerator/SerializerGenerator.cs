@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -214,9 +215,13 @@ namespace Orleans.CodeGenerator
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
                 fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+
                 // Add a codec field for any field in the target which does not have a static codec.
-                if (!libraryTypes.StaticCodecs.Exists(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                if (!Array.Exists(libraryTypes.StaticCodecs, c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                {
                     fields.Add(GetCodecDescription(member, typeIndex));
+                }
+
                 typeIndex++;
             }
 
@@ -262,12 +267,12 @@ namespace Orleans.CodeGenerator
                     }
                     codecType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
                 }
-                else if (libraryTypes.WellKnownCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)) is WellKnownCodecDescription codec)
+                else if (libraryTypes.WellKnownCodecs.FindByUnderlyingType(t) is { } codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.
                     codecType = codec.CodecType.ToTypeSyntax();
                 }
-                else if (t is INamedTypeSymbol named && libraryTypes.WellKnownCodecs.Find(c => t is INamedTypeSymbol named && named.ConstructedFrom is ISymbol unboundFieldType && SymbolEqualityComparer.Default.Equals(c.UnderlyingType, unboundFieldType)) is WellKnownCodecDescription genericCodec)
+                else if (t is INamedTypeSymbol { ConstructedFrom: { } unboundFieldType } named && libraryTypes.WellKnownCodecs.FindByUnderlyingType(unboundFieldType) is { } genericCodec)
                 {
                     // Construct the generic codec type using the field's type arguments.
                     codecType = genericCodec.CodecType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -392,7 +397,7 @@ namespace Orleans.CodeGenerator
                 // Codecs can either be static classes or injected into the constructor.
                 // Either way, the member signatures are the same.
                 var memberType = description.Type;
-                var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
                 ExpressionSyntax codecExpression;
                 if (staticCodec != null && libraryTypes.Compilation.IsSymbolAccessibleWithin(staticCodec.CodecType, libraryTypes.Compilation.Assembly))
                 {
@@ -588,7 +593,7 @@ namespace Orleans.CodeGenerator
                     // Either way, the member signatures are the same.
                     var codec = codecs.First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
                     var memberType = description.Type;
-                    var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, memberType));
+                    var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
                     ExpressionSyntax codecExpression;
                     if (staticCodec != null)
                     {
@@ -942,7 +947,7 @@ namespace Orleans.CodeGenerator
 
             // Codecs can either be static classes or injected into the constructor.
             // Either way, the member signatures are the same.
-            var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
+            var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
             var codecExpression = staticCodec.CodecType.ToNameSyntax();
 
             body.Add(
@@ -984,7 +989,7 @@ namespace Orleans.CodeGenerator
             var readerParam = "reader".ToIdentifierName();
             var fieldParam = "field".ToIdentifierName();
 
-            var staticCodec = libraryTypes.StaticCodecs.Find(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, type.BaseType));
+            var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
             ExpressionSyntax codecExpression = staticCodec.CodecType.ToNameSyntax();
             ExpressionSyntax readValueExpression = InvocationExpression(
                 codecExpression.Member("ReadValue"),

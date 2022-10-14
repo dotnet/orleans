@@ -19,8 +19,7 @@ namespace Orleans.Versions.Compatibility
     /// <summary>
     /// Base class for all grain interface version compatibility strategies.
     /// </summary>
-    [Serializable]
-    [GenerateSerializer]
+    [Serializable, SerializerTransparent]
     public abstract class CompatibilityStrategy
     {
     }
