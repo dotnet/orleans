@@ -8,65 +8,31 @@ using Orleans.Serialization;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Options for <see cref="JsonGrainStorageSerializer"/>.
-    /// </summary>
-    public class JsonGrainStorageSerializerOptions
-    {
-        /// <summary>
-        /// Gets or sets a value indicating whether to serialize values using their full assembly-qualified type names.
-        /// </summary>
-        public bool UseFullAssemblyNames { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to indent serialized JSON payloads.
-        /// </summary>
-        public bool IndentJson { get; set; }
-
-        /// <summary>
-        /// Gets or sets the type name handling strategy.
-        /// </summary>
-        public TypeNameHandling? TypeNameHandling { get; set; }
-
-        /// <summary>
-        /// Gets or sets a delegate used to configure <see cref="JsonSerializerSettings"/> after other options have been applied.
-        /// </summary>
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
-    }
-
-    /// <summary>
     /// Grain storage serializer that uses Newtonsoft.Json
     /// </summary>
     public class JsonGrainStorageSerializer : IGrainStorageSerializer
     {
-        private JsonSerializerSettings jsonSettings;
+        private readonly OrleansJsonSerializer _orleansJsonSerializer;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="JsonGrainStorageSerializer"/> class.
         /// </summary>
-        /// <param name="options">The serializer options.</param>
-        /// <param name="services">The service provider.</param>
-        public JsonGrainStorageSerializer(IOptions<JsonGrainStorageSerializerOptions> options, IServiceProvider services)
+        public JsonGrainStorageSerializer(OrleansJsonSerializer orleansJsonSerializer)
         {
-            this.jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(
-                OrleansJsonSerializerSettings.GetDefaultSerializerSettings(services),
-                options.Value.UseFullAssemblyNames,
-                options.Value.IndentJson,
-                options.Value.TypeNameHandling);
-
-            options.Value.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
+            _orleansJsonSerializer = orleansJsonSerializer;
         }
 
         /// <inheritdoc/>
         public BinaryData Serialize<T>(T value)
         {
-            var data = JsonConvert.SerializeObject(value, this.jsonSettings);
+            var data = _orleansJsonSerializer.Serialize(value, typeof(T));
             return new BinaryData(data);
         }
 
         /// <inheritdoc/>
         public T Deserialize<T>(BinaryData input)
         {
-            return JsonConvert.DeserializeObject<T>(input.ToString(), this.jsonSettings);
+            return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
         }
     }
 }
