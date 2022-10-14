@@ -189,7 +189,7 @@ namespace Orleans.CodeGenerator
                 fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
             }
 
-            if (!serializableTypeDescription.IsUnsealedImmutable)
+            if (!serializableTypeDescription.IsImmutable)
             {
                 if (serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
                 {

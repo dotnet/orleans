@@ -187,7 +187,9 @@ namespace Orleans.CodeGenerator
 
         public bool IsShallowCopyable => IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
 
-        public bool IsUnsealedImmutable => !Type.IsSealed && Type.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+        public bool IsUnsealedImmutable => !Type.IsSealed && IsImmutable;
+
+        public bool IsImmutable => Type.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
         public bool IsExceptionType => Type.HasBaseType(_libraryTypes.Exception);
 
