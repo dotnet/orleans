@@ -612,7 +612,7 @@ namespace Orleans.Storage
                 var arityIndex = input.IndexOf("`", StringComparison.OrdinalIgnoreCase);
                 if (arityIndex != -1)
                 {
-                    return int.Parse(input.Substring(arityIndex + 1));
+                    return int.Parse(input.AsSpan().Slice(arityIndex + 1));
                 }
 
                 return 0;

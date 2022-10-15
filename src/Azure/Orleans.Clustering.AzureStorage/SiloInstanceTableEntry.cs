@@ -42,7 +42,7 @@ namespace Orleans.AzureUtils
 
         public static string ConstructRowKey(SiloAddress silo)
         {
-            return String.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
+            return string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
         }
         internal static SiloAddress UnpackRowKey(string rowKey)
         {
@@ -50,24 +50,27 @@ namespace Orleans.AzureUtils
             try
             {
 #if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0}", rowKey);
+                debugInfo = string.Format("UnpackRowKey: RowKey={0}", rowKey);
                 Trace.TraceInformation(debugInfo);
 #endif
                 int idx1 = rowKey.IndexOf(Seperator);
                 int idx2 = rowKey.LastIndexOf(Seperator);
 #if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
+                debugInfo = string.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
 #endif
-                var addressStr = rowKey.Substring(0, idx1);
-                var portStr = rowKey.Substring(idx1 + 1, idx2 - idx1 - 1);
-                var genStr = rowKey.Substring(idx2 + 1);
+                ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
+                ReadOnlySpan<char> addressStr = rowKeySpan.Slice(0, idx1);
+                ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
+                ReadOnlySpan<char> genStr = rowKeySpan.Slice(idx2 + 1);
 #if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}", rowKey, addressStr, portStr, genStr);
+                debugInfo = string.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}",
+                    rowKey, addressStr.ToString(), portStr.ToString(), genStr.ToString());
+
                 Trace.TraceInformation(debugInfo);
 #endif
                 IPAddress address = IPAddress.Parse(addressStr);
-                int port = Int32.Parse(portStr);
-                int generation = Int32.Parse(genStr);
+                int port = int.Parse(portStr);
+                int generation = int.Parse(genStr);
                 return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)
