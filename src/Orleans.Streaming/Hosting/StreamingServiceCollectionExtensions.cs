@@ -1,11 +1,14 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration.Internal;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
+using Orleans.Serialization;
+using Orleans.Streaming.JsonConverters;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Streams.Filtering;
@@ -45,6 +48,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
                 new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
+            services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
 
             // One stream directory per activation
             services.AddScoped<StreamDirectory>();
@@ -69,6 +73,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
             services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
+            services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
         }
 
         /// <summary>

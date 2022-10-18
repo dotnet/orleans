@@ -41,12 +41,7 @@ namespace Orleans.Streams
         public bool IsRewindable => isRewindable;
         public string ProviderName => streamId.ProviderName;
 
-        // IMPORTANT: This constructor needs to be public for Json deserialization to work.
-        public StreamImpl()
-        {
-        }
-
-        internal StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
+        public StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             this.streamId = streamId;
             this.provider = provider ?? throw new ArgumentNullException(nameof(provider));
