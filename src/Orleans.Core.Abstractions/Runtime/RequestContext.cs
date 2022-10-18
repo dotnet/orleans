@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
+using Orleans.Core.Internal;
 
 namespace Orleans.Runtime
 {
@@ -20,33 +23,41 @@ namespace Orleans.Runtime
     /// </remarks>
     public static class RequestContext
     {
-        /// <summary>
-        /// Gets or sets a value indicating whether <c>Trace.CorrelationManager.ActivityId</c> settings should be propagated into grain calls.
-        /// </summary>
-        public static bool PropagateActivityId { get; set; }
-
-        internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
-        internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
+        internal const string CALL_CHAIN_REENTRANCY_HEADER = "#CCR";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
         internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
 
-        /// <summary>Gets or sets an activity ID that can be used for correlation.</summary>
-        public static Guid ActivityId
+        public static Guid ReentrancyId
         {
-            get { return (Guid)(Get(E2_E_TRACING_ACTIVITY_ID_HEADER) ?? Guid.Empty); }
+            get => Get(CALL_CHAIN_REENTRANCY_HEADER) is Guid guid ? guid : Guid.Empty;
             set
             {
                 if (value == Guid.Empty)
                 {
-                    Remove(E2_E_TRACING_ACTIVITY_ID_HEADER);
+                    Remove(CALL_CHAIN_REENTRANCY_HEADER);
                 }
                 else
-                { 
-                    Set(E2_E_TRACING_ACTIVITY_ID_HEADER, value);
+                {
+                    Set(CALL_CHAIN_REENTRANCY_HEADER, value);
                 }
             }
         }
+
+        /// <summary>
+        /// Allows reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// </summary>
+        public static ReentrancySection AllowCallChainReentrancy()
+        {
+            var originalCallChainId = ReentrancyId;
+            var newCallChainId = originalCallChainId == Guid.Empty ? Guid.NewGuid() : originalCallChainId;
+            return new ReentrancySection(originalCallChainId, newCallChainId);
+        }
+
+        /// <summary>
+        /// Suppresses reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// </summary>
+        public static ReentrancySection SuppressCallChainReentrancy() => new(ReentrancyId, Guid.Empty);
 
         /// <summary>
         /// Retrieves a value from the request context.
@@ -100,7 +111,6 @@ namespace Orleans.Runtime
             values[key] = value;
             CallContextData.Value = new ContextProperties
             {
-                RequestObject = properties.RequestObject,
                 Values = values
             };
         }
@@ -124,7 +134,6 @@ namespace Orleans.Runtime
             {
                 CallContextData.Value = new ContextProperties
                 {
-                    RequestObject = properties.RequestObject,
                     Values = null
                 };
                 return true;
@@ -135,7 +144,6 @@ namespace Orleans.Runtime
                 newValues.Remove(key);
                 CallContextData.Value = new ContextProperties
                 {
-                    RequestObject = properties.RequestObject,
                     Values = newValues
                 };
                 return true;
@@ -154,18 +162,47 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <summary>
-        /// Gets the currently executing request.
-        /// </summary>
-        internal static object RequestObject => CallContextData.Value.RequestObject;
-
         internal readonly struct ContextProperties
         {
-            public object RequestObject { get; init; }
-
             public Dictionary<string, object> Values { get; init; }
+            public bool IsDefault => Values is null;
+        }
 
-            public bool IsDefault => RequestObject is null && Values is null;
+        public readonly struct ReentrancySection : IDisposable
+        {
+            private readonly Guid _originalReentrancyId;
+            private readonly Guid _newReentrancyId;
+
+            public ReentrancySection(Guid originalReentrancyId, Guid newReentrancyId)
+            {
+                _originalReentrancyId = originalReentrancyId;
+                _newReentrancyId = newReentrancyId;
+
+                if (newReentrancyId != originalReentrancyId)
+                {
+                    ReentrancyId = newReentrancyId;
+                }
+
+                if (newReentrancyId != Guid.Empty)
+                {
+                    var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
+                    grain?.OnEnterReentrantSection(_newReentrancyId);
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_newReentrancyId != Guid.Empty)
+                {
+                    var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
+                    grain?.OnExitReentrantSection(_newReentrancyId);
+                }
+
+                if (_newReentrancyId != _originalReentrancyId)
+                {
+                    ReentrancyId = _originalReentrancyId;
+                }
+            }
         }
     }
 }

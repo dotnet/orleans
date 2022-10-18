@@ -100,7 +100,6 @@ namespace Orleans.Runtime
 
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-            RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
             this.waitForMessageToBeQueuedForOutbound = messagingOptions.Value.WaitForMessageToBeQueuedForOutboundTime;
 
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();

@@ -20,7 +20,7 @@ namespace Orleans
         /// The grain extension.
         /// </returns>
         public static TComponent GetGrainExtension<TComponent>(this IGrainContext context)
-            where TComponent : IGrainExtension
+            where TComponent : class, IGrainExtension
         {
             var binder = context.GetComponent<IGrainExtensionBinder>();
             return binder.GetExtension<TComponent>();

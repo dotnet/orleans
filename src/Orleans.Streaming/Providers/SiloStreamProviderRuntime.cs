@@ -135,8 +135,8 @@ namespace Orleans.Runtime.Providers
         }
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
             {

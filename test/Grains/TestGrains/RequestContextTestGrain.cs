@@ -34,13 +34,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-            return Task.FromResult(RequestContext.ActivityId);
-        }
-
-        public Task<Guid> E2ELegacyActivityId()
-        {
-            if (!RequestContext.PropagateActivityId) throw new InvalidOperationException("ActivityId propagation is not enabled on silo.");
-            return Task.FromResult(Trace.CorrelationManager.ActivityId);
+            return Task.FromResult(RequestContext.ReentrancyId);
         }
     }
 
@@ -130,7 +124,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-            return Task.FromResult(RequestContext.ActivityId);
+            return Task.FromResult(RequestContext.ReentrancyId);
         }
 
         public async Task<Tuple<string, string>> TestRequestContext()

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -43,26 +44,26 @@ namespace Orleans
 
         public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
 
-        public TComponent GetComponent<TComponent>()
+        public TComponent GetComponent<TComponent>() where TComponent : class
         {
             if (this is TComponent component) return component;
             return default;
         }
 
-        public TTarget GetTarget<TTarget>()
+        public TTarget GetTarget<TTarget>() where TTarget : class
         {
             if (this is TTarget target) return target;
             return default;
         }
 
-        public void SetComponent<TComponent>(TComponent instance)
+        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
             throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");
         }
 
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             (TExtension, TExtensionInterface) result;
             if (this.TryGetExtension(out result))
@@ -86,8 +87,8 @@ namespace Orleans
         }
 
         private bool TryGetExtension<TExtension, TExtensionInterface>(out (TExtension, TExtensionInterface) result)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
             {
@@ -118,7 +119,7 @@ namespace Orleans
         }
 
         public TExtensionInterface GetExtension<TExtensionInterface>()
-            where TExtensionInterface : IGrainExtension
+            where TExtensionInterface : class, IGrainExtension
         {
             if (this.TryGetExtension<TExtensionInterface>(out var result))
             {

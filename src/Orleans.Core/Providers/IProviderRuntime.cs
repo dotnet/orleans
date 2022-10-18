@@ -27,7 +27,7 @@ namespace Orleans.Providers
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
         (TExtension Extension, TExtensionInterface ExtensionReference) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension;
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension;
     }
 }

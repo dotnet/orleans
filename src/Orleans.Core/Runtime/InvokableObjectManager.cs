@@ -113,7 +113,7 @@ namespace Orleans
 
             public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
-            void IGrainContext.SetComponent<TComponent>(TComponent value)
+            void IGrainContext.SetComponent<TComponent>(TComponent value) where TComponent : class
             {
                 if (this.LocalObject.Target is TComponent)
                 {
@@ -123,7 +123,7 @@ namespace Orleans
                 _manager.rootGrainContext.SetComponent(value);
             }
 
-            public TComponent GetComponent<TComponent>()
+            public TComponent GetComponent<TComponent>() where TComponent : class
             {
                 if (this.LocalObject.Target is TComponent component)
                 {
@@ -133,7 +133,7 @@ namespace Orleans
                 return _manager.rootGrainContext.GetComponent<TComponent>();
             }
 
-            public TTarget GetTarget<TTarget>() => (TTarget)(object)this.LocalObject.Target;
+            public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)this.LocalObject.Target;
 
             bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
 
@@ -220,7 +220,11 @@ namespace Orleans
                             continue;
                         }
 
-                        RequestContextExtensions.Import(message.RequestContextData, message);
+                        if (message.RequestContextData is { Count: > 0 })
+                        {
+                            RequestContextExtensions.Import(message.RequestContextData);
+                        }
+
                         IInvokable request = null;
                         try
                         {
@@ -260,10 +264,6 @@ namespace Orleans
                         _manager.logger.LogWarning(
                             outerException,
                             "Exception in " + nameof(LocalObjectMessagePumpAsync));
-                    }
-                    finally
-                    {
-                        RequestContext.Clear();
                     }
                 }
             }

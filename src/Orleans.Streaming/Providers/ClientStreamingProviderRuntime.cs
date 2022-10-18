@@ -67,8 +67,8 @@ namespace Orleans.Providers
         }
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }

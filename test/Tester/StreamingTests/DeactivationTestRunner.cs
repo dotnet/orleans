@@ -6,6 +6,7 @@ using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Runtime;
+using Orleans.Core.Internal;
 
 namespace UnitTests.StreamingTests
 {

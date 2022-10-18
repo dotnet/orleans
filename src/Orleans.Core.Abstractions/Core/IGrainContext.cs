@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="TComponent">The type used to lookup this component.</typeparam>
         /// <param name="value">The component instance.</param>
-        void SetComponent<TComponent>(TComponent value);
+        void SetComponent<TComponent>(TComponent value) where TComponent : class;
 
         /// <summary>
         /// Submits an incoming message to this instance.
@@ -238,7 +238,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// The implementation of the extension which is bound to this grain.
         /// </returns>
-        TExtensionInterface GetExtension<TExtensionInterface>() where TExtensionInterface : IGrainExtension;
+        TExtensionInterface GetExtension<TExtensionInterface>() where TExtensionInterface : class, IGrainExtension;
 
         /// <summary>
         /// Binds an extension to an addressable object, if not already done.
@@ -248,7 +248,7 @@ namespace Orleans.Runtime
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
         (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension;
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension;
     }
 }

@@ -124,18 +124,17 @@ namespace Tester
     {
         public static void SetActivityId(Guid id)
         {
-            RequestContext.ActivityId = id;
+            RequestContext.ReentrancyId = id;
         }
 
         public static Guid GetActivityId()
         {
-            return RequestContext.ActivityId;
+            return RequestContext.ReentrancyId is Guid value ? value : Guid.Empty;
         }
 
         public static void ClearActivityId()
         {
-            Trace.CorrelationManager.ActivityId = Guid.Empty;
-            RequestContext.ActivityId = Guid.Empty;
+            RequestContext.ReentrancyId = Guid.Empty;
         }
     }
 }

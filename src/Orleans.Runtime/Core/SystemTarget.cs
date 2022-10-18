@@ -126,7 +126,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public void SetComponent<TComponent>(TComponent instance)
+        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
             if (this is TComponent)
             {
@@ -206,8 +206,8 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : TExtensionInterface
-            where TExtensionInterface : IGrainExtension
+            where TExtension : class, TExtensionInterface
+            where TExtensionInterface : class, IGrainExtension
         {
             TExtension implementation;
             if (this.GetComponent<TExtensionInterface>() is object existing)
@@ -252,7 +252,7 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public TExtensionInterface GetExtension<TExtensionInterface>()
-            where TExtensionInterface : IGrainExtension
+            where TExtensionInterface : class, IGrainExtension
         {
             if (this.GetComponent<TExtensionInterface>() is TExtensionInterface result)
             {
@@ -290,7 +290,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public TTarget GetTarget<TTarget>() => (TTarget)(object)this;
+        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
 
         /// <inheritdoc/>
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }

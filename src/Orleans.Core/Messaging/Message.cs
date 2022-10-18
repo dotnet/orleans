@@ -21,7 +21,6 @@ namespace Orleans.Runtime
         public PackedHeaders _headers;
         public CorrelationId _id;
 
-        public Guid _callChainId;
         public Dictionary<string, object> _requestContextData;
 
         public SiloAddress _targetSilo;
@@ -225,16 +224,6 @@ namespace Orleans.Runtime
             }
         }
 
-        public Guid CallChainId
-        {
-            get => _callChainId;
-            set
-            {
-                _callChainId = value;
-                _headers.SetFlag(MessageFlags.HasCallChainId, value != Guid.Empty);
-            }
-        }
-
         public GrainInterfaceType InterfaceType
         {
             get => _interfaceType;
@@ -346,10 +335,9 @@ grow:
 
             HasRequestContextData = 1 << 4,
             HasInterfaceVersion = 1 << 5,
-            HasCallChainId = 1 << 6,
-            HasInterfaceType = 1 << 7,
-            HasCacheInvalidationHeader = 1 << 8,
-            HasTimeToLive = 1 << 9,
+            HasInterfaceType = 1 << 6,
+            HasCacheInvalidationHeader = 1 << 7,
+            HasTimeToLive = 1 << 8,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

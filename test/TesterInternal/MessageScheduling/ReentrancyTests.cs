@@ -22,11 +22,7 @@ namespace UnitTests
             hostBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore")
-                .AddMemoryGrainStorageAsDefault()
-                .Configure<SchedulingOptions>(options =>
-                {
-                    options.AllowCallChainReentrancy = false;
-                });
+                .AddMemoryGrainStorageAsDefault();
         }
     }
 

@@ -1,8 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -16,21 +13,6 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-
-            private class SiloConfigurator : ISiloConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.Configure<SchedulingOptions>(options =>
-                    {
-                        options.AllowCallChainReentrancy = true;
-                    });
-                }
-            }
         }
 
         public AllowCallChainReentrancyTests(ITestOutputHelper output, Fixture fixture)
@@ -84,6 +66,12 @@ namespace UnitTests.General
         public async Task CallChainReentrancy_6()
         {
             await _testHelper.CallChainReentrancy_6();
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
+        public async Task CallChainReentrancy_WithSuppression()
+        {
+            await _testHelper.CallChainReentrancy_WithSuppression();
         }
     }
 } 
