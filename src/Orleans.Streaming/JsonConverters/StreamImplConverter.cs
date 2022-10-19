@@ -47,9 +47,9 @@ namespace Orleans.Streaming.JsonConverters
 
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
+            writer.WriteStartObject();
             if (value is IAsyncStream target)
             {
-                writer.WriteStartObject();
                 writer.WritePropertyName("streamId");
                 serializer.Serialize(writer, target.StreamId);
                 writer.WritePropertyName("providerName");

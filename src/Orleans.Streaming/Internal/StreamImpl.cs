@@ -41,6 +41,11 @@ namespace Orleans.Streams
         public bool IsRewindable => isRewindable;
         public string ProviderName => streamId.ProviderName;
 
+        // Constructor for Orleans serialization, otherwise initLock is null
+        public StreamImpl()
+        {
+        }
+
         public StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             this.streamId = streamId;
@@ -48,7 +53,6 @@ namespace Orleans.Streams
             this.runtimeClient = runtimeClient ?? throw new ArgumentNullException(nameof(runtimeClient));
             producerInterface = null;
             consumerInterface = null;
-            initLock = new object();
             this.isRewindable = isRewindable;
         }
 
