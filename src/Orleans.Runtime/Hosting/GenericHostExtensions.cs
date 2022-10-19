@@ -24,6 +24,20 @@ namespace Microsoft.Extensions.Hosting
         /// </remarks>
         public static IHostBuilder UseOrleans(
             this IHostBuilder hostBuilder,
+            Action<ISiloBuilder> configureDelegate) => hostBuilder.UseOrleans((_, siloBuilder) => configureDelegate(siloBuilder));
+
+        /// <summary>
+        /// Configures the host builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <param name="configureDelegate">The delegate used to configure the silo.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IHostBuilder"/> instance will result in one silo being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// </remarks>
+        public static IHostBuilder UseOrleans(
+            this IHostBuilder hostBuilder,
             Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
             if (hostBuilder is null) throw new ArgumentNullException(nameof(hostBuilder));
