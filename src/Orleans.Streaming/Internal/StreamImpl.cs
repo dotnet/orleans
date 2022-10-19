@@ -41,19 +41,18 @@ namespace Orleans.Streams
         public bool IsRewindable => isRewindable;
         public string ProviderName => streamId.ProviderName;
 
-        // IMPORTANT: This constructor needs to be public for Json deserialization to work.
+        // Constructor for Orleans serialization, otherwise initLock is null
         public StreamImpl()
         {
         }
 
-        internal StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
+        public StreamImpl(QualifiedStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             this.streamId = streamId;
             this.provider = provider ?? throw new ArgumentNullException(nameof(provider));
             this.runtimeClient = runtimeClient ?? throw new ArgumentNullException(nameof(runtimeClient));
             producerInterface = null;
             consumerInterface = null;
-            initLock = new object();
             this.isRewindable = isRewindable;
         }
 
