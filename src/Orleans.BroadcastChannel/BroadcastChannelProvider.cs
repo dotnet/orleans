@@ -8,8 +8,17 @@ using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {
+    /// <summary>
+    /// Functionality for providing broadcast channel to producers.
+    /// </summary>
     public interface IBroadcastChannelProvider
     {
+        /// <summary>
+        /// Get a writer to a channel.
+        /// </summary>
+        /// <typeparam name="T">The channel element type.</typeparam>
+        /// <param name="streamId">The channel identifier.</param>
+        /// <returns></returns>
         IBroadcastChannelWriter<T> GetChannelWriter<T>(ChannelId streamId);
     }
 
@@ -35,6 +44,7 @@ namespace Orleans.BroadcastChannel
             _loggerFactory = loggerFactory;
         }
 
+        /// <inheritdoc />
         public IBroadcastChannelWriter<T> GetChannelWriter<T>(ChannelId streamId)
         {
             return new BroadcastChannelWriter<T>(
@@ -45,6 +55,12 @@ namespace Orleans.BroadcastChannel
                 _loggerFactory);
         }
 
+        /// <summary>
+        /// Create a new channel provider.
+        /// </summary>
+        /// <param name="sp">The service provider.</param>
+        /// <param name="name">The name of the provider.</param>
+        /// <returns>The named channel provider.</returns>
         public static IBroadcastChannelProvider Create(IServiceProvider sp, string name)
         {
             var opt = sp.GetOptionsByName<BroadcastChannelOptions>(name);
