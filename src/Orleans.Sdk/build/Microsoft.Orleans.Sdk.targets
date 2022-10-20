@@ -1,6 +1,6 @@
 <Project>
 
-  <ItemGroup Condition="'$(ImplicitUsings)' == 'enable' ">
+  <ItemGroup Condition="'$(ImplicitUsings)' == 'enable' or '$(ImplicitUsings)' == 'true'">
     <Using Include="Orleans"/>
     <Using Include="Orleans.Hosting"/>
   </ItemGroup>
