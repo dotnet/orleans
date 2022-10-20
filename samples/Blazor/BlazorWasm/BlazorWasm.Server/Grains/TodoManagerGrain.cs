@@ -28,6 +28,7 @@ public class TodoManagerGrain : Grain, ITodoManagerGrain
     public Task<ImmutableArray<Guid>> GetAllAsync() =>
         Task.FromResult(ImmutableArray.CreateRange(_state.State.Items));
 
+    [GenerateSerializer]
     public class State
     {
         public HashSet<Guid> Items { get; set; } = new();

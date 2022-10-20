@@ -1,8 +1,9 @@
-using Orleans.Concurrency;
+using Orleans;
 
 namespace BlazorWasm.Models;
 
 [Immutable]
+[GenerateSerializer]
 public record class TodoItem(
     Guid Key,
     string Title,
