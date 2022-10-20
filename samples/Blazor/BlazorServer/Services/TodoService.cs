@@ -68,7 +68,7 @@ public class TodoService
 
     public Task<StreamSubscriptionHandle<TodoNotification>> SubscribeAsync(
         Guid ownerKey, Func<TodoNotification, Task> action) =>
-        _client.GetStreamProvider("SMS")
+        _client.GetStreamProvider("MemoryStreams")
             .GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
             .SubscribeAsync(new TodoItemObserver(_logger, action));
 
