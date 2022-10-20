@@ -64,11 +64,10 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Add a new broadcast channel to the client.
+        /// Get the named broadcast channel provided.
         /// </summary>
-        /// <param name="this">The builder.</param>
+        /// <param name="this">The client.</param>
         /// <param name="name">The name of the provider</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
         public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
             => @this.ServiceProvider.GetRequiredServiceByName<IBroadcastChannelProvider>(name);
 
