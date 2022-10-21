@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans;
 using Orleans.Streams;
 using Orleans.Statistics;

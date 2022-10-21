@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection.Extensions;

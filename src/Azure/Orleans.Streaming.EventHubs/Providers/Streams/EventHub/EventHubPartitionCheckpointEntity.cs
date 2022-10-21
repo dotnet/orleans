@@ -3,7 +3,7 @@ using Azure;
 using Azure.Data.Tables;
 using Orleans.Streaming.EventHubs;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     internal class EventHubPartitionCheckpointEntity : ITableEntity
     {

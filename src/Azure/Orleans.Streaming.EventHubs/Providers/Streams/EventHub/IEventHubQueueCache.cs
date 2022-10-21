@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Interface for a stream message cache that stores EventHub EventData

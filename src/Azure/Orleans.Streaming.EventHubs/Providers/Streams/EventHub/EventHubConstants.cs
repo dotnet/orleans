@@ -1,4 +1,4 @@
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     internal class EventHubConstants
     {

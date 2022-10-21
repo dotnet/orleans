@@ -2,7 +2,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Orleans.ServiceBus.Providers.Testing
+namespace Orleans.Streaming.EventHubs.Testing
 {
     public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
     {

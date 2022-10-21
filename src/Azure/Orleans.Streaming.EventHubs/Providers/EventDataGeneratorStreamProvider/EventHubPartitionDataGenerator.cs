@@ -8,7 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.ServiceBus.Providers.Testing
+namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
     /// Generate data for one stream

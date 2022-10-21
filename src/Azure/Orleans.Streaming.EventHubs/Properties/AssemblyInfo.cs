@@ -1,4 +1,4 @@
 using System.Runtime.CompilerServices;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 
 [assembly: InternalsVisibleTo("ServiceBus.Tests")]

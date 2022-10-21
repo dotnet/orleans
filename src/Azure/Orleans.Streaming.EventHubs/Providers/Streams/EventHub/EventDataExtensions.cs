@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Azure.Messaging.EventHubs;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Extends EventData to support streaming

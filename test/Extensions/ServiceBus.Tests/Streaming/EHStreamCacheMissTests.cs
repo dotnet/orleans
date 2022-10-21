@@ -8,7 +8,7 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using Xunit.Abstractions;
 using Orleans.Streams;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Tester;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Serialization;

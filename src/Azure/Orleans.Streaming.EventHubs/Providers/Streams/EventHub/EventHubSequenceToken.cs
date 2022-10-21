@@ -3,7 +3,7 @@ using System;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Location of a message within an EventHub partition

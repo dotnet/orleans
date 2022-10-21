@@ -4,7 +4,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     public interface IEventHubDataAdapter : IQueueDataAdapter<EventData>, ICacheDataAdapter
     {
