@@ -1,6 +1,6 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using System;
@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
-using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;

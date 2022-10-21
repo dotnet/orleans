@@ -1,7 +1,7 @@
 using Orleans.Runtime;
 using System.Collections.Generic;
 
-namespace Orleans.ServiceBus.Providers.Testing
+namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
     /// Data generator for test purpose

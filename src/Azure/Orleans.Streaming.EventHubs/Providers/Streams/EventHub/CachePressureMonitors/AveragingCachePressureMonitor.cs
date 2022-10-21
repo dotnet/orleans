@@ -4,7 +4,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Cache pressure monitor whose back pressure algorithm is based on averaging pressure value

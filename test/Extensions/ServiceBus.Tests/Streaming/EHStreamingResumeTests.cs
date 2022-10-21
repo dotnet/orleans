@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester;
 using Tester.StreamingTests;

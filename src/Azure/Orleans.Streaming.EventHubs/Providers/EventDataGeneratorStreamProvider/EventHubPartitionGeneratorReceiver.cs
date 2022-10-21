@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Orleans.ServiceBus.Providers.Testing
+namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
     /// Eventhub receiver which configured with data generator

@@ -1,7 +1,7 @@
 ﻿using Orleans.Providers.Streams.Common;
 using System;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Cache pressure monitor records pressure contribution to the cache, and determine if the cache is under pressure based on its 

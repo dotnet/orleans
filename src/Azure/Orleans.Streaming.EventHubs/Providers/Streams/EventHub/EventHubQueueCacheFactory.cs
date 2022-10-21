@@ -5,9 +5,9 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors;
+using Orleans.Streaming.EventHubs.StatisticMonitors;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Factory class to configure and create IEventHubQueueCache

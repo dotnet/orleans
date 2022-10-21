@@ -13,7 +13,7 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Queue adapter factory which allows the PersistentStreamProvider to use EventHub as its backend persistent event queue.

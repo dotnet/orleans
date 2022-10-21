@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using Orleans.Runtime;
 using Azure.Messaging.EventHubs;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub

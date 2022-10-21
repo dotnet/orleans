@@ -10,7 +10,7 @@ using Xunit;
 using ServiceBus.Tests.SlowConsumingTests;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
-using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
 
 namespace ServiceBus.Tests.MonitorTests
