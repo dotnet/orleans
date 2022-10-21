@@ -15,16 +15,16 @@ namespace Orleans.Runtime
 
         internal const string RpcSystem = "orleans";
         internal const string OrleansNamespacePrefix = "Orleans";
-        internal const string UserGrainActivitySourceName = "Microsoft.Orleans.User";
+        internal const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
         internal const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
 
-        protected static readonly ActivitySource UserGrainSource = new(UserGrainActivitySourceName, "1.0.0");
+        protected static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
         protected static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
 
         protected static ActivitySource GetActivitySource(IGrainCallContext context) =>
             context.Request.GetInterfaceType().Namespace?.StartsWith(OrleansNamespacePrefix) == true
                 ? RuntimeGrainSource
-                : UserGrainSource;
+                : ApplicationGrainSource;
 
         protected static async Task Process(IGrainCallContext context, Activity activity)
         {

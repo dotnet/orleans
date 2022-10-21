@@ -23,7 +23,7 @@ namespace UnitTests.General
         {
             Listener = new()
             {
-                ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.UserGrainActivitySourceName,
+                ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ApplicationGrainActivitySourceName,
                 Sample = Sample,
                 SampleUsingParentId = SampleUsingParentId,
             };
