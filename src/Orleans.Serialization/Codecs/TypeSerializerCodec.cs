@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Reflection.PortableExecutable;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
@@ -38,7 +37,7 @@ namespace Orleans.Serialization.Codecs
             writer.WriteStartObject(fieldIdDelta, expectedType, TypeType);
 
             var schemaType = writer.Session.WellKnownTypes.TryGetWellKnownTypeId(value, out var id) ? SchemaType.WellKnown
-                : writer.Session.ReferencedTypes.GetOrAddTypeReference(value, out id) ? SchemaType.Referenced
+                : writer.Session.ReferencedTypes.TryGetTypeReference(value, out id) ? SchemaType.Referenced
                 : SchemaType.Encoded;
 
             // Write the encoding type.
@@ -121,7 +120,7 @@ namespace Orleans.Serialization.Codecs
                     break;
 
                 case SchemaType.Encoded:
-                    reader.Session.ReferencedTypes.RecordReferencedType(result);
+                    // Type codec should not update the type reference map, otherwise unknown-field deserialization could be broken
                     break;
 
                 default:

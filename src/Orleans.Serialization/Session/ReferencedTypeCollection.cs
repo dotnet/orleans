@@ -42,6 +42,14 @@ namespace Orleans.Serialization.Session
         public void RecordReferencedType(Type type) => _referencedTypes.Add(++_currentReferenceId, type);
 
         /// <summary>
+        /// Gets the identifier for the specified type.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <param name="reference">The reference.</param>
+        /// <returns><see langword="true" /> if the type has been previoulsy referenced, <see langword="false" /> otherwise.</returns>
+        public bool TryGetTypeReference(Type type, out uint reference) => _referencedTypeToIdMap.TryGetValue(type, out reference);
+
+        /// <summary>
         /// Gets or adds the identifier for the specified type.
         /// </summary>
         public bool GetOrAddTypeReference(Type type, out uint reference)
