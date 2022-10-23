@@ -5,7 +5,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// The random placement strategy specifies that new activations of a grain should be placed on a random, compatible server.
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable]
+    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
     public sealed class RandomPlacement : PlacementStrategy
     {
         /// <summary>

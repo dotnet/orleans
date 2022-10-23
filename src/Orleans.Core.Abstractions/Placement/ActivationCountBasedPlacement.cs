@@ -19,7 +19,7 @@ namespace Orleans.Runtime
     /// <br/>
     /// This placement strategy is configured by adding the <see cref="Orleans.Placement.ActivationCountBasedPlacementAttribute"/> attribute to a grain.
     /// </remarks>
-    [Serializable, GenerateSerializer, Immutable]
+    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
     public sealed class ActivationCountBasedPlacement : PlacementStrategy
     {
         /// <summary>

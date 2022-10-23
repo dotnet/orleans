@@ -5,7 +5,7 @@ namespace Orleans.Versions.Selector
     /// <summary>
     /// Grain interface version selector which always selects the highest compatible version.
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable]
+    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
     public sealed class LatestVersion : VersionSelectorStrategy
     {
         /// <summary>
