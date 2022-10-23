@@ -371,10 +371,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
-                sp,
-                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageHeaderSize,
-                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageBodySize));
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
             services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();

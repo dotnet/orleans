@@ -4,23 +4,24 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
-using static Orleans.Runtime.Message;
 using Orleans.Serialization;
-using Orleans.Serialization.Session;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Buffers;
-using System.Diagnostics;
+using Orleans.Serialization.Session;
+using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageSerializer : IMessageSerializer
+    internal sealed class MessageSerializer : IMessageSerializer
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
@@ -47,8 +48,7 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider services,
             Serializer<GrainAddress> activationAddressSerializer,
             ICodecProvider codecProvider,
-            int maxHeaderSize,
-            int maxBodySize)
+            IOptions<ClientMessagingOptions> options)
         {
             _readerSiloAddressCodec = new CachingSiloAddressCodec();
             _writerSiloAddressCodec = new CachingSiloAddressCodec();
@@ -60,8 +60,9 @@ namespace Orleans.Runtime.Messaging
             _deserializationSession = sessionPool.GetSession();
             _memoryPool = memoryPool.Pool;
             _bodySerializer = bodySerializer;
-            _maxHeaderLength = maxHeaderSize;
-            _maxBodyLength = maxBodySize;
+            var optionsValue = options.Value;
+            _maxHeaderLength = optionsValue.MaxMessageHeaderSize;
+            _maxBodyLength = optionsValue.MaxMessageBodySize;
             _sessionPool = sessionPool;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
         }
@@ -129,7 +130,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 input = input.Slice(requiredBytes);
-                _deserializationSession.PartialReset();
+                _deserializationSession.FullReset();
             }
         }
 
@@ -169,7 +170,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _serializationSession.PartialReset();
+                _serializationSession.FullReset();
             }
         }
 
