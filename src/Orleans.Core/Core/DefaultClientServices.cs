@@ -122,7 +122,9 @@ namespace Orleans
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
+                sp,
+                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value));
             services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();

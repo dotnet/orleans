@@ -8,7 +8,6 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
 using Orleans.Serialization;
@@ -37,7 +36,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MemoryPool<byte> _memoryPool;
         private readonly int _maxHeaderLength;
         private readonly int _maxBodyLength;
-        private readonly SerializerSessionPool _sessionPool;
         private readonly DictionaryCodec<string, object> _requestContextCodec;
         private object? _bufferWriter;
 
@@ -48,7 +46,7 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider services,
             Serializer<GrainAddress> activationAddressSerializer,
             ICodecProvider codecProvider,
-            IOptions<ClientMessagingOptions> options)
+            MessagingOptions options)
         {
             _readerSiloAddressCodec = new CachingSiloAddressCodec();
             _writerSiloAddressCodec = new CachingSiloAddressCodec();
@@ -60,10 +58,8 @@ namespace Orleans.Runtime.Messaging
             _deserializationSession = sessionPool.GetSession();
             _memoryPool = memoryPool.Pool;
             _bodySerializer = bodySerializer;
-            var optionsValue = options.Value;
-            _maxHeaderLength = optionsValue.MaxMessageHeaderSize;
-            _maxBodyLength = optionsValue.MaxMessageBodySize;
-            _sessionPool = sessionPool;
+            _maxHeaderLength = options.MaxMessageHeaderSize;
+            _maxBodyLength = options.MaxMessageBodySize;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
         }
 

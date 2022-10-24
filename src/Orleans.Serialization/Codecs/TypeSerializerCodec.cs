@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Codecs
             {
                 // If the type is encoded, write the length-prefixed bytes.
                 ReferenceCodec.MarkValueField(writer.Session);
-                writer.WriteFieldHeader(1, null, null, WireType.LengthPrefixed);
+                writer.WriteFieldHeaderExpected(1, WireType.LengthPrefixed);
                 writer.Session.TypeCodec.WriteLengthPrefixed(ref writer, value);
             }
             else
