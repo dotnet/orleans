@@ -14,9 +14,17 @@ namespace Orleans.Runtime
         protected const string TraceStateHeaderName = "tracestate";
 
         internal const string RpcSystem = "orleans";
-        internal const string ActivitySourceName = "Microsoft.Orleans";
+        internal const string OrleansNamespacePrefix = "Orleans";
+        internal const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
+        internal const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
 
-        protected static readonly ActivitySource Source = new(ActivitySourceName);
+        protected static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
+        protected static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
+
+        protected static ActivitySource GetActivitySource(IGrainCallContext context) =>
+            context.Request.GetInterfaceType().Namespace?.StartsWith(OrleansNamespacePrefix) == true
+                ? RuntimeGrainSource
+                : ApplicationGrainSource;
 
         protected static async Task Process(IGrainCallContext context, Activity activity)
         {
@@ -86,7 +94,8 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public Task Invoke(IOutgoingGrainCallContext context)
         {
-            var activity = Source.StartActivity(context.Request.GetActivityName(), ActivityKind.Client);
+            var source = GetActivitySource(context);
+            var activity = source.StartActivity(context.Request.GetActivityName(), ActivityKind.Client);
 
             if (activity is not null)
             {
@@ -129,9 +138,10 @@ namespace Orleans.Runtime
                 out var traceParent,
                 out var traceState);
 
+            var source = GetActivitySource(context);
             if (!string.IsNullOrEmpty(traceParent))
             {
-                activity = Source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
+                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
 
                 if (activity is not null)
                 {
@@ -157,7 +167,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                activity = Source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server);
+                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server);
             }
 
             activity?.Start();
