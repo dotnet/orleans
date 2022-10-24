@@ -1,4 +1,6 @@
 using System;
+using System.Net;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.Configuration
 {
@@ -28,6 +30,22 @@ namespace Orleans.Serialization.Configuration
             wellKnownTypes[18] = typeof(DateTimeOffset);
             wellKnownTypes[19] = typeof(object);
             wellKnownTypes[20] = typeof(DotNetSerializableCodec);
+            wellKnownTypes[21] = typeof(ExceptionCodec);
+            wellKnownTypes[22] = typeof(byte[]);
+            wellKnownTypes[23] = typeof(object[]);
+            wellKnownTypes[24] = typeof(char[]);
+            wellKnownTypes[25] = typeof(int[]);
+            wellKnownTypes[26] = typeof(string[]);
+            wellKnownTypes[27] = typeof(Type);
+            wellKnownTypes[28] = typeof(DateOnly);
+            wellKnownTypes[29] = typeof(TimeOnly);
+            wellKnownTypes[30] = typeof(DayOfWeek);
+            wellKnownTypes[31] = typeof(Uri);
+            wellKnownTypes[32] = typeof(Version);
+            wellKnownTypes[33] = typeof(IPAddress);
+            wellKnownTypes[34] = typeof(IPEndPoint);
+            wellKnownTypes[35] = typeof(ExceptionResponse);
+            wellKnownTypes[36] = typeof(CompletedResponse);
 
             var allowedTypes = typeManifest.AllowedTypes;
             allowedTypes.Add("System.Globalization.CompareOptions");

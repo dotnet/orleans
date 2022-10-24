@@ -310,7 +310,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             {
                 if (value is null)
                 {
-                    ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType);
+                    ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 }
                 else
                 {

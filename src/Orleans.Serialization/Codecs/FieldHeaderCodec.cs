@@ -33,7 +33,7 @@ namespace Orleans.Serialization.Codecs
             var embeddedFieldId = hasExtendedFieldId ? Tag.FieldIdCompleteMask : (byte)fieldId;
             var tag = (byte)((byte)wireType | embeddedFieldId);
 
-            if (actualType == expectedType)
+            if (actualType is null || actualType == expectedType)
             {
                 writer.WriteByte((byte)(tag | (byte)SchemaType.Expected));
                 if (hasExtendedFieldId)

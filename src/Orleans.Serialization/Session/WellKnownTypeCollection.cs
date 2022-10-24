@@ -21,7 +21,7 @@ namespace Orleans.Serialization.Session
         public WellKnownTypeCollection(IOptions<TypeManifestOptions> config)
         {
             _wellKnownTypes = config?.Value.WellKnownTypeIds ?? throw new ArgumentNullException(nameof(config));
-            _wellKnownTypeToIdMap = new Dictionary<Type, uint>();
+            _wellKnownTypeToIdMap = new Dictionary<Type, uint>(_wellKnownTypes.Count);
             foreach (var item in _wellKnownTypes)
             {
                 _wellKnownTypeToIdMap[item.Value] = item.Key;
@@ -66,15 +66,6 @@ namespace Orleans.Serialization.Session
         /// <param name="type">The type.</param>
         /// <param name="typeId">The type identifier.</param>
         /// <returns><see langword="true" /> if the type has a well-known identifier, <see langword="false" /> otherwise.</returns>
-        public bool TryGetWellKnownTypeId(Type type, out uint typeId)
-        {
-            if (type is null)
-            {
-                typeId = 0;
-                return true;
-            }
-
-            return _wellKnownTypeToIdMap.TryGetValue(type, out typeId);
-        }
+        public bool TryGetWellKnownTypeId(Type type, out uint typeId) => _wellKnownTypeToIdMap.TryGetValue(type, out typeId);
     }
 }

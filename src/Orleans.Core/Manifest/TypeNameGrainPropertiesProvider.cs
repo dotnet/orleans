@@ -16,7 +16,7 @@ namespace Orleans.Metadata
             properties[WellKnownGrainTypeProperties.TypeName] = grainClass.Name;
             properties[WellKnownGrainTypeProperties.FullTypeName] = grainClass.FullName;
             properties["diag.type"] = RuntimeTypeNameFormatter.Format(grainClass);
-            properties["diag.asm"] = grainClass.Assembly.GetName().Name;
+            properties["diag.asm"] = CachedTypeResolver.GetName(grainClass.Assembly);
         }
 
         /// <inheritdoc/>
@@ -24,7 +24,7 @@ namespace Orleans.Metadata
         {
             properties[WellKnownGrainInterfaceProperties.TypeName] = interfaceType.Name;
             properties["diag.type"] = RuntimeTypeNameFormatter.Format(interfaceType);
-            properties["diag.asm"] = interfaceType.Assembly.GetName().Name;
+            properties["diag.asm"] = CachedTypeResolver.GetName(interfaceType.Assembly);
         }
     }
 }

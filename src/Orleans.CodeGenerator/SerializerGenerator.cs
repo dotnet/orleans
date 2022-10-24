@@ -716,7 +716,7 @@ namespace Orleans.CodeGenerator
                 }
                 else
                 {
-                    // C#: if (value is null) { ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType); return; }
+                    // C#: if (value is null) { ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta); return; }
                     innerBody.Add(
                         IfStatement(
                             IsPatternExpression(valueParam, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
@@ -725,8 +725,7 @@ namespace Orleans.CodeGenerator
                                     ArgumentList(SeparatedList(new[]
                                     {
                                         Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(fieldIdDeltaParam),
-                                        Argument(expectedTypeParam)
+                                        Argument(fieldIdDeltaParam)
                                     })))),
                                 ReturnStatement()))
                     );

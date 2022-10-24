@@ -80,15 +80,13 @@ namespace Orleans.Serialization.Codecs
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldId">The field identifier.</param>
-        /// <param name="expectedType">The expected type.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void WriteNullReference<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
-            uint fieldId,
-            Type expectedType) where TBufferWriter : IBufferWriter<byte>
+            uint fieldId) where TBufferWriter : IBufferWriter<byte>
         {
             writer.Session.ReferencedObjects.MarkValueField();
-            writer.WriteFieldHeader(fieldId, expectedType, expectedType, WireType.Reference);
+            writer.WriteFieldHeaderExpected(fieldId, WireType.Reference);
             writer.WriteVarUInt32(0U);
         }
 

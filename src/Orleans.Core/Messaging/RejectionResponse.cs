@@ -2,7 +2,7 @@ using System;
 
 namespace Orleans.Runtime
 {
-    [GenerateSerializer, Immutable]
+    [Id(102), GenerateSerializer, Immutable]
     internal sealed class RejectionResponse
     {
         [Id(0)]

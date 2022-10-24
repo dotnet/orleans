@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Serialization
         {
             if (value is null)
             {
-                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType);
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 return;
             }
 
