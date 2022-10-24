@@ -79,7 +79,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPAddress value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecFieldType, value))
             {
                 return;
             }

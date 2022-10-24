@@ -66,9 +66,8 @@ namespace Orleans.Serialization.TypeSystem
         /// </summary>
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
-        /// <param name="type">The type.</param>
-        /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
-        public unsafe bool TryRead<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type)
+        /// <returns>The type if it was successfully read, <see langword="null" /> otherwise.</returns>
+        public unsafe Type TryRead<TInput>(ref Reader<TInput> reader)
         {
             var version = reader.ReadByte();
             if (version != Version1)
@@ -96,8 +95,7 @@ namespace Orleans.Serialization.TypeSystem
 
                 if (existingKey.TypeName.AsSpan().SequenceEqual(typeName))
                 {
-                    type = entry.Type;
-                    return true;
+                    return entry.Type;
                 }
 
                 // Try the next entry.
@@ -111,19 +109,16 @@ namespace Orleans.Serialization.TypeSystem
                 typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
             }
 
-            _ = _typeConverter.TryParse(typeNameString, out type);
-            if (type is not null)
+            if (_typeConverter.TryParse(typeNameString, out var type))
             {
                 var key = new TypeKey(hashCode, typeName.ToArray());
                 while (!_typeKeyCache.TryAdd(candidateHashCode++, (key, type)))
                 {
                     // Insert the type at the first available position.
                 }
-
-                return true;
             }
 
-            return false;
+            return type;
         }
 
         /// <summary>

@@ -5,7 +5,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Marker object used to denote an unknown field and its position into a stream of data.
     /// </summary>
-    public class UnknownFieldMarker
+    public sealed class UnknownFieldMarker
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="UnknownFieldMarker"/> class.

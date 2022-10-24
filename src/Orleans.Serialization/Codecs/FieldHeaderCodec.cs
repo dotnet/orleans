@@ -51,7 +51,7 @@ namespace Orleans.Serialization.Codecs
 
                 writer.WriteVarUInt32(typeOrReferenceId);
             }
-            else if (writer.Session.ReferencedTypes.TryGetTypeReference(actualType, out typeOrReferenceId))
+            else if (writer.Session.ReferencedTypes.GetOrAddTypeReference(actualType, out typeOrReferenceId))
             {
                 writer.WriteByte((byte)(tag | (byte)SchemaType.Referenced));
                 if (hasExtendedFieldId)
@@ -130,15 +130,14 @@ namespace Orleans.Serialization.Codecs
         public static void ReadFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
             var tag = reader.ReadByte();
-
-            if (tag != (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))
+            field.Tag = tag;
+            // If the id or schema type are required and were not encoded into the tag, read the extended header data.
+            if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
             {
-                field.Tag = tag;
                 ReadExtendedFieldHeader(ref reader, ref field);
             }
             else
             {
-                field.Tag = tag;
                 field.FieldIdDeltaRaw = default;
                 field.FieldTypeRaw = default;
             }
@@ -155,14 +154,14 @@ namespace Orleans.Serialization.Codecs
         {
             Field field = default;
             var tag = reader.ReadByte();
-            if (tag != (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))
+            field.Tag = tag;
+            // If the id or schema type are required and were not encoded into the tag, read the extended header data.
+            if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
             {
-                field.Tag = tag;
                 ReadExtendedFieldHeader(ref reader, ref field);
             }
             else
             {
-                field.Tag = tag;
                 field.FieldIdDeltaRaw = default;
                 field.FieldTypeRaw = default;
             }
@@ -177,11 +176,9 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        internal static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
+        private static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
-            // If all of the field id delta bits are set and the field isn't an extended wiretype field, read the extended field id delta
-            var notExtended = (field.Tag & (byte)WireType.Extended) != (byte)WireType.Extended;
-            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask && notExtended)
+            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask)
             {
                 field.FieldIdDeltaRaw = reader.ReadVarUInt32NoInlining();
             }
@@ -192,7 +189,7 @@ namespace Orleans.Serialization.Codecs
 
             // If schema type is valid, read the type.
             var schemaType = (SchemaType)(field.Tag & Tag.SchemaTypeMask);
-            if (notExtended && schemaType != SchemaType.Expected)
+            if (schemaType != SchemaType.Expected)
             {
                 field.FieldTypeRaw = reader.ReadType(schemaType);
             }
@@ -207,13 +204,12 @@ namespace Orleans.Serialization.Codecs
         {
             switch (schemaType)
             {
-                case SchemaType.Expected:
-                    return null;
                 case SchemaType.WellKnown:
                     var typeId = reader.ReadVarUInt32();
                     return reader.Session.WellKnownTypes.GetWellKnownType(typeId);
                 case SchemaType.Encoded:
-                    _ = reader.Session.TypeCodec.TryRead(ref reader, out Type encoded);
+                    var encoded = reader.Session.TypeCodec.TryRead(ref reader);
+                    reader.Session.ReferencedTypes.RecordReferencedType(encoded);
                     return encoded;
                 case SchemaType.Referenced:
                     var reference = reader.ReadVarUInt32();
@@ -228,30 +224,23 @@ namespace Orleans.Serialization.Codecs
         {
             switch (schemaType)
             {
-                case SchemaType.Expected:
-                    return (null, "Expected");
                 case SchemaType.WellKnown:
                     { 
                         var typeId = reader.ReadVarUInt32();
-                        if (reader.Session.WellKnownTypes.TryGetWellKnownType(typeId, out var type))
-                        {
-                            return (type, $"WellKnown {typeId} ({(type is null ? "null" : RuntimeTypeNameFormatter.Format(type))})");
-                        }
-                        else
-                        {
-                            return (null, $"WellKnown {typeId} (unknown)");
-                        }
+                        var found = reader.Session.WellKnownTypes.TryGetWellKnownType(typeId, out var type);
+                        return (type, $"WellKnown {typeId} ({(found ? type is null ? "null" : RuntimeTypeNameFormatter.Format(type) : "unknown")})");
                     }
                 case SchemaType.Encoded:
                     {
                         var found = reader.Session.TypeCodec.TryReadForAnalysis(ref reader, out Type encoded, out var typeString);
-                        return (encoded, $"Encoded \"{typeString}\" ({(found ? RuntimeTypeNameFormatter.Format(encoded) : "not found")})");
+                        reader.Session.ReferencedTypes.RecordReferencedType(encoded);
+                        return (encoded, $"Encoded \"{typeString}\" ({(found ? encoded is null ? "null" : RuntimeTypeNameFormatter.Format(encoded) : "not found")})");
                     }
                 case SchemaType.Referenced:
                     {
                         var reference = reader.ReadVarUInt32();
                         var found = reader.Session.ReferencedTypes.TryGetReferencedType(reference, out var type);
-                        return (type, $"Referenced {reference} ({(found ? RuntimeTypeNameFormatter.Format(type) : "not found")})");
+                        return (type, $"Referenced {reference} ({(found ? type is null ? "null" : RuntimeTypeNameFormatter.Format(type) : "not found")})");
                     }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(schemaType));
@@ -270,7 +259,7 @@ namespace Orleans.Serialization.Codecs
             Field field = default;
             string type = default;
             var tag = reader.ReadByte();
-            if (tag != (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))
+            if (tag < (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))
             {
                 field.Tag = tag;
                 ReadFieldHeaderForAnalysisSlow(ref reader, ref field, ref type);
@@ -289,8 +278,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ReadFieldHeaderForAnalysisSlow<TInput>(ref this Reader<TInput> reader, scoped ref Field field, scoped ref string type)
         {
-            var notExtended = (field.Tag & (byte)WireType.Extended) != (byte)WireType.Extended;
-            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask && notExtended)
+            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask)
             {
                 field.FieldIdDeltaRaw = reader.ReadVarUInt32NoInlining();
             }
@@ -301,13 +289,14 @@ namespace Orleans.Serialization.Codecs
 
             // If schema type is valid, read the type.
             var schemaType = (SchemaType)(field.Tag & Tag.SchemaTypeMask);
-            if (notExtended && schemaType != SchemaType.Expected)
+            if (schemaType != SchemaType.Expected)
             {
                 (field.FieldTypeRaw, type) = reader.ReadTypeForAnalysis(schemaType);
             }
             else
             {
                 field.FieldTypeRaw = default;
+                type = "Expected";
             }
         }
     }

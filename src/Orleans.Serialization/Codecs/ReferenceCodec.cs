@@ -46,6 +46,35 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <summary>
+        /// Write an object reference if <paramref name="value"/> has already been written and has been tracked via <see cref="RecordObject(SerializerSession, object)"/>.        /// 
+        /// </summary>
+        /// <remarks>This overload allows specifying a fixed reference type for codecs that implement <see cref="IDerivedTypeCodec"/>.</remarks>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="actualType">The actual type.</param>
+        /// <param name="value">The value.</param>
+        /// <returns><see langword="true" /> if a reference was written, <see langword="false" /> otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryWriteReferenceField<TBufferWriter>(
+            ref Writer<TBufferWriter> writer,
+            uint fieldId,
+            Type expectedType,
+            Type actualType,
+            object value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (!writer.Session.ReferencedObjects.GetOrAddReference(value, out var reference))
+            {
+                return false;
+            }
+
+            writer.WriteFieldHeader(fieldId, expectedType, value is null ? null : actualType, WireType.Reference);
+            writer.WriteVarUInt32(reference);
+            return true;
+        }
+
+        /// <summary>
         /// Writes the null reference.
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>

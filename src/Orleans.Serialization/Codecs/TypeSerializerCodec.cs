@@ -1,9 +1,8 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Session;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -13,9 +12,8 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TypeSerializerCodec : IFieldCodec<Type>, IDerivedTypeCodec
     {
-        private static readonly Type SchemaTypeType = typeof(SchemaType);
+        private static readonly Type ByteType = typeof(byte);
         private static readonly Type TypeType = typeof(Type);
-        private static readonly Type ByteArrayType = typeof(byte[]);
         private static readonly Type UIntType = typeof(uint);
 
         /// <inheritdoc />
@@ -31,32 +29,31 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, TypeType, value))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, TypeType, WireType.TagDelimited);
-            var (schemaType, id) = GetSchemaType(writer.Session, value);
+            writer.WriteStartObject(fieldIdDelta, expectedType, TypeType);
+
+            var schemaType = writer.Session.WellKnownTypes.TryGetWellKnownTypeId(value, out var id) ? SchemaType.WellKnown
+                : writer.Session.ReferencedTypes.TryGetTypeReference(value, out id) ? SchemaType.Referenced
+                : SchemaType.Encoded;
 
             // Write the encoding type.
-            ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(0, SchemaTypeType, SchemaTypeType, WireType.VarInt);
-            writer.WriteVarUInt32((uint)schemaType);
+            ByteCodec.WriteField(ref writer, 0, ByteType, (byte)schemaType);
 
             if (schemaType == SchemaType.Encoded)
             {
                 // If the type is encoded, write the length-prefixed bytes.
                 ReferenceCodec.MarkValueField(writer.Session);
-                writer.WriteFieldHeader(1, ByteArrayType, ByteArrayType, WireType.LengthPrefixed);
+                writer.WriteFieldHeaderExpected(1, WireType.LengthPrefixed);
                 writer.Session.TypeCodec.WriteLengthPrefixed(ref writer, value);
             }
             else
             {
                 // If the type is referenced or well-known, write it as a varint.
-                ReferenceCodec.MarkValueField(writer.Session);
-                writer.WriteFieldHeader(2, UIntType, UIntType, WireType.VarInt);
-                writer.WriteVarUInt32((uint)id);
+                UInt32Codec.WriteField(ref writer, 2, UIntType, id);
             }
 
             writer.WriteEndObject();
@@ -86,27 +83,27 @@ namespace Orleans.Serialization.Codecs
             Type result = null;
             while (true)
             {
-                var header = reader.ReadFieldHeader();
-                if (header.IsEndBaseOrEndObject)
+                reader.ReadFieldHeader(ref field);
+                if (field.IsEndBaseOrEndObject)
                 {
                     break;
                 }
 
-                ReferenceCodec.MarkValueField(reader.Session);
-                fieldId += header.FieldIdDelta;
+                fieldId += field.FieldIdDelta;
                 switch (fieldId)
                 {
                     case 0:
-                        schemaType = (SchemaType)reader.ReadVarUInt32();
+                        schemaType = (SchemaType)ByteCodec.ReadValue(ref reader, field);
                         break;
                     case 1:
+                        ReferenceCodec.MarkValueField(reader.Session);
                         result = reader.Session.TypeCodec.ReadLengthPrefixed(ref reader);
                         break;
                     case 2:
-                        id = reader.ReadVarUInt32();
+                        id = UInt32Codec.ReadValue(ref reader, field);
                         break;
                     default:
-                        reader.ConsumeUnknownField(header);
+                        reader.ConsumeUnknownField(field);
                         break;
                 }
             }
@@ -114,55 +111,33 @@ namespace Orleans.Serialization.Codecs
             switch (schemaType)
             {
                 case SchemaType.Referenced:
-                    if (reader.Session.ReferencedTypes.TryGetReferencedType(id, out result))
-                    {
-                        break;
-                    }
+                    result = reader.Session.ReferencedTypes.GetReferencedType(id);
+                    break;
 
-                    return ThrowUnknownReferencedType(id);
                 case SchemaType.WellKnown:
-                    if (reader.Session.WellKnownTypes.TryGetWellKnownType(id, out result))
-                    {
-                        break;
-                    }
+                    if (!reader.Session.WellKnownTypes.TryGetWellKnownType(id, out result))
+                        ThrowUnknownWellKnownType(id);
+                    break;
 
-                    return ThrowUnknownWellKnownType(id);
                 case SchemaType.Encoded:
-                    if (result is not null)
-                    {
-                        break;
-                    }
+                    // Type codec should not update the type reference map, otherwise unknown-field deserialization could be broken
+                    break;
 
-                    return ThrowMissingType();
                 default:
-                    return ThrowInvalidSchemaType(schemaType);
+                    ThrowInvalidSchemaType(schemaType);
+                    break;
             }
 
+            if (result is null) ThrowMissingType();
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
 
-        private static (SchemaType, uint) GetSchemaType(SerializerSession session, Type actualType)
-        {
-            if (session.WellKnownTypes.TryGetWellKnownTypeId(actualType, out uint typeId))
-            {
-                return (SchemaType.WellKnown, typeId);
-            }
-
-            if (session.ReferencedTypes.TryGetTypeReference(actualType, out uint reference))
-            {
-                return (SchemaType.Referenced, reference);
-            }
-
-            return (SchemaType.Encoded, 0);
-        }
-
-        private static Type ThrowInvalidSchemaType(SchemaType schemaType) => throw new NotSupportedException(
+        private static void ThrowInvalidSchemaType(SchemaType schemaType) => throw new NotSupportedException(
             $"SchemaType {schemaType} is not supported by {nameof(TypeSerializerCodec)}.");
 
-        private static Type ThrowUnknownReferencedType(uint id) => throw new UnknownReferencedTypeException(id);
-        private static Type ThrowUnknownWellKnownType(uint id) => throw new UnknownWellKnownTypeException(id);
-        private static Type ThrowMissingType() => throw new TypeMissingException();
+        private static void ThrowUnknownWellKnownType(uint id) => throw new UnknownWellKnownTypeException(id);
+        private static void ThrowMissingType() => throw new TypeMissingException();
     }
 
     /// <summary>

@@ -527,4 +527,12 @@ namespace Orleans.Serialization.UnitTests
 
         public override string ToString() => $"{nameof(StringValue)}: {StringValue}, {nameof(EnumValue)}: {EnumValue}";
     }
+
+    [GenerateSerializer]
+    public sealed class ClassWithTypeFields
+    {
+        [Id(1)] public Type Type1;
+        [Id(2)] public object UntypedValue;
+        [Id(3)] public Type Type2;
+    }
 }

@@ -373,6 +373,7 @@ namespace Orleans.Runtime.Messaging
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
+                            message = null;
                         }
                     }
                     catch (Exception exception) when (message != default)

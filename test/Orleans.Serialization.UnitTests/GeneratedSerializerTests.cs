@@ -367,6 +367,47 @@ namespace Orleans.Serialization.UnitTests
             }
         }
 
+        [Fact]
+        public void TypeReferencesAreEncodedOnce()
+        {
+            var original = new object[] { new MyValue(1), new MyValue(2), new MyValue(3) };
+            var result = (object[])RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
+
+            Assert.Equal(original, result);
+            Assert.Contains("SchemaType: Referenced RuntimeType: MyValue", formattedBitStream);
+        }
+
+        [Fact]
+        public void TypeCodecDoesNotUpdateTypeReferences()
+        {
+            var original = new ClassWithTypeFields { Type1 = typeof(MyValue), UntypedValue = new MyValue(42), Type2 = typeof(MyValue) };
+            var result = (ClassWithTypeFields)RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
+
+            Assert.Equal(original.Type1, result.Type1);
+            Assert.Equal(original.UntypedValue, result.UntypedValue);
+            Assert.Equal(original.Type2, result.Type2);
+
+            Assert.Contains("[#4 LengthPrefixed Id: 1 SchemaType: Expected]", formattedBitStream); // Type1
+            Assert.Contains("[#5 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue", formattedBitStream); // UntypedValue
+            Assert.Contains("[#7 Reference Id: 3 SchemaType: Expected", formattedBitStream); // Type2
+        }
+
+        [Fact]
+        public void TypeCodecConsumesTypeReferences()
+        {
+            var original = new ClassWithTypeFields { UntypedValue = new MyValue(42), Type2 = typeof(MyValue) };
+            var result = (ClassWithTypeFields)RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
+
+            Assert.Equal(original.Type1, result.Type1);
+            Assert.Equal(original.UntypedValue, result.UntypedValue);
+            Assert.Equal(original.Type2, result.Type2);
+
+            Assert.Contains("[#2 Reference Id: 1 SchemaType: WellKnown", formattedBitStream); // Type1
+            Assert.Contains("[#3 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue", formattedBitStream); // UntypedValue
+            Assert.Contains("[#5 TagDelimited Id: 3 SchemaType: Expected]", formattedBitStream); // Type2
+            Assert.Contains("[#7 VarInt Id: 2 SchemaType: Expected] Value: 2", formattedBitStream); // type reference from Type2 field pointing to the encoded field type of UntypedValue
+        }
+
         public void Dispose() => _serviceProvider?.Dispose();
 
         private T RoundTripThroughCodec<T>(T original)
