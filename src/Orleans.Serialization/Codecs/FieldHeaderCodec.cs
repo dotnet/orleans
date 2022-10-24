@@ -154,6 +154,7 @@ namespace Orleans.Serialization.Codecs
             Field field = default;
             var tag = reader.ReadByte();
             field.Tag = tag;
+            // If the id or schema type are required and were not encoded into the tag, read the extended header data.
             if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
             {
                 ReadExtendedFieldHeader(ref reader, ref field);
