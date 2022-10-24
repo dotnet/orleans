@@ -327,14 +327,6 @@ namespace Orleans
         public void Reset()
         {
             Utils.SafeExecute(() =>
-            {
-                if (logger != null)
-                {
-                    logger.LogInformation("OutsideRuntimeClient.Reset(): client Id {ClientId}", clientId);
-                }
-            }, this.logger);
-
-            Utils.SafeExecute(() =>
                 {
                     if (MessageCenter != null)
                     {
@@ -346,14 +338,6 @@ namespace Orleans
 
         private void ConstructorReset()
         {
-            Utils.SafeExecute(() =>
-            {
-                if (logger != null)
-                {
-                    logger.LogInformation("OutsideRuntimeClient.ConstructorReset(): client Id {ClientId}", clientId);
-                }
-            });
-
             Utils.SafeExecute(() => this.Dispose());
         }
 
