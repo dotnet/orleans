@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 
-namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
+namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {
     /// <summary>
     /// Default monitor for Object pool used by EventHubStreamProvider

@@ -1,5 +1,5 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;

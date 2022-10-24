@@ -14,7 +14,7 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.Utilities;
 using TestExtensions;

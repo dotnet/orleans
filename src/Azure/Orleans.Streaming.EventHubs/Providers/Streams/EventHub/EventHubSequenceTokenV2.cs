@@ -2,7 +2,7 @@ using System;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.

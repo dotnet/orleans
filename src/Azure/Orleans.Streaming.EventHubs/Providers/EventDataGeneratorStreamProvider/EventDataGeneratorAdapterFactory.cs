@@ -11,7 +11,7 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers.Testing
+namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
     /// This is a persistent stream provider adapter that generates it's own events rather than reading them from Eventhub.

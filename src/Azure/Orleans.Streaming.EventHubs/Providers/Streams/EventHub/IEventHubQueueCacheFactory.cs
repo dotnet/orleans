@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Factory responsible for creating a message cache for an EventHub partition.

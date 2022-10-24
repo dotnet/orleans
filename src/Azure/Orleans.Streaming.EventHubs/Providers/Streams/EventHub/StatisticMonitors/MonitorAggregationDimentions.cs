@@ -1,5 +1,5 @@
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Base class for monitor aggregation dimensions, which is an information bag for the monitoring target. 

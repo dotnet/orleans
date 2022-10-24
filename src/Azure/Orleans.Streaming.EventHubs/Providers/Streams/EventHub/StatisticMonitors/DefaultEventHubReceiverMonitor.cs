@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Default EventHub receiver monitor that tracks metrics using loggers PKI support.

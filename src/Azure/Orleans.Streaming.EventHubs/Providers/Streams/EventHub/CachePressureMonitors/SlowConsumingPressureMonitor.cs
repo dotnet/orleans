@@ -3,7 +3,7 @@ using Orleans.Runtime;
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Pressure monitor which is in favor of the slow consumer in the cache

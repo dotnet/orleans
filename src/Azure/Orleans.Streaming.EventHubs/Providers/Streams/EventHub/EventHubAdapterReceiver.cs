@@ -9,11 +9,11 @@ using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
     /// Event Hub Partition settings
@@ -137,7 +137,7 @@ namespace Orleans.ServiceBus.Providers
             // if receiver initialization failed, retry
             if (this.receiver == null)
             {
-                this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                this.logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
                     "Retrying initialization of EventHub partition {0}-{1}.", this.settings.Hub.EventHubName, this.settings.Partition);
                 await Initialize();
                 if (this.receiver == null)
@@ -160,7 +160,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 watch.Stop();
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
-                this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                this.logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
                     "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.EventHubName,
                     this.settings.Partition, ex);
                 throw;

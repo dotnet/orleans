@@ -6,7 +6,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
