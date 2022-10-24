@@ -387,7 +387,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class UInt32Codec : TypedCodecBase<uint>, IFieldCodec<uint>, IDeepCopier<uint>, IOptionalDeepCopier
     {
-        private static readonly Type CodecFieldType = typeof(uint);
+        public static readonly Type CodecFieldType = typeof(uint);
 
         /// <inheritdoc/>
         void IFieldCodec<uint>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,

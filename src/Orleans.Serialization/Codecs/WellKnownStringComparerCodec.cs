@@ -77,7 +77,7 @@ namespace Orleans.Serialization.Codecs
                         type = UInt32Codec.ReadValue(ref reader, header);
                         break;
                     case 1:
-                        options = (CompareOptions)UInt64Codec.ReadValue(ref reader, header);
+                        options = (CompareOptions)UInt32Codec.ReadValue(ref reader, header);
                         break;
                     case 2:
                         lcid = Int32Codec.ReadValue(ref reader, header);
@@ -191,8 +191,8 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(WellKnownStringComparerCodec), WireType.TagDelimited);
 
-            UInt32Codec.WriteField(ref writer, 0, typeof(int), type);
-            UInt64Codec.WriteField(ref writer, 1, typeof(ulong), (ulong)compareOptions);
+            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, type);
+            UInt32Codec.WriteField(ref writer, 1, UInt32Codec.CodecFieldType, (uint)compareOptions);
 
             if (compareInfo is not null)
             {
