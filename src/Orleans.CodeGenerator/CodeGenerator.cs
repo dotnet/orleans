@@ -644,7 +644,7 @@ namespace Orleans.CodeGenerator
         {
             var version = typeof(CodeGenerator).Assembly.GetName().Version.ToString();
             return
-                Attribute(ParseName("System.CodeDom.Compiler.GeneratedCodeAttribute"))
+                Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
                         AttributeArgument(version.GetLiteralExpression()));
@@ -652,8 +652,8 @@ namespace Orleans.CodeGenerator
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax()
         {
-            return Attribute(ParseName("System.Runtime.CompilerServices.MethodImplAttribute"))
-                .AddArgumentListArguments(AttributeArgument(ParseName("System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
+            return Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
+                .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
         }
     }
 }
