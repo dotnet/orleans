@@ -9,8 +9,14 @@ namespace Orleans.Serialization.TypeSystem
     /// </summary>
     public sealed class CachedTypeResolver : TypeResolver
     {
-        private readonly ConcurrentDictionary<string, Type> _typeCache = new ConcurrentDictionary<string, Type>();
-        private readonly ConcurrentDictionary<string, Assembly> _assemblyCache = new ConcurrentDictionary<string, Assembly>();
+        private readonly ConcurrentDictionary<string, Type> _typeCache = new();
+        private readonly ConcurrentDictionary<string, Assembly> _assemblyCache = new();
+        private static readonly ConcurrentDictionary<Assembly, string> _assemblyNameCache = new();
+
+        /// <summary>
+        /// Gets the cached assembly name.
+        /// </summary>
+        public static string GetName(Assembly assembly) => _assemblyNameCache.GetOrAdd(assembly, a => a.GetName().Name);
 
         /// <inheritdoc />
         public override Type ResolveType(string name)
@@ -123,9 +129,8 @@ namespace Orleans.Serialization.TypeSystem
 
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    var name = assembly.GetName();
-                    _assemblyCache[name.FullName] = assembly;
-                    _assemblyCache[name.Name] = assembly;
+                    _assemblyCache[assembly.FullName] = assembly;
+                    _assemblyCache[GetName(assembly)] = assembly;
                 }
 
                 if (_assemblyCache.TryGetValue(fullAssemblyName, out result))
@@ -134,9 +139,8 @@ namespace Orleans.Serialization.TypeSystem
                 }
 
                 result = Assembly.Load(assemblyName);
-                var resultName = result.GetName();
-                _assemblyCache[resultName.Name] = result;
-                _assemblyCache[resultName.FullName] = result;
+                _assemblyCache[GetName(result)] = result;
+                _assemblyCache[result.FullName] = result;
 
                 return result;
             }

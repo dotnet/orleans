@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -8,9 +7,10 @@ namespace Orleans.Metadata
     /// <summary>
     /// Populates grain interface properties with the grain interfaces implemented by a grain class.
     /// </summary>
-    internal class ImplementedInterfaceProvider : IGrainPropertiesProvider
+    internal sealed class ImplementedInterfaceProvider : IGrainPropertiesProvider
     {
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
+        private readonly string[] _cachedKeys = new string[16];
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImplementedInterfaceProvider"/> class.
@@ -35,11 +35,13 @@ namespace Orleans.Metadata
                     _ => @interface
                 };
                 var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(type);
-                var key = WellKnownGrainTypeProperties.ImplementedInterfacePrefix + counter.ToString(CultureInfo.InvariantCulture);
+                var key = (uint)counter < (uint)_cachedKeys.Length ? (_cachedKeys[counter] ??= GetKey(counter)) : GetKey(counter);
                 properties[key] = interfaceId.ToString();
                 ++counter;
             }
         }
+
+        private static string GetKey(int counter) => $"{WellKnownGrainTypeProperties.ImplementedInterfacePrefix}{counter}";
 
         /// <summary>
         /// Gets a value indicating whether the specified type is a grain interface type.

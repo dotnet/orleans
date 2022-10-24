@@ -223,7 +223,7 @@ namespace Orleans.Serialization
         {
             if (value is null)
             {
-                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType);
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 return;
             }
 
@@ -278,7 +278,7 @@ namespace Orleans.Serialization
         {
             if (value is null)
             {
-                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta, expectedType);
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 return;
             }
 

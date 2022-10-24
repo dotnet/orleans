@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -23,6 +24,7 @@ namespace Orleans.Runtime.MembershipService
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
         private static readonly TimeSpan GossipTimeout = TimeSpan.FromMilliseconds(3000);
+        private static readonly string RoleName = CachedTypeResolver.GetName(Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly);
 
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper gossiper;
@@ -472,7 +474,7 @@ namespace Orleans.Runtime.MembershipService
                 Status = currentStatus,
                 ProxyPort = this.localSiloDetails.GatewayAddress?.Endpoint?.Port ?? 0,
 
-                RoleName = (Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly).GetName().Name,
+                RoleName = RoleName,
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,

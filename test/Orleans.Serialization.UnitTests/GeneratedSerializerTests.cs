@@ -402,7 +402,7 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.UntypedValue, result.UntypedValue);
             Assert.Equal(original.Type2, result.Type2);
 
-            Assert.Contains("[#2 Reference Id: 1 SchemaType: WellKnown", formattedBitStream); // Type1
+            Assert.Contains("[#2 Reference Id: 1 SchemaType: Expected Reference: 0 ()]", formattedBitStream); // Type1
             Assert.Contains("[#3 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue", formattedBitStream); // UntypedValue
             Assert.Contains("[#5 TagDelimited Id: 3 SchemaType: Expected]", formattedBitStream); // Type2
             Assert.Contains("[#7 VarInt Id: 2 SchemaType: Expected] Value: 2", formattedBitStream); // type reference from Type2 field pointing to the encoded field type of UntypedValue

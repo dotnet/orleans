@@ -236,6 +236,6 @@ public static class RuntimeTypeNameFormatter
         }
 
         _ = builder.Append(',');
-        _ = builder.Append(assembly.GetName().Name);
+        _ = builder.Append(CachedTypeResolver.GetName(assembly));
     }
 }
