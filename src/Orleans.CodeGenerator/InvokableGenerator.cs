@@ -48,17 +48,17 @@ namespace Orleans.CodeGenerator
                 classDeclaration = classDeclaration.AddMembers(ctor);
 
             classDeclaration = AddOptionalMembers(classDeclaration,
-                    GenerateGetArgumentCount(libraryTypes, method),
+                    GenerateGetArgumentCount(method),
                     GenerateGetMethodName(libraryTypes, method),
                     GenerateGetInterfaceName(libraryTypes, method),
                     GenerateGetActivityName(libraryTypes, method),
                     GenerateGetInterfaceType(libraryTypes, method),
                     GenerateGetMethod(libraryTypes),
                     GenerateSetTargetMethod(libraryTypes, interfaceDescription, targetField),
-                    GenerateGetTargetMethod(libraryTypes, targetField),
-                    GenerateDisposeMethod(libraryTypes, fieldDescriptions, baseClassType),
-                    GenerateGetArgumentMethod(libraryTypes, method, fieldDescriptions),
-                    GenerateSetArgumentMethod(libraryTypes, method, fieldDescriptions),
+                    GenerateGetTargetMethod(targetField),
+                    GenerateDisposeMethod(fieldDescriptions, baseClassType),
+                    GenerateGetArgumentMethod(method, fieldDescriptions),
+                    GenerateSetArgumentMethod(method, fieldDescriptions),
                     GenerateInvokeInnerMethod(libraryTypes, method, fieldDescriptions, targetField));
 
             var typeParametersWithNames = method.AllTypeParameters;
@@ -191,16 +191,16 @@ namespace Orleans.CodeGenerator
                     SyntaxKind.SimpleAssignmentExpression,
                     IdentifierName(targetField.FieldName),
                     getTarget);
-            return MethodDeclaration(libraryTypes.Void.ToTypeSyntax(), "SetTarget")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
                 .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(libraryTypes.ITargetHolder.ToTypeSyntax()))))
                 .WithExpressionBody(ArrowExpressionClause(body))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private static MemberDeclarationSyntax GenerateGetTargetMethod(LibraryTypes libraryTypes, TargetFieldDescription targetField)
+        private static MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
         {
-            return MethodDeclaration(libraryTypes.Object.ToTypeSyntax(), "GetTarget")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
                 .WithParameterList(ParameterList())
                 .WithExpressionBody(ArrowExpressionClause(IdentifierName(targetField.FieldName)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
@@ -208,7 +208,6 @@ namespace Orleans.CodeGenerator
         }
 
         private static MemberDeclarationSyntax GenerateGetArgumentMethod(
-            LibraryTypes libraryTypes,
             MethodDescription methodDescription,
             List<InvokerFieldDescripton> fields)
         {
@@ -260,17 +259,16 @@ namespace Orleans.CodeGenerator
                                                         Math.Max(0, methodDescription.Method.Parameters.Length - 1))))
                                         })))))));
             var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return MethodDeclaration(libraryTypes.Object.ToTypeSyntax(), "GetArgument")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetArgument")
                 .WithParameterList(
                     ParameterList(
                         SingletonSeparatedList(
-                            Parameter(Identifier("index")).WithType(libraryTypes.Int32.ToTypeSyntax()))))
+                            Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))))))
                 .WithBody(Block(body))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateSetArgumentMethod(
-            LibraryTypes libraryTypes,
             MethodDescription methodDescription,
             List<InvokerFieldDescripton> fields)
         {
@@ -334,14 +332,14 @@ namespace Orleans.CodeGenerator
                             ReturnStatement()
                         })));
             var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return MethodDeclaration(libraryTypes.Void.ToTypeSyntax(), "SetArgument")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetArgument")
                 .WithParameterList(
                     ParameterList(
                         SeparatedList(
                             new[]
                             {
-                                Parameter(Identifier("index")).WithType(libraryTypes.Int32.ToTypeSyntax()),
-                                Parameter(Identifier("value")).WithType(libraryTypes.Object.ToTypeSyntax())
+                                Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))),
+                                Parameter(Identifier("value")).WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))
                             }
                         )))
                 .WithBody(Block(body))
@@ -386,7 +384,6 @@ namespace Orleans.CodeGenerator
         }
 
         private static MemberDeclarationSyntax GenerateDisposeMethod(
-            LibraryTypes libraryTypes,
             List<InvokerFieldDescripton> fields,
             INamedTypeSymbol baseClassType)
         {
@@ -412,14 +409,14 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
             }
 
-            return MethodDeclaration(libraryTypes.Void.ToTypeSyntax(), "Dispose")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithBody(Block(body));
         }
 
-        private static MemberDeclarationSyntax GenerateGetArgumentCount(LibraryTypes libraryTypes, MethodDescription methodDescription)
+        private static MemberDeclarationSyntax GenerateGetArgumentCount(MethodDescription methodDescription)
             => methodDescription.Method.Parameters.Length is var count and not 0 ?
-            MethodDeclaration(libraryTypes.Int32.ToTypeSyntax(), "GetArgumentCount")
+            MethodDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)), "GetArgumentCount")
                 .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;

@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
@@ -20,15 +19,11 @@ namespace Orleans.Serialization.Serializers
             // Therefore write the null reference and exit.
             if (value is null)
             {
-                _ = ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, null);
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 return;
             }
 
-            var fieldType = value.GetType();
-            var specificSerializer = writer.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer == null)
-                ThrowSerializerNotFound(fieldType);
-
+            var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
@@ -47,13 +42,8 @@ namespace Orleans.Serialization.Serializers
             }
 
             var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
-            if (specificSerializer == null)
-                ThrowSerializerNotFound(fieldType);
-
             return (TField)specificSerializer.ReadValue(ref reader, field);
         }
-
-        private static void ThrowSerializerNotFound(Type type) => throw new KeyNotFoundException($"Could not find a serializer for type {type}.");
 
         private static void ThrowMissingFieldType() => throw new FieldTypeMissingException(typeof(TField));
     }
