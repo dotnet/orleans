@@ -5,9 +5,26 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using Xunit;
 using Microsoft.Extensions.Options;
+using System.Runtime.Serialization;
+using System.Linq.Expressions;
+using Xunit.Sdk;
+using System.Data;
 
 namespace Orleans.Serialization.UnitTests
 {
+
+    [GenerateSerializer]
+    public class CustomException : Exception
+    {
+        public CustomException() { }
+        public CustomException(string message) : base(message) { }
+        public CustomException(string message, Exception inner) : base(message, inner) { }
+        public CustomException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+        [Id(0)]
+        public int CustomInt;
+    }
+
     public class PolymorphismTests
     {
         private readonly ServiceProvider _serviceProvider;
@@ -33,16 +50,18 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void ExceptionsAreSerializable()
         {
-            InvalidOperationException exception;
+            Exception baseEx;
+            InvalidOperationException ioEx;
             AggregateException aggregateException;
+            CustomException customException;
             try
             {
                 throw new InvalidOperationException("This is exceptional!");
             }
             catch (InvalidOperationException ex)
             {
-                exception = ex;
-                exception.Data.Add("Hi", "yes?");
+                ioEx = ex;
+                ioEx.Data.Add("Hi", "yes?");
                 try
                 {
                     throw new AggregateException("This is insane!", ex);
@@ -50,23 +69,83 @@ namespace Orleans.Serialization.UnitTests
                 catch (AggregateException ag)
                 {
                     aggregateException = ag;
+                    try
+                    {
+                        throw new CustomException("it's customization time") { CustomInt = 45 };
+                    }
+                    catch (CustomException ce)
+                    {
+                        customException = ce;
+                        try
+                        {
+                            throw new Exception("boring base exception");
+                        }
+                        catch (Exception e)
+                        {
+                            baseEx = e;
+                            baseEx.Data.Add("Hi", "yes?");
+                        }
+                    }
                 }
             }
 
-            var result = RoundTripToExpectedType<Exception, InvalidOperationException>(exception);
-            Assert.Equal(exception.Message, result.Message);
-            Assert.Contains(exception.StackTrace, result.StackTrace);
-            Assert.Equal(exception.InnerException, result.InnerException);
+            var result = RoundTripToExpectedType<Exception, InvalidOperationException>(ioEx);
+            Assert.Equal(ioEx.Message, result.Message);
+            Assert.Contains(ioEx.StackTrace, result.StackTrace);
+            Assert.Equal(ioEx.InnerException, result.InnerException);
             Assert.NotNull(result.Data);
             var data = result.Data;
             Assert.True(data.Count == 1);
             Assert.Equal("yes?", data["Hi"]);
 
+            var exCopy = DeepCopy(ioEx);
+            Assert.Equal(ioEx.Message, exCopy.Message);
+            Assert.Contains(ioEx.StackTrace, exCopy.StackTrace);
+            Assert.Equal(ioEx.InnerException, exCopy.InnerException);
+            Assert.NotNull(exCopy.Data);
+            var copyData = exCopy.Data;
+            Assert.True(copyData.Count == 1);
+            Assert.Equal("yes?", copyData["Hi"]);
+
+            var baseExResult = RoundTripToExpectedType<Exception, Exception>(baseEx);
+            Assert.Equal(baseEx.Message, baseExResult.Message);
+            Assert.Contains(baseEx.StackTrace, baseExResult.StackTrace);
+            Assert.Equal(baseEx.InnerException, baseExResult.InnerException);
+            Assert.NotNull(baseExResult.Data);
+            var baseExData = baseExResult.Data;
+            Assert.True(baseExData.Count == 1);
+            Assert.Equal("yes?", baseExData["Hi"]);
+
+            var baseExCopy = DeepCopy(baseEx);
+            Assert.Equal(baseEx.Message, baseExCopy.Message);
+            Assert.Contains(baseEx.StackTrace, baseExCopy.StackTrace);
+            Assert.Equal(baseEx.InnerException, baseExCopy.InnerException);
+            Assert.NotNull(baseExCopy.Data);
+            var baseExCopyData = baseExCopy.Data;
+            Assert.True(baseExCopyData.Count == 1);
+            Assert.Equal("yes?", baseExCopyData["Hi"]);
+
             var agResult = RoundTripToExpectedType<Exception, AggregateException>(aggregateException);
             Assert.Equal(aggregateException.Message, agResult.Message);
             Assert.Contains(aggregateException.StackTrace, agResult.StackTrace);
             var inner = Assert.IsType<InvalidOperationException>(agResult.InnerException);
-            Assert.Equal(exception.Message, inner.Message);
+            Assert.Equal(ioEx.Message, inner.Message);
+
+            var agCopy = DeepCopy(aggregateException);
+            Assert.Equal(aggregateException.Message, agCopy.Message);
+            Assert.Contains(aggregateException.StackTrace, agCopy.StackTrace);
+            var agInner = Assert.IsType<InvalidOperationException>(agCopy.InnerException);
+            Assert.Equal(ioEx.Message, agInner.Message);
+
+            var ceResult = RoundTripToExpectedType<Exception, CustomException>(customException);
+            Assert.Equal(customException.Message, ceResult.Message);
+            Assert.Contains(customException.StackTrace, ceResult.StackTrace);
+            Assert.Equal(customException.CustomInt, ceResult.CustomInt);
+
+            var ceCopy = DeepCopy(customException);
+            Assert.Equal(customException.Message, ceCopy.Message);
+            Assert.Contains(customException.StackTrace, ceCopy.StackTrace);
+            Assert.Equal(customException.CustomInt, ceCopy.CustomInt);
         }
 
         [Fact]

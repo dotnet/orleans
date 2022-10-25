@@ -217,7 +217,7 @@ namespace Orleans.CodeGenerator
                 fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
 
                 // Add a codec field for any field in the target which does not have a static codec.
-                if (!Array.Exists(libraryTypes.StaticCodecs, c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, member.Type)))
+                if (libraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is null)
                 {
                     fields.Add(GetCodecDescription(member, typeIndex));
                 }
@@ -266,6 +266,10 @@ namespace Orleans.CodeGenerator
                         name = IdentifierName(GetSimpleClassName(t.Name));
                     }
                     codecType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
+                }
+                else if (t is IArrayTypeSymbol { IsSZArray: true } array)
+                {
+                    codecType = libraryTypes.ArrayCodec.Construct(array.ElementType).ToTypeSyntax();
                 }
                 else if (libraryTypes.WellKnownCodecs.FindByUnderlyingType(t) is { } codec)
                 {
@@ -601,7 +605,7 @@ namespace Orleans.CodeGenerator
                     }
                     else
                     {
-                        var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
+                        var instanceCodec = serializerFields.Find(c => c is CodecFieldDescription f && SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
                         codecExpression = IdentifierName(instanceCodec.FieldName);
                     }
 

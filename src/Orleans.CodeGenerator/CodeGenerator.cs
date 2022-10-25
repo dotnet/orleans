@@ -320,7 +320,7 @@ namespace Orleans.CodeGenerator
 
                     GenerateFieldIds GetGenerateFieldIdsOptionFromType(INamedTypeSymbol t)
                     {
-                        var attribute = HasAttribute(t, LibraryTypes.GenerateSerializerAttribute);
+                        var attribute = t.GetAttribute(LibraryTypes.GenerateSerializerAttribute);
                         if (attribute == null)
                             return GenerateFieldIds.None;
 
@@ -342,7 +342,7 @@ namespace Orleans.CodeGenerator
                             return false;
                         }
 
-                        if (HasAttribute(t, LibraryTypes.GenerateSerializerAttribute) != null)
+                        if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute))
                         {
                             return true;
                         }
@@ -362,7 +362,7 @@ namespace Orleans.CodeGenerator
                     {
                         static bool TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
                         {
-                            var attribute = HasAttribute(t, at);
+                            var attribute = t.GetAttribute(at);
                             if (attribute != null)
                             {
                                 foreach (var namedArgument in attribute.NamedArguments)
@@ -484,14 +484,9 @@ namespace Orleans.CodeGenerator
 
         internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
         {
-            var idAttr = memberSymbol.GetAttributes().FirstOrDefault(attr => libraryTypes.IdAttributeTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, attr.AttributeClass)));
-            if (idAttr is null)
-            {
-                return null;
-            }
-
-            var id = (uint)idAttr.ConstructorArguments.First().Value;
-            return id;
+            return memberSymbol.GetAnyAttribute(libraryTypes.IdAttributeTypes) is { } attr
+                ? (uint)attr.ConstructorArguments.First().Value
+                : null;
         }
 
         internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
@@ -556,19 +551,12 @@ namespace Orleans.CodeGenerator
 
         public string GetAlias(ISymbol symbol)
         {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.AliasAttribute, attr.AttributeClass));
-            if (attr is null)
-            {
-                return null;
-            }
-
-            var value = (string)attr.ConstructorArguments.First().Value;
-            return value;
+            return (string)symbol.GetAttribute(LibraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
         }
 
         private CompoundTypeAliasComponent[] GetCompoundTypeAlias(ISymbol symbol)
         {
-            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.CompoundTypeAliasAttribute, attr.AttributeClass));
+            var attr = symbol.GetAttribute(LibraryTypes.CompoundTypeAliasAttribute);
             if (attr is null)
             {
                 return null;
@@ -602,58 +590,39 @@ namespace Orleans.CodeGenerator
         }
 
         // Returns true if the type declaration has the specified attribute.
-        private static AttributeData HasAttribute(INamedTypeSymbol symbol, ISymbol attributeType, bool inherited = false)
+        private static AttributeData HasAttribute(INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited)
         {
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
-                {
-                    return attribute;
-                }
-            }
+            if (symbol.GetAttribute(attributeType) is { } attribute)
+                return attribute;
 
             if (inherited)
             {
                 foreach (var iface in symbol.AllInterfaces)
                 {
-                    foreach (var attribute in iface.GetAttributes())
-                    {
-                        if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
-                        {
-                            return attribute;
-                        }
-                    }
+                    if (iface.GetAttribute(attributeType) is { } iattr)
+                        return iattr;
                 }
 
                 while ((symbol = symbol.BaseType) != null)
                 {
-                    foreach (var attribute in symbol.GetAttributes())
-                    {
-                        if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
-                        {
-                            return attribute;
-                        }
-                    }
+                    if (symbol.GetAttribute(attributeType) is { } attr)
+                        return attr;
                 }
             }
 
             return null;
         }
 
-        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax()
-        {
-            var version = typeof(CodeGenerator).Assembly.GetName().Version.ToString();
-            return
+        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax() => GeneratedCodeAttributeSyntax;
+        private static readonly AttributeSyntax GeneratedCodeAttributeSyntax =
                 Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(version.GetLiteralExpression()));
-        }
+                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()));
 
-        internal static AttributeSyntax GetMethodImplAttributeSyntax()
-        {
-            return Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
+        internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
+        private static readonly AttributeSyntax MethodImplAttributeSyntax =
+            Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
                 .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
-        }
     }
 }
