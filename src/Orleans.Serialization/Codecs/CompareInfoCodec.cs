@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Globalization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -12,11 +11,8 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="CompareInfo"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class CompareInfoCodec : IFieldCodec<CompareInfo>, IGeneralizedCodec
+    public sealed class CompareInfoCodec : IFieldCodec<CompareInfo>
     {
-        /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => typeof(CompareInfo).IsAssignableFrom(type);
-
         /// <inheritdoc/>
         public CompareInfo ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -47,8 +43,6 @@ namespace Orleans.Serialization.Codecs
                     case 0:
                         name = StringCodec.ReadValue(ref reader, header);
                         break;
-                    case 1:
-                        break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -73,12 +67,6 @@ namespace Orleans.Serialization.Codecs
             writer.WriteEndObject();
         }
 
-        /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte> => WriteField(ref writer, fieldIdDelta, expectedType, value as CompareInfo);
-
-        /// <inheritdoc/>
-        object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
-
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(CompareInfo)} fields. {field}");
     }
@@ -87,15 +75,9 @@ namespace Orleans.Serialization.Codecs
     /// Copier for <see cref="CompareInfo"/>.
     /// </summary>
     [RegisterCopier]
-    public sealed class CompareInfoCopier : IDeepCopier<CompareInfo>, IGeneralizedCopier, IOptionalDeepCopier
+    public sealed class CompareInfoCopier : IDeepCopier<CompareInfo>, IOptionalDeepCopier
     {
         /// <inheritdoc/>
         public CompareInfo DeepCopy(CompareInfo input, CopyContext context) => input;
-
-        /// <inheritdoc/>
-        public object DeepCopy(object input, CopyContext context) => input;
-
-        /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => typeof(CompareInfo).IsAssignableFrom(type);
     }
 }

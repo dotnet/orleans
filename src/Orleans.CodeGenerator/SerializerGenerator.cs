@@ -370,7 +370,7 @@ namespace Orleans.CodeGenerator
 
             res = type.IsAbstractType
                 ? res.AddModifiers(Token(SyntaxKind.OverrideKeyword))
-                : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.Construct(libraryTypes.Byte).ToTypeSyntax())));
+                : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
 
             return res;
         }
@@ -431,7 +431,7 @@ namespace Orleans.CodeGenerator
                     ExpressionSyntax condition = member.IsValueType switch
                     {
                         true => BinaryExpression(SyntaxKind.NotEqualsExpression, member.GetGetter(instanceParam), LiteralExpression(SyntaxKind.DefaultLiteralExpression)),
-                        false => IsPatternExpression(member.GetGetter(instanceParam), TypePattern(libraryTypes.Object.ToTypeSyntax()))
+                        false => IsPatternExpression(member.GetGetter(instanceParam), TypePattern(PredefinedType(Token(SyntaxKind.ObjectKeyword))))
                     };
 
                     body.Add(IfStatement(
@@ -801,7 +801,7 @@ namespace Orleans.CodeGenerator
             var parameters = new[]
             {
                 Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter("fieldIdDelta".ToIdentifier()).WithType(libraryTypes.UInt32.ToTypeSyntax()),
+                Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
                 Parameter("expectedType".ToIdentifier()).WithType(libraryTypes.Type.ToTypeSyntax()),
                 Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
             };
@@ -810,7 +810,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.Construct(libraryTypes.Byte).ToTypeSyntax())))
+                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
@@ -967,7 +967,7 @@ namespace Orleans.CodeGenerator
             var parameters = new[]
             {
                 Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter("fieldIdDelta".ToIdentifier()).WithType(libraryTypes.UInt32.ToTypeSyntax()),
+                Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
                 Parameter("expectedType".ToIdentifier()).WithType(libraryTypes.Type.ToTypeSyntax()),
                 Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
             };
@@ -976,7 +976,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.Construct(libraryTypes.Byte).ToTypeSyntax())))
+                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }

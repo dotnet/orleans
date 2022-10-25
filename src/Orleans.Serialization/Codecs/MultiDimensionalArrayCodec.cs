@@ -154,7 +154,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => type.IsArray && type.GetArrayRank() > 1;
+        public bool IsSupportedType(Type type) => type.IsArray && !type.IsSZArray;
 
         private static object ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");
@@ -254,6 +254,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => type.IsArray && type.GetArrayRank() > 1;
+        public bool IsSupportedType(Type type) => type.IsArray && !type.IsSZArray;
     }
 }

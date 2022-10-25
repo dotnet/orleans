@@ -74,8 +74,6 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<SerializerSessionPool>();
                 services.TryAddSingleton<CopyContextPool>();
 
-                services.AddSingleton<IGeneralizedCodec, CompareInfoCodec>();
-                services.AddSingleton<IGeneralizedCopier, CompareInfoCopier>();
                 services.AddSingleton<IGeneralizedCodec, WellKnownStringComparerCodec>();
 
                 services.AddSingleton<ExceptionCodec>();

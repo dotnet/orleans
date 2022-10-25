@@ -744,8 +744,8 @@ namespace Orleans.Serialization.Serializers
             }
             else if (fieldType.IsArray)
             {
-                // Depending on the rank of the array (1 or higher), select the base array codec or the multi-dimensional codec.
-                var arrayCodecType = fieldType.GetArrayRank() == 1 ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
+                // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
+                var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
                 codecType = arrayCodecType.MakeGenericType(fieldType.GetElementType());
             }
             else if (fieldType.IsEnum)
@@ -849,8 +849,8 @@ namespace Orleans.Serialization.Serializers
             }
             else if (fieldType.IsArray)
             {
-                // Depending on the rank of the array (1 or higher), select the base array copier or the multi-dimensional copier.
-                var arrayCopierType = fieldType.GetArrayRank() == 1 ? typeof(ArrayCopier<>) : typeof(MultiDimensionalArrayCopier<>);
+                // Depending on the type of the array, select the base array copier or the multi-dimensional copier.
+                var arrayCopierType = fieldType.IsSZArray ? typeof(ArrayCopier<>) : typeof(MultiDimensionalArrayCopier<>);
                 copierType = arrayCopierType.MakeGenericType(fieldType.GetElementType());
             }
             else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
