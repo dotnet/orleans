@@ -98,6 +98,14 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<DateTime>> ValueProvider => Gen.DateTime.ToValueProvider();
     }
 
+    public class DateTimeCopierTests : CopierTester<DateTime, IDeepCopier<DateTime>>
+    {
+        protected override DateTime CreateValue() => DateTime.UtcNow;
+        protected override DateTime[] TestValues => new[] { DateTime.MinValue, DateTime.MaxValue, new DateTime(1970, 1, 1, 0, 0, 0) };
+        protected override Action<Action<DateTime>> ValueProvider => Gen.DateTime.ToValueProvider();
+    }
+
+
     public class TimeSpanTests : FieldCodecTester<TimeSpan, TimeSpanCodec>
     {
         protected override TimeSpan CreateValue() => TimeSpan.FromMilliseconds(Guid.NewGuid().GetHashCode());
@@ -105,7 +113,28 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<TimeSpan>> ValueProvider => Gen.TimeSpan.ToValueProvider();
     }
 
+    public class TimeSpanCopierTests : CopierTester<TimeSpan, IDeepCopier<TimeSpan>>
+    {
+        protected override TimeSpan CreateValue() => TimeSpan.FromMilliseconds(Guid.NewGuid().GetHashCode());
+        protected override TimeSpan[] TestValues => new[] { TimeSpan.MinValue, TimeSpan.MaxValue, TimeSpan.Zero, TimeSpan.FromSeconds(12345) };
+        protected override Action<Action<TimeSpan>> ValueProvider => Gen.TimeSpan.ToValueProvider();
+    }
+
     public class DateTimeOffsetTests : FieldCodecTester<DateTimeOffset, DateTimeOffsetCodec>
+    {
+        protected override DateTimeOffset CreateValue() => DateTime.UtcNow;
+        protected override DateTimeOffset[] TestValues => new[]
+        {
+            DateTimeOffset.MinValue,
+            DateTimeOffset.MaxValue,
+            new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(11.5)),
+            new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(-11.5)),
+        };
+
+        protected override Action<Action<DateTimeOffset>> ValueProvider => Gen.DateTimeOffset.ToValueProvider();
+    }
+
+    public class DateTimeOffsetCopierTests : CopierTester<DateTimeOffset, IDeepCopier<DateTimeOffset>>
     {
         protected override DateTimeOffset CreateValue() => DateTime.UtcNow;
         protected override DateTimeOffset[] TestValues => new[]
@@ -136,7 +165,43 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Version left, Version right) => left == right && (left is null || left.GetHashCode() == right.GetHashCode());
     }
 
+    public class VersionCopierTests : CopierTester<Version, IDeepCopier<Version>>
+    {
+        protected override Version CreateValue() => new();
+        protected override Version[] TestValues => new[]
+        {
+            new Version(),
+            new Version(1, 2),
+            new Version(1, 2, 3),
+            new Version(1, 2, 3, 4),
+            new Version("1.2"),
+            new Version("1.2.3"),
+            new Version("1.2.3.4")
+        };
+
+        protected override bool Equals(Version left, Version right) => left == right && (left is null || left.GetHashCode() == right.GetHashCode());
+
+        protected override bool IsImmutable => true;
+    }
+
     public class BitVector32Tests: FieldCodecTester<BitVector32, BitVector32Codec>
+    {
+        protected override BitVector32 CreateValue() => new(new Random(Guid.NewGuid().GetHashCode()).Next());
+
+        protected override BitVector32[] TestValues => new[]
+        {
+            new BitVector32(0),
+            new BitVector32(100),
+            new BitVector32(-100),
+            CreateValue(),
+            CreateValue(),
+            CreateValue()
+        };
+
+        protected override bool Equals(BitVector32 left, BitVector32 right) => left.Equals(right) && left.GetHashCode() == right.GetHashCode();
+    }
+
+    public class BitVector32CopierTests: CopierTester<BitVector32, IDeepCopier<BitVector32>>
     {
         protected override BitVector32 CreateValue() => new(new Random(Guid.NewGuid().GetHashCode()).Next());
 
@@ -752,11 +817,27 @@ namespace Orleans.Serialization.UnitTests
         protected override bool[] TestValues => new[] { false, true };
     }
 
+    public class BoolCopierTests : CopierTester<bool, IDeepCopier<bool>>
+    {
+        protected override bool CreateValue() => true;
+        protected override bool Equals(bool left, bool right) => left == right;
+        protected override bool[] TestValues => new[] { false, true };
+    }
+
     public class StringCodecTests : FieldCodecTester<string, StringCodec>
     {
         protected override string CreateValue() => Guid.NewGuid().ToString();
         protected override bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
         protected override string[] TestValues => new[] { null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!" };
+    }
+
+    public class StringCopierTests : CopierTester<string, IDeepCopier<string>>
+    {
+        protected override string CreateValue() => Guid.NewGuid().ToString();
+        protected override bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
+        protected override string[] TestValues => new[] { null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!" };
+
+        protected override bool IsImmutable => true;
     }
 
     public class ObjectCodecTests : FieldCodecTester<object, ObjectCodec>
@@ -818,7 +899,40 @@ namespace Orleans.Serialization.UnitTests
 
     public class UInt64CodecTests : FieldCodecTester<ulong, UInt64Codec>
     {
-        protected override ulong CreateValue() => (ulong)Random.Shared.NextInt64();
+        protected override ulong CreateValue()
+        {
+            var msb = (ulong)Guid.NewGuid().GetHashCode() << 32;
+            var lsb = (ulong)Guid.NewGuid().GetHashCode();
+            return msb | lsb;
+        }
+
+        protected override ulong[] TestValues => new ulong[]
+        {
+            0,
+            1,
+            (ulong)byte.MaxValue - 1,
+            byte.MaxValue,
+            (ulong)byte.MaxValue + 1,
+            (ulong)ushort.MaxValue - 1,
+            ushort.MaxValue,
+            (ulong)ushort.MaxValue + 1,
+            (ulong)uint.MaxValue - 1,
+            uint.MaxValue,
+            (ulong)uint.MaxValue + 1,
+            ulong.MaxValue,
+        };
+
+        protected override Action<Action<ulong>> ValueProvider => Gen.ULong.ToValueProvider();
+    }
+
+    public class UInt64CopierTests : CopierTester<ulong, IDeepCopier<ulong>>
+    {
+        protected override ulong CreateValue()
+        {
+            var msb = (ulong)Guid.NewGuid().GetHashCode() << 32;
+            var lsb = (ulong)Guid.NewGuid().GetHashCode();
+            return msb | lsb;
+        }
 
         protected override ulong[] TestValues => new ulong[]
         {
@@ -859,7 +973,44 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<uint>> ValueProvider => Gen.UInt.ToValueProvider();
     }
 
+    public class UInt32CopiercTests : CopierTester<uint, IDeepCopier<uint>>
+    {
+        protected override uint CreateValue() => (uint)Guid.NewGuid().GetHashCode();
+
+        protected override uint[] TestValues => new uint[]
+        {
+            0,
+            1,
+            (uint)byte.MaxValue - 1,
+            byte.MaxValue,
+            (uint)byte.MaxValue + 1,
+            (uint)ushort.MaxValue - 1,
+            ushort.MaxValue,
+            (uint)ushort.MaxValue + 1,
+            uint.MaxValue,
+        };
+
+        protected override Action<Action<uint>> ValueProvider => Gen.UInt.ToValueProvider();
+    }
+
     public class UInt16CodecTests : FieldCodecTester<ushort, UInt16Codec>
+    {
+        protected override ushort CreateValue() => (ushort)Guid.NewGuid().GetHashCode();
+        protected override ushort[] TestValues => new ushort[]
+        {
+            0,
+            1,
+            byte.MaxValue - 1,
+            byte.MaxValue,
+            byte.MaxValue + 1,
+            ushort.MaxValue - 1,
+            ushort.MaxValue,
+        };
+
+        protected override Action<Action<ushort>> ValueProvider => Gen.UShort.ToValueProvider();
+    }
+
+    public class UInt16CopierTests : CopierTester<ushort, IDeepCopier<ushort>>
     {
         protected override ushort CreateValue() => (ushort)Guid.NewGuid().GetHashCode();
         protected override ushort[] TestValues => new ushort[]
@@ -884,9 +1035,52 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<byte>> ValueProvider => Gen.Byte.ToValueProvider();
     }
 
+    public class ByteCopierTests : CopierTester<byte, IDeepCopier<byte>>
+    {
+        protected override byte CreateValue() => (byte)Guid.NewGuid().GetHashCode();
+        protected override byte[] TestValues => new byte[] { 0, 1, byte.MaxValue - 1, byte.MaxValue };
+
+        protected override Action<Action<byte>> ValueProvider => Gen.Byte.ToValueProvider();
+    }
+
     public class Int64CodecTests : FieldCodecTester<long, Int64Codec>
     {
-        protected override long CreateValue() => Random.Shared.NextInt64();
+        protected override long CreateValue()
+        {
+            var msb = (ulong)Guid.NewGuid().GetHashCode() << 32;
+            var lsb = (ulong)Guid.NewGuid().GetHashCode();
+            return (long)(msb | lsb);
+        }
+
+        protected override long[] TestValues => new[]
+        {
+            long.MinValue,
+            -1,
+            0,
+            1,
+            (long)sbyte.MaxValue - 1,
+            sbyte.MaxValue,
+            (long)sbyte.MaxValue + 1,
+            (long)short.MaxValue - 1,
+            short.MaxValue,
+            (long)short.MaxValue + 1,
+            (long)int.MaxValue - 1,
+            int.MaxValue,
+            (long)int.MaxValue + 1,
+            long.MaxValue,
+        };
+
+        protected override Action<Action<long>> ValueProvider => Gen.Long.ToValueProvider();
+    }
+
+    public class Int64CopierTests : CopierTester<long, IDeepCopier<long>>
+    {
+        protected override long CreateValue()
+        {
+            var msb = (ulong)Guid.NewGuid().GetHashCode() << 32;
+            var lsb = (ulong)Guid.NewGuid().GetHashCode();
+            return (long)(msb | lsb);
+        }
 
         protected override long[] TestValues => new[]
         {
@@ -960,7 +1154,50 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
+    public class Int32CopierTests : CopierTester<int, IDeepCopier<int>>
+    {
+        protected override int CreateValue() => Guid.NewGuid().GetHashCode();
+
+        protected override int[] TestValues => new[]
+        {
+            int.MinValue,
+            -1,
+            0,
+            1,
+            sbyte.MaxValue - 1,
+            sbyte.MaxValue,
+            sbyte.MaxValue + 1,
+            short.MaxValue - 1,
+            short.MaxValue,
+            short.MaxValue + 1,
+            int.MaxValue - 1,
+            int.MaxValue,
+        };
+
+        protected override Action<Action<int>> ValueProvider => Gen.Int.ToValueProvider();
+    }
+
     public class Int16CodecTests : FieldCodecTester<short, Int16Codec>
+    {
+        protected override short CreateValue() => (short)Guid.NewGuid().GetHashCode();
+
+        protected override short[] TestValues => new short[]
+        {
+            short.MinValue,
+            -1,
+            0,
+            1,
+            sbyte.MaxValue - 1,
+            sbyte.MaxValue,
+            sbyte.MaxValue + 1,
+            short.MaxValue - 1,
+            short.MaxValue
+        };
+
+        protected override Action<Action<short>> ValueProvider => Gen.Short.ToValueProvider();
+    }
+
+    public class Int16CopierTests : CopierTester<short, IDeepCopier<short>>
     {
         protected override short CreateValue() => (short)Guid.NewGuid().GetHashCode();
 
@@ -997,6 +1234,23 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<sbyte>> ValueProvider => Gen.SByte.ToValueProvider();
     }
 
+    public class SByteCopierTests : CopierTester<sbyte, IDeepCopier<sbyte>>
+    {
+        protected override sbyte CreateValue() => (sbyte)Guid.NewGuid().GetHashCode();
+
+        protected override sbyte[] TestValues => new sbyte[]
+        {
+            sbyte.MinValue,
+            -1,
+            0,
+            1,
+            sbyte.MaxValue - 1,
+            sbyte.MaxValue
+        };
+
+        protected override Action<Action<sbyte>> ValueProvider => Gen.SByte.ToValueProvider();
+    }
+
     public class CharCodecTests : FieldCodecTester<char, CharCodec>
     {
         private int _createValueCount;
@@ -1015,7 +1269,38 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<char>> ValueProvider => Gen.Char.ToValueProvider();
     }
 
+    public class CharCopierTests : CopierTester<char, IDeepCopier<char>>
+    {
+        private int _createValueCount;
+        protected override char CreateValue() => (char)('!' + _createValueCount++ % ('~' - '!'));
+        protected override char[] TestValues => new[]
+        {
+            (char)0,
+            (char)1,
+            (char)(byte.MaxValue - 1),
+            (char)byte.MaxValue,
+            (char)(byte.MaxValue + 1),
+            (char)(ushort.MaxValue - 1),
+            (char)ushort.MaxValue,
+        };
+
+        protected override Action<Action<char>> ValueProvider => Gen.Char.ToValueProvider();
+    }
+
     public class GuidCodecTests : FieldCodecTester<Guid, GuidCodec>
+    {
+        protected override Guid CreateValue() => Guid.NewGuid();
+        protected override Guid[] TestValues => new[]
+        {
+            Guid.Empty,
+            Guid.Parse("4DEBD074-5DBB-45F6-ACB7-ED97D2AEE02F"),
+            Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")
+        };
+
+        protected override Action<Action<Guid>> ValueProvider => Gen.Guid.ToValueProvider();
+    }
+
+    public class GuidCopierTests : CopierTester<Guid, IDeepCopier<Guid>>
     {
         protected override Guid CreateValue() => Guid.NewGuid();
         protected override Guid[] TestValues => new[]
@@ -1052,7 +1337,41 @@ namespace Orleans.Serialization.UnitTests
         protected override Type[] TestValues => _values;
     }
 
+    public class TypeCopierTests : CopierTester<Type, IDeepCopier<Type>>
+    {
+        private readonly Type[] _values =
+        {
+            null,
+            typeof(Dictionary<Guid, List<string>>),
+            typeof(Type).MakeByRefType(),
+            typeof(Guid),
+            typeof(int).MakePointerType(),
+            typeof(string[]),
+            typeof(string[,]),
+            typeof(string[,]).MakePointerType(),
+            typeof(string[,]).MakeByRefType(),
+            typeof(Dictionary<,>),
+            typeof(List<>),
+            typeof(string)
+        };
+
+        private int _valueIndex;
+
+        protected override Type CreateValue() => _values[_valueIndex++ % _values.Length];
+        protected override Type[] TestValues => _values;
+
+        protected override bool IsImmutable => true;
+    }
+
     public class FloatCodecTests : FieldCodecTester<float, FloatCodec>
+    {
+        protected override float CreateValue() => float.MaxValue * (float)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
+        protected override float[] TestValues => new[] { float.MinValue, 0, 1.0f, float.MaxValue };
+
+        protected override Action<Action<float>> ValueProvider => Gen.Float.ToValueProvider();
+    }
+
+    public class FloatCopierTests : CopierTester<float, IDeepCopier<float>>
     {
         protected override float CreateValue() => float.MaxValue * (float)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
         protected override float[] TestValues => new[] { float.MinValue, 0, 1.0f, float.MaxValue };
@@ -1068,7 +1387,22 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<double>> ValueProvider => Gen.Double.ToValueProvider();
     }
 
+    public class DoubleCopierTests : CopierTester<double, IDeepCopier<double>>
+    {
+        protected override double CreateValue() => double.MaxValue * new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
+        protected override double[] TestValues => new[] { double.MinValue, 0, 1.0, double.MaxValue };
+
+        protected override Action<Action<double>> ValueProvider => Gen.Double.ToValueProvider();
+    }
+
     public class DecimalCodecTests : FieldCodecTester<decimal, DecimalCodec>
+    {
+        protected override decimal CreateValue() => decimal.MaxValue * (decimal)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
+        protected override decimal[] TestValues => new[] { decimal.MinValue, 0, 1.0M, decimal.MaxValue };
+        protected override Action<Action<decimal>> ValueProvider => Gen.Decimal.ToValueProvider();
+    }
+
+    public class DecimalCopierTests : CopierTester<decimal, IDeepCopier<decimal>>
     {
         protected override decimal CreateValue() => decimal.MaxValue * (decimal)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
         protected override decimal[] TestValues => new[] { decimal.MinValue, 0, 1.0M, decimal.MaxValue };
@@ -1490,6 +1824,30 @@ namespace Orleans.Serialization.UnitTests
         } 
     }
 
+    public class IPAddressCopierTests : CopierTester<IPAddress, IDeepCopier<IPAddress>>
+    {
+        protected override IPAddress[] TestValues => new[] { null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue() };
+
+        protected override IPAddress CreateValue()
+        {
+            var rand = new Random(Guid.NewGuid().GetHashCode());
+            byte[] bytes;
+            if (rand.Next(1) == 0)
+            {
+                bytes = new byte[4];
+            }
+            else
+            {
+                bytes = new byte[16];
+            }
+
+            rand.NextBytes(bytes);
+            return new IPAddress(bytes);
+        }
+
+        protected override bool IsImmutable => true;
+    }
+
     public class HashSetTests : FieldCodecTester<HashSet<string>, HashSetCodec<string>>
     {
         protected override HashSet<string> CreateValue()
@@ -1597,6 +1955,17 @@ namespace Orleans.Serialization.UnitTests
         protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
 
         protected override bool Equals(Uri left, Uri right) => object.ReferenceEquals(left, right) || left == right;
+    }
+
+    public class UriCopierTests : CopierTester<Uri, IDeepCopier<Uri>>
+    {
+        protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
+
+        protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
+
+        protected override bool Equals(Uri left, Uri right) => object.ReferenceEquals(left, right) || left == right;
+
+        protected override bool IsImmutable => true;
     }
 
     public class FSharpOptionTests : FieldCodecTester<FSharpOption<Guid>, FSharpOptionCodec<Guid>>
