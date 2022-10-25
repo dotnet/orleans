@@ -43,8 +43,6 @@ namespace Orleans.Serialization.Codecs
                     case 0:
                         name = StringCodec.ReadValue(ref reader, header);
                         break;
-                    case 1:
-                        break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
