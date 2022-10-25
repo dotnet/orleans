@@ -5,7 +5,7 @@ namespace Orleans.Versions.Selector
     /// <summary>
     /// Grain interface version selector which allows any compatible version to be chosen.
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable]
+    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
     public sealed class AllCompatibleVersions : VersionSelectorStrategy
     {
         /// <summary>

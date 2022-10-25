@@ -332,18 +332,26 @@ skip:;
             }
             else if (!type.IsValueType)
             {
-                // C#: if (context.TryGetCopy(original, out T existing)) { return existing; }
-                var tryGetCopy = InvocationExpression(
-                    contextParam.Member("TryGetCopy"),
-                    ArgumentList(SeparatedList(new[]
-                    {
-                        Argument(originalParam),
-                        Argument(DeclarationExpression(
-                            type.TypeSyntax,
-                            SingleVariableDesignation(Identifier("existing"))))
-                                    .WithRefKindKeyword(Token(SyntaxKind.OutKeyword))
-                    })));
-                body.Add(IfStatement(tryGetCopy, ReturnStatement("existing".ToIdentifierName())));
+                if (type.TrackReferences)
+                {
+                    // C#: if (context.TryGetCopy(original, out T existing)) return existing;
+                    var tryGetCopy = InvocationExpression(
+                        contextParam.Member("TryGetCopy"),
+                        ArgumentList(SeparatedList(new[]
+                        {
+                            Argument(originalParam),
+                            Argument(DeclarationExpression(
+                                type.TypeSyntax,
+                                SingleVariableDesignation(Identifier("existing"))))
+                                        .WithRefKindKeyword(Token(SyntaxKind.OutKeyword))
+                        })));
+                    body.Add(IfStatement(tryGetCopy, ReturnStatement("existing".ToIdentifierName())));
+                }
+                else
+                {
+                    // C#: if (original is null) return null;
+                    body.Add(IfStatement(BinaryExpression(SyntaxKind.IsExpression, originalParam, LiteralExpression(SyntaxKind.NullLiteralExpression)), ReturnStatement(LiteralExpression(SyntaxKind.NullLiteralExpression))));
+                }
 
                 if (!type.IsSealedType)
                 {
@@ -362,12 +370,15 @@ skip:;
                             argumentList: null,
                             initializer: EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
 
-                // C#: context.RecordCopy(original, result);
-                body.Add(ExpressionStatement(InvocationExpression(contextParam.Member("RecordCopy"), ArgumentList(SeparatedList(new[]
+                if (type.TrackReferences)
                 {
-                    Argument(originalParam),
-                    Argument(resultVar)
-                })))));
+                    // C#: context.RecordCopy(original, result);
+                    body.Add(ExpressionStatement(InvocationExpression(contextParam.Member("RecordCopy"), ArgumentList(SeparatedList(new[]
+                    {
+                        Argument(originalParam),
+                        Argument(resultVar)
+                    })))));
+                }
 
                 if (!type.IsSealedType)
                 {

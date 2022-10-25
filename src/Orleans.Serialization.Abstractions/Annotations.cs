@@ -406,7 +406,7 @@ namespace Orleans
     /// <remarks>
     /// Reference tracking allows a serializable type to participate in a cyclic object graph.
     /// </remarks>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    [AttributeUsage(AttributeTargets.Class)]
     public sealed class SuppressReferenceTrackingAttribute : Attribute
     {
     }

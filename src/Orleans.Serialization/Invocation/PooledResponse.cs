@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Activators;
 
 namespace Orleans.Serialization.Invocation
 {
@@ -7,8 +8,7 @@ namespace Orleans.Serialization.Invocation
     /// <see cref="Response{TResult}"/> implementation which can be pooled.
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
-    [GenerateSerializer]
-    [SuppressReferenceTracking]
+    [GenerateSerializer, UseActivator, SuppressReferenceTracking]
     public sealed class PooledResponse<TResult> : Response<TResult>
     {
         [Id(0)]
@@ -27,8 +27,8 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public override object Result
         {
-            get => TypedResult;
-            set => TypedResult = (TResult)value;
+            get => _result;
+            set => _result = (TResult)value;
         }
 
         /// <inheritdoc />
@@ -43,11 +43,9 @@ namespace Orleans.Serialization.Invocation
         }
 
         /// <inheritdoc />
-#pragma warning disable CA1816 // Dispose methods should call SuppressFinalize
         public override void Dispose()
-#pragma warning restore CA1816 // Dispose methods should call SuppressFinalize
         {
-            TypedResult = default;
+            _result = default;
             ResponsePool.Return(this);
         }
 
@@ -59,12 +57,19 @@ namespace Orleans.Serialization.Invocation
                 return exception.ToString();
             }
 
-            if (_result is { })
+            if (_result is { } r)
             {
-                return _result.ToString();
+                return r.ToString();
             }
 
             return "[null]";
         }
+    }
+
+    [RegisterActivator]
+    internal sealed class PooledResponseActivator<TResult> : IActivator<PooledResponse<TResult>>
+    {
+        /// <inheritdoc />
+        public PooledResponse<TResult> Create() => ResponsePool.Get<TResult>();
     }
 }

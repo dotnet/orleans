@@ -7,7 +7,7 @@ namespace Orleans.Serialization.Invocation
     /// <summary>
     /// Represents the result of a method invocation.
     /// </summary>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class Response : IDisposable
     {
         /// <summary>
@@ -72,9 +72,7 @@ namespace Orleans.Serialization.Invocation
     /// <summary>
     /// Represents a completed <see cref="Response"/>.
     /// </summary>
-    [GenerateSerializer]
-    [Immutable]
-    [UseActivator]
+    [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
     public sealed class CompletedResponse : Response
     {
         /// <summary>
@@ -102,7 +100,7 @@ namespace Orleans.Serialization.Invocation
     /// Activator for <see cref="CompletedResponse"/>.
     /// </summary>
     [RegisterActivator]
-    public sealed class CompletedResponseActivator : IActivator<CompletedResponse>
+    internal sealed class CompletedResponseActivator : IActivator<CompletedResponse>
     {
         /// <inheritdoc/>
         public CompletedResponse Create() => CompletedResponse.Instance;
@@ -111,8 +109,7 @@ namespace Orleans.Serialization.Invocation
     /// <summary>
     /// A <see cref="Response"/> which represents an exception, a broken promise.
     /// </summary>
-    [GenerateSerializer]
-    [Immutable]
+    [GenerateSerializer, Immutable]
     public sealed class ExceptionResponse : Response
     {
         /// <inheritdoc/>
@@ -149,7 +146,7 @@ namespace Orleans.Serialization.Invocation
     /// A <see cref="Response"/> which represents a typed value.
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
-    [GenerateSerializer]
+    [SerializerTransparent]
     public abstract class Response<TResult> : Response
     {
         /// <inheritdoc/>
