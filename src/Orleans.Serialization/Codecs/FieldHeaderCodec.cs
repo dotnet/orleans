@@ -152,7 +152,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Field ReadFieldHeader<TInput>(ref this Reader<TInput> reader)
         {
-            Field field = default;
+            Unsafe.SkipInit(out Field field);
             var tag = reader.ReadByte();
             field.Tag = tag;
             // If the id or schema type are required and were not encoded into the tag, read the extended header data.
@@ -256,7 +256,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (Field Field, string Type) ReadFieldHeaderForAnalysis<TInput>(ref this Reader<TInput> reader)
         {
-            Field field = default;
+            Unsafe.SkipInit(out Field field);
             string type = default;
             var tag = reader.ReadByte();
             if (tag < (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))

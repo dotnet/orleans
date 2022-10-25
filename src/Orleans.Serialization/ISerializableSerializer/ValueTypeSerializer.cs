@@ -56,8 +56,7 @@ namespace Orleans.Serialization
             var info = new SerializationInfo(Type, _formatterConverter);
             ((ISerializable)value).GetObjectData(info, _streamingContext);
 
-            Int32Codec.WriteField(ref writer, 0, typeof(int), 0);
-            TypeSerializerCodec.WriteField(ref writer, 1, typeof(Type), info.ObjectType);
+            TypeSerializerCodec.WriteField(ref writer, 0, typeof(Type), info.ObjectType);
 
             var first = true;
             foreach (var field in info)

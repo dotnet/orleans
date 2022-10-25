@@ -39,7 +39,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Length > 0)
             {
-                Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Length);
+                UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value)
                 {
@@ -81,7 +81,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
@@ -175,6 +175,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ReadOnlyMemoryCodec<T> : IFieldCodec<ReadOnlyMemory<T>>
     {
+        private readonly Type CodecType = typeof(ReadOnlyMemory<T>);
         private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
@@ -190,14 +191,18 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (!MemoryMarshal.TryGetArray(value, out var segment) || segment.Array.Length != value.Length)
+            {
+                ReferenceCodec.MarkValueField(writer.Session);
+            }
+            else if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecType, segment.Array))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Length);
+            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
             uint innerFieldIdDelta = 1;
             foreach (var element in value.Span)
             {
@@ -238,7 +243,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
@@ -250,12 +255,12 @@ namespace Orleans.Serialization.Codecs
                     case 1:
                         if (result is null)
                         {
-                            return ThrowLengthFieldMissing();
+                            ThrowLengthFieldMissing();
                         }
 
                         if (index >= length)
                         {
-                            return ThrowIndexOutOfRangeException(length);
+                            ThrowIndexOutOfRangeException(length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -273,10 +278,10 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        private static T[] ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static T[] ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
@@ -338,6 +343,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class MemoryCodec<T> : IFieldCodec<Memory<T>>
     {
+        private readonly Type CodecType = typeof(Memory<T>);
         private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
@@ -353,14 +359,18 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (!MemoryMarshal.TryGetArray<T>(value, out var segment) || segment.Array.Length != value.Length)
+            {
+                ReferenceCodec.MarkValueField(writer.Session);
+            }
+            else if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecType, segment.Array))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Length);
+            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
             uint innerFieldIdDelta = 1;
             foreach (var element in value.Span)
             {
@@ -401,7 +411,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
@@ -413,12 +423,12 @@ namespace Orleans.Serialization.Codecs
                     case 1:
                         if (result is null)
                         {
-                            return ThrowLengthFieldMissing();
+                            ThrowLengthFieldMissing();
                         }
 
                         if (index >= length)
                         {
-                            return ThrowIndexOutOfRangeException(length);
+                            ThrowIndexOutOfRangeException(length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -436,10 +446,10 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        private static Memory<T> ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static Memory<T> ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
@@ -501,6 +511,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ArraySegmentCodec<T> : IFieldCodec<ArraySegment<T>>
     {
+        private readonly Type CodecType = typeof(ArraySegment<T>);
         private readonly Type CodecElementType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
@@ -516,19 +527,26 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ArraySegment<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (value.Array?.Length != value.Count)
+            {
+                ReferenceCodec.MarkValueField(writer.Session);
+            }
+            else if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecType, value.Array))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
 
-            Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value.AsSpan())
+            if (value.Count > 0)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
+                UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value.AsSpan())
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
             }
 
             writer.WriteEndObject();
@@ -539,7 +557,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<ArraySegment<T>, TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
             }
 
             if (field.WireType != WireType.TagDelimited)
@@ -564,7 +582,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        length = Int32Codec.ReadValue(ref reader, header);
+                        length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
@@ -576,12 +594,12 @@ namespace Orleans.Serialization.Codecs
                     case 1:
                         if (result is null)
                         {
-                            return ThrowLengthFieldMissing();
+                            ThrowLengthFieldMissing();
                         }
 
                         if (index >= length)
                         {
-                            return ThrowIndexOutOfRangeException(length);
+                            ThrowIndexOutOfRangeException(length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -593,16 +611,16 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            return new ArraySegment<T>(result);
+            return result;
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
 
-        private static ArraySegment<T> ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static ArraySegment<T> ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");

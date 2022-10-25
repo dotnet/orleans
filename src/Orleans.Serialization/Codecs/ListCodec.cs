@@ -42,7 +42,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Count > 0)
             {
-                Int32Codec.WriteField(ref writer, 0, Int32Codec.CodecFieldType, value.Count);
+                UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Count);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value)
                 {
@@ -82,7 +82,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        var length = Int32Codec.ReadValue(ref reader, header);
+                        var length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
                             ThrowInvalidSizeException(length);
