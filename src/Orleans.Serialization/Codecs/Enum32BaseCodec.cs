@@ -13,8 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <seealso cref="Orleans.Serialization.Codecs.IFieldCodec{T}" />
-    /// <seealso cref="Orleans.Serialization.Cloning.IDeepCopier{T}" />
-    public abstract class Enum32BaseCodec<T> : IFieldCodec<T>, IDeepCopier<T>, IOptionalDeepCopier where T : Enum
+    public abstract class Enum32BaseCodec<T> : IFieldCodec<T> where T : Enum
     {
         /// <summary>
         /// The codec field type
@@ -55,9 +54,6 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        /// <inheritdoc/>
-        public T DeepCopy(T input, CopyContext context) => input;
-
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {typeof(T).GetType()} fields. {field}");
 
@@ -73,17 +69,11 @@ namespace Orleans.Serialization.Codecs
     /// Serializer and copier for <see cref="DateTimeKind"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class DateTimeKindCodec : Enum32BaseCodec<DateTimeKind>
-    {
-    }
+    public sealed class DateTimeKindCodec : Enum32BaseCodec<DateTimeKind> { }
 
     /// <summary>
     /// Serializer and copier for <see cref="DayOfWeek"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class DayOfWeekCodec : Enum32BaseCodec<DayOfWeek>
-    {
-    }
+    public sealed class DayOfWeekCodec : Enum32BaseCodec<DayOfWeek> { }
 }

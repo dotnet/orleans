@@ -59,14 +59,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed64} is supported for {nameof(TimeSpan)} fields. {field}");
     }
-
-    /// <summary>
-    /// Copier for <see cref="TimeSpan"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class TimeSpanCopier : IDeepCopier<TimeSpan>, IOptionalDeepCopier
-    {
-        /// <inheritdoc />
-        public TimeSpan DeepCopy(TimeSpan input, CopyContext _) => input;
-    }
 }

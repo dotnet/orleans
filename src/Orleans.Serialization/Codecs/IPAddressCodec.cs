@@ -96,13 +96,6 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
-    /// <summary>
-    /// Copier for <see cref="IPAddress"/>.
-    /// </summary>
     [RegisterCopier]
-    public sealed class IPAddressCopier : IDeepCopier<IPAddress>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public IPAddress DeepCopy(IPAddress input, CopyContext _) => input;
-    }
+    internal sealed class IPAddressCopier : ShallowCopier<IPAddress>, IDerivedTypeCopier { }
 }

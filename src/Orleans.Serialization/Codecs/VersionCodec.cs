@@ -84,14 +84,4 @@ namespace Orleans.Serialization.Codecs
         [Id(3)]
         public int Revision;
     }
-
-    /// <summary>
-    /// Copier for <see cref="Version"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class VersionCopier : IDeepCopier<Version>, IOptionalDeepCopier
-    {
-        /// <inheritdoc />
-        public Version DeepCopy(Version input, CopyContext context) => input;
-    }
 }

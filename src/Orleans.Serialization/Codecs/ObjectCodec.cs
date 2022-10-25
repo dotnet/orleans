@@ -87,14 +87,17 @@ namespace Orleans.Serialization.Codecs
         /// <returns>A copy of <paramref name="input" />.</returns>
         public static object DeepCopy(object input, CopyContext context)
         {
-            if (context.TryGetCopy<object>(input, out var result))
-            {
-                return result;
-            }
-
-            return input.GetType() == typeof(object) ? input : context.DeepCopy(input);
+            return context.TryGetCopy<object>(input, out var result) ? result
+                : input.GetType() == typeof(object) ? input : context.DeepCopy(input);
         }
 
-        object IDeepCopier<object>.DeepCopy(object input, CopyContext context) => DeepCopy(input, context);
+        object IDeepCopier<object>.DeepCopy(object input, CopyContext context)
+        {
+            return context.TryGetCopy<object>(input, out var result) ? result
+                : input.GetType() == typeof(object) ? input : context.DeepCopy(input);
+        }
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context)
+            => input is null || input.GetType() == typeof(object) ? input : context.DeepCopy(input);
     }
 }

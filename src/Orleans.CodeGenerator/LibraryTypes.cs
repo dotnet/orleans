@@ -23,7 +23,7 @@ namespace Orleans.CodeGenerator
                 WireType = Type("Orleans.Serialization.WireProtocol.WireType"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
-                IOptionalDeepCopier = Type("Orleans.Serialization.Cloning.IOptionalDeepCopier"),
+                ShallowCopier = Type("Orleans.Serialization.Cloning.ShallowCopier`1"),
                 CompoundTypeAliasAttribute = Type("Orleans.CompoundTypeAliasAttribute"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
@@ -115,30 +115,9 @@ namespace Orleans.CodeGenerator
                 StaticCopiers = new WellKnownCopierDescription[]
                 {
                     new(compilation.GetSpecialType(SpecialType.System_Object), Type("Orleans.Serialization.Codecs.ObjectCopier")),
-                    new(compilation.GetSpecialType(SpecialType.System_Boolean), Type("Orleans.Serialization.Codecs.BoolCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Char), Type("Orleans.Serialization.Codecs.CharCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Byte), Type("Orleans.Serialization.Codecs.ByteCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_SByte), Type("Orleans.Serialization.Codecs.SByteCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Int16), Type("Orleans.Serialization.Codecs.Int16Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Int32), Type("Orleans.Serialization.Codecs.Int32Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Int64), Type("Orleans.Serialization.Codecs.Int64Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_UInt16), Type("Orleans.Serialization.Codecs.UInt16Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_UInt32), Type("Orleans.Serialization.Codecs.UInt32Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_UInt64), Type("Orleans.Serialization.Codecs.UInt64Codec")),
-                    new(compilation.GetSpecialType(SpecialType.System_String), Type("Orleans.Serialization.Codecs.StringCopier")),
                     new(compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Byte), 1), Type("Orleans.Serialization.Codecs.ByteArrayCopier")),
-                    new(compilation.GetSpecialType(SpecialType.System_Single), Type("Orleans.Serialization.Codecs.FloatCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Double), Type("Orleans.Serialization.Codecs.DoubleCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_Decimal), Type("Orleans.Serialization.Codecs.DecimalCodec")),
-                    new(compilation.GetSpecialType(SpecialType.System_DateTime), Type("Orleans.Serialization.Codecs.DateTimeCodec")),
-                    new(Type("System.TimeSpan"), Type("Orleans.Serialization.Codecs.TimeSpanCopier")),
-                    new(Type("System.DateTimeOffset"), Type("Orleans.Serialization.Codecs.DateTimeOffsetCopier")),
-                    new(Type("System.Guid"), Type("Orleans.Serialization.Codecs.GuidCopier")),
-                    new(Type("System.Type"), Type("Orleans.Serialization.Codecs.TypeCopier")),
                     new(Type("System.ReadOnlyMemory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.ReadOnlyMemoryOfByteCopier")),
                     new(Type("System.Memory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.MemoryOfByteCopier")),
-                    new(Type("System.Net.IPAddress"), Type("Orleans.Serialization.Codecs.IPAddressCopier")),
-                    new(Type("System.Net.IPEndPoint"), Type("Orleans.Serialization.Codecs.IPEndPointCopier")),
                 },
                 WellKnownCopiers = new WellKnownCopierDescription[]
                 {
@@ -206,7 +185,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Field { get; private set; }
         public INamedTypeSymbol WireType { get; private set; }
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
-        public INamedTypeSymbol IOptionalDeepCopier { get; private set; }
+        public INamedTypeSymbol ShallowCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }
         public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }

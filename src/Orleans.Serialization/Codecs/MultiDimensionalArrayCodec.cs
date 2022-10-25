@@ -160,7 +160,7 @@ namespace Orleans.Serialization.Codecs
             $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static T ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }
@@ -171,17 +171,6 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T">The array element type.</typeparam>
     internal sealed class MultiDimensionalArrayCopier<T> : IGeneralizedCopier
     {
-        private readonly IDeepCopier<object> _elementCopier;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCopier{T}"/> class.
-        /// </summary>
-        /// <param name="elementCopier">The element copier.</param>
-        public MultiDimensionalArrayCopier(IDeepCopier<object> elementCopier)
-        {
-            _elementCopier = OrleansGeneratedCodeHelper.UnwrapService(this, elementCopier);
-        }
-
         /// <inheritdoc/>
         public object DeepCopy(object original, CopyContext context)
         {
@@ -213,7 +202,7 @@ namespace Orleans.Serialization.Codecs
             {
                 for (var i = 0; i < lengths[0]; i++)
                 {
-                    result.SetValue(_elementCopier.DeepCopy(originalArray.GetValue(i), context), i);
+                    result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(i), context), i);
                 }
             }
             else if (rank == 2)
@@ -222,7 +211,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     for (var j = 0; j < lengths[1]; j++)
                     {
-                        result.SetValue(_elementCopier.DeepCopy(originalArray.GetValue(i, j), context), i, j);
+                        result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(i, j), context), i, j);
                     }
                 }
             }
@@ -246,7 +235,7 @@ namespace Orleans.Serialization.Codecs
                         index[n] = offset;
                     }
 
-                    result.SetValue(_elementCopier.DeepCopy(originalArray.GetValue(index), context), index);
+                    result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(index), context), index);
                 }
             }
 

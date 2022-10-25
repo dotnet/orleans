@@ -79,15 +79,9 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier is null;
 
-        /// <inheritdoc/>
-        public T? DeepCopy(T? input, CopyContext context)
-        {
-            if (input is null || _copier is null)
-            {
-                return input;
-            }
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input, context);
 
-            return _copier.DeepCopy(input.GetValueOrDefault(), context);
-        }
+        /// <inheritdoc/>
+        public T? DeepCopy(T? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input.GetValueOrDefault(), context);
     }
 }

@@ -36,16 +36,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for tuple fields.");
-    }
-
-    /// <summary>
-    /// Copier for <see cref="ValueTuple"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class ValueTupleCopier : IDeepCopier<ValueTuple>, IOptionalDeepCopier
-    {
-        public ValueTuple DeepCopy(ValueTuple input, CopyContext _) => input;
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -134,6 +125,8 @@ namespace Orleans.Serialization.Codecs
         public ValueTupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
         public bool IsShallowCopyable() => _copier is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T>)input, context);
 
         /// <inheritdoc />
         public ValueTuple<T> DeepCopy(ValueTuple<T> input, CopyContext context)
@@ -241,6 +234,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2> DeepCopy(ValueTuple<T1, T2> input, CopyContext context)
@@ -366,6 +361,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3> DeepCopy(ValueTuple<T1, T2, T3> input, CopyContext context)
@@ -505,6 +502,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4> DeepCopy(ValueTuple<T1, T2, T3, T4> input, CopyContext context)
@@ -657,6 +656,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5> DeepCopy(ValueTuple<T1, T2, T3, T4, T5> input, CopyContext context)
@@ -824,6 +825,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
@@ -1007,6 +1010,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6, T7))input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
@@ -1203,6 +1208,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>)input, context);
 
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)

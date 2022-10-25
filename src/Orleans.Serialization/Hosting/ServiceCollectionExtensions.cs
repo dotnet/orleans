@@ -201,6 +201,8 @@ namespace Orleans.Serialization
 
             public T DeepCopy(T original, CopyContext context) => Value.DeepCopy(original, context);
 
+            public object DeepCopy(object original, CopyContext context) => Value.DeepCopy(original, context);
+
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();

@@ -295,14 +295,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Default copier for shallow-copyable types
-        /// </summary>
-        public sealed class DefaultShallowCopier<T> : IDeepCopier<T>
-        {
-            public T DeepCopy(T input, CopyContext _) => input;
-        }
-
-        /// <summary>
         /// Default codec implementation for abstract classes
         /// </summary>
         public abstract class AbstractCodec<T> : IFieldCodec<T>, IBaseCodec<T> where T : class

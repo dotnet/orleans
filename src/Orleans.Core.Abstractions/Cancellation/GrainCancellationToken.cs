@@ -9,6 +9,7 @@ namespace Orleans
     /// <summary>
     /// An analogue to <see cref="CancellationToken"/> which can be sent between grains.
     /// </summary>
+    [Immutable]
     public sealed class GrainCancellationToken : IDisposable
     {
         /// <summary>

@@ -86,7 +86,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported. {field}");
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported. {field}");
     }
 
     /// <summary>
@@ -112,6 +112,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((KeyValuePair<TKey, TValue>)input, context);
 
         /// <inheritdoc/>
         public KeyValuePair<TKey, TValue> DeepCopy(KeyValuePair<TKey, TValue> input, CopyContext context)

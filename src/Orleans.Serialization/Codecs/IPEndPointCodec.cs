@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="IPEndPoint"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class IPEndPointCodec : IFieldCodec<IPEndPoint>
+    public sealed class IPEndPointCodec : IFieldCodec<IPEndPoint>, IDerivedTypeCodec
     {
         /// <summary>
         /// The codec field type
@@ -75,7 +75,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPEndPoint value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecFieldType, value))
             {
                 return;
             }
@@ -87,23 +87,6 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
-    /// <summary>
-    /// Copier for <see cref="IPEndPoint"/>.
-    /// </summary>
     [RegisterCopier]
-    public sealed class IPEndPointCopier : IDeepCopier<IPEndPoint>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public IPEndPoint DeepCopy(IPEndPoint input, CopyContext _) => input;
-    }
-
-    /// <summary>
-    /// Copier for <see cref="EndPoint"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class EndPointCopier : IDeepCopier<EndPoint>, IDerivedTypeCopier, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public EndPoint DeepCopy(EndPoint input, CopyContext _) => input;
-    }
+    internal sealed class EndPointCopier : ShallowCopier<EndPoint>, IDerivedTypeCopier { }
 }

@@ -45,17 +45,6 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ArrayListCopier : IDeepCopier<ArrayList>, IBaseCopier<ArrayList>
     {
-        private readonly IDeepCopier<object> _copier;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ArrayListCopier"/> class.
-        /// </summary>
-        /// <param name="copier">The copier.</param>
-        public ArrayListCopier(IDeepCopier<object> copier)
-        {
-            _copier = copier;
-        }
-
         /// <inheritdoc/>
         public ArrayList DeepCopy(ArrayList input, CopyContext context)
         {
@@ -73,7 +62,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Add(_copier.DeepCopy(item, context));
+                result.Add(ObjectCopier.DeepCopy(item, context));
             }
 
             return result;
@@ -84,7 +73,7 @@ namespace Orleans.Serialization.Codecs
         {
             foreach (var item in input)
             {
-                output.Add(_copier.DeepCopy(item, context));
+                output.Add(ObjectCopier.DeepCopy(item, context));
             }
         }
     }

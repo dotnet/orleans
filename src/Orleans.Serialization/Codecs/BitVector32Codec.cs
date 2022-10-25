@@ -55,14 +55,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {nameof(BitVector32)} fields. {field}");
     }
-
-    /// <summary>
-    /// Copier for <see cref="BitVector32"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class BitVector32Copier : IDeepCopier<BitVector32>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public BitVector32 DeepCopy(BitVector32 input, CopyContext _) => new(input);
-    }
 }

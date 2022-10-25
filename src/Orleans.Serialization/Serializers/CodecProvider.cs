@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,14 +24,12 @@ namespace Orleans.Serialization.Serializers
         private static readonly MethodInfo TypedCodecWrapperCreateMethod = typeof(CodecAdapter).GetMethod(nameof(CodecAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
         private static readonly MethodInfo TypedBaseCodecWrapperCreateMethod = typeof(CodecAdapter).GetMethod(nameof(BaseCodecAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
 
-        private static readonly Type OpenGenericCopierType = typeof(IDeepCopier<>);
-        private static readonly MethodInfo TypedCopierWrapperCreateMethod = typeof(CopierAdapter).GetMethod(nameof(CopierAdapter.CreateUntypedFromTyped), BindingFlags.Public | BindingFlags.Static);
-
         private readonly object _initializationLock = new();
 
-        private readonly ConcurrentDictionary<(Type, Type), IFieldCodec> _adaptedCodecs = new(TypeTypeValueTupleComparer.Instance);
-        private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new(TypeTypeValueTupleComparer.Instance);
-        private readonly ConcurrentDictionary<(Type, Type), IDeepCopier> _adaptedCopiers = new(TypeTypeValueTupleComparer.Instance);
+        private readonly ConcurrentDictionary<(Type, Type), IFieldCodec> _adaptedCodecs = new();
+        private readonly ConcurrentDictionary<(Type, Type), IBaseCodec> _adaptedBaseCodecs = new();
+        private readonly ConcurrentDictionary<Type, IDeepCopier> _untypedCopiers = new();
+        private readonly ConcurrentDictionary<Type, IDeepCopier> _typedCopiers = new();
 
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
@@ -51,9 +48,9 @@ namespace Orleans.Serialization.Serializers
         private readonly List<IGeneralizedCopier> _generalizedCopiers = new();
         private readonly List<ISpecializableCopier> _specializableCopiers = new();
         private readonly VoidCodec _voidCodec = new();
-        private readonly ObjectCopier _objectCopier;
+        private readonly ObjectCopier _objectCopier = new();
         private readonly IServiceProvider _serviceProvider;
-        private readonly IDeepCopier _voidCopier = new VoidCopier();
+        private readonly VoidCopier _voidCopier = new();
         private bool _initialized;
 
         /// <summary>
@@ -68,8 +65,6 @@ namespace Orleans.Serialization.Serializers
             // Hard-code the object codec because many codecs implement IFieldCodec<object> and this is cleaner
             // than adding some filtering logic to find "the object codec" below.
             _fieldCodecs[typeof(object)] = typeof(ObjectCodec);
-            _copiers[typeof(object)] = typeof(ObjectCopier);
-            _objectCopier = new ObjectCopier();
 
             ConsumeMetadata(codecConfiguration);
         }
@@ -79,19 +74,12 @@ namespace Orleans.Serialization.Serializers
 
         private void Initialize()
         {
-            if (_initialized)
-            {
-                return;
-            }
-
             lock (_initializationLock)
             {
                 if (_initialized)
                 {
                     return;
                 }
-
-                _initialized = true;
 
                 _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
                 _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
@@ -100,6 +88,8 @@ namespace Orleans.Serialization.Serializers
                 _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
                 _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
                 _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
+
+                _initialized = true;
             }
         }
 
@@ -159,7 +149,12 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IFieldCodec<object> GetCodec(Type fieldType) => TryGetCodec(fieldType) ?? ThrowCodecNotFound<object>(fieldType);
+        public IFieldCodec<object> GetCodec(Type fieldType)
+        {
+            var res = TryGetCodec(fieldType);
+            if (res is null) ThrowCodecNotFound(fieldType);
+            return res;
+        }
 
         /// <inheritdoc/>
         public IFieldCodec<object> TryGetCodec(Type fieldType)
@@ -173,14 +168,16 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IFieldCodec<TField> GetCodec<TField>() => TryGetCodec<TField>() ?? ThrowCodecNotFound<TField>(typeof(TField));
+        public IFieldCodec<TField> GetCodec<TField>()
+        {
+            var res = TryGetCodec<TField>();
+            if (res is null) ThrowCodecNotFound(typeof(TField));
+            return res;
+        }
 
         private IFieldCodec<TField> TryCreateCodec<TField>(Type fieldType)
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
+            if (!_initialized) Initialize();
 
             // Try to find the codec from the configured codecs.
             IFieldCodec untypedResult;
@@ -453,148 +450,72 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier<T> GetDeepCopier<T>() => TryGetCopierInner<T>(typeof(T)) ?? ThrowCopierNotFound<T>(typeof(T));
-
-        /// <inheritdoc/>
-        public IDeepCopier<T> TryGetDeepCopier<T>() => TryGetCopierInner<T>(typeof(T));
-
-        /// <inheritdoc/>
-        public IDeepCopier<object> GetDeepCopier(Type fieldType) => TryGetCopierInner<object>(fieldType) ?? ThrowCopierNotFound<object>(fieldType);
-
-        /// <inheritdoc/>
-        public IDeepCopier<object> TryGetDeepCopier(Type fieldType) => TryGetCopierInner<object>(fieldType);
-        
-        private IDeepCopier<T> TryGetCopierInner<T>(Type fieldType)
+        public IDeepCopier<T> GetDeepCopier<T>()
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
+            var res = TryGetDeepCopier<T>();
+            if (res is null) ThrowCopierNotFound(typeof(T));
+            return res;
+        }
 
-            var resultFieldType = typeof(T);
-            var wasCreated = false;
+        /// <inheritdoc/>
+        public IDeepCopier<T> TryGetDeepCopier<T>()
+        {
+            if (_typedCopiers.TryGetValue(typeof(T), out var existing))
+                return (IDeepCopier<T>)existing;
 
-            // Try to find the copier from the configured copiers.
-            IDeepCopier untypedResult;
-
-            // If the field type is unavailable, return the void copier which can at least handle references.
-            if (fieldType is null)
-            {
-                untypedResult = _voidCopier;
-            }
-            else if (!_adaptedCopiers.TryGetValue((fieldType, resultFieldType), out untypedResult))
-            {
-                ThrowIfUnsupportedType(fieldType);
-
-                if (fieldType.IsConstructedGenericType)
-                {
-                    untypedResult = CreateCopierInstance(fieldType, fieldType.GetGenericTypeDefinition());
-                }
-                else
-                {
-                    untypedResult = CreateCopierInstance(fieldType, fieldType);
-                }
-
-                if (untypedResult is null)
-                {
-                    foreach (var specializableCopier in _specializableCopiers)
-                    {
-                        if (specializableCopier.IsSupportedType(fieldType))
-                        {
-                            untypedResult = specializableCopier.GetSpecializedCopier(fieldType);
-                            break;
-                        }
-                    }
-                }
-
-                if (untypedResult is null)
-                {
-                    foreach (var dynamicCopier in _generalizedCopiers)
-                    {
-                        if (dynamicCopier.IsSupportedType(fieldType))
-                        {
-                            untypedResult = dynamicCopier;
-                            break;
-                        }
-                    }
-                }
-
-                if (untypedResult is null && (fieldType.IsInterface || fieldType.IsAbstract))
-                {
-                    untypedResult = _objectCopier;
-                }
-
-                wasCreated = untypedResult != null;
-            }
-
-            // Attempt to adapt the copier if it's not already adapted.
-            IDeepCopier<T> typedResult;
-            var wasAdapted = false;
-            switch (untypedResult)
-            {
-                case null:
-                    return null;
-                case IDeepCopier<T> typedCopier:
-                    typedResult = typedCopier;
-                    break;
-                case IWrappedCodec wrapped when wrapped.Inner is IDeepCopier<T> typedCopier:
-                    typedResult = typedCopier;
-                    wasAdapted = true;
-                    break;
-                case IDeepCopier<object> objectCopier:
-                    typedResult = CopierAdapter.CreateTypedFromUntyped<T>(objectCopier);
-                    wasAdapted = true;
-                    break;
-                default:
-                    typedResult = TryWrapCopier(untypedResult);
-                    wasAdapted = true;
-                    break;
-            }
-
-            // Store the results or throw if adaptation failed.
-            if (typedResult is not null && (wasCreated || wasAdapted))
-            {
-                untypedResult = typedResult;
-                var key = (fieldType, resultFieldType);
-                if (_adaptedCopiers.TryGetValue(key, out var existing))
-                {
-                    typedResult = (IDeepCopier<T>)existing;
-                }
-                else if (!_adaptedCopiers.TryAdd(key, untypedResult))
-                {
-                    typedResult = (IDeepCopier<T>)_adaptedCopiers[key];
-                }
-            }
-            else if (typedResult is null)
-            {
-                ThrowCannotConvert(untypedResult);
-            }
-
-            return typedResult;
-
-            static IDeepCopier<T> TryWrapCopier(object rawCopier)
-            {
-                var copierType = rawCopier.GetType();
-                if (typeof(T) == ObjectType)
-                {
-                    foreach (var @interface in copierType.GetInterfaces())
-                    {
-                        if (@interface.IsConstructedGenericType
-                            && OpenGenericCopierType.IsAssignableFrom(@interface.GetGenericTypeDefinition()))
-                        {
-                            // Convert the typed copier provider into a wrapped object copier provider.
-                            return TypedCopierWrapperCreateMethod.MakeGenericMethod(@interface.GetGenericArguments()).Invoke(null, new[] { rawCopier }) as IDeepCopier<T>;
-                        }
-                    }
-                }
-
+            if (TryGetDeepCopier(typeof(T)) is not { } untypedResult)
                 return null;
+
+            var typedResult = untypedResult switch
+            {
+                IDeepCopier<T> typed => typed,
+                IOptionalDeepCopier optional when optional.IsShallowCopyable() => new ShallowCopier<T>(),
+                _ => new UntypedCopierWrapper<T>(untypedResult)
+            };
+
+            return (IDeepCopier<T>)_typedCopiers.GetOrAdd(typeof(T), typedResult);
+        }
+
+        /// <inheritdoc/>
+        public IDeepCopier GetDeepCopier(Type fieldType)
+        {
+            var res = TryGetDeepCopier(fieldType);
+            if (res is null) ThrowCopierNotFound(fieldType);
+            return res;
+        }
+
+        /// <inheritdoc/>
+        public IDeepCopier TryGetDeepCopier(Type fieldType)
+        {
+            // If the field type is unavailable, return the void copier which can at least handle references.
+            return fieldType is null ? _voidCopier
+                : _untypedCopiers.TryGetValue(fieldType, out var existing) ? existing
+                : TryCreateCopier(fieldType) is { } res ? _untypedCopiers.GetOrAdd(fieldType, res)
+                : null;
+        }
+
+        private IDeepCopier TryCreateCopier(Type fieldType)
+        {
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(fieldType);
+
+            if (CreateCopierInstance(fieldType, fieldType.IsConstructedGenericType ? fieldType.GetGenericTypeDefinition() : fieldType) is { } res)
+                return res;
+
+            foreach (var specializableCopier in _specializableCopiers)
+            {
+                if (specializableCopier.IsSupportedType(fieldType))
+                    return specializableCopier.GetSpecializedCopier(fieldType);
             }
 
-            static void ThrowCannotConvert(object rawCopier)
+            foreach (var dynamicCopier in _generalizedCopiers)
             {
-                throw new InvalidOperationException($"Cannot convert copier of type {rawCopier.GetType()} to copier of type {typeof(IDeepCopier<T>)}.");
+                if (dynamicCopier.IsSupportedType(fieldType))
+                    return dynamicCopier;
             }
+
+            return fieldType.IsInterface || fieldType.IsAbstract ? _objectCopier : null;
         }
 
         private IValueSerializer<TField> GetValueSerializerInner<TField>(Type concreteType, Type searchType) where TField : struct
@@ -835,6 +756,9 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier CreateCopierInstance(Type fieldType, Type searchType)
         {
+            if (searchType == ObjectType)
+                return _objectCopier;
+
             object[] constructorArguments = null;
             if (_copiers.TryGetValue(searchType, out var copierType))
             {
@@ -845,7 +769,7 @@ namespace Orleans.Serialization.Serializers
             }
             else if (ShallowCopyableTypes.Contains(fieldType))
             {
-                copierType = typeof(ShallowCopyableTypeCopier<>).MakeGenericType(fieldType);
+                return ShallowCopier.Instance;
             }
             else if (fieldType.IsArray)
             {
@@ -857,7 +781,7 @@ namespace Orleans.Serialization.Serializers
             {
                 copierType = surrogateCodecType;
             }
-            else if (searchType.BaseType is object && CreateCopierInstance(fieldType, searchType.BaseType) is IDerivedTypeCopier baseCopier)
+            else if (searchType.BaseType is { } baseType && CreateCopierInstance(fieldType, baseType) is IDerivedTypeCopier baseCopier)
             {
                 // Find copiers which generalize over all subtypes.
                 return baseCopier;
@@ -872,9 +796,9 @@ namespace Orleans.Serialization.Serializers
 
         private static void ThrowGenericTypeDefinition(Type fieldType) => throw new InvalidOperationException($"Type {fieldType} is a non-constructed generic type and is therefore unsupported.");
 
-        private static IFieldCodec<TField> ThrowCodecNotFound<TField>(Type fieldType) => throw new CodecNotFoundException($"Could not find a codec for type {fieldType}.");
+        private static void ThrowCodecNotFound(Type fieldType) => throw new CodecNotFoundException($"Could not find a codec for type {fieldType}.");
 
-        private static IDeepCopier<T> ThrowCopierNotFound<T>(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
+        private static void ThrowCopierNotFound(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
 
         private static void ThrowBaseCodecNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
 
@@ -883,12 +807,5 @@ namespace Orleans.Serialization.Serializers
         private static IActivator<T> ThrowActivatorNotFound<T>(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
 
         private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
-
-        private sealed class TypeTypeValueTupleComparer : IEqualityComparer<(Type, Type)>
-        {
-            public static TypeTypeValueTupleComparer Instance { get; } = new();
-            public bool Equals([AllowNull] (Type, Type) x, [AllowNull] (Type, Type) y) => x.Item1 == y.Item1 && x.Item2 == y.Item2;
-            public int GetHashCode([DisallowNull] (Type, Type) obj) => obj.GetHashCode();
-        }
     }
 }

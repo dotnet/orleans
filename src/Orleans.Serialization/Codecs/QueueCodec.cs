@@ -107,7 +107,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for string fields. {field}");
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
     }

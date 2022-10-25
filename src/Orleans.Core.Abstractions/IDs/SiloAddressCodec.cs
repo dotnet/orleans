@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
@@ -15,8 +14,7 @@ namespace Orleans.Runtime.Serialization
     /// Serializer and deserializer for <see cref="SiloAddress"/> instances.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>, IDeepCopier<SiloAddress>, IOptionalDeepCopier
+    public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>
     {
         private static readonly Type _codecFieldType = typeof(SiloAddress);
 
@@ -77,8 +75,5 @@ namespace Orleans.Runtime.Serialization
 
             return SiloAddress.New(address, port, generation);
         }
-
-        /// <inheritdoc />
-        public SiloAddress DeepCopy(SiloAddress input, CopyContext context) => input;
     }
 }

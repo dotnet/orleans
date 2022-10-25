@@ -115,22 +115,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for string fields. {field}");
     }
-
-    /// <summary>
-    /// Copier for <see cref="string"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class StringCopier : IDeepCopier<string>, IOptionalDeepCopier
-    {
-        /// <summary>
-        /// Creates a copy of the provided input.
-        /// </summary>
-        /// <param name="input">The input.</param>
-        /// <param name="copyContext">The copy context.</param>
-        /// <returns>A copy of the provided value.</returns>
-        public static string DeepCopy(string input, CopyContext copyContext) => input;
-
-        /// <inheritdoc />
-        string IDeepCopier<string>.DeepCopy(string input, CopyContext _) => input;
-    }
 }
