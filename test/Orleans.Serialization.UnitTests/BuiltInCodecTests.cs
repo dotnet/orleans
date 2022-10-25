@@ -105,6 +105,33 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<DateTime>> ValueProvider => Gen.DateTime.ToValueProvider();
     }
 
+    public class DateOnlyTests : FieldCodecTester<DateOnly, DateOnlyCodec>
+    {
+        protected override DateOnly CreateValue() => DateOnly.FromDateTime(DateTime.UtcNow);
+        protected override DateOnly[] TestValues => new[] { DateOnly.MinValue, DateOnly.MaxValue, new DateOnly(1970, 1, 1), CreateValue() };
+        protected override Action<Action<DateOnly>> ValueProvider => assert => Gen.Date.Sample(dt => assert(DateOnly.FromDateTime(dt)));
+    }
+
+    public class TimeOnlyTests : FieldCodecTester<TimeOnly, TimeOnlyCodec>
+    {
+        protected override TimeOnly CreateValue() => TimeOnly.FromDateTime(DateTime.UtcNow);
+        protected override TimeOnly[] TestValues => new[] { TimeOnly.MinValue, TimeOnly.MaxValue, TimeOnly.FromTimeSpan(TimeSpan.Zero), CreateValue() };
+        protected override Action<Action<TimeOnly>> ValueProvider => assert => Gen.Date.Sample(dt => assert(TimeOnly.FromDateTime(dt)));
+    }
+
+    public class DateOnlyCopierTests : CopierTester<DateOnly, IDeepCopier<DateOnly>>
+    {
+        protected override DateOnly CreateValue() => DateOnly.FromDateTime(DateTime.UtcNow);
+        protected override DateOnly[] TestValues => new[] { DateOnly.MinValue, DateOnly.MaxValue, new DateOnly(1970, 1, 1), CreateValue() };
+        protected override Action<Action<DateOnly>> ValueProvider => assert => Gen.Date.Sample(dt => assert(DateOnly.FromDateTime(dt)));
+    }
+
+    public class TimeOnlyCopierTests : CopierTester<TimeOnly, IDeepCopier<TimeOnly>>
+    {
+        protected override TimeOnly CreateValue() => TimeOnly.FromDateTime(DateTime.UtcNow);
+        protected override TimeOnly[] TestValues => new[] { TimeOnly.MinValue, TimeOnly.MaxValue, TimeOnly.FromTimeSpan(TimeSpan.Zero), CreateValue() };
+        protected override Action<Action<TimeOnly>> ValueProvider => assert => Gen.Date.Sample(dt => assert(TimeOnly.FromDateTime(dt)));
+    }
 
     public class TimeSpanTests : FieldCodecTester<TimeSpan, TimeSpanCodec>
     {
