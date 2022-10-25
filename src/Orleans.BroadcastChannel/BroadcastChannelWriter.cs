@@ -9,11 +9,20 @@ using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {
+    /// <summary>
+    /// Interface to allow writing to a channel.
+    /// </summary>
+    /// <typeparam name="T">The channel element type.</typeparam>
     public interface IBroadcastChannelWriter<T>
     {
+        /// <summary>
+        /// Publish an element to the channel.
+        /// </summary>
+        /// <param name="item">The element to publish.</param>
         Task Publish(T item);
     }
 
+    /// <inheritdoc />
     internal class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
     {
         private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
@@ -38,6 +47,7 @@ namespace Orleans.BroadcastChannel
             _logger = loggerFactory.CreateLogger(LoggingCategory);
         }
 
+        /// <inheritdoc />
         public async Task Publish(T item)
         {
             var subscribers = _subscriberTable.GetImplicitSubscribers(_channelId, _grainFactory);
