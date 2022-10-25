@@ -68,6 +68,7 @@ namespace Orleans.CodeGenerator
                 Task = Type("System.Threading.Tasks.Task"),
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
                 Type = Type("System.Type"),
+                Uri = Type("System.Uri"),
                 ICodecProvider = Type("Orleans.Serialization.Serializers.ICodecProvider"),
                 ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1"),
                 ValueTask = Type("System.Threading.Tasks.ValueTask"),
@@ -109,6 +110,9 @@ namespace Orleans.CodeGenerator
                 {
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
+                    new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
+                    new(Type("System.Nullable`1"), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
+                    new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
                 },
                 StaticCopiers = new WellKnownCopierDescription[]
                 {
@@ -142,6 +146,8 @@ namespace Orleans.CodeGenerator
                 {
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
+                    new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
+                    new(Type("System.Nullable`1"), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
                 },
                 Exception = Type("System.Exception"),
                 ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray(),
@@ -224,6 +230,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
+        private INamedTypeSymbol Uri;
         public INamedTypeSymbol MethodInfo { get; private set; }
         public INamedTypeSymbol ICodecProvider { get; private set; }
         public INamedTypeSymbol ValueSerializer { get; private set; }
@@ -296,18 +303,19 @@ namespace Orleans.CodeGenerator
                     return true;
             }
 
+            if (_shallowCopyableTypes.TryGetValue(type, out var result))
+            {
+                return result;
+            }
+
             if (SymbolEqualityComparer.Default.Equals(TimeSpan, type)
                 || SymbolEqualityComparer.Default.Equals(IPAddress, type)
                 || SymbolEqualityComparer.Default.Equals(IPEndPoint, type)
                 || SymbolEqualityComparer.Default.Equals(CancellationToken, type)
-                || SymbolEqualityComparer.Default.Equals(Type, type))
+                || SymbolEqualityComparer.Default.Equals(Type, type)
+                || SymbolEqualityComparer.Default.Equals(Uri, type))
             {
-                return true;
-            }
-
-            if (_shallowCopyableTypes.TryGetValue(type, out var result))
-            {
-                return result;
+                return _shallowCopyableTypes[type] = true;
             }
 
             if (type.IsSealed && type.HasAnyAttribute(ImmutableAttributes))

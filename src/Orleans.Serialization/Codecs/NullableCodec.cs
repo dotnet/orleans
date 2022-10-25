@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -14,7 +15,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class NullableCodec<T> : IFieldCodec<T?> where T : struct
     {
-        public static readonly Type CodecFieldType = typeof(T);
+        private readonly Type CodecFieldType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
 
         /// <summary>
@@ -27,30 +28,38 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T? value) where TBufferWriter : IBufferWriter<byte>
         {
             // If the value is null, write it as the null reference.
-            if (!value.HasValue && ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, null))
+            if (value is null)
             {
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
                 return;
             }
 
             // The value is not null.
-            _fieldCodec.WriteField(ref writer, fieldIdDelta, CodecFieldType, value.Value);
+            _fieldCodec.WriteField(ref writer, fieldIdDelta, CodecFieldType, value.GetValueOrDefault());
         }
 
         /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             // This will only be true if the value is null.
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<T?, TInput>(ref reader, field);
+                ReferenceCodec.MarkValueField(reader.Session);
+                var reference = reader.ReadVarUInt32();
+                if (reference != 0) ThrowInvalidReference(reference);
+                return null;
             }
 
             // Read the non-null value.
             return _fieldCodec.ReadValue(ref reader, field);
         }
+
+        private static void ThrowInvalidReference(uint reference) => throw new ReferenceNotFoundException(typeof(T?), reference);
     }
 
     /// <summary>
@@ -78,7 +87,7 @@ namespace Orleans.Serialization.Codecs
                 return input;
             }
 
-            return new T?(_copier.DeepCopy(input.Value, context));
+            return _copier.DeepCopy(input.GetValueOrDefault(), context);
         }
     }
 }
