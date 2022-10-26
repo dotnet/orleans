@@ -29,7 +29,7 @@ namespace Orleans.Serialization.Serializers
         /// The field type.
         /// </param>
         /// <returns>A codec.</returns>
-        IFieldCodec<object> GetCodec(Type fieldType);
+        IFieldCodec GetCodec(Type fieldType);
 
         /// <summary>
         /// Gets a codec for the specific type, or <see langword="null"/> if no appropriate codec was found.
@@ -38,6 +38,6 @@ namespace Orleans.Serialization.Serializers
         /// The field type.
         /// </param>
         /// <returns>A codec.</returns>
-        IFieldCodec<object> TryGetCodec(Type fieldType);
+        IFieldCodec TryGetCodec(Type fieldType);
     }
 }

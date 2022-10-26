@@ -1,29 +1,26 @@
-using Orleans.Serialization.Buffers;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.DependencyInjection;
-using System.IO.Pipelines;
-using Xunit;
-using System.Reflection;
 using Orleans.Serialization.TestKit;
-using Orleans.Serialization.Cloning;
+using Xunit;
 
 namespace Orleans.Serialization.UnitTests
 {
     [Trait("Category", "BVT")]
-    public class NewtonsoftJsonCodecTests : FieldCodecTester<object, NewtonsoftJsonCodec>
+    public class NewtonsoftJsonCodecTests : FieldCodecTester<MyJsonClass, IFieldCodec<MyJsonClass>>
     {
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
 
-        protected override object CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
 
         protected override int[] MaxSegmentSizes => new[] { 840 };
 
-        protected override object[] TestValues => new object[]
+        protected override MyJsonClass[] TestValues => new MyJsonClass[]
         {
             null,
             new MyJsonClass(),

@@ -8,7 +8,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// A serializer which skips all fields which it encounters.
     /// </summary>
-    public class SkipFieldCodec : IFieldCodec<object>
+    public class SkipFieldCodec : IFieldCodec
     {
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>

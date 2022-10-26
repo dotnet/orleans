@@ -303,7 +303,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {

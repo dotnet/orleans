@@ -22,6 +22,7 @@ namespace Orleans.CodeGenerator
                 Field = Type("Orleans.Serialization.WireProtocol.Field"),
                 WireType = Type("Orleans.Serialization.WireProtocol.WireType"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
+                AbstractTypeSerializer = Type("Orleans.Serialization.Serializers.AbstractTypeSerializer`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
                 ShallowCopier = Type("Orleans.Serialization.Cloning.ShallowCopier`1"),
                 CompoundTypeAliasAttribute = Type("Orleans.CompoundTypeAliasAttribute"),
@@ -119,7 +120,7 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
-                    new(Type("System.Nullable`1"), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
+                    new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
                     new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
                 },
                 StaticCopiers = new WellKnownCopierDescription[]
@@ -135,7 +136,7 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
-                    new(Type("System.Nullable`1"), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
+                    new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
                 },
                 Exception = Type("System.Exception"),
                 ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray(),
@@ -145,7 +146,7 @@ namespace Orleans.CodeGenerator
                 CancellationToken = Type("System.Threading.CancellationToken"),
                 ImmutableContainerTypes = new[]
                 {
-                    Type("System.Nullable`1"),
+                    compilation.GetSpecialType(SpecialType.System_Nullable_T),
                     Type("System.Tuple`1"),
                     Type("System.Tuple`2"),
                     Type("System.Tuple`3"),
@@ -198,6 +199,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
         public INamedTypeSymbol ShallowCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
+        public INamedTypeSymbol AbstractTypeSerializer { get; private set; }
         public INamedTypeSymbol Func_2 { get; private set; }
         public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
         public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }

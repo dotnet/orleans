@@ -52,8 +52,7 @@ namespace Orleans.CodeGenerator
                 _ => SyntaxKind.InternalKeyword,
             };
 
-            var baseType = type.IsAbstractType ? QualifiedName(IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("AbstractCodec"), TypeArgumentList(SingletonSeparatedList(type.TypeSyntax))))
-                : libraryTypes.FieldCodec_1.ToTypeSyntax(type.TypeSyntax);
+            var baseType = (type.IsAbstractType ? libraryTypes.AbstractTypeSerializer : libraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))

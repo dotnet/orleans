@@ -1,14 +1,12 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Codecs;
 using System;
-using System.Diagnostics.CodeAnalysis;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.Serializers
 {
     /// <summary>
     /// A codec which supports multiple types.
     /// </summary>
-    public interface IGeneralizedCodec : IFieldCodec<object>
+    public interface IGeneralizedCodec : IFieldCodec
     {
         /// <summary>
         /// Determines whether the specified type is supported by this instance.

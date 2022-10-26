@@ -9,7 +9,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for unknown types.
     /// </summary>
-    internal sealed class VoidCodec : IFieldCodec<object>
+    internal sealed class VoidCodec : IFieldCodec
     {
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
