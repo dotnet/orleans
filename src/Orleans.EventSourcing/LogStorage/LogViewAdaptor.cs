@@ -221,7 +221,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class UpdateLogStorageFailed : PrimaryOperationFailed
+        public sealed class UpdateLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -236,7 +236,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class ReadFromLogStorageFailed : PrimaryOperationFailed
+        public sealed class ReadFromLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -251,7 +251,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>
             [Id(0)]

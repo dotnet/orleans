@@ -11,7 +11,7 @@ namespace Orleans.EventSourcing.LogStorage
     /// <typeparam name="TEntry">The type used for log entries</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
+    public sealed class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
         /// <summary>
         /// Gets and Sets StateAndMetaData
@@ -55,7 +55,7 @@ namespace Orleans.EventSourcing.LogStorage
     /// <typeparam name="TEntry"></typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class LogStateWithMetaData<TEntry> where TEntry : class
+    public sealed class LogStateWithMetaData<TEntry> where TEntry : class
     {
         /// <summary>
         /// The stored view of the log

@@ -73,14 +73,15 @@ namespace Orleans.EventSourcing.CustomStorage
 
         [Serializable]
         [GenerateSerializer]
-        private class ReadRequest : ILogConsistencyProtocolMessage
+        internal sealed class ReadRequest : ILogConsistencyProtocolMessage
         {
             [Id(0)]
             public int KnownVersion { get; set; }
         }
+
         [Serializable]
         [GenerateSerializer]
-        private class ReadResponse<ViewType> : ILogConsistencyProtocolMessage
+        internal sealed class ReadResponse<ViewType> : ILogConsistencyProtocolMessage
         {
             [Id(0)]
             public int Version { get; set; }
@@ -229,7 +230,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class UpdatePrimaryFailed : PrimaryOperationFailed
+        public sealed class UpdatePrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -244,7 +245,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class ReadFromPrimaryFailed : PrimaryOperationFailed
+        public sealed class ReadFromPrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -260,7 +261,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected class UpdateNotificationMessage : INotificationMessage
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
             [Id(0)]
