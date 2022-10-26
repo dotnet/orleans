@@ -41,6 +41,25 @@ public record Person3(int Age, string Name)
 [GenerateSerializer]
 public record Person4(int Age, string Name);
 
+[GenerateSerializer(IncludePrimaryConstructorParameters = false)]
+public record Person5([property: Id(0)] int Age, [property: Id(1)] string Name)
+{
+    [Id(2)]
+    public string FavouriteColor { get; init; }
+
+    [Id(3)]
+    public string StarSign { get; init; }
+}
+
+[GenerateSerializer]
+public class Person5_Class
+{
+    [Id(0)] public int Age { get; init; }
+    [Id(1)] public string Name { get; init; }
+    [Id(2)] public string FavouriteColor { get; init; }
+    [Id(3)] public string StarSign { get; init; }
+}
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
 {

@@ -19,6 +19,7 @@ namespace Orleans.Serialization.UnitTests
         private readonly ServiceProvider _serviceProvider;
         private readonly CodecProvider _codecProvider;
         private readonly SerializerSessionPool _sessionPool;
+        private readonly Serializer _serializer;
 
         public GeneratedSerializerTests()
         {
@@ -27,6 +28,7 @@ namespace Orleans.Serialization.UnitTests
                 .BuildServiceProvider();
             _codecProvider = _serviceProvider.GetRequiredService<CodecProvider>();
             _sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
+            _serializer = _serviceProvider.GetRequiredService<Serializer>();
         }
 
         [Fact]
@@ -125,6 +127,29 @@ namespace Orleans.Serialization.UnitTests
 
             Assert.Equal(original.Age, result.Age);
             Assert.Equal(original.Name, result.Name);
+        }
+
+        /// <summary>
+        /// Tests that a record type can be serialized bitwise identically to a regular (non-record) class with the same layout.
+        /// </summary>
+        [Fact]
+        public void RecordSerializedAsRegularClass()
+        {
+            var original = new Person5(2, "harry") { FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original.Age, result.Age);
+            Assert.Equal(original.Name, result.Name);
+            Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+            Assert.Equal(original.StarSign, result.StarSign);
+
+            // Note that this only works because we are serializing each object using the "expected type" optimization and
+            // therefore omitting the concrete type names.
+            var originalAsArray = _serializer.SerializeToArray(original);
+            var classVersion = new Person5_Class { Age = 2,  Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+            var classAsArray = _serializer.SerializeToArray(classVersion);
+            Assert.Equal(originalAsArray, classAsArray);
         }
 
         [Fact]
