@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Azure.Messaging.EventHubs;
+using Newtonsoft.Json.Serialization;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
@@ -9,21 +11,21 @@ namespace Silo;
 // Custom EventHubDataAdapter that serialize event using System.Text.Json
 public class CustomDataAdapter : EventHubDataAdapter
 {
-    public CustomDataAdapter(SerializationManager serializationManager) : base(serializationManager)
+    public CustomDataAdapter(Serializer serializer) : base(serializer)
     {
     }
 
-    public override string GetPartitionKey(Guid streamGuid, string streamNamespace)
-        => streamGuid.ToString();
+    public override string GetPartitionKey(StreamId streamId)
+        => streamId.ToString();
 
-    public override IStreamIdentity GetStreamIdentity(EventData queueMessage)
+    public override StreamId GetStreamIdentity(EventData queueMessage)
     {
         var guid = Guid.Parse(queueMessage.PartitionKey);
         var ns = (string) queueMessage.Properties["StreamNamespace"];
-        return new StreamIdentity(guid, ns);
+        return StreamId.Create(ns, guid);
     }
 
-    public override EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+    public override EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         => throw new NotSupportedException("This adapter only supports read");
 
     protected override IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
@@ -32,9 +34,7 @@ public class CustomDataAdapter : EventHubDataAdapter
 
 public class CustomBatchContainer : IBatchContainer
 {
-    public Guid StreamGuid { get; }
-
-    public string StreamNamespace { get; }
+    public StreamId StreamId { get; }
 
     public StreamSequenceToken SequenceToken { get; }
 
@@ -42,8 +42,7 @@ public class CustomBatchContainer : IBatchContainer
 
     public CustomBatchContainer(EventHubMessage eventHubMessage)
     {
-        StreamGuid = eventHubMessage.StreamIdentity.Guid;
-        StreamNamespace = eventHubMessage.StreamIdentity.Namespace;
+        StreamId = eventHubMessage.StreamId;
         SequenceToken = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         _payload = eventHubMessage.Payload;
     }
@@ -62,6 +61,4 @@ public class CustomBatchContainer : IBatchContainer
     }
 
     public bool ImportRequestContext() => false;
-
-    public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc) => true;
 }

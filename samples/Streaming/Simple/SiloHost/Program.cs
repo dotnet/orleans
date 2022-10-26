@@ -20,11 +20,11 @@ catch (Exception ex)
     return 1;
 }
 
-static void ConfigureSilo(ISiloBuilder siloBuilder)
+static void ConfigureSilo(HostBuilderContext context, ISiloBuilder siloBuilder)
 {
     var secrets = Secrets.LoadFromFile()!;
     siloBuilder
-        .UseLocalhostClustering(serviceId: Constants.ServiceId, clusterId: Constants.ServiceId)
+        .UseLocalhostClustering(serviceId: Constants.ServiceId, clusterId: Constants.ClusterId)
         .AddAzureTableGrainStorage(
             "PubSubStore",
             options => options.ConfigureTableServiceClient(secrets.DataConnectionString))

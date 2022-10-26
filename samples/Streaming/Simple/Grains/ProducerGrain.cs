@@ -26,7 +26,7 @@ public class ProducerGrain : Grain, IProducerGrain
             throw new Exception("This grain is already producing events");
 
         // Get the stream
-        _stream = GetStreamProvider(Constants.StreamProvider)
+        _stream = this.GetStreamProvider(Constants.StreamProvider)
             .GetStream<int>(key, ns);
 
         // Register a timer that produce an event every second
