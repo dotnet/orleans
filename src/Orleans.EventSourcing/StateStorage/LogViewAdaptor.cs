@@ -191,7 +191,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class UpdateStateStorageFailed : PrimaryOperationFailed
+        public sealed class UpdateStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -206,7 +206,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        public class ReadFromStateStorageFailed : PrimaryOperationFailed
+        public sealed class ReadFromStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
@@ -221,7 +221,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>
             [Id(0)]

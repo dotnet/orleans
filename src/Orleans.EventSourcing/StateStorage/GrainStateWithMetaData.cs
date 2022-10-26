@@ -10,7 +10,7 @@ namespace Orleans.EventSourcing.StateStorage
     /// <typeparam name="TView">The type used for log view</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainStateWithMetaDataAndETag<TView> : IGrainState<GrainStateWithMetaData<TView>> where TView : class, new()
+    public sealed class GrainStateWithMetaDataAndETag<TView> : IGrainState<GrainStateWithMetaData<TView>> where TView : class, new()
     {
         /// <summary>
         /// Gets and Sets StateAndMetaData
@@ -62,7 +62,7 @@ namespace Orleans.EventSourcing.StateStorage
     /// <typeparam name="TView"></typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainStateWithMetaData<TView> where TView : class, new()
+    public sealed class GrainStateWithMetaData<TView> where TView : class, new()
     {
         /// <summary>
         /// The stored view of the log
