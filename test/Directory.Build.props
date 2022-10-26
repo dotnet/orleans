@@ -10,6 +10,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
