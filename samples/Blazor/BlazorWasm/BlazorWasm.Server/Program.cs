@@ -3,18 +3,15 @@ using Orleans;
 using Orleans.Hosting;
 using BlazorWasm.Grains;
 using Sample.Silo.Api;
+using Orleans.Providers;
 
 await Host.CreateDefaultBuilder(args)
-    .UseOrleans(builder =>
+    .UseOrleans((ctx, builder) =>
     {
-        builder.ConfigureApplicationParts(manager =>
-        {
-            manager.AddApplicationPart(typeof(WeatherGrain).Assembly).WithReferences();
-        });
         builder.UseLocalhostClustering();
         builder.AddMemoryGrainStorageAsDefault();
-        builder.AddSimpleMessageStreamProvider("SMS");
-        builder.AddMemoryGrainStorage("PubSubStore");
+        builder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemoryStreams");
+        builder.AddMemoryGrainStorage("PubSubStore");    
     })
     .ConfigureWebHostDefaults(webBuilder =>
     {

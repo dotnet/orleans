@@ -44,8 +44,8 @@ public class TodoGrain : Grain, ITodoGrain
             GrainType, GrainKey, item);
 
         // notify listeners - best effort only
-        GetStreamProvider("SMS")
-            .GetStream<TodoNotification>(item.OwnerKey, nameof(ITodoGrain))
+        this.GetStreamProvider("MemoryStreams")
+            .GetStream<TodoNotification>(StreamId.Create(nameof(ITodoGrain), item.OwnerKey))
             .OnNextAsync(new TodoNotification(item.Key, item))
             .Ignore();
     }
@@ -72,8 +72,8 @@ public class TodoGrain : Grain, ITodoGrain
             GrainType, GrainKey);
 
         // notify listeners - best effort only
-        GetStreamProvider("SMS")
-            .GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
+        this.GetStreamProvider("MemoryStreams")
+            .GetStream<TodoNotification>(StreamId.Create(nameof(ITodoGrain), itemKey))
             .OnNextAsync(new TodoNotification(itemKey, null))
             .Ignore();
 
@@ -81,8 +81,10 @@ public class TodoGrain : Grain, ITodoGrain
         DeactivateOnIdle();
     }
 
+    [GenerateSerializer]
     public class State
     {
+        [Id(0)]
         public TodoItem? Item { get; set; }
     }
 }

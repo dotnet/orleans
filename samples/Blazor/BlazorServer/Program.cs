@@ -1,12 +1,14 @@
 using BlazorServer.Services;
 using Orleans.Hosting;
+using Orleans.Providers;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseOrleans((ctx, siloBuilder) => {
 
     siloBuilder.UseLocalhostClustering();
     siloBuilder.AddMemoryGrainStorageAsDefault();
-    siloBuilder.AddSimpleMessageStreamProvider("SMS");
+    siloBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemoryStreams");
     siloBuilder.AddMemoryGrainStorage("PubSubStore");
 });
 
