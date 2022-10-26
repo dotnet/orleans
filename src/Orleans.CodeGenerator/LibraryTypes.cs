@@ -66,6 +66,14 @@ namespace Orleans.CodeGenerator
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
                 Type = Type("System.Type"),
                 Uri = Type("System.Uri"),
+                DateOnly = Type("System.DateOnly"),
+                DateTimeOffset = Type("System.DateTimeOffset"),
+                BitVector32 = Type("System.Collections.Specialized.BitVector32"),
+                Guid = Type("System.Guid"),
+                CompareInfo = Type("System.Globalization.CompareInfo"),
+                CultureInfo = Type("System.Globalization.CultureInfo"),
+                Version = Type("System.Version"),
+                TimeOnly = Type("System.TimeOnly"),
                 ICodecProvider = Type("Orleans.Serialization.Serializers.ICodecProvider"),
                 ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1"),
                 ValueTask = Type("System.Threading.Tasks.ValueTask"),
@@ -96,6 +104,8 @@ namespace Orleans.CodeGenerator
                     new(compilation.GetSpecialType(SpecialType.System_DateTime), Type("Orleans.Serialization.Codecs.DateTimeCodec")),
                     new(Type("System.TimeSpan"), Type("Orleans.Serialization.Codecs.TimeSpanCodec")),
                     new(Type("System.DateTimeOffset"), Type("Orleans.Serialization.Codecs.DateTimeOffsetCodec")),
+                    new(Type("System.DateOnly"), Type("Orleans.Serialization.Codecs.DateOnlyCodec")),
+                    new(Type("System.TimeOnly"), Type("Orleans.Serialization.Codecs.TimeOnlyCodec")),
                     new(Type("System.Guid"), Type("Orleans.Serialization.Codecs.GuidCodec")),
                     new(Type("System.Type"), Type("Orleans.Serialization.Codecs.TypeSerializerCodec")),
                     new(Type("System.ReadOnlyMemory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.ReadOnlyMemoryOfByteCodec")),
@@ -135,6 +145,7 @@ namespace Orleans.CodeGenerator
                 CancellationToken = Type("System.Threading.CancellationToken"),
                 ImmutableContainerTypes = new[]
                 {
+                    Type("System.Nullable`1"),
                     Type("System.Tuple`1"),
                     Type("System.Tuple`2"),
                     Type("System.Tuple`3"),
@@ -208,6 +219,9 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Task_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
         private INamedTypeSymbol Uri;
+        private INamedTypeSymbol DateOnly;
+        private INamedTypeSymbol DateTimeOffset;
+        private INamedTypeSymbol TimeOnly;
         public INamedTypeSymbol MethodInfo { get; private set; }
         public INamedTypeSymbol ICodecProvider { get; private set; }
         public INamedTypeSymbol ValueSerializer { get; private set; }
@@ -237,6 +251,31 @@ namespace Orleans.CodeGenerator
         private INamedTypeSymbol IPEndPoint;
         private INamedTypeSymbol CancellationToken;
         private INamedTypeSymbol[] ImmutableContainerTypes;
+        private INamedTypeSymbol Guid;
+        private INamedTypeSymbol BitVector32;
+        private INamedTypeSymbol CompareInfo;
+        private INamedTypeSymbol CultureInfo;
+        private INamedTypeSymbol Version;
+        private INamedTypeSymbol[] _regularShallowCopyableTypes;
+        private INamedTypeSymbol[] RegularShallowCopyableType => _regularShallowCopyableTypes ??= new[]
+        {
+            TimeSpan,
+            DateOnly,
+            TimeOnly,
+            DateTimeOffset,
+            Guid,
+            BitVector32,
+            CompareInfo,
+            CultureInfo,
+            Version,
+            IPAddress,
+            IPEndPoint,
+            CancellationToken,
+            Type,
+            Uri
+        };
+
+
         public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
         public INamedTypeSymbol ApplicationPartAttribute { get; private set; }
@@ -283,14 +322,12 @@ namespace Orleans.CodeGenerator
                 return result;
             }
 
-            if (SymbolEqualityComparer.Default.Equals(TimeSpan, type)
-                || SymbolEqualityComparer.Default.Equals(IPAddress, type)
-                || SymbolEqualityComparer.Default.Equals(IPEndPoint, type)
-                || SymbolEqualityComparer.Default.Equals(CancellationToken, type)
-                || SymbolEqualityComparer.Default.Equals(Type, type)
-                || SymbolEqualityComparer.Default.Equals(Uri, type))
+            foreach (var shallowCopyable in RegularShallowCopyableType)
             {
-                return _shallowCopyableTypes[type] = true;
+                if (SymbolEqualityComparer.Default.Equals(shallowCopyable, type))
+                {
+                    return _shallowCopyableTypes[type] = true;
+                }
             }
 
             if (type.IsSealed && type.HasAnyAttribute(ImmutableAttributes))
@@ -315,11 +352,6 @@ namespace Orleans.CodeGenerator
             else if (namedType.IsGenericType)
             {
                 var def = namedType.ConstructedFrom;
-                if (def.SpecialType == SpecialType.System_Nullable_T)
-                {
-                    return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);
-                }
-
                 foreach (var t in ImmutableContainerTypes)
                 {
                     if (SymbolEqualityComparer.Default.Equals(t, def))

@@ -274,6 +274,8 @@ namespace Orleans.Serialization.Cloning
         {
             [typeof(decimal)] = true,
             [typeof(DateTime)] = true,
+            [typeof(DateOnly)] = true,
+            [typeof(TimeOnly)] = true,
             [typeof(DateTimeOffset)] = true,
             [typeof(TimeSpan)] = true,
             [typeof(IPAddress)] = true,
