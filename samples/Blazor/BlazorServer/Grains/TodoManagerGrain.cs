@@ -32,6 +32,7 @@ public class TodoManagerGrain : Grain, ITodoManagerGrain
     [GenerateSerializer]
     public class State
     {
+        [Id(0)]
         public HashSet<Guid> Items { get; set; } = new();
     }
 }
