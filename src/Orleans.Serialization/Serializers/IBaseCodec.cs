@@ -8,7 +8,7 @@ namespace Orleans.Serialization.Serializers
     /// Functionality for serializing and deserializing members in a type hierarchy.
     /// </summary>
     /// <typeparam name="T">The type supported by this codec.</typeparam>
-    public interface IBaseCodec<T> : IBaseCodec where T : class
+    public interface IBaseCodec<in T> : IBaseCodec where T : class
     {
         /// <summary>
         /// Serializes the provided value.
