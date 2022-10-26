@@ -60,7 +60,6 @@ namespace Orleans.Serialization
                 services.TryAddSingleton(typeof(IFieldCodec<>), typeof(FieldCodecHolder<>));
                 services.TryAddSingleton(typeof(IBaseCodec<>), typeof(BaseCodecHolder<>));
                 services.TryAddSingleton(typeof(IValueSerializer<>), typeof(ValueSerializerHolder<>));
-                services.TryAddSingleton(typeof(DefaultActivator<>));
                 services.TryAddSingleton(typeof(IActivator<>), typeof(ActivatorHolder<>));
                 services.TryAddSingleton<WellKnownTypeCollection>();
                 services.TryAddSingleton<TypeCodec>();

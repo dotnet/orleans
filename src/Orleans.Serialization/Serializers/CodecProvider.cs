@@ -267,24 +267,19 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IActivator<T> GetActivator<T>()
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
-
-            ThrowIfUnsupportedType(typeof(T));
             var type = typeof(T);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
-            return GetActivatorInner<T>(type, searchType) ?? ThrowActivatorNotFound<T>(type);
+            var res = GetActivatorInner(type, searchType);
+            if (res is null) ThrowActivatorNotFound(type);
+            return (IActivator<T>)res;
         }
 
         private IBaseCodec<TField> TryGetBaseCodecInner<TField>(Type fieldType) where TField : class
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(fieldType);
 
             var resultFieldType = typeof(TField);
             var wasCreated = false;
@@ -401,12 +396,6 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IBaseCodec<TField> GetBaseCodec<TField>() where TField : class
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
-
-            ThrowIfUnsupportedType(typeof(TField));
             var type = typeof(TField);
 
             var result = TryGetBaseCodecInner<TField>(type);
@@ -422,31 +411,23 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IValueSerializer<TField> GetValueSerializer<TField>() where TField : struct
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
-
-            ThrowIfUnsupportedType(typeof(TField));
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
-            return GetValueSerializerInner<TField>(type, searchType) ?? ThrowValueSerializerNotFound<TField>(type);
+            var res = GetValueSerializerInner(type, searchType);
+            if (res is null) ThrowValueSerializerNotFound(type);
+            return (IValueSerializer<TField>)res;
         }
 
         /// <inheritdoc/>
         public IBaseCopier<TField> GetBaseCopier<TField>() where TField : class
         {
-            if (!_initialized)
-            {
-                Initialize();
-            }
-
-            ThrowIfUnsupportedType(typeof(TField));
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
-            return GetBaseCopierInner<TField>(type, searchType) ?? ThrowBaseCopierNotFound<TField>(type);
+            var res = GetBaseCopierInner(type, searchType);
+            if (res is null) ThrowBaseCopierNotFound(type);
+            return (IBaseCopier<TField>)res;
         }
 
         /// <inheritdoc/>
@@ -518,8 +499,12 @@ namespace Orleans.Serialization.Serializers
             return fieldType.IsInterface || fieldType.IsAbstract ? _objectCopier : null;
         }
 
-        private IValueSerializer<TField> GetValueSerializerInner<TField>(Type concreteType, Type searchType) where TField : struct
+        private object GetValueSerializerInner(Type concreteType, Type searchType)
         {
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(concreteType);
+
             object[] constructorArguments = null;
             if (_valueSerializers.TryGetValue(searchType, out var serializerType))
             {
@@ -532,8 +517,7 @@ namespace Orleans.Serialization.Serializers
             {
                 serializerType = surrogateCodecType;
             }
-
-            if (serializerType is null)
+            else
             {
                 return null;
             }
@@ -543,11 +527,15 @@ namespace Orleans.Serialization.Serializers
                 result = _instantiatedValueSerializers.GetOrAdd(serializerType, GetServiceOrCreateInstance(serializerType, constructorArguments));
             }
 
-            return (IValueSerializer<TField>)result;
+            return result;
         }
 
-        private IBaseCopier<T> GetBaseCopierInner<T>(Type concreteType, Type searchType) where T : class
+        private object GetBaseCopierInner(Type concreteType, Type searchType)
         {
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(concreteType);
+
             object[] constructorArguments = null;
             if (_baseCopiers.TryGetValue(searchType, out var copierType))
             {
@@ -561,8 +549,7 @@ namespace Orleans.Serialization.Serializers
             {
                 copierType = surrogateCodecType;
             }
-
-            if (copierType is null)
+            else
             {
                 return null;
             }
@@ -572,17 +559,20 @@ namespace Orleans.Serialization.Serializers
                 result = _instantiatedBaseCopiers.GetOrAdd(copierType, GetServiceOrCreateInstance(copierType, constructorArguments));
             }
 
-            return (IBaseCopier<T>)result;
+            return result;
         }
 
-        private IActivator<T> GetActivatorInner<T>(Type concreteType, Type searchType)
+        private object GetActivatorInner(Type concreteType, Type searchType)
         {
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(concreteType);
+
             if (!_activators.TryGetValue(searchType, out var activatorType))
             {
                 activatorType = typeof(DefaultActivator<>).MakeGenericType(concreteType);
             }
-
-            if (activatorType.IsGenericTypeDefinition)
+            else if (activatorType.IsGenericTypeDefinition)
             {
                 activatorType = activatorType.MakeGenericType(concreteType.GetGenericArguments());
             }
@@ -592,7 +582,7 @@ namespace Orleans.Serialization.Serializers
                 result = _instantiatedActivators.GetOrAdd(activatorType, GetServiceOrCreateInstance(activatorType));
             }
 
-            return (IActivator<T>)result;
+            return result;
         }
 
         private static void ThrowIfUnsupportedType(Type fieldType)
@@ -802,10 +792,10 @@ namespace Orleans.Serialization.Serializers
 
         private static void ThrowBaseCodecNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
 
-        private static IValueSerializer<TField> ThrowValueSerializerNotFound<TField>(Type fieldType) where TField : struct => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
+        private static void ThrowValueSerializerNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
 
-        private static IActivator<T> ThrowActivatorNotFound<T>(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
+        private static void ThrowActivatorNotFound(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
 
-        private static IBaseCopier<T> ThrowBaseCopierNotFound<T>(Type type) where T : class => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
+        private static void ThrowBaseCopierNotFound(Type type) => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
     }
 }

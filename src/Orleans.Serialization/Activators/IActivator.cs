@@ -5,8 +5,7 @@ namespace Orleans.Serialization.Activators
     /// Functionality for creating object instances.
     /// </summary>
     /// <typeparam name="T">The instance type which this implementation creates.</typeparam>
-    /// <seealso cref="Orleans.Serialization.Activators.IActivator" />
-    public interface IActivator<T> : IActivator
+    public interface IActivator<T>
     {
         /// <summary>
         /// Creates an instance of type <typeparamref name="T"/>.
@@ -14,10 +13,4 @@ namespace Orleans.Serialization.Activators
         /// <returns>An instance of type <typeparamref name="T"/>.</returns>
         T Create();
     }
-
-    /// <summary>
-    /// Marker type for activators.
-    /// </summary>
-    /// <seealso cref="Orleans.Serialization.Activators.IActivator" />
-    public interface IActivator { }
 }

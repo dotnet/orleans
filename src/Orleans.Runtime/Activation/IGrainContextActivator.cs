@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -343,11 +342,7 @@ namespace Orleans.Runtime
                     $"Expected: public static bool {callbackMethodName}(IInvokable req)");
             }
 
-            var parameter = Expression.Parameter(typeof(IInvokable));
-            var call = Expression.Call(null, method, parameter);
-            var predicate = Expression.Lambda<Func<IInvokable, bool>>(call, parameter).Compile();
-
-            return predicate;
+            return method.CreateDelegate<Func<IInvokable, bool>>();
         }
     }
 
