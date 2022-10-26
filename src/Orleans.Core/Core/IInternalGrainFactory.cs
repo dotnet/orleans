@@ -37,16 +37,6 @@ namespace Orleans
         TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId) where TGrainInterface : ISystemTarget;
 
         /// <summary>
-        /// Casts the provided <paramref name="grain"/> to the specified interface
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The target grain interface type.</typeparam>
-        /// <param name="grain">The grain reference being cast.</param>
-        /// <returns>
-        /// A reference to <paramref name="grain"/> which implements <typeparamref name="TGrainInterface"/>.
-        /// </returns>
-        TGrainInterface Cast<TGrainInterface>(IAddressable grain);
-
-        /// <summary>
         /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
         /// </summary>
         /// <param name="grain">The grain.</param>

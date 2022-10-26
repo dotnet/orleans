@@ -39,49 +39,6 @@ namespace Orleans
         private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
-        {
-            var grainKey = GrainIdKeyExtensions.CreateGuidKey(primaryKey);
-            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
-        }
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
-        {
-            var grainKey = GrainIdKeyExtensions.CreateIntegerKey(primaryKey);
-            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
-        }
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithStringKey
-        {
-            var grainKey = IdSpan.Create(primaryKey);
-            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
-        }
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithGuidCompoundKey
-        {
-            ValidateGrainKeyExtension(keyExtension);
-
-            var grainKey = GrainIdKeyExtensions.CreateGuidKey(primaryKey, keyExtension);
-            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
-        }
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithIntegerCompoundKey
-        {
-            ValidateGrainKeyExtension(keyExtension);
-
-            var grainKey = GrainIdKeyExtensions.CreateIntegerKey(primaryKey, keyExtension);
-            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
-        }
-
-
-        /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
@@ -149,41 +106,6 @@ namespace Orleans
         public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
 
         /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, Guid key)
-        {
-            var grainKey = GrainIdKeyExtensions.CreateGuidKey(key);
-            return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
-        }
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, long key)
-        {
-            var grainKey = GrainIdKeyExtensions.CreateIntegerKey(key);
-            return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
-        }
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, string key)
-        {
-            var grainKey = IdSpan.Create(key);
-            return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
-        }
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, Guid key, string keyExtension)
-        {
-            var grainKey = GrainIdKeyExtensions.CreateGuidKey(key, keyExtension);
-            return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
-        }
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, long key, string keyExtension)
-        {
-            var grainKey = GrainIdKeyExtensions.CreateIntegerKey(key, keyExtension);
-            return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
-        }
-
-        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
         {
             return this.referenceActivator.CreateReference(grainId, interfaceType);
@@ -200,7 +122,7 @@ namespace Orleans
         /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
         /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
         /// <returns>A grain reference which implements the provided interface.</returns>
-        private IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
@@ -251,24 +173,6 @@ namespace Orleans
             }
 
             return this.Cast(this.runtimeClient.CreateObjectReference(obj), interfaceType);
-        }
-
-        /// <summary>
-        /// Validates the provided grain key extension.
-        /// </summary>
-        /// <param name="keyExt">The grain key extension.</param>
-        /// <exception cref="ArgumentNullException">The key is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException">The key is empty or contains only whitespace.</exception>
-        private static void ValidateGrainKeyExtension(string keyExt)
-        {
-            if (!string.IsNullOrWhiteSpace(keyExt)) return;
-
-            if (null == keyExt)
-            {
-                throw new ArgumentNullException(nameof(keyExt)); 
-            }
-            
-            throw new ArgumentException("Key extension is empty or white space.", nameof(keyExt));
         }
     }
 }
