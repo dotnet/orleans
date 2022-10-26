@@ -352,11 +352,6 @@ namespace Orleans.CodeGenerator
             else if (namedType.IsGenericType)
             {
                 var def = namedType.ConstructedFrom;
-                if (def.SpecialType == SpecialType.System_Nullable_T)
-                {
-                    return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);
-                }
-
                 foreach (var t in ImmutableContainerTypes)
                 {
                     if (SymbolEqualityComparer.Default.Equals(t, def))
