@@ -46,7 +46,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
-    void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -88,7 +88,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
-    object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
         {

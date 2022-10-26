@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="string"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class StringCodec : TypedCodecBase<string>, IFieldCodec<string>
+    public sealed class StringCodec : IFieldCodec<string>
     {
         /// <summary>
         /// The codec field type

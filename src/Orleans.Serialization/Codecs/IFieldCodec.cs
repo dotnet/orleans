@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
@@ -10,6 +11,15 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     public interface IFieldCodec
     {
+        /// <summary>
+        /// Writes a field using the provided untyped value. The type must still match the codec instance!
+        /// </summary>
+        void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>;
+
+        /// <summary>
+        /// Reads a value and returns it untyped. The type must still match the codec instance!
+        /// </summary>
+        object ReadValue<TInput>(ref Reader<TInput> reader, Field field);
     }
 
     /// <summary>
@@ -37,7 +47,12 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
-        T ReadValue<TInput>(ref Reader<TInput> reader, Field field);
+        new T ReadValue<TInput>(ref Reader<TInput> reader, Field field);
+
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+            => WriteField(ref writer, fieldIdDelta, expectedType, (T)value);
+
+        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
     }
 
     /// <summary>
@@ -91,4 +106,22 @@ namespace Orleans.Serialization.Codecs
         /// <param name="result">The copy.</param>
         void OnCopied(T original, T result);
     }
+
+    internal sealed class UntypedCodecWrapper<TField> : IFieldCodec<TField>
+    {
+        private readonly IFieldCodec _codec;
+
+        public UntypedCodecWrapper(IFieldCodec codec) => _codec = codec;
+
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+            => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+            => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+
+        public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)_codec.ReadValue(ref reader, field);
+
+        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
+    }
+
 }

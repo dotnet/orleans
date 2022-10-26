@@ -222,4 +222,17 @@ namespace Orleans.Serialization
             public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
         }
     }
+
+    /// <summary>
+    /// Holds a reference to a service.
+    /// </summary>
+    /// <typeparam name="T">The service type.</typeparam>
+    internal interface IServiceHolder<T>
+    {
+        /// <summary>
+        /// Gets the service.
+        /// </summary>
+        /// <value>The service.</value>
+        T Value { get; }
+    }
 }

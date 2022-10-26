@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="bool"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class BoolCodec : TypedCodecBase<bool>, IFieldCodec<bool>
+    public sealed class BoolCodec : IFieldCodec<bool>
     {
         private static readonly Type CodecFieldType = typeof(bool);
 
@@ -58,7 +58,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="char"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class CharCodec : TypedCodecBase<char>, IFieldCodec<char>
+    public sealed class CharCodec : IFieldCodec<char>
     {
         private static readonly Type CodecFieldType = typeof(char);
 
@@ -105,7 +105,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="byte"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class ByteCodec : TypedCodecBase<byte>, IFieldCodec<byte>
+    public sealed class ByteCodec : IFieldCodec<byte>
     {
         private static readonly Type CodecFieldType = typeof(byte);
 
@@ -168,7 +168,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="sbyte"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class SByteCodec : TypedCodecBase<sbyte>, IFieldCodec<sbyte>
+    public sealed class SByteCodec : IFieldCodec<sbyte>
     {
         private static readonly Type CodecFieldType = typeof(sbyte);
 
@@ -231,7 +231,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="ushort"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class UInt16Codec : TypedCodecBase<ushort>, IFieldCodec<ushort>
+    public sealed class UInt16Codec : IFieldCodec<ushort>
     {
         /// <summary>
         /// The codec field type
@@ -297,7 +297,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="short"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class Int16Codec : TypedCodecBase<short>, IFieldCodec<short>
+    public sealed class Int16Codec : IFieldCodec<short>
     {
         private static readonly Type CodecFieldType = typeof(short);
 
@@ -360,7 +360,7 @@ namespace Orleans.Serialization.Codecs
     /// Serialzier for <see cref="uint"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class UInt32Codec : TypedCodecBase<uint>, IFieldCodec<uint>
+    public sealed class UInt32Codec : IFieldCodec<uint>
     {
         public static readonly Type CodecFieldType = typeof(uint);
 
@@ -439,7 +439,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="int"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class Int32Codec : TypedCodecBase<int>, IFieldCodec<int>
+    public sealed class Int32Codec : IFieldCodec<int>
     {
         /// <summary>
         /// The codec field type
@@ -543,7 +543,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="long"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class Int64Codec : TypedCodecBase<long>, IFieldCodec<long>
+    public sealed class Int64Codec : IFieldCodec<long>
     {
         private static readonly Type CodecFieldType = typeof(long);
 
@@ -645,7 +645,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="long"/>.
     /// </summary>
     [RegisterSerializer]
-    public sealed class UInt64Codec : TypedCodecBase<ulong>, IFieldCodec<ulong>
+    public sealed class UInt64Codec : IFieldCodec<ulong>
     {
         private static readonly Type CodecFieldType = typeof(ulong);
 
