@@ -22,11 +22,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="buildMultiTargeting\Orleans.CodeGenerator.MSBuild.props" />
-    <None Remove="build\Orleans.CodeGenerator.MSBuild.props" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
   </ItemGroup>
 
