@@ -84,6 +84,7 @@ public class TodoGrain : Grain, ITodoGrain
     [GenerateSerializer]
     public class State
     {
+        [Id(0)]
         public TodoItem? Item { get; set; }
     }
 }
