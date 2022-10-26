@@ -58,7 +58,7 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetSiloIdentity();
     }
 
-    public interface IMessageSerializationClientObject : IAddressable
+    public interface IMessageSerializationClientObject : IGrainObserver
     {
         Task SendUnserializable(UnserializableType input);
         Task SendUndeserializable(UndeserializableType input);

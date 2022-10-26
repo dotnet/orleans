@@ -82,7 +82,7 @@ namespace Orleans.Runtime
             await invoker.Invoke();
         }
 
-        public object Cast(IAddressable grain, Type grainInterface)
+        public object AsReference(IAddressable grain, Type grainInterface)
         {
             var grainId = grain.GetGrainId();
             if (grain is GrainReference && grainInterface.IsAssignableFrom(grain.GetType()))

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -56,18 +55,20 @@ namespace Orleans
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
                 where TGrainObserverInterface : IAddressable
         {
-            return (TGrainObserverInterface)this.CreateObjectReference(typeof(TGrainObserverInterface), obj);
-        }
+            var interfaceType = typeof(TGrainObserverInterface);
+            if (!interfaceType.IsInterface)
+            {
+                throw new ArgumentException(
+                    $"The provided type parameter must be an interface. '{interfaceType.FullName}' is not an interface.");
+            }
 
-        /// <inheritdoc />
-        public TGrainInterface Cast<TGrainInterface>(IAddressable grain)
-        {
-            var interfaceType = typeof(TGrainInterface);
-            return (TGrainInterface)this.Cast(grain, interfaceType);
-        }
+            if (obj is not TGrainObserverInterface typedObject)
+            {
+                throw new ArgumentException($"The provided object must implement '{interfaceType.FullName}'.", nameof(obj));
+            }
 
-        /// <inheritdoc />
-        public object Cast(IAddressable grain, Type interfaceType) => this.GrainReferenceRuntime.Cast(grain, interfaceType);
+            return this.runtimeClient.CreateObjectReference(typedObject);
+        }
 
         public TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
             where TGrainInterface : ISystemTarget
@@ -101,9 +102,6 @@ namespace Orleans
         {
             return (TGrainInterface)this.CreateGrainReference(typeof(TGrainInterface), grainId);
         }
-
-        /// <inheritdoc />
-        public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
 
         /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
@@ -151,28 +149,6 @@ namespace Orleans
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
             return this.referenceActivator.CreateReference(grainId, grainInterfaceType);
-        }
-
-        /// <summary>
-        /// Creates an object reference which points to the provided object.
-        /// </summary>
-        /// <param name="interfaceType">The interface type which the reference must implement..</param>
-        /// <param name="obj">The addressable object implementation.</param>
-        /// <returns>An object reference.</returns>
-        private object CreateObjectReference(Type interfaceType, IAddressable obj)
-        {
-            if (!interfaceType.IsInterface)
-            {
-                throw new ArgumentException(
-                    $"The provided type parameter must be an interface. '{interfaceType.FullName}' is not an interface.");
-            }
-
-            if (!interfaceType.IsInstanceOfType(obj))
-            {
-                throw new ArgumentException($"The provided object must implement '{interfaceType.FullName}'.", nameof(obj));
-            }
-
-            return this.Cast(this.runtimeClient.CreateObjectReference(obj), interfaceType);
         }
     }
 }

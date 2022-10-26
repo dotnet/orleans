@@ -110,13 +110,6 @@ namespace Orleans
         TGrainInterface IGrainFactory.GetGrain<TGrainInterface>(GrainId grainId) => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
 
         /// <inheritdoc />
-        IAddressable IGrainFactory.GetGrain(GrainId grainId) => _runtimeClient.InternalGrainFactory.GetGrain(grainId);
-
-        /// <inheritdoc />
-        public object Cast(IAddressable grain, Type outputGrainInterfaceType)
-            => _runtimeClient.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
-
-        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
 

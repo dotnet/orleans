@@ -45,7 +45,7 @@ namespace Orleans.Runtime
 
         void ReceiveResponse(Message message);
 
-        IAddressable CreateObjectReference(IAddressable obj);
+        TAddressable CreateObjectReference<TAddressable>(TAddressable obj) where TAddressable : IAddressable;
 
         void DeleteObjectReference(IAddressable obj);
 

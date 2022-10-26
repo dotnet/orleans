@@ -374,12 +374,12 @@ namespace UnitTests.Serialization
             source4[0] = new GrainReference[2];
             source4[1] = new GrainReference[3];
             source4[2] = new GrainReference[1];
-            source4[0][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[0][1] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][1] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][2] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[2][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[0][0] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
+            source4[0][1] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
+            source4[1][0] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
+            source4[1][1] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
+            source4[1][2] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
+            source4[2][0] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source4);
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
@@ -389,7 +389,7 @@ namespace UnitTests.Serialization
                 source5[i] = new GrainReference[64];
                 for (int j = 0; j < source5[i].Length; j++)
                 {
-                    source5[i][j] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+                    source5[i][j] = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(LegacyGrainId.NewId());
                 }
             }
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source5);
@@ -556,7 +556,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference()
         {
             GrainId grainId = LegacyGrainId.NewId();
-            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
+            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain<IAddressable>(grainId);
 
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  input);
 

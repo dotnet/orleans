@@ -347,7 +347,7 @@ namespace Orleans
         /// <inheritdoc />
         public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
-        public IAddressable CreateObjectReference(IAddressable obj)
+        public TAddressable CreateObjectReference<TAddressable>(TAddressable obj) where TAddressable : IAddressable 
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
@@ -358,7 +358,7 @@ namespace Orleans
             var observerId = obj is ClientObserver clientObserver
                 ? clientObserver.GetObserverGrainId(this.clientId)
                 : ObserverGrainId.Create(this.clientId);
-            var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
+            var reference = this.InternalGrainFactory.GetGrain<TAddressable>(observerId.GrainId);
 
             if (!localObjects.TryRegister(obj, observerId))
             {

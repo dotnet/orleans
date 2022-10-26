@@ -466,9 +466,10 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
-        public IAddressable CreateObjectReference(IAddressable obj)
+        /// <inheritdoc />
+        public TAddressable CreateObjectReference<TAddressable>(TAddressable obj) where TAddressable : IAddressable
         {
-            if (RuntimeContext.Current is null) return this.HostedClient.CreateObjectReference(obj);
+            if (RuntimeContext.Current is null) return this.HostedClient.CreateObjectReference<TAddressable>(obj);
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 

@@ -109,7 +109,7 @@ namespace DefaultCluster.Tests
                 SimpleGrain.SimpleGrainNamePrefix);
 
             // Attempting to cast a grain to a non-grain type should fail.
-            Assert.Throws<ArgumentException>(() => this.internalGrainFactory.Cast(grain, typeof(bool)));
+            Assert.Throws<ArgumentException>(() => grain.AsReference(typeof(bool)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]

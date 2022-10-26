@@ -20,7 +20,7 @@ namespace Orleans
             _runtimeClient = runtimeClient;
         }
 
-        public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain(this.GrainId);
+        public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain<IAddressable>(this.GrainId);
 
         public GrainId GrainId => _runtimeClient.CurrentActivationAddress.GrainId;
 

@@ -130,13 +130,13 @@ namespace Tester.HeterogeneousSilosTests
 
         private async Task CallITestGrainMethod(IGrain grain)
         {
-            var g = grain.Cast<ITestGrain>();
+            var g = grain.AsReference<ITestGrain>();
             await g.SetLabel("Hello world");
         }
 
         private async Task CallIStatelessWorkerGrainMethod(IGrain grain)
         {
-            var g = grain.Cast<IStatelessWorkerGrain>();
+            var g = grain.AsReference<IStatelessWorkerGrain>();
             await g.GetCallStats();
         }
 

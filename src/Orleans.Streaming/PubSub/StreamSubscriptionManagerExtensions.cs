@@ -28,7 +28,7 @@ namespace Orleans.Streams.PubSub
             GrainId grainId)
             where TGrainInterface : IGrainWithGuidKey
         {
-            var grainRef = grainFactory.GetGrain(grainId) as GrainReference;
+            var grainRef = (GrainReference)grainFactory.GetGrain<IAddressable>(grainId);
             return manager.AddSubscription(streamProviderName, streamId, grainRef);
         }
 

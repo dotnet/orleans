@@ -16,7 +16,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task DebuggerHelper_GetGrainInstance()
         {
-            var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid()).Cast<IDebuggerHelperTestGrain>();
+            var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid()).AsReference<IDebuggerHelperTestGrain>();
             await grain.OrleansDebuggerHelper_GetGrainInstance_Test();
         }
     }

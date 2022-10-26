@@ -62,7 +62,7 @@ namespace Orleans
             }
 
             var grainReference = grain.AsReference();
-            return (TGrainInterface)grainReference.Runtime.Cast(grain, typeof(TGrainInterface));
+            return (TGrainInterface)grainReference.Runtime.AsReference(grain, typeof(TGrainInterface));
         }
 
         /// <summary>
@@ -76,6 +76,7 @@ namespace Orleans
         /// If the provided value is already grain reference, this will create a new reference which implements the provided interface.
         /// </remarks>
         /// <returns>A strongly typed reference to the provided grain which implements <typeparamref name="TGrainInterface"/>.</returns>
+        [Obsolete("Use AsReference<TGrainInterface>() instead.")]
         public static TGrainInterface Cast<TGrainInterface>(this IAddressable grain) => grain.AsReference<TGrainInterface>();
 
         /// <summary>
@@ -88,7 +89,7 @@ namespace Orleans
         /// If the provided value is already grain reference, this will create a new reference which implements the provided interface.
         /// </remarks>
         /// <returns>A strongly typed reference to the provided grain which implements <paramref name="interfaceType"/>.</returns>
-        public static object AsReference(this IAddressable grain, Type interfaceType) => grain.AsReference().Runtime.Cast(grain, interfaceType);
+        public static object AsReference(this IAddressable grain, Type interfaceType) => grain.AsReference().Runtime.AsReference(grain, interfaceType);
 
         /// <summary>
         /// Returns a typed reference to the provided grain.
@@ -101,7 +102,8 @@ namespace Orleans
         /// If the provided value is already grain reference, this will create a new reference which implements the provided interface.
         /// </remarks>
         /// <returns>A strongly typed reference to the provided grain which implements <paramref name="interfaceType"/>.</returns>
-        public static object Cast(this IAddressable grain, Type interfaceType) => grain.AsReference().Runtime.Cast(grain, interfaceType);
+        [Obsolete("Use AsReference(Type) instead.")]
+        private static object Cast(this IAddressable grain, Type interfaceType) => grain.AsReference(interfaceType);
 
         /// <summary>
         /// Returns the grain id corresponding to the provided grain.

@@ -1,5 +1,3 @@
-using System;
-
 using Orleans.Runtime;
 
 namespace Orleans
@@ -35,13 +33,5 @@ namespace Orleans
         /// <param name="grainId">The id of the target.</param>
         /// <returns>A reference to the specified system target.</returns>
         TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId) where TGrainInterface : ISystemTarget;
-
-        /// <summary>
-        /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
-        /// </summary>
-        /// <param name="grain">The grain.</param>
-        /// <param name="interfaceType">The resulting interface type.</param>
-        /// <returns>A reference to <paramref name="grain"/> which implements <paramref name="interfaceType"/>.</returns>
-        object Cast(IAddressable grain, Type interfaceType);
     }
 }

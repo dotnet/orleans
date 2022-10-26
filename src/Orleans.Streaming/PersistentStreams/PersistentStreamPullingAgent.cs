@@ -265,9 +265,7 @@ namespace Orleans.Streams
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
             {
-                var consumerReference = this.RuntimeClient.InternalGrainFactory
-                    .GetGrain(streamConsumer)
-                    .AsReference<IStreamConsumerExtension>();
+                var consumerReference = this.RuntimeClient.InternalGrainFactory.GetGrain<IStreamConsumerExtension>(streamConsumer);
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData);
             }
 

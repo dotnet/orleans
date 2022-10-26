@@ -147,7 +147,7 @@ namespace Orleans.Runtime
 
             var addressable = (IAddressable)input;
             var grainReference = addressable.AsReference();
-            return (TInterface)grainReference.Runtime.Cast(addressable, typeof(TInterface));
+            return (TInterface)grainReference.Runtime.AsReference(addressable, typeof(TInterface));
         }
     }
 
@@ -321,7 +321,7 @@ namespace Orleans.Runtime
         /// <returns>A new grain reference which implements the specified interface type.</returns>
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable
-            => (TGrainInterface)_shared.Runtime.Cast(this, typeof(TGrainInterface));
+            => (TGrainInterface)_shared.Runtime.AsReference(this, typeof(TGrainInterface));
 
         /// <summary>
         /// Tests this reference for equality to another object.

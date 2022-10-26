@@ -10,18 +10,6 @@ namespace Orleans
     public interface IGrainFactory
     {
         /// <summary>
-        /// Returns a reference to the specified grain which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.
-        /// </summary>
-        /// <remarks>
-        /// This method infers the most appropriate <see cref="GrainId.Type"/> value based on the <paramref name="interfaceType"/> argument and optional <paramref name="grainClassNamePrefix"/> argument.
-        /// </remarks>
-        /// <param name="interfaceType">The interface type which the returned grain reference will implement.</param>
-        /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
-        /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
-        /// <returns>A grain reference which implements the provided interface.</returns>
-        IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix);
-
-        /// <summary>
         /// Creates a reference to the provided <paramref name="obj"/>.
         /// </summary>
         /// <typeparam name="TGrainObserverInterface">
@@ -42,6 +30,18 @@ namespace Orleans
         void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         /// <summary>
+        /// Returns a reference to the specified grain which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.
+        /// </summary>
+        /// <remarks>
+        /// This method infers the most appropriate <see cref="GrainId.Type"/> value based on the <paramref name="interfaceType"/> argument and optional <paramref name="grainClassNamePrefix"/> argument.
+        /// </remarks>
+        /// <param name="interfaceType">The interface type which the returned grain reference will implement.</param>
+        /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
+        /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
+        /// <returns>A grain reference which implements the provided interface.</returns>
+        IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix);
+
+        /// <summary>
         /// Returns a reference to the specified grain which implements the specified interface.
         /// </summary>
         /// <param name="grainId">
@@ -54,17 +54,6 @@ namespace Orleans
         /// A reference to the specified grain which implements the specified interface.
         /// </returns>
         TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
-
-        /// <summary>
-        /// Returns an untyped reference for the provided grain id.
-        /// </summary>
-        /// <param name="grainId">
-        /// The grain id.
-        /// </param>
-        /// <returns>
-        /// An untyped reference for the provided grain id.
-        /// </returns>
-        IAddressable GetGrain(GrainId grainId);
 
         /// <summary>
         /// Returns a reference for the provided grain id which implements the specified interface type.

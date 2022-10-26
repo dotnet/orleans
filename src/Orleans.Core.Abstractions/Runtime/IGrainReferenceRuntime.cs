@@ -36,6 +36,6 @@ namespace Orleans.Runtime
         /// <param name="grain">The grain.</param>
         /// <param name="interfaceType">The resulting interface type.</param>
         /// <returns>A reference to <paramref name="grain"/> which implements <paramref name="interfaceType"/>.</returns>
-        object Cast(IAddressable grain, Type interfaceType);
+        object AsReference(IAddressable grain, Type interfaceType);
     }
 }

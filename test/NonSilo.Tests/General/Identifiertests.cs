@@ -316,10 +316,10 @@ namespace UnitTests.General
         {
             Guid guid = Guid.NewGuid();
             GrainId regularGrainId = LegacyGrainId.GetGrainIdForTesting(guid);
-            GrainReference grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain(regularGrainId);
+            GrainReference grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain<IAddressable>(regularGrainId);
             TestGrainReference(grainRef);
 
-            grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain(regularGrainId);
+            grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain<IAddressable>(regularGrainId);
             TestGrainReference(grainRef);
         }
 

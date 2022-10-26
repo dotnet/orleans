@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -56,21 +55,9 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        object IInternalGrainFactory.Cast(IAddressable grain, Type interfaceType)
-        {
-            return this.grainFactory.Cast(grain, interfaceType);
-        }
-
-        /// <inheritdoc />
         TGrainInterface IGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
         {
             return this.grainFactory.GetGrain<TGrainInterface>(grainId);
-        }
-
-        /// <inheritdoc />
-        IAddressable IGrainFactory.GetGrain(GrainId grainId)
-        {
-            return this.grainFactory.GetGrain(grainId);
         }
 
         /// <inheritdoc />

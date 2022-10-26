@@ -99,7 +99,7 @@ namespace Orleans
             GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
 
             GrainReference IGrainContext.GrainReference =>
-                _manager.runtimeClient.InternalGrainFactory.GetGrain(ObserverId.GrainId).AsReference();
+                _manager.runtimeClient.InternalGrainFactory.GetGrain<IAddressable>(ObserverId.GrainId).AsReference();
 
             object IGrainContext.GrainInstance => this.LocalObject.Target;
 
