@@ -21,9 +21,15 @@ namespace Orleans.Serialization.Session
         /// <param name="codecProvider">The codec provider.</param>
         public SerializerSessionPool(TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, CodecProvider codecProvider)
         {
+            CodecProvider = codecProvider;
             var sessionPoolPolicy = new SerializerSessionPoolPolicy(typeCodec, wellKnownTypes, codecProvider, ReturnSession);
             _sessionPool = new ConcurrentObjectPool<SerializerSession, SerializerSessionPoolPolicy>(sessionPoolPolicy);
         }
+
+        /// <summary>
+        /// Gets the codec provider.
+        /// </summary>
+        public CodecProvider CodecProvider { get; }
 
         /// <summary>
         /// Gets a serializer session from the pool.

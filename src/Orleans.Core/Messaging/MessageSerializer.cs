@@ -7,14 +7,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
-using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
-using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using static Orleans.Runtime.Message;
 
@@ -24,13 +21,10 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
-        private readonly Serializer<object> _bodySerializer;
-        private readonly Serializer<GrainAddress> _activationAddressCodec;
-        private readonly CachingSiloAddressCodec _readerSiloAddressCodec;
-        private readonly CachingSiloAddressCodec _writerSiloAddressCodec;
-        private readonly CachingIdSpanCodec _readerIdSpanCodec;
-        private readonly CachingIdSpanCodec _writerIdSpanCodec;
-        private readonly Serializer _serializer;
+        private readonly IFieldCodec<GrainAddress> _activationAddressCodec;
+        private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
+        private readonly CachingSiloAddressCodec _writerSiloAddressCodec = new();
+        private readonly CachingIdSpanCodec _idSpanCodec = new();
         private readonly SerializerSession _serializationSession;
         private readonly SerializerSession _deserializationSession;
         private readonly MemoryPool<byte> _memoryPool;
@@ -40,27 +34,17 @@ namespace Orleans.Runtime.Messaging
         private object? _bufferWriter;
 
         public MessageSerializer(
-            Serializer<object> bodySerializer,
             SerializerSessionPool sessionPool,
             SharedMemoryPool memoryPool,
-            IServiceProvider services,
-            Serializer<GrainAddress> activationAddressSerializer,
-            ICodecProvider codecProvider,
             MessagingOptions options)
         {
-            _readerSiloAddressCodec = new CachingSiloAddressCodec();
-            _writerSiloAddressCodec = new CachingSiloAddressCodec();
-            _readerIdSpanCodec = new CachingIdSpanCodec();
-            _writerIdSpanCodec = new CachingIdSpanCodec();
-            _serializer = ActivatorUtilities.CreateInstance<Serializer>(services);
-            _activationAddressCodec = activationAddressSerializer;
             _serializationSession = sessionPool.GetSession();
             _deserializationSession = sessionPool.GetSession();
             _memoryPool = memoryPool.Pool;
-            _bodySerializer = bodySerializer;
             _maxHeaderLength = options.MaxMessageHeaderSize;
             _maxBodyLength = options.MaxMessageBodySize;
-            _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
+            _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
+            _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddress>>(this, sessionPool.CodecProvider);
         }
 
         public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
@@ -114,11 +98,13 @@ namespace Orleans.Runtime.Messaging
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
                 if (body.IsSingleSegment)
                 {
-                    message.BodyObject = _bodySerializer.Deserialize(body.First.Span, _deserializationSession);
+                    var reader = Reader.Create(body.First.Span, _deserializationSession);
+                    message.BodyObject = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
                 }
                 else
                 {
-                    message.BodyObject = _bodySerializer.Deserialize(body, _deserializationSession);
+                    var reader = Reader.Create(body, _deserializationSession);
+                    message.BodyObject = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
                 }
 
                 return (0, headerLength, bodyLength);
@@ -150,7 +136,10 @@ namespace Orleans.Runtime.Messaging
                 var headerLength = bufferWriter.CommittedBytes;
 
                 _serializationSession.PartialReset();
-                _bodySerializer.Serialize(message.BodyObject, buffer, _serializationSession);
+
+                var bodyWriter = Writer.Create(buffer, _serializationSession);
+                ObjectCodec.WriteField(ref bodyWriter, 0, typeof(object), message.BodyObject);
+                bodyWriter.Commit();
 
                 // Write length prefixes, first header length then body length.
                 BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
@@ -197,7 +186,7 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasInterfaceType))
             {
-                _writerIdSpanCodec.WriteRaw(ref writer, value.InterfaceType.Value);
+                _idSpanCodec.WriteRaw(ref writer, value.InterfaceType.Value);
             }
 
             if (headers.HasFlag(MessageFlags.HasInterfaceVersion))
@@ -241,7 +230,7 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasInterfaceType))
             {
-                var interfaceTypeSpan = _readerIdSpanCodec.ReadRaw(ref reader);
+                var interfaceTypeSpan = _idSpanCodec.ReadRaw(ref reader);
                 result.InterfaceType = new GrainInterfaceType(interfaceTypeSpan);
             }
 
@@ -263,13 +252,13 @@ namespace Orleans.Runtime.Messaging
 
         private List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
         {
-            var n = reader.ReadVarUInt32();
+            var n = (int)reader.ReadVarUInt32();
             if (n > 0)
             {
-                var list = new List<GrainAddress>((int)n);
+                var list = new List<GrainAddress>(n);
                 for (int i = 0; i < n; i++)
                 {
-                    list.Add(_activationAddressCodec.Deserialize(ref reader));
+                    list.Add(_activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
                 }
 
                 return list;
@@ -283,14 +272,14 @@ namespace Orleans.Runtime.Messaging
             writer.WriteVarUInt32((uint)value.Count);
             foreach (var entry in value)
             {
-                _activationAddressCodec.Serialize(entry, ref writer);
+                _activationAddressCodec.WriteField(ref writer, 0, typeof(GrainAddress), entry);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static string? ReadString<TInput>(ref Reader<TInput> reader)
         {
-            var length = reader.ReadVarInt32();
+            var length = (int)reader.ReadVarUInt32() - 1;
             if (length <= 0)
             {
                 if (length < 0)
@@ -320,12 +309,12 @@ namespace Orleans.Runtime.Messaging
         {
             if (value is null)
             {
-                writer.WriteVarInt32(-1);
+                writer.WriteVarUInt32(0);
                 return;
             }
 
             var numBytes = Encoding.UTF8.GetByteCount(value);
-            writer.WriteVarInt32(numBytes);
+            writer.WriteVarUInt32((uint)numBytes + 1);
             if (numBytes < 512)
             {
                 writer.EnsureContiguous(numBytes);
@@ -348,24 +337,24 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void WriteRequestContext<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<string, object> value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteRequestContext<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<string, object> value) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteVarUInt32((uint)value.Count);
             foreach (var entry in value)
             {
                 WriteString(ref writer, entry.Key);
-                _serializer.Serialize(entry.Value, ref writer);
+                ObjectCodec.WriteField(ref writer, 0, typeof(object), entry.Value);
             }
         }
 
-        public Dictionary<string, object> ReadRequestContext<TInput>(ref Reader<TInput> reader)
+        private static Dictionary<string, object> ReadRequestContext<TInput>(ref Reader<TInput> reader)
         {
             var size = (int)reader.ReadVarUInt32();
             var result = new Dictionary<string, object>(size);
             for (var i = 0; i < size; i++)
             {
                 var key = ReadString(ref reader);
-                var value = _serializer.Deserialize<object, TInput>(ref reader);
+                var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
 
                 Debug.Assert(key is not null);
                 result.Add(key, value);
@@ -376,55 +365,15 @@ namespace Orleans.Runtime.Messaging
 
         private GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
         {
-            var grainType = _readerIdSpanCodec.ReadRaw(ref reader);
+            var grainType = _idSpanCodec.ReadRaw(ref reader);
             var grainKey = IdSpanCodec.ReadRaw(ref reader);
             return new GrainId(new GrainType(grainType), grainKey);
         }
 
         private void WriteGrainId<TBufferWriter>(ref Writer<TBufferWriter> writer, GrainId value) where TBufferWriter : IBufferWriter<byte>
         {
-            _writerIdSpanCodec.WriteRaw(ref writer, value.Type.Value);
+            _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
-        }
-
-        private static ActivationId ReadActivationId<TInput>(ref Reader<TInput> reader)
-        {
-            if (reader.ReadByte() == 0)
-            {
-                return default;
-            }
-
-            if (reader.TryReadBytes(16, out var readOnly))
-            {
-                return new(new Guid(readOnly));
-            }
-
-            Span<byte> bytes = stackalloc byte[16];
-            for (var i = 0; i < 16; i++)
-            {
-                bytes[i] = reader.ReadByte();
-            }
-
-            return new(new Guid(bytes));
-        }
-
-        private static void WriteActivationId<TBufferWriter>(ref Writer<TBufferWriter> writer, ActivationId value) where TBufferWriter : IBufferWriter<byte>
-        {
-            if (value.IsDefault)
-            {
-                writer.WriteByte(0);
-                return;
-            }
-
-            writer.WriteByte(1);
-            writer.EnsureContiguous(16);
-            if (value.Key.TryWriteBytes(writer.WritableSpan))
-            {
-                writer.AdvanceSpan(16);
-                return;
-            }
-
-            writer.Write(value.Key.ToByteArray());
         }
     }
 }

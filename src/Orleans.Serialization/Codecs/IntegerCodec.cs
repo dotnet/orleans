@@ -482,12 +482,12 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             if (value > 1 << 20 || -value > 1 << 20)
             {
-                writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed32);
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
                 writer.WriteInt32(value);
             }
             else
             {
-                writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
                 writer.WriteVarInt32(value);
             }
         }

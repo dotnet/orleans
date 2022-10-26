@@ -119,7 +119,7 @@ namespace Orleans.Runtime
         public int ForwardCount
         {
             get => _headers.ForwardCount;
-            set => _headers.ForwardCount = (byte)value;
+            set => _headers.ForwardCount = value;
         }
 
         public SiloAddress TargetSilo
@@ -343,13 +343,14 @@ grow:
             Reserved = 1 << 15,
         }
 
-        [StructLayout(LayoutKind.Explicit)]
         internal struct PackedHeaders
         {
             private const uint DirectionMask = 0x000F_0000;
             private const int DirectionShift = 16;
             private const uint ResponseTypeMask = 0x00F0_0000;
             private const int ResponseTypeShift = 20;
+            private const uint ForwardCountMask = 0xFF00_0000;
+            private const int ForwardCountShift = 24;
 
             public static implicit operator PackedHeaders(uint fields) => new() { _fields = fields };
             public static implicit operator uint(PackedHeaders value) => value._fields;
@@ -359,14 +360,13 @@ grow:
             // D: 4 bits for Direction
             // R: 4 bits for ResponseType
             // H: 8 bits for ForwardCount (hop count)
-            [FieldOffset(0)]
             private uint _fields;
 
-            [FieldOffset(0)]
-            private MessageFlags _flags;
-
-            [FieldOffset(3)]
-            public byte ForwardCount;
+            public int ForwardCount
+            {
+                get => (int)(_fields >> ForwardCountShift);
+                set => _fields = (_fields & ~ForwardCountMask) | (uint)value << ForwardCountShift;
+            }
 
             public Directions Direction
             {
@@ -380,12 +380,12 @@ grow:
                 set => _fields = (_fields & ~ResponseTypeMask) | (uint)value << ResponseTypeShift;
             }
 
-            public bool HasFlag(MessageFlags flag) => _flags.HasFlag(flag);
+            public bool HasFlag(MessageFlags flag) => (_fields & (uint)flag) != 0;
 
-            public void SetFlag(MessageFlags flag, bool value) => _flags = value switch
+            public void SetFlag(MessageFlags flag, bool value) => _fields = value switch
             {
-                true => _flags | flag,
-                _ => _flags & ~flag,
+                true => _fields | (uint)flag,
+                _ => _fields & ~(uint)flag,
             };
         }
     }
