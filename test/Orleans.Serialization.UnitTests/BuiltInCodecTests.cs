@@ -98,12 +98,13 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<DateTime>> ValueProvider => Gen.DateTime.ToValueProvider();
     }
 
-    public class DateTimeCopierTests : CopierTester<DateTime, DateTimeCopier>
+    public class DateTimeCopierTests : CopierTester<DateTime, IDeepCopier<DateTime>>
     {
         protected override DateTime CreateValue() => DateTime.UtcNow;
         protected override DateTime[] TestValues => new[] { DateTime.MinValue, DateTime.MaxValue, new DateTime(1970, 1, 1, 0, 0, 0) };
         protected override Action<Action<DateTime>> ValueProvider => Gen.DateTime.ToValueProvider();
     }
+
 
     public class TimeSpanTests : FieldCodecTester<TimeSpan, TimeSpanCodec>
     {
@@ -112,7 +113,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<TimeSpan>> ValueProvider => Gen.TimeSpan.ToValueProvider();
     }
 
-    public class TimeSpanCopierTests : CopierTester<TimeSpan, TimeSpanCopier>
+    public class TimeSpanCopierTests : CopierTester<TimeSpan, IDeepCopier<TimeSpan>>
     {
         protected override TimeSpan CreateValue() => TimeSpan.FromMilliseconds(Guid.NewGuid().GetHashCode());
         protected override TimeSpan[] TestValues => new[] { TimeSpan.MinValue, TimeSpan.MaxValue, TimeSpan.Zero, TimeSpan.FromSeconds(12345) };
@@ -133,7 +134,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<DateTimeOffset>> ValueProvider => Gen.DateTimeOffset.ToValueProvider();
     }
 
-    public class DateTimeOffsetCopierTests : CopierTester<DateTimeOffset, DateTimeOffsetCopier>
+    public class DateTimeOffsetCopierTests : CopierTester<DateTimeOffset, IDeepCopier<DateTimeOffset>>
     {
         protected override DateTimeOffset CreateValue() => DateTime.UtcNow;
         protected override DateTimeOffset[] TestValues => new[]
@@ -164,7 +165,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Version left, Version right) => left == right && (left is null || left.GetHashCode() == right.GetHashCode());
     }
 
-    public class VersionCopierTests : CopierTester<Version, VersionCopier>
+    public class VersionCopierTests : CopierTester<Version, IDeepCopier<Version>>
     {
         protected override Version CreateValue() => new();
         protected override Version[] TestValues => new[]
@@ -200,7 +201,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(BitVector32 left, BitVector32 right) => left.Equals(right) && left.GetHashCode() == right.GetHashCode();
     }
 
-    public class BitVector32CopierTests: CopierTester<BitVector32, BitVector32Copier>
+    public class BitVector32CopierTests: CopierTester<BitVector32, IDeepCopier<BitVector32>>
     {
         protected override BitVector32 CreateValue() => new(new Random(Guid.NewGuid().GetHashCode()).Next());
 
@@ -816,7 +817,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool[] TestValues => new[] { false, true };
     }
 
-    public class BoolCopierTests : CopierTester<bool, BoolCodec>
+    public class BoolCopierTests : CopierTester<bool, IDeepCopier<bool>>
     {
         protected override bool CreateValue() => true;
         protected override bool Equals(bool left, bool right) => left == right;
@@ -830,7 +831,7 @@ namespace Orleans.Serialization.UnitTests
         protected override string[] TestValues => new[] { null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!" };
     }
 
-    public class StringCopierTests : CopierTester<string, StringCopier>
+    public class StringCopierTests : CopierTester<string, IDeepCopier<string>>
     {
         protected override string CreateValue() => Guid.NewGuid().ToString();
         protected override bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
@@ -924,7 +925,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<ulong>> ValueProvider => Gen.ULong.ToValueProvider();
     }
 
-    public class UInt64CopierTests : CopierTester<ulong, UInt64Codec>
+    public class UInt64CopierTests : CopierTester<ulong, IDeepCopier<ulong>>
     {
         protected override ulong CreateValue()
         {
@@ -972,7 +973,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<uint>> ValueProvider => Gen.UInt.ToValueProvider();
     }
 
-    public class UInt32CopiercTests : CopierTester<uint, UInt32Codec>
+    public class UInt32CopiercTests : CopierTester<uint, IDeepCopier<uint>>
     {
         protected override uint CreateValue() => (uint)Guid.NewGuid().GetHashCode();
 
@@ -1009,7 +1010,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<ushort>> ValueProvider => Gen.UShort.ToValueProvider();
     }
 
-    public class UInt16CopierTests : CopierTester<ushort, UInt16Codec>
+    public class UInt16CopierTests : CopierTester<ushort, IDeepCopier<ushort>>
     {
         protected override ushort CreateValue() => (ushort)Guid.NewGuid().GetHashCode();
         protected override ushort[] TestValues => new ushort[]
@@ -1034,7 +1035,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<byte>> ValueProvider => Gen.Byte.ToValueProvider();
     }
 
-    public class ByteCopierTests : CopierTester<byte, ByteCodec>
+    public class ByteCopierTests : CopierTester<byte, IDeepCopier<byte>>
     {
         protected override byte CreateValue() => (byte)Guid.NewGuid().GetHashCode();
         protected override byte[] TestValues => new byte[] { 0, 1, byte.MaxValue - 1, byte.MaxValue };
@@ -1072,7 +1073,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<long>> ValueProvider => Gen.Long.ToValueProvider();
     }
 
-    public class Int64CopierTests : CopierTester<long, Int64Codec>
+    public class Int64CopierTests : CopierTester<long, IDeepCopier<long>>
     {
         protected override long CreateValue()
         {
@@ -1153,7 +1154,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    public class Int32CopierTests : CopierTester<int, Int32Codec>
+    public class Int32CopierTests : CopierTester<int, IDeepCopier<int>>
     {
         protected override int CreateValue() => Guid.NewGuid().GetHashCode();
 
@@ -1196,7 +1197,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<short>> ValueProvider => Gen.Short.ToValueProvider();
     }
 
-    public class Int16CopierTests : CopierTester<short, Int16Codec>
+    public class Int16CopierTests : CopierTester<short, IDeepCopier<short>>
     {
         protected override short CreateValue() => (short)Guid.NewGuid().GetHashCode();
 
@@ -1233,7 +1234,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<sbyte>> ValueProvider => Gen.SByte.ToValueProvider();
     }
 
-    public class SByteCopierTests : CopierTester<sbyte, SByteCodec>
+    public class SByteCopierTests : CopierTester<sbyte, IDeepCopier<sbyte>>
     {
         protected override sbyte CreateValue() => (sbyte)Guid.NewGuid().GetHashCode();
 
@@ -1268,7 +1269,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<char>> ValueProvider => Gen.Char.ToValueProvider();
     }
 
-    public class CharCopierTests : CopierTester<char, CharCodec>
+    public class CharCopierTests : CopierTester<char, IDeepCopier<char>>
     {
         private int _createValueCount;
         protected override char CreateValue() => (char)('!' + _createValueCount++ % ('~' - '!'));
@@ -1299,7 +1300,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<Guid>> ValueProvider => Gen.Guid.ToValueProvider();
     }
 
-    public class GuidCopierTests : CopierTester<Guid, GuidCopier>
+    public class GuidCopierTests : CopierTester<Guid, IDeepCopier<Guid>>
     {
         protected override Guid CreateValue() => Guid.NewGuid();
         protected override Guid[] TestValues => new[]
@@ -1336,7 +1337,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Type[] TestValues => _values;
     }
 
-    public class TypeCopierTests : CopierTester<Type, TypeCopier>
+    public class TypeCopierTests : CopierTester<Type, IDeepCopier<Type>>
     {
         private readonly Type[] _values =
         {
@@ -1370,7 +1371,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<float>> ValueProvider => Gen.Float.ToValueProvider();
     }
 
-    public class FloatCopierTests : CopierTester<float, FloatCopier>
+    public class FloatCopierTests : CopierTester<float, IDeepCopier<float>>
     {
         protected override float CreateValue() => float.MaxValue * (float)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
         protected override float[] TestValues => new[] { float.MinValue, 0, 1.0f, float.MaxValue };
@@ -1386,7 +1387,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<double>> ValueProvider => Gen.Double.ToValueProvider();
     }
 
-    public class DoubleCopierTests : CopierTester<double, DoubleCopier>
+    public class DoubleCopierTests : CopierTester<double, IDeepCopier<double>>
     {
         protected override double CreateValue() => double.MaxValue * new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
         protected override double[] TestValues => new[] { double.MinValue, 0, 1.0, double.MaxValue };
@@ -1401,7 +1402,7 @@ namespace Orleans.Serialization.UnitTests
         protected override Action<Action<decimal>> ValueProvider => Gen.Decimal.ToValueProvider();
     }
 
-    public class DecimalCopierTests : CopierTester<decimal, DecimalCopier>
+    public class DecimalCopierTests : CopierTester<decimal, IDeepCopier<decimal>>
     {
         protected override decimal CreateValue() => decimal.MaxValue * (decimal)new Random(Guid.NewGuid().GetHashCode()).NextDouble() * Math.Sign(Guid.NewGuid().GetHashCode());
         protected override decimal[] TestValues => new[] { decimal.MinValue, 0, 1.0M, decimal.MaxValue };
@@ -1823,7 +1824,7 @@ namespace Orleans.Serialization.UnitTests
         } 
     }
 
-    public class IPAddressCopierTests : CopierTester<IPAddress, IPAddressCopier>
+    public class IPAddressCopierTests : CopierTester<IPAddress, IDeepCopier<IPAddress>>
     {
         protected override IPAddress[] TestValues => new[] { null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue() };
 
@@ -1956,7 +1957,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Uri left, Uri right) => object.ReferenceEquals(left, right) || left == right;
     }
 
-    public class UriCopierTests : CopierTester<Uri, UriCopier>
+    public class UriCopierTests : CopierTester<Uri, IDeepCopier<Uri>>
     {
         protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
 

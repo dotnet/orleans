@@ -68,16 +68,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(CompareInfo)} fields. {field}");
-    }
-
-    /// <summary>
-    /// Copier for <see cref="CompareInfo"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class CompareInfoCopier : IDeepCopier<CompareInfo>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public CompareInfo DeepCopy(CompareInfo input, CopyContext context) => input;
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for {nameof(CompareInfo)} fields. {field}");
     }
 }

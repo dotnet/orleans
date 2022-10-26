@@ -11,8 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="bool"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class BoolCodec : TypedCodecBase<bool>, IFieldCodec<bool>, IDeepCopier<bool>, IOptionalDeepCopier
+    public sealed class BoolCodec : TypedCodecBase<bool>, IFieldCodec<bool>
     {
         private static readonly Type CodecFieldType = typeof(bool);
 
@@ -53,17 +52,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt8(field.WireType) == 1;
         }
-
-        /// <inheritdoc/>
-        public bool DeepCopy(bool input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="char"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class CharCodec : TypedCodecBase<char>, IFieldCodec<char>, IDeepCopier<char>, IOptionalDeepCopier
+    public sealed class CharCodec : TypedCodecBase<char>, IFieldCodec<char>
     {
         private static readonly Type CodecFieldType = typeof(char);
 
@@ -104,17 +99,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return (char)reader.ReadUInt16(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public char DeepCopy(char input, CopyContext _) => input; 
     }
 
     /// <summary>
     /// Serializer for <see cref="byte"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class ByteCodec : TypedCodecBase<byte>, IFieldCodec<byte>, IDeepCopier<byte>, IOptionalDeepCopier
+    public sealed class ByteCodec : TypedCodecBase<byte>, IFieldCodec<byte>
     {
         private static readonly Type CodecFieldType = typeof(byte);
 
@@ -171,17 +162,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt8(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public byte DeepCopy(byte input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="sbyte"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class SByteCodec : TypedCodecBase<sbyte>, IFieldCodec<sbyte>, IDeepCopier<sbyte>, IOptionalDeepCopier
+    public sealed class SByteCodec : TypedCodecBase<sbyte>, IFieldCodec<sbyte>
     {
         private static readonly Type CodecFieldType = typeof(sbyte);
 
@@ -238,17 +225,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadInt8(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public sbyte DeepCopy(sbyte input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="ushort"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class UInt16Codec : TypedCodecBase<ushort>, IFieldCodec<ushort>, IDeepCopier<ushort>, IOptionalDeepCopier
+    public sealed class UInt16Codec : TypedCodecBase<ushort>, IFieldCodec<ushort>
     {
         /// <summary>
         /// The codec field type
@@ -308,17 +291,13 @@ namespace Orleans.Serialization.Codecs
             writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
             writer.WriteVarUInt32(value);
         }
-
-        /// <inheritdoc/>
-        public ushort DeepCopy(ushort input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="short"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class Int16Codec : TypedCodecBase<short>, IFieldCodec<short>, IDeepCopier<short>, IOptionalDeepCopier
+    public sealed class Int16Codec : TypedCodecBase<short>, IFieldCodec<short>
     {
         private static readonly Type CodecFieldType = typeof(short);
 
@@ -375,17 +354,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadInt16(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public short DeepCopy(short input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serialzier for <see cref="uint"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class UInt32Codec : TypedCodecBase<uint>, IFieldCodec<uint>, IDeepCopier<uint>, IOptionalDeepCopier
+    public sealed class UInt32Codec : TypedCodecBase<uint>, IFieldCodec<uint>
     {
         public static readonly Type CodecFieldType = typeof(uint);
 
@@ -458,17 +433,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt32(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public uint DeepCopy(uint input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="int"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class Int32Codec : TypedCodecBase<int>, IFieldCodec<int>, IDeepCopier<int>, IOptionalDeepCopier
+    public sealed class Int32Codec : TypedCodecBase<int>, IFieldCodec<int>
     {
         /// <summary>
         /// The codec field type
@@ -566,17 +537,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadInt32(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public int DeepCopy(int input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="long"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class Int64Codec : TypedCodecBase<long>, IFieldCodec<long>, IDeepCopier<long>, IOptionalDeepCopier
+    public sealed class Int64Codec : TypedCodecBase<long>, IFieldCodec<long>
     {
         private static readonly Type CodecFieldType = typeof(long);
 
@@ -672,17 +639,13 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadInt64(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public long DeepCopy(long input, CopyContext _) => input;
     }
 
     /// <summary>
     /// Serializer for <see cref="long"/>.
     /// </summary>
     [RegisterSerializer]
-    [RegisterCopier]
-    public sealed class UInt64Codec : TypedCodecBase<ulong>, IFieldCodec<ulong>, IDeepCopier<ulong>, IOptionalDeepCopier
+    public sealed class UInt64Codec : TypedCodecBase<ulong>, IFieldCodec<ulong>
     {
         private static readonly Type CodecFieldType = typeof(ulong);
 
@@ -781,8 +744,5 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt64(field.WireType);
         }
-
-        /// <inheritdoc/>
-        public ulong DeepCopy(ulong input, CopyContext _) => input;
     }
 }

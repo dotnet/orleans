@@ -9,7 +9,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for unknown types.
     /// </summary>
-    public sealed class VoidCodec : IFieldCodec<object>
+    internal sealed class VoidCodec : IFieldCodec<object>
     {
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
@@ -40,7 +40,7 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Copier for unknown types.
     /// </summary>
-    public sealed class VoidCopier : IDeepCopier<object>
+    internal sealed class VoidCopier : IDeepCopier
     {
         public object DeepCopy(object input, CopyContext context)
         {

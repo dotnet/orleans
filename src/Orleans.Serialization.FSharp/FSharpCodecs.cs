@@ -187,7 +187,7 @@ namespace Orleans.Serialization
         }
 
         internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported");
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported");
     }
 
     /// <summary>

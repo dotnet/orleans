@@ -25,7 +25,7 @@ namespace Orleans.CodeGenerator
             var isShallowCopyable = type.IsShallowCopyable;
             if (isShallowCopyable && !type.IsGenericType)
             {
-                defaultCopiers.Add(type, GetDefaultCopier("DefaultShallowCopier", SingletonSeparatedList(type.TypeSyntax)));
+                defaultCopiers.Add(type, libraryTypes.ShallowCopier.ToTypeSyntax(type.TypeSyntax));
                 return null;
             }
 
@@ -57,20 +57,14 @@ namespace Orleans.CodeGenerator
             var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
 
             var baseType = isExceptionType ? QualifiedName(IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
-                : libraryTypes.DeepCopier_1.ToTypeSyntax(type.TypeSyntax);
+                : (isShallowCopyable ? libraryTypes.ShallowCopier : libraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())));
 
-            if (isShallowCopyable)
-            {
-                var copyMethod = GenerateImmutableTypeCopyMethod(type, libraryTypes);
-                classDeclaration = classDeclaration.AddMembers(copyMethod);
-                classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(libraryTypes.IOptionalDeepCopier.ToTypeSyntax()));
-            }
-            else
+            if (!isShallowCopyable)
             {
                 var fieldDescriptions = GetFieldDescriptions(type, members, libraryTypes, isExceptionType, out var onlyDeepFields);
                 var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
@@ -104,9 +98,6 @@ namespace Orleans.CodeGenerator
 
             return classDeclaration;
         }
-
-        private static TypeSyntax GetDefaultCopier(string name, SeparatedSyntaxList<TypeSyntax> args)
-            => QualifiedName(IdentifierName("OrleansGeneratedCodeHelper"), GenericName(name).WithTypeArgumentList(TypeArgumentList(args)));
 
         public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
 
@@ -611,32 +602,6 @@ skip:;
             }
 
             return getValueExpression;
-        }
-
-        private static MemberDeclarationSyntax GenerateImmutableTypeCopyMethod(
-            ISerializableTypeDescription type,
-            LibraryTypes libraryTypes)
-        {
-            var returnType = type.TypeSyntax;
-
-            var inputParam = "input".ToIdentifierName();
-
-            var body = new StatementSyntax[]
-            {
-                ReturnStatement(inputParam)
-            };
-
-            var parameters = new[]
-            {
-                Parameter("input".ToIdentifier()).WithType(returnType),
-                Parameter("_".ToIdentifier()).WithType(libraryTypes.CopyContext.ToTypeSyntax()),
-            };
-
-            return MethodDeclaration(returnType, DeepCopyMethodName)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
-                .AddBodyStatements(body.ToArray());
         }
 
         private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)

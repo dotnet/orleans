@@ -114,15 +114,8 @@ namespace Orleans.Runtime
         }
     }
 
-    /// <summary>
-    /// Copier implementation for <see cref="GrainReference"/> and derived classes.
-    /// </summary>
     [RegisterCopier]
-    internal sealed class GrainReferenceCopier : IDeepCopier<GrainReference>, IDerivedTypeCopier, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public GrainReference DeepCopy(GrainReference input, CopyContext context) => input;
-    }
+    internal sealed class GrainReferenceCopier : ShallowCopier<GrainReference>, IDerivedTypeCopier { }
 
     /// <summary>
     /// Provides specialized copier instances for grain reference types.

@@ -124,14 +124,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for {nameof(Guid)} fields. {field}");
     }
-
-    /// <summary>
-    /// Copier for <see cref="Guid"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class GuidCopier : IDeepCopier<Guid>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public Guid DeepCopy(Guid input, CopyContext _) => input;
-    }
 }

@@ -7,6 +7,7 @@ using System.IO.Pipelines;
 using Xunit;
 using System.Reflection;
 using Orleans.Serialization.TestKit;
+using Orleans.Serialization.Cloning;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -75,16 +76,18 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public class NewtonsoftJsonCodecCopierTests : CopierTester<object, NewtonsoftJsonCodec>
+    public class NewtonsoftJsonCodecCopierTests : CopierTester<MyJsonClass, IDeepCopier<MyJsonClass>>
     {
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
 
-        protected override object CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override IDeepCopier<MyJsonClass> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass>();
 
-        protected override object[] TestValues => new object[]
+        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+
+        protected override MyJsonClass[] TestValues => new MyJsonClass[]
         {
             null,
             new MyJsonClass(),

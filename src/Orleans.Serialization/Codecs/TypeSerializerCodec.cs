@@ -139,14 +139,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnknownWellKnownType(uint id) => throw new UnknownWellKnownTypeException(id);
         private static void ThrowMissingType() => throw new TypeMissingException();
     }
-
-    /// <summary>
-    /// Copier for <see cref="Type"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class TypeCopier : IDeepCopier<Type>, IDerivedTypeCopier, IOptionalDeepCopier
-    {
-        /// <inheritdoc />
-        public Type DeepCopy(Type input, CopyContext context) => input;
-    }
 }

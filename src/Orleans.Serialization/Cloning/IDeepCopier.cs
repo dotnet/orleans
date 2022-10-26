@@ -1,14 +1,16 @@
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.ObjectPool;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
-using System.Diagnostics.CodeAnalysis;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Utilities;
 
 namespace Orleans.Serialization.Cloning
 {
@@ -38,7 +40,7 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </param>
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>.</returns>
-        IDeepCopier<object> GetDeepCopier(Type type);
+        IDeepCopier GetDeepCopier(Type type);
 
         /// <summary>
         /// Gets a deep copier capable of copying instances of type <paramref name="type"/>, or returns <see langword="null"/> if an appropriate copier was not found.
@@ -47,7 +49,7 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </param>
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
-        IDeepCopier<object> TryGetDeepCopier(Type type);
+        IDeepCopier TryGetDeepCopier(Type type);
 
         /// <summary>
         /// Gets a base type copier capable of copying instances of type <typeparamref name="T"/>.
@@ -62,17 +64,45 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Marker type for deep copiers.
     /// </summary>
-    public interface IDeepCopier { }
+    public interface IDeepCopier
+    {
+        /// <summary>
+        /// Creates a deep copy of the provided untyped input. The type must still match the copier instance!
+        /// </summary>
+        object DeepCopy(object input, CopyContext context);
+    }
 
     /// <summary>
     /// Marker interface for deep copiers of types that could optionally be shallow-copyable.
     /// </summary>
-    public interface IOptionalDeepCopier
+    public interface IOptionalDeepCopier : IDeepCopier
     {
         /// <summary>
         /// Returns true if the type is shallow-copyable.
         /// </summary>
-        public virtual bool IsShallowCopyable() => true;
+        bool IsShallowCopyable();
+    }
+
+    internal sealed class ShallowCopier : IOptionalDeepCopier
+    {
+        public static readonly ShallowCopier Instance = new();
+
+        public bool IsShallowCopyable() => true;
+        public object DeepCopy(object input, CopyContext _) => input;
+    }
+
+    /// <summary>
+    /// Base type for deep copiers of types that are actually shallow-copyable.
+    /// </summary>
+    public class ShallowCopier<T> : IOptionalDeepCopier, IDeepCopier<T>
+    {
+        public bool IsShallowCopyable() => true;
+
+        /// <summary>Returns the input value.</summary>
+        public T DeepCopy(T input, CopyContext _) => input;
+
+        /// <summary>Returns the input value.</summary>
+        public object DeepCopy(object input, CopyContext _) => input;
     }
 
     /// <summary>
@@ -89,6 +119,8 @@ namespace Orleans.Serialization.Cloning
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input"/>.</returns>
         T DeepCopy(T input, CopyContext context);
+
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => DeepCopy((T)input, context);
     }
 
     /// <summary>
@@ -124,7 +156,7 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Provides functionality for copying objects of multiple types.
     /// </summary>
-    public interface IGeneralizedCopier : IDeepCopier<object>
+    public interface IGeneralizedCopier : IDeepCopier
     {
         /// <summary>
         /// Returns a value indicating whether the provided type is supported by this implementation.
@@ -249,6 +281,11 @@ namespace Orleans.Serialization.Cloning
             [typeof(string)] = true,
             [typeof(CancellationToken)] = true,
             [typeof(Guid)] = true,
+            [typeof(BitVector32)] = true,
+            [typeof(CompareInfo)] = true,
+            [typeof(CultureInfo)] = true,
+            [typeof(Version)] = true,
+            [typeof(Uri)] = true,
         };
 
         public static bool Contains(Type type)
@@ -268,7 +305,7 @@ namespace Orleans.Serialization.Cloning
                 return true;
             }
 
-            if (type.IsDefined(typeof(ImmutableAttribute), false))
+            if (type.IsSealed && type.IsDefined(typeof(ImmutableAttribute), false))
             {
                 return true;
             }
@@ -297,69 +334,27 @@ namespace Orleans.Serialization.Cloning
             }
 
             if (typeof(Exception).IsAssignableFrom(type))
-            {
                 return true;
-            }
+
+            if (typeof(Type).IsAssignableFrom(type))
+                return true;
 
             return false;
         }
     }
 
     /// <summary>
-    /// Methods for adapting typed and untyped copiers.
+    /// Converts an untyped copier into a strongly-typed copier.
     /// </summary>
-    internal static class CopierAdapter
+    internal sealed class UntypedCopierWrapper<T> : IDeepCopier<T>
     {
-        /// <summary>
-        /// Converts a strongly-typed copier into an untyped copier.
-        /// </summary>
-        public static IDeepCopier<object> CreateUntypedFromTyped<T>(IDeepCopier<T> typedCopier) => new TypedCopierWrapper<T>(typedCopier);
+        private readonly IDeepCopier _copier;
 
-        /// <summary>
-        /// Converts an untyped copier into a strongly-typed copier.
-        /// </summary>
-        public static IDeepCopier<T> CreateTypedFromUntyped<T>(IDeepCopier<object> untypedCopier) => new UntypedCopierWrapper<T>(untypedCopier);
+        public UntypedCopierWrapper(IDeepCopier copier) => _copier = copier;
 
-        private sealed class TypedCopierWrapper<T> : IDeepCopier<object>, IWrappedCodec, IOptionalDeepCopier
-        {
-            private readonly IDeepCopier<T> _copier;
-            private readonly bool _shallow;
+        public T DeepCopy(T original, CopyContext context) => (T)_copier.DeepCopy(original, context);
 
-            public TypedCopierWrapper(IDeepCopier<T> copier)
-            {
-                _copier = copier;
-                _shallow = (copier as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
-            }
-
-            public object DeepCopy(object original, CopyContext context) => _shallow ? original : _copier.DeepCopy((T)original, context);
-
-            public object Inner => _copier;
-
-            public bool IsShallowCopyable() => _shallow;
-        }
-
-        private sealed class UntypedCopierWrapper<T> : IWrappedCodec, IDeepCopier<T>, IOptionalDeepCopier
-        {
-            private readonly IDeepCopier<object> _copier;
-            private readonly bool _shallow;
-
-            public UntypedCopierWrapper(IDeepCopier<object> copier)
-            {
-                _copier = copier;
-                _shallow = (copier as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
-            }
-
-            public T DeepCopy(T original, CopyContext context) => _shallow ? original : (T)_copier.DeepCopy(original, context);
-
-            public object Inner => _copier;
-
-            public bool IsShallowCopyable() => _shallow;
-        }
-    }
-
-    internal sealed class ShallowCopyableTypeCopier<T> : IDeepCopier<T>, IOptionalDeepCopier
-    {
-        public T DeepCopy(T input, CopyContext context) => input;
+        public object DeepCopy(object original, CopyContext context) => _copier.DeepCopy(original, context);
     }
 
     /// <summary>

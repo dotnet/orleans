@@ -67,16 +67,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.TagDelimited} is supported for {nameof(DateTimeOffset)} fields. {field}");
-    }
-
-    /// <summary>
-    /// Copier for <see cref="DateTimeOffset"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class DateTimeOffsetCopier : IDeepCopier<DateTimeOffset>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public DateTimeOffset DeepCopy(DateTimeOffset input, CopyContext _) => input;
+            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for {nameof(DateTimeOffset)} fields. {field}");
     }
 }

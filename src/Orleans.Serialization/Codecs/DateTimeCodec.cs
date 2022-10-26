@@ -46,14 +46,4 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
             $"Only a {nameof(WireType)} value of {WireType.Fixed64} is supported for {nameof(DateTime)} fields. {field}");
     }
-
-    /// <summary>
-    /// Copier for <see cref="DateTime"/>.
-    /// </summary>
-    [RegisterCopier]
-    public sealed class DateTimeCopier : IDeepCopier<DateTime>, IOptionalDeepCopier
-    {
-        /// <inheritdoc/>
-        public DateTime DeepCopy(DateTime input, CopyContext _) => input;
-    }
 }
