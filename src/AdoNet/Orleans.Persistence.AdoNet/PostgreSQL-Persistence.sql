@@ -8,8 +8,6 @@ CREATE TABLE OrleansStorage
     grainidextensionstring character varying(512) ,
     serviceid character varying(150)  NOT NULL,
     payloadbinary bytea,
-    payloadxml xml,
-    payloadjson text,
     modifiedon timestamp without time zone NOT NULL,
     version integer
 );
@@ -27,9 +25,7 @@ CREATE OR REPLACE FUNCTION writetostorage(
     _grainidextensionstring character varying,
     _serviceid character varying,
     _grainstateversion integer,
-    _payloadbinary bytea,
-    _payloadjson text,
-    _payloadxml xml)
+    _payloadbinary bytea)
     RETURNS TABLE(newgrainstateversion integer)
     LANGUAGE 'plpgsql'
 AS $function$
@@ -62,8 +58,6 @@ AS $function$
         UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
-            PayloadJson = _PayloadJson,
-            PayloadXml = _PayloadXml,
             ModifiedOn = (now() at time zone 'utc'),
             Version = Version + 1
 
@@ -98,8 +92,6 @@ AS $function$
             GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
-            PayloadJson,
-            PayloadXml,
             ModifiedOn,
             Version
         )
@@ -112,8 +104,6 @@ AS $function$
             _GrainIdExtensionString,
             _ServiceId,
             _PayloadBinary,
-            _PayloadJson,
-            _PayloadXml,
            (now() at time zone 'utc'),
             1
         WHERE NOT EXISTS
@@ -148,7 +138,7 @@ VALUES
 (
     'WriteToStorageKey','
 
-        select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary, @PayloadJson, CAST(@PayloadXml AS xml));
+        select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary);
 ');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -157,8 +147,6 @@ VALUES
     'ReadFromStorageKey','
     SELECT
         PayloadBinary,
-        PayloadXml,
-        PayloadJson,
         (now() at time zone ''utc''),
         Version
     FROM
@@ -180,8 +168,6 @@ VALUES
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        PayloadJson = NULL,
-        PayloadXml = NULL,
         Version = Version + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL

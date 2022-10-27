@@ -62,16 +62,8 @@ CREATE TABLE OrleansStorage
     GrainIdExtensionString    NVARCHAR(512) NULL,
     ServiceId                NVARCHAR(150) NOT NULL,
 
-    -- The usage of the Payload records is exclusive in that
-    -- only one should be populated at any given time and two others
-    -- are NULL. The types are separated to advantage on special
-    -- processing capabilities present on database engines (not all might
-    -- have both JSON and XML types.
-    --
-    -- One is free to alter the size of these fields.
+    -- Payload
     PayloadBinary    VARBINARY(MAX) NULL,
-    PayloadXml        XML NULL,
-    PayloadJson        NVARCHAR(MAX) NULL,
 
     -- Informational field, no other use.
     ModifiedOn DATETIME2(3) NOT NULL,
@@ -131,8 +123,6 @@ VALUES
         UPDATE OrleansStorage
         SET
             PayloadBinary = @PayloadBinary,
-            PayloadJson = @PayloadJson,
-            PayloadXml = @PayloadXml,
             ModifiedOn = GETUTCDATE(),
             Version = Version + 1,
             @NewGrainStateVersion = Version + 1,
@@ -163,8 +153,6 @@ VALUES
             GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
-            PayloadJson,
-            PayloadXml,
             ModifiedOn,
             Version
         )
@@ -177,8 +165,6 @@ VALUES
             @GrainIdExtensionString,
             @ServiceId,
             @PayloadBinary,
-            @PayloadJson,
-            @PayloadXml,
             GETUTCDATE(),
             1
          WHERE NOT EXISTS
@@ -216,8 +202,6 @@ VALUES
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        PayloadJson = NULL,
-        PayloadXml = NULL,
         ModifiedOn = GETUTCDATE(),
         Version = Version + 1,
         @NewGrainStateVersion = Version + 1
@@ -249,8 +233,6 @@ VALUES
     -- should guarantee the execution time is robustly basically the same from query-to-query.
     SELECT
         PayloadBinary,
-        PayloadXml,
-        PayloadJson,
         Version
     FROM
         OrleansStorage

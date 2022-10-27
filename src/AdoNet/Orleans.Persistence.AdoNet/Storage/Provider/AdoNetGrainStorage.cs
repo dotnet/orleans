@@ -363,8 +363,6 @@ namespace Orleans.Storage
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                     command.AddParameter("PayloadBinary", serialized.ToArray());
-                    command.AddParameter<string>("PayloadJson", null);
-                    command.AddParameter<string>("PayloadXml", null);
                 }, (selector, resultSetCount, token) =>
                 { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();

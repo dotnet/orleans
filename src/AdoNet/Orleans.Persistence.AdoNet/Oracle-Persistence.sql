@@ -63,17 +63,9 @@ CREATE TABLE "ORLEANSSTORAGE"
     "GRAINIDEXTENSIONSTRING" NVARCHAR2(512),
     "SERVICEID" NVARCHAR2(150) NOT NULL ENABLE,
 
-
-    -- The usage of the Payload records is exclusive in that
-    -- only one should be populated at any given time and two others
-    -- are NULL. The types are separated to advantage on special
-    -- processing capabilities present on database engines (not all might
-    -- have both JSON and XML types.
-    --
-    -- One is free to alter the size of these fields.
+    -- Payload
     "PAYLOADBINARY" BLOB,
-    "PAYLOADXML" CLOB,
-    "PAYLOADJSON" CLOB,
+
     -- Informational field, no other use.
     "MODIFIEDON" TIMESTAMP (6) NOT NULL ENABLE,
     -- The version of the stored payload.
@@ -89,8 +81,7 @@ COMPRESS;
 /
 
 CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
-                                             PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB,
-                                             PARAM_PAYLOADJSON IN CLOB, PARAM_PAYLOADXML IN CLOB)
+                                             PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB)
   RETURN NUMBER IS
   rowcount NUMBER;
   newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
@@ -119,8 +110,6 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         UPDATE OrleansStorage
         SET
             PayloadBinary = PARAM_PAYLOADBINARY,
-            PayloadJson = PARAM_PAYLOADJSON,
-            PayloadXml = PARAM_PAYLOADXML,
             ModifiedOn = sys_extract_utc(systimestamp),
             Version = Version + 1
         WHERE
@@ -155,8 +144,6 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
             GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
-            PayloadJson,
-            PayloadXml,
             ModifiedOn,
             Version
         )
@@ -169,8 +156,6 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
             PARAM_GRAINIDEXTENSIONSTRING,
             PARAM_SERVICEID,
             PARAM_PAYLOADBINARY,
-            PARAM_PAYLOADJSON,
-            PARAM_PAYLOADXML,
             sys_extract_utc(systimestamp),
             1 FROM DUAL
          WHERE NOT EXISTS
@@ -209,8 +194,6 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        PayloadJson = NULL,
-        PayloadXml = NULL,
         ModifiedOn = sys_extract_utc(systimestamp),
         Version = Version + 1
     WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
@@ -233,8 +216,8 @@ VALUES
 (
     'WriteToStorageKey','
   SELECT WriteToStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
-                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion, :PayloadBinary,
-                                             :PayloadJson, :PayloadXml) AS NewGrainStateVersion FROM DUAL
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion, :PayloadBinary)
+                                             AS NewGrainStateVersion FROM DUAL
 ');
 /
 
@@ -252,7 +235,7 @@ VALUES
 (
     'ReadFromStorageKey',
     '
-     SELECT PayloadBinary, PayloadXml, PayloadJson, Version
+     SELECT PayloadBinary, Version
      FROM OrleansStorage
      WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
        AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
