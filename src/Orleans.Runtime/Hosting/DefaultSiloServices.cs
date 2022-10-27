@@ -243,6 +243,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainActivator, DefaultGrainActivator>();
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
             services.TryAddScoped<IGrainActivationContext>(sp => sp.GetRequiredService<ActivationData.GrainActivationContextFactory>().Context);
+            services.AddSingleton<IGrainActivationContextAccessor, GrainActivationContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
 

@@ -121,12 +121,14 @@ namespace UnitTests.General
             private readonly SerializationManager serializationManager;
             private readonly Silo silo;
             private readonly IGrainFactory grainFactory;
+            private readonly IGrainActivationContextAccessor contextAccessor;
 
-            public GrainCallFilterWithDependencies(SerializationManager serializationManager, Silo silo, IGrainFactory grainFactory)
+            public GrainCallFilterWithDependencies(SerializationManager serializationManager, Silo silo, IGrainFactory grainFactory, IGrainActivationContextAccessor contextAccessor)
             {
                 this.serializationManager = serializationManager;
                 this.silo = silo;
                 this.grainFactory = grainFactory;
+                this.contextAccessor = contextAccessor;
             }
 
             public Task Invoke(IIncomingGrainCallContext context)
@@ -136,7 +138,14 @@ namespace UnitTests.General
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
                     {
                         RequestContext.Set(GrainCallFilterTestConstants.Key, value + '2');
+                        RequestContext.Set("id", contextAccessor.GrainActivationContext.GrainIdentity.IdentityString);
                     }
+                }
+
+                if (string.Equals(context.ImplementationMethod.Name, nameof(IGrainCallFilterTestGrain.GetGrainId)))
+                {
+                    Assert.NotNull(this.contextAccessor.GrainActivationContext);
+                    RequestContext.Set("id", contextAccessor.GrainActivationContext.GrainIdentity.IdentityString);
                 }
 
                 return context.Invoke();
@@ -184,6 +193,20 @@ namespace UnitTests.General
             var context = await grain.GetRequestContext();
             Assert.NotNull(context);
             Assert.Equal("1234", context);
+        }
+
+        /// <summary>
+        /// Ensures that grain call filters have access to to the grain context via <see cref="IGrainActivationContextAccessor"/>.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_GrainContextTest()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+
+            // This grain method reads the grain identity from the request context, added there by the grain call filter, and returns it.
+            var context = await grain.GetGrainId();
+            Assert.NotNull(context);
+            Assert.Equal(grain.GetGrainIdentity().IdentityString, context);
         }
         
         /// <summary>
