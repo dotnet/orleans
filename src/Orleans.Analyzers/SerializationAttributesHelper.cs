@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -18,7 +19,15 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static (List<MemberDeclarationSyntax> UnannotatedMembers, List<MemberDeclarationSyntax> AnnotatedMembers, uint NextAvailableId, uint AnnotatedConstructorCount) AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
+        public readonly record struct TypeAnalysis
+        {
+            public List<MemberDeclarationSyntax> UnannotatedMembers { get; init; }
+            public List<MemberDeclarationSyntax> AnnotatedMembers { get; init; }
+            public uint NextAvailableId { get; init; }
+            public uint AnnotatedConstructorCount { get; init; }
+        }
+
+        public static TypeAnalysis AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
         {
             uint nextId = 0;
             uint annotatedConstructorCount = 0;
@@ -63,7 +72,13 @@ namespace Orleans.Analyzers
                 unannotatedSerializableMembers.Add(member);
             }
 
-            return (unannotatedSerializableMembers, annotatedSerializableMembers, nextId, annotatedConstructorCount);
+            return new TypeAnalysis
+            {
+                UnannotatedMembers = unannotatedSerializableMembers,
+                AnnotatedMembers = annotatedSerializableMembers,
+                NextAvailableId = nextId,
+                AnnotatedConstructorCount = annotatedConstructorCount
+            };
         }
     }
 }

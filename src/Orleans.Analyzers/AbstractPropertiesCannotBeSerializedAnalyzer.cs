@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -14,7 +14,7 @@ namespace Orleans.Analyzers
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AbstractOrStaticMembersCannotBeSerializedTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AbstractOrStaticMembersCannotBeSerializedMessageFormat), Resources.ResourceManager, typeof(Resources));
 
-        internal static DiagnosticDescriptor Rule { get; } = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -29,8 +29,8 @@ namespace Orleans.Analyzers
         {
             if (context.Node is TypeDeclarationSyntax declaration && SerializationAttributesHelper.ShouldGenerateSerializer(declaration))
             {
-                var (_, members, _, _) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
-                foreach (var member in members)
+                var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                foreach (var member in analysis.AnnotatedMembers)
                 {
                     string modifier = null;
                     if (member.IsAbstract())
