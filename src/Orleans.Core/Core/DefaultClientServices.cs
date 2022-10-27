@@ -58,6 +58,7 @@ namespace Orleans
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+            services.AddSingleton<IGrainActivationContextAccessor, GrainActivationContextAccessor>();
 
             // Serialization
             services.TryAddSingleton<SerializationManager>(sp => ActivatorUtilities.CreateInstance<SerializationManager>(sp,

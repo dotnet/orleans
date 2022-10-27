@@ -31,4 +31,27 @@ namespace Orleans.Runtime
         /// </summary>
         IGrainLifecycle ObservableLifecycle { get; }
     }
+
+    /// <summary>
+    /// Provides access to the <see cref="IGrainActivationContext"/> of the currently executing grain activation.
+    /// </summary>
+    public interface IGrainActivationContextAccessor
+    {
+        /// <summary>
+        /// Gets the <see cref="IGrainActivationContext"/> of the currently executing grain activation.
+        /// </summary>
+        /// <remarks>
+        /// The resulting value will be <see langword="null"/> if the current execution context is not associated with a grain activation.
+        /// </remarks>
+        IGrainActivationContext GrainActivationContext { get; }
+    }
+
+    /// <summary>
+    /// Provides access to the <see cref="IGrainActivationContext"/> of the currently executing grain activation.
+    /// </summary>
+    internal sealed class GrainActivationContextAccessor : IGrainActivationContextAccessor
+    {
+        /// <inheritdoc/>
+        public IGrainActivationContext GrainActivationContext => RuntimeContext.CurrentGrainContext as IGrainActivationContext;
+    }
 }

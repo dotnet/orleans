@@ -199,6 +199,8 @@ namespace UnitTests.Grains
                 }
             }
         }
+
+        public Task<string> GetGrainId() => Task.FromResult(RequestContext.Get("id") as string);
     }
 
     public class CaterpillarGrain : Grain, ICaterpillarGrain, IIncomingGrainCallFilter

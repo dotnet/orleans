@@ -51,6 +51,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task<string> ThrowIfGreaterThanZero(int value);
         Task<string> GetRequestContext();
+        Task<string> GetGrainId();
     }
 
     public interface IHungryGrain<T> : IGrainWithIntegerKey
