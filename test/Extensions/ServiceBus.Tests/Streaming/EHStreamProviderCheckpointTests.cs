@@ -173,7 +173,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             IStreamProvider streamProvider = this.Client.GetStreamProvider(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers = streamGuids
-                    .Select(streamGuid => streamProvider.GetStream<GeneratedEvent>(streamGuid, streamNamespace))
+                    .Select(streamGuid => streamProvider.GetStream<GeneratedEvent>(streamNamespace, streamGuid))
                     .ToArray();
 
             for (int i = 0; i < eventsInStream - 1; i++)

@@ -313,7 +313,7 @@ namespace UnitTests.StreamingTests
             int eventCount = 0;
 
             var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
-            var stream = provider.GetStream<int>(streamGuid, streamNamespace);
+            var stream = provider.GetStream<int>(streamNamespace, streamGuid);
             var handle = await stream.SubscribeAsync((e,t) =>
             {
                 eventCount++;

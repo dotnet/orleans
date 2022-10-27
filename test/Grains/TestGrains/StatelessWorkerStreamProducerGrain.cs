@@ -23,7 +23,7 @@ namespace UnitTests.Grains
 
         public async Task Produce(Guid streamId, string providerToUse, string message)
         {
-            var stream = this.GetStreamProvider(providerToUse).GetStream<string>(streamId, StreamNamespace);
+            var stream = this.GetStreamProvider(providerToUse).GetStream<string>(StreamNamespace, streamId);
             await stream.OnNextAsync(message);
         }
     }

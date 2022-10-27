@@ -25,7 +25,7 @@ namespace UnitTests.Grains
             var streamProvider = this.GetStreamProvider("SMSProvider");
 
             var streamIdentity = this.GetImplicitStreamIdentity();
-            var stream = streamProvider.GetStream<int>(streamIdentity.Guid, streamIdentity.Namespace);
+            var stream = streamProvider.GetStream<int>(streamIdentity.Namespace, streamIdentity.Guid);
             await stream.SubscribeAsync(
                 (e, t) =>
                 {

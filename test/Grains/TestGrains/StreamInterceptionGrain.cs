@@ -14,7 +14,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var streams = this.GetStreamProvider("SMSProvider");
-            var stream = streams.GetStream<int>(this.GetPrimaryKey(), "InterceptedStream");
+            var stream = streams.GetStream<int>("InterceptedStream", this.GetPrimaryKey());
             await stream.SubscribeAsync(
                 (value, token) =>
                 {

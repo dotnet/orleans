@@ -30,7 +30,7 @@ namespace UnitTests.StreamingTests
             Guid streamGuid = Guid.NewGuid();
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(streamGuid, StreamBatchingTestConst.BatchingNameSpace);
+            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
             for(int i = 0; i< ExpectedConsumed; i++)
             {
                 await stream.OnNextAsync(i.ToString());
@@ -48,7 +48,7 @@ namespace UnitTests.StreamingTests
             Guid streamGuid = Guid.NewGuid();
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(streamGuid, StreamBatchingTestConst.NonBatchingNameSpace);
+            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.NonBatchingNameSpace, streamGuid);
             for (int i = 0; i < BatchesSent; i++)
             {
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));
@@ -66,7 +66,7 @@ namespace UnitTests.StreamingTests
             Guid streamGuid = Guid.NewGuid();
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(streamGuid, StreamBatchingTestConst.BatchingNameSpace);
+            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
             for (int i = 0; i < BatchesSent; i++)
             {
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));

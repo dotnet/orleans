@@ -106,7 +106,7 @@ namespace Tester.StreamingTests
             Func<int, StreamSequenceToken, Task> onNextAsync)
         {
             IStreamProvider streamProvider = this.testHost.Client.GetStreamProvider(streamProviderName);
-            IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamGuid, streamNamespace);
+            IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             return stream.SubscribeAsync(onNextAsync);
         }
 
@@ -128,7 +128,7 @@ namespace Tester.StreamingTests
         private async Task GenerateEvents(string streamProviderName, Guid streamGuid, string streamNamespace, int produceCount)
         {
             IStreamProvider streamProvider = this.testHost.Client.GetStreamProvider(streamProviderName);
-            IAsyncObserver<int> observer = streamProvider.GetStream<int>(streamGuid, streamNamespace);
+            IAsyncObserver<int> observer = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             for (int i = 0; i < produceCount; i++)
             {
                 await observer.OnNextAsync(i);

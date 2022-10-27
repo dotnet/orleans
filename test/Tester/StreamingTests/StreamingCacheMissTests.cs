@@ -43,13 +43,13 @@ namespace Tester.StreamingTests
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
-            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
+            var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             var otherStreams = new List<IAsyncStream<byte[]>>();
             for (var i = 0; i < 20; i++)
-                otherStreams.Add(streamProvider.GetStream<byte[]>(Guid.NewGuid(), nameof(IImplicitSubscriptionCounterGrain)));
+                otherStreams.Add(streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid()));
 
             // Data that will be sent to the grains
             var interestingData = new byte[1024];
@@ -78,13 +78,13 @@ namespace Tester.StreamingTests
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
-            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
+            var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             var otherStreams = new List<IAsyncStream<byte[]>>();
             for (var i = 0; i < 20; i++)
-                otherStreams.Add(streamProvider.GetStream<byte[]>(Guid.NewGuid(), nameof(IImplicitSubscriptionCounterGrain)));
+                otherStreams.Add(streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid()));
 
             // Data that will always be filtered
             var skippedData = new byte[1024];

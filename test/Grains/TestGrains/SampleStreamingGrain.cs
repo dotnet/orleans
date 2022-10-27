@@ -64,7 +64,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("BecomeProducer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
-            producer = streamProvider.GetStream<int>(streamId, streamNamespace);
+            producer = streamProvider.GetStream<int>(streamNamespace, streamId);
             return Task.CompletedTask;
         }
 
@@ -146,7 +146,7 @@ namespace UnitTests.Grains
             logger.LogInformation("BecomeConsumer");
             consumerObserver = new SampleConsumerObserver<int>(this);
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
-            consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
+            consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
             consumerHandle = await consumer.SubscribeAsync(consumerObserver);
         }
 
@@ -196,7 +196,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation( "BecomeConsumer" );
             IStreamProvider streamProvider = this.GetStreamProvider( providerToUse );
-            consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
+            consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
             consumerHandle = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
         }
 
