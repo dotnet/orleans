@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    [Serializable, GenerateSerializer, Immutable]
+    [Id(103), Serializable, GenerateSerializer, Immutable]
     internal sealed class StatusResponse
     {
         [Id(1)]

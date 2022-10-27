@@ -3,16 +3,21 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
@@ -21,6 +26,8 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
+        private static readonly ConcurrentDictionary<Type, IFieldCodec> _rawResponseCodecs = new();
+        private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddress> _activationAddressCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
         private readonly CachingSiloAddressCodec _writerSiloAddressCodec = new();
@@ -43,6 +50,7 @@ namespace Orleans.Runtime.Messaging
             _memoryPool = memoryPool.Pool;
             _maxHeaderLength = options.MaxMessageHeaderSize;
             _maxBodyLength = options.MaxMessageBodySize;
+            _codecProvider = sessionPool.CodecProvider;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
             _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddress>>(this, sessionPool.CodecProvider);
         }
@@ -92,19 +100,22 @@ namespace Orleans.Runtime.Messaging
                     Deserialize(ref headersReader, message);
                 }
 
-                _deserializationSession.PartialReset();
+                if (bodyLength != 0)
+                {
+                    _deserializationSession.PartialReset();
 
-                // Body deserialization is more likely to fail than header deserialization.
-                // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                if (body.IsSingleSegment)
-                {
-                    var reader = Reader.Create(body.First.Span, _deserializationSession);
-                    message.BodyObject = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
-                }
-                else
-                {
-                    var reader = Reader.Create(body, _deserializationSession);
-                    message.BodyObject = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                    // Body deserialization is more likely to fail than header deserialization.
+                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
+                    if (body.IsSingleSegment)
+                    {
+                        var reader = Reader.Create(body.First.Span, _deserializationSession);
+                        ReadBodyObject(message, ref reader);
+                    }
+                    else
+                    {
+                        var reader = Reader.Create(body, _deserializationSession);
+                        ReadBodyObject(message, ref reader);
+                    }
                 }
 
                 return (0, headerLength, bodyLength);
@@ -116,8 +127,33 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
+        {
+            var field = reader.ReadFieldHeader();
+
+            IFieldCodec bodyCodec;
+            if (message.Result == ResponseTypes.Success)
+            {
+                bodyCodec = GetRawResponseCodec(field.FieldType);
+                message.Result = ResponseTypes.None;
+            }
+            else
+            {
+                bodyCodec = _codecProvider.GetCodec(field.FieldType);
+            }
+
+            message.BodyObject = bodyCodec.ReadValue(ref reader, field);
+        }
+
         public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
+            IFieldCodec? bodyCodec = null;
+            if (message.Result is ResponseTypes.None && (message.BodyObject as Response)?.GetSimpleResultType() is { } simpleType)
+            {
+                bodyCodec = GetRawResponseCodec(simpleType);
+                message.Result = ResponseTypes.Success;
+            }
+
             try
             {
                 if (_bufferWriter is not PrefixingBufferWriter<byte, TBufferWriter> bufferWriter)
@@ -137,9 +173,13 @@ namespace Orleans.Runtime.Messaging
 
                 _serializationSession.PartialReset();
 
-                var bodyWriter = Writer.Create(buffer, _serializationSession);
-                ObjectCodec.WriteField(ref bodyWriter, 0, typeof(object), message.BodyObject);
-                bodyWriter.Commit();
+                if (message.BodyObject is not null)
+                {
+                    bodyCodec ??= _codecProvider.GetCodec(message.BodyObject.GetType());
+                    var bodyWriter = Writer.Create(buffer, _serializationSession);
+                    bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
+                    bodyWriter.Commit();
+                }
 
                 // Write length prefixes, first header length then body length.
                 BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
@@ -343,7 +383,7 @@ namespace Orleans.Runtime.Messaging
             foreach (var entry in value)
             {
                 WriteString(ref writer, entry.Key);
-                ObjectCodec.WriteField(ref writer, 0, typeof(object), entry.Value);
+                ObjectCodec.WriteField(ref writer, 0, null, entry.Value);
             }
         }
 
@@ -375,5 +415,45 @@ namespace Orleans.Runtime.Messaging
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
         }
+
+        private IFieldCodec GetRawResponseCodec(Type resultType)
+        {
+            return _rawResponseCodecs.GetOrAdd(resultType,
+                static (key, provider) => (IFieldCodec)Activator.CreateInstance(typeof(RawResponseCodec<>).MakeGenericType(key), provider)!, _codecProvider);
+        }
+
+        private sealed class RawResponseCodec<T> : IFieldCodec
+        {
+            private readonly Type _resultType = typeof(T);
+            private readonly IFieldCodec<T> _codec;
+
+            public RawResponseCodec(CodecProvider codecProvider) => _codec = codecProvider.GetCodec<T>();
+
+            public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+            {
+                writer.WriteStartObject(0, null, _resultType);
+                var holder = (Response<T>)value;
+                if (holder.TypedResult is not null)
+                    _codec.WriteField(ref writer, 0, _resultType, holder.TypedResult);
+                writer.WriteEndObject();
+            }
+
+            public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+            {
+                field.EnsureWireType(WireType.TagDelimited);
+                reader.ReadFieldHeader(ref field);
+
+                var holder = ResponsePool.Get<T>();
+                if (!field.IsEndObject)
+                {
+                    holder.TypedResult = _codec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    if (!field.IsEndObject) ThrowEndObjectExpected();
+                }
+                return holder;
+            }
+        }
+
+        private static void ThrowEndObjectExpected() => throw new UnsupportedWireTypeException($"Expected a {nameof(ExtendedWireType.EndTagDelimited)} field");
     }
 }

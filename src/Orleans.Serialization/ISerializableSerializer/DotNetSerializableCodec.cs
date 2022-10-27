@@ -80,7 +80,7 @@ namespace Orleans.Serialization
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<object, TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference(ref reader, field, null);
             }
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);

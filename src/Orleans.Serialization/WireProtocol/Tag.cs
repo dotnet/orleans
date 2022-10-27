@@ -98,6 +98,10 @@ namespace Orleans.Serialization.WireProtocol
             set => _tag = (byte)((_tag & ~ExtendedWireTypeMask) | ((byte)value & ExtendedWireTypeMask));
         }
 
+        internal bool IsEndBaseFields => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndBaseFields);
+
+        internal bool IsEndObject => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndTagDelimited);
+
         /// <summary>
         /// Gets or sets the schema type.
         /// </summary>

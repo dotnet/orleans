@@ -92,7 +92,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     {
         if (field.WireType == WireType.Reference)
         {
-            return ReferenceCodec.ReadReference<object, TInput>(ref reader, field);
+            return ReferenceCodec.ReadReference(ref reader, field, null);
         }
 
         if (field.WireType != WireType.TagDelimited)

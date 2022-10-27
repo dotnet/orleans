@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Orleans.Serialization.Activators;
 
@@ -38,6 +39,8 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public abstract object Result { get; set; }
 
+        public virtual Type GetSimpleResultType() => null;
+
         /// <inheritdoc />
         public abstract Exception Exception { get; set; }
 
@@ -47,26 +50,8 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public abstract void Dispose();
 
-        /// <summary>
-        /// Gets the result value or <see langword="null"/> in the case of an exception.
-        /// </summary>
-        /// <returns>The result or <see langword="null"/>.</returns>
-        public virtual object GetResultOrDefault() => Exception switch { null => Result, _ => default };
-
         /// <inheritdoc />
-        public override string ToString()
-        {
-            if (GetResultOrDefault() is { } result)
-            {
-                return result.ToString();
-            }
-            else if (Exception is { } exception)
-            {
-                return exception.ToString();
-            }
-
-            return "[null]";
-        }
+        public override string ToString() => Exception is { } ex ? ex.ToString() : Result is { } r ? r.ToString() : "[null]";
     }
 
     /// <summary>
@@ -146,26 +131,48 @@ namespace Orleans.Serialization.Invocation
     /// A <see cref="Response"/> which represents a typed value.
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
-    [SerializerTransparent]
-    public abstract class Response<TResult> : Response
+    [GenerateSerializer, UseActivator, SuppressReferenceTracking]
+    public sealed class Response<TResult> : Response
     {
-        /// <inheritdoc/>
-        public abstract TResult TypedResult { get; set; }
+        [Id(0)]
+        private TResult _result;
 
-        /// <inheritdoc/>
-        public override string ToString()
+        public TResult TypedResult { get => _result; set => _result = value; }
+
+        public override Exception Exception
         {
-            if (Exception is { } exception)
-            {
-                return exception.ToString();
-            }
-
-            if (TypedResult is { } result)
-            {
-                return result.ToString();
-            }
-
-            return "[null]";
+            get => null;
+            set => throw new InvalidOperationException($"Cannot set {nameof(Exception)} property for type {nameof(Response<TResult>)}");
         }
+
+        public override object Result
+        {
+            get => _result;
+            set => _result = (TResult)value;
+        }
+
+        public override Type GetSimpleResultType() => typeof(TResult);
+
+        public override T GetResult<T>()
+        {
+            if (typeof(TResult).IsValueType && typeof(T).IsValueType && typeof(T) == typeof(TResult))
+                return Unsafe.As<TResult, T>(ref _result);
+
+            return (T)(object)_result;
+        }
+
+        public override void Dispose()
+        {
+            _result = default;
+            ResponsePool.Return(this);
+        }
+
+        public override string ToString() => _result is { } r ? r.ToString() : "[null]";
+    }
+
+    [RegisterActivator]
+    internal sealed class PooledResponseActivator<TResult> : IActivator<Response<TResult>>
+    {
+        public Response<TResult> Create() => ResponsePool.Get<TResult>();
     }
 }
