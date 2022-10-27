@@ -14,6 +14,8 @@ namespace Orleans.Runtime;
 [RegisterSerializer]
 public sealed class IdSpanCodec : IFieldCodec<IdSpan>
 {
+    private readonly Type _codecType = typeof(IdSpan);
+
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteField<TBufferWriter>(
@@ -24,11 +26,15 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
         where TBufferWriter : IBufferWriter<byte>
     {
         ReferenceCodec.MarkValueField(writer.Session);
-        writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, _codecType, WireType.LengthPrefixed);
         var bytes = value.AsSpan();
-        writer.WriteVarUInt32((uint)(sizeof(int) + bytes.Length));
-        writer.WriteInt32(value.GetHashCode());
-        writer.Write(bytes);
+        if (bytes.IsEmpty) writer.WriteVarUInt32(0);
+        else
+        {
+            writer.WriteVarUInt32((uint)(sizeof(int) + bytes.Length));
+            writer.WriteInt32(value.GetHashCode());
+            writer.Write(bytes);
+        }
     }
 
     /// <summary>
@@ -42,10 +48,13 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
         IdSpan value)
         where TBufferWriter : IBufferWriter<byte>
     {
-        writer.WriteInt32(value.GetHashCode());
         var bytes = value.AsSpan();
         writer.WriteVarUInt32((uint)bytes.Length);
-        writer.Write(bytes);
+        if (!bytes.IsEmpty)
+        {
+            writer.WriteInt32(value.GetHashCode());
+            writer.Write(bytes);
+        }
     }
 
     /// <summary>
@@ -56,12 +65,13 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     /// <returns>An <see cref="IdSpan"/>.</returns>
     public static unsafe IdSpan ReadRaw<TInput>(ref Reader<TInput> reader)
     {
-        var hashCode = reader.ReadInt32();
         var length = reader.ReadVarUInt32();
-        var payloadArray = reader.ReadBytes(length);
-        var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
+        if (length == 0)
+            return default;
 
-        return value;
+        var hashCode = reader.ReadInt32();
+        var payloadArray = reader.ReadBytes(length);
+        return IdSpan.UnsafeCreate(payloadArray, hashCode);
     }
 
     /// <inheritdoc />
@@ -70,12 +80,12 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     {
         ReferenceCodec.MarkValueField(reader.Session);
 
-        var length = reader.ReadVarUInt32() - sizeof(int);
+        var length = reader.ReadVarUInt32();
+        if (length == 0)
+            return default;
+
         var hashCode = reader.ReadInt32();
-
-        var payloadArray = reader.ReadBytes(length);
-        var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-
-        return value;
+        var payloadArray = reader.ReadBytes(length - sizeof(int));
+        return IdSpan.UnsafeCreate(payloadArray, hashCode);
     }
 }

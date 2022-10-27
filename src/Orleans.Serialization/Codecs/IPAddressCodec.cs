@@ -36,24 +36,26 @@ namespace Orleans.Serialization.Codecs
                 return (IPAddress)ReferenceCodec.ReadReference(ref reader, field, CodecFieldType);
             }
 
-            var length = reader.ReadVarUInt32();
-            IPAddress result;
-#if NET5_0_OR_GREATER
-            if (reader.TryReadBytes((int)length, out var bytes))
-            {
-                result = new IPAddress(bytes);
-            }
-            else
-            {
-#endif
-                var addressBytes = reader.ReadBytes(length);
-                result = new IPAddress(addressBytes);
-#if NET5_0_OR_GREATER
-            }
-#endif
+            if (field.WireType != WireType.LengthPrefixed)
+                ThrowUnsupportedWireTypeException(field);
 
+            var result = ReadRaw(ref reader);
             ReferenceCodec.RecordObject(reader.Session, result);
             return result;
+        }
+
+        /// <summary>
+        /// Reads the raw length prefixed IP address value.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IPAddress ReadRaw<TInput>(ref Buffers.Reader<TInput> reader)
+        {
+            var length = reader.ReadVarUInt32();
+#if NET5_0_OR_GREATER
+            if (reader.TryReadBytes((int)length, out var bytes))
+                return new(bytes);
+#endif
+            return new(reader.ReadBytes(length));
         }
 
         /// <summary>
@@ -85,15 +87,28 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
+            WriteRaw(ref writer, value);
+        }
 
-            Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
-            var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
-            if (!value.TryWriteBytes(buffer, out var length)) throw new NotSupportedException();
+        /// <summary>
+        /// Writes the raw length prefixed IP address value.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, IPAddress value) where TBufferWriter : IBufferWriter<byte>
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            if (!value.TryWriteBytes(buffer, out var length)) ThrowNotSupported();
             buffer = buffer[..length];
 
             writer.WriteVarUInt32((uint)buffer.Length);
             writer.Write(buffer);
         }
+
+        private static void ThrowNotSupported() => throw new NotSupportedException();
+
+        private static void ThrowUnsupportedWireTypeException(Field field)
+            => throw new UnsupportedWireTypeException($"Only a {nameof(WireType)} value of {nameof(WireType.LengthPrefixed)} is supported for {nameof(IPAddress)} fields. {field}");
+
     }
 
     [RegisterCopier]

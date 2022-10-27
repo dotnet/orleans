@@ -2,9 +2,8 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using System.Runtime.InteropServices;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,7 +12,7 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingIdSpanCodec
     {
-        internal static LRU<IdSpan, (IdSpan Value, byte[] Encoded)> SharedCache { get; } = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
+        private static readonly LRU<IdSpan, IdSpan> SharedCache = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
 
         // Purge entries which have not been accessed in over 2 minutes. 
         private const long PurgeAfterMilliseconds = 2 * 60 * 1000;
@@ -21,7 +20,7 @@ namespace Orleans.Runtime.Messaging
         // Scan for entries which are expired every minute
         private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
 
-        private readonly Dictionary<int, (byte[] Encoded, IdSpan Value, long LastSeen)> _cache = new();
+        private readonly Dictionary<int, (byte[] Value, long LastSeen)> _cache = new();
         private long _lastGarbageCollectionTimestamp;
 
         public CachingIdSpanCodec()
@@ -33,47 +32,35 @@ namespace Orleans.Runtime.Messaging
         {
             var currentTimestamp = Environment.TickCount64;
 
+            var length = reader.ReadVarUInt32();
+            if (length == 0)
+                return default;
+
+            var hashCode = reader.ReadInt32();
+
             IdSpan result = default;
             byte[] payloadArray = default;
-            var length = reader.ReadVarInt32();
-            if (length == -1)
+            if (!reader.TryReadBytes((int)length, out var payloadSpan))
             {
-                return default;
+                payloadSpan = payloadArray = reader.ReadBytes(length);
             }
-
-            if (!reader.TryReadBytes(length, out var payloadSpan))
-            {
-                payloadSpan = payloadArray = reader.ReadBytes((uint)length);
-            }
-
-            var innerReader = Reader.Create(payloadSpan, null);
-            var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
-            if (exists && new ReadOnlySpan<byte>(cacheEntry.Encoded).SequenceEqual(payloadSpan))
+            if (exists && payloadSpan.SequenceEqual(cacheEntry.Value))
             {
-                result = cacheEntry.Value;
-                cacheEntry.LastSeen = currentTimestamp;
+                result = IdSpan.UnsafeCreate(cacheEntry.Value, hashCode);
             }
-
-            if (!exists || result.IsDefault)
+            else
             {
-                if (payloadArray is null)
-                {
-                    payloadArray = new byte[length];
-                    payloadSpan.CopyTo(payloadArray);
-                }
-
-                result = ReadRawInner(ref innerReader, hashCode);
+                result = IdSpan.UnsafeCreate(payloadArray ?? payloadSpan.ToArray(), hashCode);
 
                 // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
-                (result, _) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
+                result = SharedCache.GetOrAdd(result, static (_, key) => key, (object)null);
 
                 // Update the cache. If there is a hash collision, the last entry wins.
-                cacheEntry.Encoded = payloadArray;
-                cacheEntry.Value = result;
-                cacheEntry.LastSeen = currentTimestamp;
+                cacheEntry.Value = IdSpan.UnsafeGetArray(result);
             }
+            cacheEntry.LastSeen = currentTimestamp;
 
             // Perform periodic maintenance to prevent unbounded memory leaks.
             if (currentTimestamp - _lastGarbageCollectionTimestamp > GarbageCollectionIntervalMilliseconds)
@@ -100,81 +87,8 @@ namespace Orleans.Runtime.Messaging
 
         public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, IdSpan value) where TBufferWriter : IBufferWriter<byte>
         {
-            var currentTimestamp = Environment.TickCount64;
-            if (value.IsDefault)
-            {
-                writer.WriteVarInt32(-1);
-                return;
-            }
-
-            var hashCode = value.GetHashCode();
-            ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
-            if (exists && value.Equals(cacheEntry.Value))
-            {
-                writer.WriteVarInt32(cacheEntry.Encoded.Length);
-                writer.Write(cacheEntry.Encoded);
-
-                cacheEntry.LastSeen = currentTimestamp;
-
-                // Perform periodic maintenance to prevent unbounded memory leaks.
-                if (currentTimestamp - _lastGarbageCollectionTimestamp > GarbageCollectionIntervalMilliseconds)
-                {
-                    PurgeStaleEntries();
-                    _lastGarbageCollectionTimestamp = currentTimestamp;
-                }
-
-                return;
-            }
-
-            var innerWriter = Writer.Create(new PooledArrayBufferWriter(), null);
-            innerWriter.WriteInt32(value.GetHashCode());
-            WriteRawInner(ref innerWriter, value);
-            innerWriter.Commit();
-
-            writer.WriteVarInt32((int)innerWriter.Output.Length);
-            innerWriter.Output.CopyTo(ref writer);
-            var payloadArray = innerWriter.Output.ToArray();
-            innerWriter.Dispose();
-
-            // Before adding this value to the private cache, intern it via the shared cache to hopefully reduce duplicates.
-            (_, payloadArray) = SharedCache.GetOrAdd(value, static (encoded, key) => (key, encoded), payloadArray);
-
-            // If there is a hash collision, then the last seen entry will always win.
-            cacheEntry.Encoded = payloadArray;
-            cacheEntry.Value = value;
-            cacheEntry.LastSeen = currentTimestamp;
-        }
-
-        /// <summary>
-        /// Writes an <see cref="IdSpan"/> value to the provided writer without field framing.
-        /// </summary>
-        /// <param name="writer">The writer.</param>
-        /// <param name="value">The value to write.</param>
-        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-        private static void WriteRawInner<TBufferWriter>(
-            ref Writer<TBufferWriter> writer,
-            IdSpan value)
-            where TBufferWriter : IBufferWriter<byte>
-        {
-            var bytes = IdSpan.UnsafeGetArray(value);
-            var bytesLength = value.IsDefault ? 0 : bytes.Length;
-            writer.WriteVarUInt32((uint)bytesLength);
-            writer.Write(bytes);
-        }
-
-        /// <summary>
-        /// Reads an <see cref="IdSpan"/> value from a reader without any field framing.
-        /// </summary>
-        /// <typeparam name="TInput">The underlying reader input type.</typeparam>
-        /// <param name="reader">The reader.</param>
-        /// <param name="hashCode">The hash code for the span.</param>
-        /// <returns>An <see cref="IdSpan"/>.</returns>
-        private static IdSpan ReadRawInner<TInput>(ref Reader<TInput> reader, int hashCode)
-        {
-            var length = reader.ReadVarUInt32();
-            var payloadArray = reader.ReadBytes(length);
-            var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-            return value;
+            IdSpanCodec.WriteRaw(ref writer, value);
+            SharedCache.GetOrAdd(value, static (_, key) => key, (object)null);
         }
     }
 }

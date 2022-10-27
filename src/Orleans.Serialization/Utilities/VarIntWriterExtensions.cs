@@ -20,7 +20,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="writer">The writer.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteVarInt8<TBufferWriter>(ref this Writer<TBufferWriter> writer, sbyte value) where TBufferWriter : IBufferWriter<byte> => WriteVarUInt8(ref writer, ZigZagEncode(value));
+        public static void WriteVarInt8<TBufferWriter>(ref this Writer<TBufferWriter> writer, sbyte value) where TBufferWriter : IBufferWriter<byte> => WriteVarUInt16(ref writer, ZigZagEncode(value));
 
         /// <summary>
         /// Writes a variable-width <see cref="short"/>.
@@ -56,21 +56,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="writer">The writer.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteVarUInt8<TBufferWriter>(ref this Writer<TBufferWriter> writer, byte value) where TBufferWriter : IBufferWriter<byte>
-        {
-            writer.EnsureContiguous(sizeof(ushort));
-
-            var span = writer.WritableSpan;
-            var neededBytes = BitOperations.Log2(value) / 7;
-
-            ushort lower = value;
-            lower <<= 1;
-            lower |= 0x01;
-            lower <<= neededBytes;
-
-            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(span), lower);
-            writer.AdvanceSpan(neededBytes + 1);
-        }
+        public static void WriteVarUInt8<TBufferWriter>(ref this Writer<TBufferWriter> writer, byte value) where TBufferWriter : IBufferWriter<byte> => WriteVarUInt16(ref writer, (ushort)value);
 
         /// <summary>
         /// Writes a variable-width <see cref="ushort"/>.

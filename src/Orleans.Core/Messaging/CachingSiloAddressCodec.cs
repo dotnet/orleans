@@ -1,11 +1,11 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -36,8 +36,8 @@ namespace Orleans.Runtime.Messaging
 
             SiloAddress result = null;
             byte[] payloadArray = default;
-            var length = reader.ReadVarInt32();
-            if (length == -1)
+            var length = (int)reader.ReadVarUInt32();
+            if (length == 0)
             {
                 return null;
             }
@@ -51,25 +51,19 @@ namespace Orleans.Runtime.Messaging
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
-            if (exists && new ReadOnlySpan<byte>(cacheEntry.Encoded).SequenceEqual(payloadSpan))
+            if (exists && payloadSpan.SequenceEqual(cacheEntry.Encoded))
             {
                 result = cacheEntry.Value;
                 cacheEntry.LastSeen = currentTimestamp;
             }
-
-            if (result is null)
+            else
             {
-                if (payloadArray is null)
-                {
-                    payloadArray = new byte[length];
-                    payloadSpan.CopyTo(payloadArray);
-                }
-
                 result = ReadSiloAddressInner(ref innerReader);
                 result.InternalSetConsistentHashCode(hashCode);
 
                 // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
-                (result, _) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
+                payloadArray ??= payloadSpan.ToArray();
+                (result, payloadArray) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
 
                 // If there is a hash collision, then the last seen entry will always win.
                 cacheEntry.Encoded = payloadArray;
@@ -102,17 +96,7 @@ namespace Orleans.Runtime.Messaging
 
         private static SiloAddress ReadSiloAddressInner<TInput>(ref Reader<TInput> reader)
         {
-            IPAddress ip;
-            var length = (int)reader.ReadVarUInt32();
-            if (reader.TryReadBytes(length, out var bytes))
-            {
-                ip = new IPAddress(bytes);
-            }
-            else
-            {
-                var addressBytes = reader.ReadBytes((uint)length);
-                ip = new IPAddress(addressBytes);
-            }
+            var ip = IPAddressCodec.ReadRaw(ref reader);
             var port = (int)reader.ReadVarUInt32();
             var generation = reader.ReadInt32();
 
@@ -124,7 +108,7 @@ namespace Orleans.Runtime.Messaging
             var currentTimestamp = Environment.TickCount64;
             if (value is null)
             {
-                writer.WriteVarInt32(-1);
+                writer.WriteVarUInt32(0);
                 return;
             }
 
@@ -132,7 +116,7 @@ namespace Orleans.Runtime.Messaging
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
             if (exists && value.Equals(cacheEntry.Value))
             {
-                writer.WriteVarInt32(cacheEntry.Encoded.Length);
+                writer.WriteVarUInt32((uint)cacheEntry.Encoded.Length);
                 writer.Write(cacheEntry.Encoded);
 
                 cacheEntry.LastSeen = currentTimestamp;
@@ -152,7 +136,7 @@ namespace Orleans.Runtime.Messaging
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();
 
-            writer.WriteVarInt32((int)innerWriter.Output.Length);
+            writer.WriteVarUInt32((uint)innerWriter.Output.Length);
             innerWriter.Output.CopyTo(ref writer);
             var payloadArray = innerWriter.Output.ToArray();
             innerWriter.Dispose();
@@ -169,14 +153,9 @@ namespace Orleans.Runtime.Messaging
         private static void WriteSiloAddressInner<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
         {
             var ep = value.Endpoint;
-            Unsafe.SkipInit(out Guid tmp); // workaround for C#10 limitation around ref scoping (C#11 will add scoped ref parameters)
-            var buffer = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1));
-            if (!ep.Address.TryWriteBytes(buffer, out var length)) throw new NotSupportedException();
 
             // IP
-            var bytes = buffer[..length];
-            writer.WriteVarUInt32((uint)bytes.Length);
-            writer.Write(bytes);
+            IPAddressCodec.WriteRaw(ref writer, ep.Address);
 
             // Port
             writer.WriteVarUInt32((uint)ep.Port);
