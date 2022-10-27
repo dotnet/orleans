@@ -169,15 +169,7 @@ namespace Orleans.Serialization.Serializers
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : _untypedCodecs.TryGetValue(fieldType, out var existing) ? existing
-                : TryCreateCodec(fieldType);
-        }
-
-        /// <inheritdoc/>
-        public IFieldCodec<TField> GetCodec<TField>()
-        {
-            var res = TryGetCodec<TField>();
-            if (res is null) ThrowCodecNotFound(typeof(TField));
-            return res;
+                : TryCreateCodec(fieldType) is { } res ? _untypedCodecs.GetOrAdd(fieldType, res) : null;
         }
 
         private IFieldCodec TryCreateCodec(Type fieldType)
@@ -202,6 +194,14 @@ namespace Orleans.Serialization.Serializers
             }
 
             return fieldType.IsInterface || fieldType.IsAbstract ? new AbstractTypeSerializer(fieldType) : null;
+        }
+
+        /// <inheritdoc/>
+        public IFieldCodec<TField> GetCodec<TField>()
+        {
+            var res = TryGetCodec<TField>();
+            if (res is null) ThrowCodecNotFound(typeof(TField));
+            return res;
         }
 
         /// <inheritdoc/>
