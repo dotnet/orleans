@@ -169,42 +169,31 @@ namespace Orleans.Serialization.Serializers
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : _untypedCodecs.TryGetValue(fieldType, out var existing) ? existing
-                : GetOrCreateCodec(fieldType);
+                : TryCreateCodec(fieldType) is { } res ? _untypedCodecs.GetOrAdd(fieldType, res) : null;
+        }
 
-            IFieldCodec GetOrCreateCodec(Type fieldType)
+        private IFieldCodec TryCreateCodec(Type fieldType)
+        {
+            if (!_initialized) Initialize();
+
+            ThrowIfUnsupportedType(fieldType);
+
+            if (CreateCodecInstance(fieldType, fieldType.IsConstructedGenericType ? fieldType.GetGenericTypeDefinition() : fieldType) is { } res)
+                return res;
+
+            foreach (var specializableCodec in _specializableCodecs)
             {
-                var result = TryCreateCodec(fieldType);
-                if (result is not null)
-                {
-                    _untypedCodecs.TryAdd(fieldType, result);
-                }
-
-                return result;
+                if (specializableCodec.IsSupportedType(fieldType))
+                    return specializableCodec.GetSpecializedCodec(fieldType);
             }
 
-            IFieldCodec TryCreateCodec(Type fieldType)
+            foreach (var dynamicCodec in _generalizedCodecs)
             {
-                if (!_initialized) Initialize();
-
-                ThrowIfUnsupportedType(fieldType);
-
-                if (CreateCodecInstance(fieldType, fieldType.IsConstructedGenericType ? fieldType.GetGenericTypeDefinition() : fieldType) is { } res)
-                    return res;
-
-                foreach (var specializableCodec in _specializableCodecs)
-                {
-                    if (specializableCodec.IsSupportedType(fieldType))
-                        return specializableCodec.GetSpecializedCodec(fieldType);
-                }
-
-                foreach (var dynamicCodec in _generalizedCodecs)
-                {
-                    if (dynamicCodec.IsSupportedType(fieldType))
-                        return dynamicCodec;
-                }
-
-                return fieldType.IsInterface || fieldType.IsAbstract ? new AbstractTypeSerializer(fieldType) : null;
+                if (dynamicCodec.IsSupportedType(fieldType))
+                    return dynamicCodec;
             }
+
+            return fieldType.IsInterface || fieldType.IsAbstract ? new AbstractTypeSerializer(fieldType) : null;
         }
 
         /// <inheritdoc/>
