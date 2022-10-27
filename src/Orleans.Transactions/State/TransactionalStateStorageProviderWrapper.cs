@@ -102,9 +102,7 @@ namespace Orleans.Transactions
 
         private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
         {
-            string formattedTypeName = RuntimeTypeNameFormatter.Format(this.context.GrainInstance.GetType());
-            string fullStateName = $"{formattedTypeName}-{this.stateName}";
-            return new(fullStateName, context.GrainId, grainStorage, loggerFactory);
+            return new(this.stateName, context.GrainId, grainStorage, loggerFactory);
         }
     }
 

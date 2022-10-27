@@ -12,28 +12,28 @@ namespace Orleans.Storage
     public interface IGrainStorage
     {
         /// <summary>Read data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">State data object to be populated for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
+        Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Write data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">State data object to be written for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
+        Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Delete / Clear data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState);
+        Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
     }
 
     /// <summary>

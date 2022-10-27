@@ -34,7 +34,7 @@ namespace Orleans.Runtime
 
         protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
         {
-            return $"{context.GrainId.Type}.{cfg.StateName}";
+            return cfg.StateName;
         }
 
         [DoesNotReturn]
@@ -55,14 +55,14 @@ namespace Orleans.Runtime
 
         private sealed class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
         {
-            private readonly string fullStateName;
+            private readonly string stateName;
             private readonly IGrainContext context;
             private readonly IGrainStorage storageProvider;
             private StateStorageBridge<TState> storage;
 
-            public PersistentStateBridge(string fullStateName, IGrainContext context, IGrainStorage storageProvider)
+            public PersistentStateBridge(string stateName, IGrainContext context, IGrainStorage storageProvider)
             {
-                this.fullStateName = fullStateName;
+                this.stateName = stateName;
                 this.context = context;
                 this.storageProvider = storageProvider;
                 storage = null!;
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             {
                 if (ct.IsCancellationRequested)
                     return Task.CompletedTask;
-                storage = new(fullStateName, context.GrainId, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>());
+                storage = new(stateName, context.GrainId, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>());
                 return this.ReadStateAsync();
             }
         }
