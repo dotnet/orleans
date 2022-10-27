@@ -15,6 +15,7 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
+using Orleans.Serialization;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -92,7 +93,8 @@ namespace UnitTests.StorageTests.Relational
                             var options = new AdoNetGrainStorageOptions()
                             {
                                 ConnectionString = Storage.Storage.ConnectionString,
-                                Invariant = storageInvariant
+                                Invariant = storageInvariant,
+                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>())
                             };
                             var clusterOptions = new ClusterOptions()
                             {
