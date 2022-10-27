@@ -73,15 +73,21 @@ namespace UnitTests.StorageTests.Relational
         {
             //Make sure the environment invariants hold before trying to give a functioning SUT instantiation.
             //This is done instead of the constructor to have more granularity on how the environment should be initialized.
-            try
+            using (await StorageLock.LockAsync())
             {
-                using(await StorageLock.LockAsync())
+                if (AdoNetInvariants.Invariants.Contains(storageInvariant))
                 {
-                    if(AdoNetInvariants.Invariants.Contains(storageInvariant))
+                    if (!StorageProviders.ContainsKey(storageInvariant))
                     {
-                        if(!StorageProviders.ContainsKey(storageInvariant))
+                        var connectionString = Invariants.ActiveSettings.ConnectionStrings.FirstOrDefault(i => i.StorageInvariant == storageInvariant);
+
+                        if (string.IsNullOrWhiteSpace(connectionString.ConnectionString))
                         {
-                            Storage = Invariants.EnsureStorageForTesting(Invariants.ActiveSettings.ConnectionStrings.First(i => i.StorageInvariant == storageInvariant));
+                            StorageProviders.Add(storageInvariant, null);
+                        }
+                        else
+                        {
+                            Storage = Invariants.EnsureStorageForTesting(connectionString);
 
                             var options = new AdoNetGrainStorageOptions()
                             {
@@ -101,10 +107,6 @@ namespace UnitTests.StorageTests.Relational
                         }
                     }
                 }
-            }
-            catch
-            {
-                StorageProviders.Add(storageInvariant, null);
             }
 
             return StorageProviders[storageInvariant];
