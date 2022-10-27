@@ -141,7 +141,7 @@ CREATE PROCEDURE WriteToStorage
     in _GrainIdExtensionString NVARCHAR(512),
     in _ServiceId NVARCHAR(150),
     in _GrainStateVersion INT,
-    in _PayloadBinary BLOB,
+    in _PayloadBinary BLOB
 )
 BEGIN
     DECLARE _newGrainStateVersion INT;
