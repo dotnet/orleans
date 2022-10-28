@@ -34,18 +34,13 @@ namespace Orleans.CodeGenerator
                 MethodTypeParameters.Add((tpName, tp));
             }
 
-#pragma warning disable RS1024 // Compare symbols correctly
             TypeParameterSubstitutions = new(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
             foreach (var tp in AllTypeParameters)
             {
                 TypeParameterSubstitutions[tp.Parameter] = tp.Name;
             }
 
-#pragma warning disable RS1024 // Compare symbols correctly
             InvokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
 
             // Set defaults from the interface type.
             foreach (var pair in containingType.InvokableBaseTypes)

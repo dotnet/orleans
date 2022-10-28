@@ -18,9 +18,7 @@ internal class FieldIdAssignmentHelper
     private readonly ImmutableArray<IParameterSymbol> _constructorParameters;
     private readonly LibraryTypes _libraryTypes;
     private readonly ISymbol[] _memberSymbols;
-#pragma warning disable RS1024 // Compare symbols correctly
     private readonly Dictionary<ISymbol, (uint, bool)> _symbols = new(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
 
     public bool IsValidForSerialization { get; }
     public string? FailureReason { get; private set; }

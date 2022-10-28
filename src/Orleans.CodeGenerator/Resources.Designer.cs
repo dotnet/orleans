@@ -70,7 +70,7 @@ namespace Orleans.CodeGenerator {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Serializable property {0} does not have an accessible setter..
+        ///   Looks up a localized string similar to Serializable property {0} does not have an accessible setter.
         /// </summary>
         internal static string InaccessibleSetterMessageFormat {
             get {
@@ -79,7 +79,7 @@ namespace Orleans.CodeGenerator {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Serializable properties with bodies must be settable..
+        ///   Looks up a localized string similar to Serializable properties with bodies must be settable.
         /// </summary>
         internal static string InaccessibleSetterTitle {
             get {
@@ -88,29 +88,29 @@ namespace Orleans.CodeGenerator {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The return type of a grain method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;..
+        ///   Looks up a localized string similar to The return type of an RPC method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;..
         /// </summary>
-        internal static string InvalidGrainMethodReturnTypeDescription {
+        internal static string InvalidRpcMethodReturnTypeDescription {
             get {
-                return ResourceManager.GetString("InvalidGrainMethodReturnTypeDescription", resourceCulture);
+                return ResourceManager.GetString("InvalidRpcMethodReturnTypeDescription", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The type {0} for the grain interface method {1} cannot be used as a grain method return type. Grain methods must return one of the following types: {2}..
+        ///   Looks up a localized string similar to The return type {0} for the RPC interface method {1} is unsupported and must be changed to one of the following types: {2}.
         /// </summary>
-        internal static string InvalidGrainMethodReturnTypeMessageFormat {
+        internal static string InvalidRpcMethodReturnTypeMessageFormat {
             get {
-                return ResourceManager.GetString("InvalidGrainMethodReturnTypeMessageFormat", resourceCulture);
+                return ResourceManager.GetString("InvalidRpcMethodReturnTypeMessageFormat", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Invalid return type for grain interface method..
+        ///   Looks up a localized string similar to Invalid return type for RPC interface method.
         /// </summary>
-        internal static string InvalidGrainMethodReturnTypeTitle {
+        internal static string InvalidRpcMethodReturnTypeTitle {
             get {
-                return ResourceManager.GetString("InvalidGrainMethodReturnTypeTitle", resourceCulture);
+                return ResourceManager.GetString("InvalidRpcMethodReturnTypeTitle", resourceCulture);
             }
         }
     }

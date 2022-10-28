@@ -121,18 +121,18 @@
     <value>Serializable properties must have accessible setters. Ensure that the property has a non-private set method.</value>
   </data>
   <data name="InaccessibleSetterMessageFormat" xml:space="preserve">
-    <value>Serializable property {0} does not have an accessible setter.</value>
+    <value>Serializable property {0} does not have an accessible setter</value>
   </data>
   <data name="InaccessibleSetterTitle" xml:space="preserve">
-    <value>Serializable properties with bodies must be settable.</value>
+    <value>Serializable properties with bodies must be settable</value>
   </data>
-  <data name="InvalidGrainMethodReturnTypeDescription" xml:space="preserve">
-    <value>The return type of a grain method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;.</value>
+  <data name="InvalidRpcMethodReturnTypeDescription" xml:space="preserve">
+    <value>The return type of an RPC method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;.</value>
   </data>
-  <data name="InvalidGrainMethodReturnTypeMessageFormat" xml:space="preserve">
-    <value>The type {0} for the grain interface method {1} cannot be used as a grain method return type. Grain methods must return one of the following types: {2}.</value>
+  <data name="InvalidRpcMethodReturnTypeMessageFormat" xml:space="preserve">
+    <value>The return type {0} for the RPC interface method {1} is unsupported and must be changed to one of the following types: {2}</value>
   </data>
-  <data name="InvalidGrainMethodReturnTypeTitle" xml:space="preserve">
-    <value>Invalid return type for grain interface method.</value>
+  <data name="InvalidRpcMethodReturnTypeTitle" xml:space="preserve">
+    <value>Invalid return type for RPC interface method</value>
   </data>
 </root>

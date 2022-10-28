@@ -148,9 +148,9 @@ namespace Orleans.CodeGenerator
             var methodReturnType = method.Method.ReturnType;
             if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
             {
-                var diagnostic = InvalidGrainMethodReturnTypeDiagnostic.CreateDiagnostic(method);
-                throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
+                throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
             }
+
             if (method.InvokableBaseTypes.TryGetValue(namedMethodReturnType, out var baseClassType))
             {
                 return baseClassType;
@@ -164,8 +164,8 @@ namespace Orleans.CodeGenerator
                     return baseClassType.ConstructedFrom.Construct(namedMethodReturnType.TypeArguments.ToArray());
                 }
             }
-            
-            throw new InvalidOperationException($"Unsupported return type {methodReturnType} for method {method.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}");
+
+            throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
         }
 
         private static MemberDeclarationSyntax GenerateSetTargetMethod(
