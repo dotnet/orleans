@@ -432,7 +432,7 @@ namespace Orleans.Serialization.Buffers
             EnsureContiguous(sizeof(ulong));
 
             nuint pos = (uint)_bufferPos;
-            var neededBytes = BitOperations.Log2(value) / 7;
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
             _bufferPos += neededBytes + 1;
 
             ulong lower = value;
@@ -454,7 +454,7 @@ namespace Orleans.Serialization.Buffers
             EnsureContiguous(sizeof(ulong) + sizeof(ushort));
 
             nuint pos = (uint)_bufferPos;
-            var neededBytes = BitOperations.Log2(value) / 7;
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
             _bufferPos += neededBytes + 1;
 
             ulong lower = value;
