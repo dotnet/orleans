@@ -184,7 +184,7 @@ namespace UnitTests.StreamingTests
 
         [Serializable]
         [Orleans.GenerateSerializer]
-        private class DummyStreamProducerExtension : IStreamProducerExtension
+        public class DummyStreamProducerExtension : IStreamProducerExtension
         {
             [Orleans.Id(0)]
             private readonly Guid id;

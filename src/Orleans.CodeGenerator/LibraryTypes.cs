@@ -293,9 +293,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
         public INamedTypeSymbol FormatterServices { get; private set; }
 
-#pragma warning disable RS1024 // Compare symbols correctly
         private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
 
         public bool IsShallowCopyable(ITypeSymbol type)
         {

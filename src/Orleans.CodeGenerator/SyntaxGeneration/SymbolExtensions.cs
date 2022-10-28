@@ -13,10 +13,8 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 {
     internal static class SymbolExtensions
     {
-#pragma warning disable RS1024 // Compare symbols correctly
         private static readonly ConcurrentDictionary<ITypeSymbol, TypeSyntax> TypeCache = new(SymbolEqualityComparer.Default);
         private static readonly ConcurrentDictionary<ISymbol, string> NameCache = new(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
 
         public struct DisplayNameOptions
         {

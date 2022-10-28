@@ -3,6 +3,8 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Orleans.CodeGenerator.Diagnostics;
+using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -67,9 +69,7 @@ namespace Orleans.CodeGenerator
 
         private List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
         {
-#pragma warning disable RS1024 // Compare symbols correctly
             var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
             foreach (var iface in GetAllInterfaces(symbol))
             {
                 foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
@@ -175,12 +175,14 @@ namespace Orleans.CodeGenerator
                 if (!found)
                 {
                     var notFoundMessage = $"Proxy base class {baseClass} does not contain a definition for ValueTask<T> InvokeAsync<T>(IInvokable)";
-                    if (complaint is { Length: > 0 })
+                    var locationMember = complaintMember ?? baseClass;
+                    var complaintMessage = complaint switch
                     {
-                        throw new InvalidOperationException($"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}");
-                    }
-
-                    throw new InvalidOperationException(notFoundMessage);
+                        { Length: > 0 } => $"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}",
+                        _ => notFoundMessage,
+                    };
+                    var diagnostic = IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(baseClass, locationMember.Locations.First(), complaintMessage);
+                    throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
                 }
             }
             
@@ -232,12 +234,14 @@ namespace Orleans.CodeGenerator
                 if (!found)
                 {
                     var notFoundMessage = $"Proxy base class {baseClass} does not contain a definition for ValueTask InvokeAsync(IInvokable)";
-                    if (complaint is { Length: > 0 })
+                    var locationMember = complaintMember ?? baseClass;
+                    var complaintMessage = complaint switch
                     {
-                        throw new InvalidOperationException($"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}");
-                    }
-
-                    throw new InvalidOperationException(notFoundMessage);
+                        { Length: > 0 } => $"{notFoundMessage}. Complaint: {complaint} for symbol: {complaintMember.ToDisplayString()}",
+                        _ => notFoundMessage,
+                    };
+                    var diagnostic = IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(baseClass, locationMember.Locations.First(), complaintMessage);
+                    throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
                 }
             }
         }

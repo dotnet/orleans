@@ -11,6 +11,7 @@ using System.Collections.Immutable;
 using Orleans.CodeGenerator.Hashing;
 using System.Text;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
+using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
@@ -133,12 +134,8 @@ namespace Orleans.CodeGenerator
         private MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
             var metadataModel = new MetadataModel();
-
-#pragma warning disable RS1024 // Compare symbols correctly
             var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
@@ -168,9 +165,7 @@ namespace Orleans.CodeGenerator
             }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
-#pragma warning disable RS1024 // Compare symbols correctly
             var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
 
             foreach (var asm in assembliesToExamine)
             {
@@ -196,11 +191,21 @@ namespace Orleans.CodeGenerator
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
                     {
+                        if (!semanticModel.IsAccessible(0, sumType))
+                        {
+                            throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(sumType));
+                        }
+
                         var typeDescription = new FSharpUtilities.FSharpUnionCaseTypeDescription(semanticModel, symbol, LibraryTypes);
                         metadataModel.SerializableTypes.Add(typeDescription);
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
+                        if (!semanticModel.IsAccessible(0, symbol))
+                        {
+                            throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(symbol));
+                        }
+
                         if (FSharpUtilities.IsRecord(LibraryTypes, symbol))
                         {
                             var typeDescription = new FSharpUtilities.FSharpRecordTypeDescription(semanticModel, symbol, LibraryTypes);
@@ -243,7 +248,7 @@ namespace Orleans.CodeGenerator
                             var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
                             if (!fieldIdAssignmentHelper.IsValidForSerialization)
                             {
-                                throw new InvalidOperationException($"Implicit field ids cannot be generated for type {symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}: {fieldIdAssignmentHelper.FailureReason}.");
+                                throw new OrleansGeneratorDiagnosticAnalysisException(CanNotGenerateImplicitFieldIdsDiagnostic.CreateDiagnostic(symbol, fieldIdAssignmentHelper.FailureReason));
                             }
 
                             var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryConstructorParameters && constructorParameters.Length > 0, GetDataMembers(fieldIdAssignmentHelper), LibraryTypes);
@@ -262,7 +267,7 @@ namespace Orleans.CodeGenerator
                             var prop = symbol.GetAllMembers<IPropertySymbol>().FirstOrDefault();
                             if (prop is { })
                             {
-                                throw new InvalidOperationException($"Invokable type {symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} contains property {prop.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}. Invokable types cannot contain properties.");
+                                throw new OrleansGeneratorDiagnosticAnalysisException(RpcInterfacePropertyDiagnostic.CreateDiagnostic(symbol, prop));
                             }
 
                             var baseClass = (INamedTypeSymbol)attribute.ConstructorArguments[0].Value;
@@ -337,11 +342,6 @@ namespace Orleans.CodeGenerator
 
                     bool ShouldGenerateSerializer(INamedTypeSymbol t)
                     {
-                        if (!semanticModel.IsAccessible(0, t))
-                        {
-                            return false;
-                        }
-
                         if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute))
                         {
                             return true;
@@ -405,10 +405,7 @@ namespace Orleans.CodeGenerator
                 // Set the base invokable types which are used if attributes on individual methods do not override them.
                 if (!proxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
                 {
-#pragma warning disable RS1024 // Compare symbols correctly
                     invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
                     if (baseClass.GetAttributes(LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
                     {
                         foreach (var attr in invokableBaseTypeAttributes)

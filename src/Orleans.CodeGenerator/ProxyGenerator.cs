@@ -221,7 +221,7 @@ namespace Orleans.CodeGenerator
             var methodReturnType = methodDescription.Method.ReturnType;
             if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
             {
-                var diagnostic = InvalidGrainMethodReturnTypeDiagnostic.CreateDiagnostic(methodDescription);
+                var diagnostic = InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(methodDescription);
                 throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
             }
 

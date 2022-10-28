@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Orleans.CodeGenerator.Diagnostics;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -71,25 +72,13 @@ namespace Orleans.CodeGenerator
 
             static bool HandleException(GeneratorExecutionContext context, Exception exception)
             {
-                Console.WriteLine(exception);
-
                 if (exception is OrleansGeneratorDiagnosticAnalysisException analysisException)
                 {
                     context.ReportDiagnostic(analysisException.Diagnostic);
                     return true;
                 }
-                else if (exception is AggregateException aggregateException)
-                {
-                    var handled = true;
-                    var flattened = aggregateException.Flatten();
-                    foreach (var innerException in flattened.InnerExceptions)
-                    {
-                        handled &= HandleException(context, innerException);
-                    }
 
-                    return handled;
-                }
-
+                context.ReportDiagnostic(UnhandledCodeGenerationExceptionDiagnostic.CreateDiagnostic(exception));
                 return false;
             }
         }
