@@ -78,6 +78,7 @@ namespace Analyzers.Tests
             var assemblies = new[]
             {
                 typeof(Task).Assembly,
+                typeof(Orleans.IGrain).Assembly,
                 typeof(Orleans.Grain).Assembly,
                 typeof(Attribute).Assembly,
                 typeof(int).Assembly,

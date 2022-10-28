@@ -118,33 +118,33 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AbstractOrStaticMembersCannotBeSerializedMessageFormat" xml:space="preserve">
-    <value>The member "{0}" is marked as {1} and therefore cannot be serialized.</value>
+    <value>The member "{0}" is marked as {1} and therefore cannot be serialized</value>
   </data>
   <data name="AbstractOrStaticMembersCannotBeSerializedTitle" xml:space="preserve">
-    <value>Members which are static or abstract cannot be serialized.</value>
+    <value>Members which are static or abstract cannot be serialized</value>
   </data>
   <data name="AddGenerateSerializerAttributeDescription" xml:space="preserve">
-    <value>Add the [GenerateSerializer] attribute.</value>
+    <value>Add the [GenerateSerializer] attribute to serializable types in your application</value>
   </data>
   <data name="AddGenerateSerializerAttributeMessageFormat" xml:space="preserve">
-    <value>Add the [GenerateSerializer] attribute.</value>
+    <value>The type "{0}" has the [Serializable] attribute but not the [GenerateSerializer] attribute</value>
   </data>
   <data name="AddGenerateSerializerAttributesTitle" xml:space="preserve">
-    <value>Add the [GenerateSerializer] attribute.</value>
+    <value>Add the [GenerateSerializer] attribute</value>
   </data>
   <data name="AddSerializationAttributesDescription" xml:space="preserve">
-    <value>Add attributes to properties and fields to direct serializer generation.</value>
+    <value>Add attributes to properties and fields to direct serializer generation</value>
   </data>
   <data name="AddSerializationAttributesMessageFormat" xml:space="preserve">
-    <value>Add missing serialization attributes.</value>
+    <value>Add missing serialization attributes</value>
   </data>
   <data name="AddSerializationAttributesTitle" xml:space="preserve">
-    <value>Add missing serialization attributes.</value>
+    <value>Add missing serialization attributes</value>
   </data>
   <data name="AtMostOneOrleansConstructorTitle" xml:space="preserve">
-    <value>At most one constructor can be annotated with the [OrleansConstructor] attribute.</value>
+    <value>At most one constructor can be annotated with the [OrleansConstructor] attribute</value>
   </data>
   <data name="AtMostOneOrleansConstructorMessageFormat" xml:space="preserve">
-    <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute.</value>
+    <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
   </data>
 </root>

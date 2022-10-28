@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -14,7 +14,7 @@ namespace Orleans.Analyzers
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AtMostOneOrleansConstructorTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AtMostOneOrleansConstructorMessageFormat), Resources.ResourceManager, typeof(Resources));
 
-        internal static DiagnosticDescriptor Rule { get; } = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -29,8 +29,8 @@ namespace Orleans.Analyzers
         {
             if (context.Node is TypeDeclarationSyntax declaration && SerializationAttributesHelper.ShouldGenerateSerializer(declaration))
             {
-                var (_, _, _, annotatedConstructorCount) = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
-                if (annotatedConstructorCount > 1)
+                var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                if (analysis.AnnotatedConstructorCount > 1)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(Rule, declaration.GetLocation()));
                 }
