@@ -135,7 +135,7 @@ namespace Orleans.Runtime.Messaging
             if (message.Result == ResponseTypes.Success)
             {
                 bodyCodec = GetRawResponseCodec(field.FieldType);
-                message.Result = ResponseTypes.None;
+                message.Result = ResponseTypes.None; // reset raw response indicator
             }
             else
             {
@@ -147,11 +147,12 @@ namespace Orleans.Runtime.Messaging
 
         public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
+            var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
-            if (message.Result is ResponseTypes.None && (message.BodyObject as Response)?.GetSimpleResultType() is { } simpleType)
+            if (headers.ResponseType is ResponseTypes.None && (message.BodyObject as Response)?.GetSimpleResultType() is { } simpleType)
             {
                 bodyCodec = GetRawResponseCodec(simpleType);
-                message.Result = ResponseTypes.Success;
+                headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
             }
 
             try
@@ -166,7 +167,7 @@ namespace Orleans.Runtime.Messaging
                 Span<byte> lengthFields = stackalloc byte[FramingLength];
 
                 var headerWriter = Writer.Create(buffer, _serializationSession);
-                Serialize(ref headerWriter, message);
+                Serialize(ref headerWriter, message, headers);
                 headerWriter.Commit();
 
                 var headerLength = bufferWriter.CommittedBytes;
@@ -208,9 +209,8 @@ namespace Orleans.Runtime.Messaging
         private void ThrowInvalidHeaderLength(int headerLength) => throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
         private void ThrowInvalidBodyLength(int bodyLength) => throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
 
-        private Message Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value) where TBufferWriter : IBufferWriter<byte>
+        private void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value, PackedHeaders headers) where TBufferWriter : IBufferWriter<byte>
         {
-            var headers = value.Headers;
             writer.WriteUInt32((uint)headers);
 
             writer.WriteInt64(value.Id.ToInt64());
@@ -244,8 +244,6 @@ namespace Orleans.Runtime.Messaging
             {
                 WriteRequestContext(ref writer, value.RequestContextData);
             }
-
-            return value;
         }
 
         private void Deserialize<TInput>(ref Reader<TInput> reader, Message result)

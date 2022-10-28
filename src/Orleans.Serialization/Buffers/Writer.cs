@@ -247,7 +247,7 @@ namespace Orleans.Serialization.Buffers
         public void EnsureContiguous(int length)
         {
             // The current buffer is adequate.
-            if (_bufferPos + length <= _currentSpan.Length)
+            if (_bufferPos + length < _currentSpan.Length)
             {
                 return;
             }
@@ -308,7 +308,7 @@ namespace Orleans.Serialization.Buffers
         public void Write(scoped ReadOnlySpan<byte> value)
         {
             // Fast path, try copying to the current buffer.
-            if (_bufferPos + value.Length <= _currentSpan.Length)
+            if (value.Length <= _currentSpan.Length - _bufferPos)
             {
                 value.CopyTo(WritableSpan);
                 _bufferPos += value.Length;
@@ -349,10 +349,11 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByte(byte value)
         {
-            if ((uint)_bufferPos < (uint)_currentSpan.Length)
+            int bufferPos = _bufferPos;
+            if ((uint)bufferPos < (uint)_currentSpan.Length)
             {
-                Unsafe.AddByteOffset(ref MemoryMarshal.GetReference(_currentSpan), (uint)_bufferPos) = value;
-                _bufferPos++;
+                Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), (uint)bufferPos) = value;
+                _bufferPos = bufferPos + 1;
             }
             else
             {
@@ -439,7 +440,7 @@ namespace Orleans.Serialization.Buffers
             lower |= 0x01;
             lower <<= neededBytes;
 
-            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref MemoryMarshal.GetReference(_currentSpan), pos), lower);
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos), lower);
         }
 
         /// <summary>
@@ -461,12 +462,13 @@ namespace Orleans.Serialization.Buffers
             lower |= 0x01;
             lower <<= neededBytes;
 
-            ref var writeHead = ref Unsafe.AddByteOffset(ref MemoryMarshal.GetReference(_currentSpan), pos);
+            ref var writeHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
             Unsafe.WriteUnaligned(ref writeHead, lower);
 
             // Write the 2 byte overflow unconditionally
             var upper = value >> (63 - neededBytes);
-            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref writeHead, sizeof(ulong)), (ushort)upper);
+            writeHead = ref Unsafe.Add(ref writeHead, sizeof(ulong));
+            Unsafe.WriteUnaligned(ref writeHead, (ushort)upper);
         }
     }
 }
