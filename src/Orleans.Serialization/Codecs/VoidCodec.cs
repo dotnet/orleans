@@ -28,7 +28,7 @@ namespace Orleans.Serialization.Codecs
                 ThrowInvalidWireType(field);
             }
 
-            return ReferenceCodec.ReadReference<object, TInput>(ref reader, field);
+            return ReferenceCodec.ReadReference(ref reader, field, null);
         }
 
         private static void ThrowInvalidWireType(Field field) => throw new UnsupportedWireTypeException($"Expected a reference, but encountered wire type of '{field.WireType}'.");

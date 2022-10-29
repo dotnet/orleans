@@ -11,18 +11,6 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     public static class TagDelimitedFieldCodec
     {
-        private static readonly byte EndObjectTag = new Tag
-        {
-            WireType = WireType.Extended,
-            ExtendedWireType = ExtendedWireType.EndTagDelimited
-        };
-
-        private static readonly byte EndBaseFieldsTag = new Tag
-        {
-            WireType = WireType.Extended,
-            ExtendedWireType = ExtendedWireType.EndBaseFields
-        };
-
         /// <summary>
         /// Writes the start object tag.
         /// </summary>
@@ -44,7 +32,8 @@ namespace Orleans.Serialization.Codecs
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteEndObject<TBufferWriter>(this ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte> => writer.WriteByte((byte)EndObjectTag);
+        public static void WriteEndObject<TBufferWriter>(this ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
+            => writer.WriteByte((byte)WireType.Extended | (byte)ExtendedWireType.EndTagDelimited);
 
         /// <summary>
         /// Writes the end base tag.
@@ -52,6 +41,7 @@ namespace Orleans.Serialization.Codecs
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteEndBase<TBufferWriter>(this ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte> => writer.WriteByte((byte)EndBaseFieldsTag);
+        public static void WriteEndBase<TBufferWriter>(this ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
+            => writer.WriteByte((byte)WireType.Extended | (byte)ExtendedWireType.EndBaseFields);
     }
 }

@@ -1,8 +1,9 @@
+using System;
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -28,19 +29,27 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<object, TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference(ref reader, field, ObjectType);
             }
 
-            if (field.FieldType == ObjectType || field.FieldType is null)
-            {
-                _ = reader.ReadVarUInt32();
-                var result = new object();
-                ReferenceCodec.RecordObject(reader.Session, result);
-                return result;
-            }
+            if (field.FieldType is null || field.FieldType == ObjectType)
+                return ReadObject(ref reader, field);
 
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);
             return specificSerializer.ReadValue(ref reader, field);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static object ReadObject<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            field.EnsureWireType(WireType.LengthPrefixed);
+
+            var length = reader.ReadVarUInt32();
+            if (length != 0) throw new UnexpectedLengthPrefixValueException(nameof(Object), 0, length);
+
+            var result = new object();
+            ReferenceCodec.RecordObject(reader.Session, result);
+            return result;
         }
 
         /// <inheritdoc/>
@@ -54,8 +63,22 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
+            if (value is null)
+            {
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
+            specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
+        }
+
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+        {
+            // only the untyped writer will need to support actual object type values
             if (value is null || value.GetType() == typeof(object))
             {
                 if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))

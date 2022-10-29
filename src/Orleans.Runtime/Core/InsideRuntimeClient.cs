@@ -290,10 +290,9 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    var isDebugLog = invokeExceptionLogger.IsEnabled(LogLevel.Debug);
-                    if (message.Direction == Message.Directions.OneWay || isDebugLog)
+                    if (message.Direction == Message.Directions.OneWay || invokeExceptionLogger.IsEnabled(LogLevel.Debug))
                     {
-                        var logLevel = isDebugLog ? LogLevel.Debug : LogLevel.Warning;
+                        var logLevel = message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning;
                         this.invokeExceptionLogger.Log(
                             logLevel,
                             (int)ErrorCode.GrainInvokeException,

@@ -126,7 +126,7 @@ namespace Orleans.Serialization.WireProtocol
         public bool HasFieldId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Tag.WireType != WireType.Extended;
+            get => !Tag.HasExtendedWireType;
         }
 
         /// <summary>
@@ -199,19 +199,19 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether this instance has an extended schema type.
         /// </summary>
         /// <value><see langword="true" /> if this instance has an extended schema type; otherwise, <see langword="false" />.</value>
-        public bool HasExtendedSchemaType => IsSchemaTypeValid && SchemaType != SchemaType.Expected;
+        public bool HasExtendedSchemaType => Tag.IsSchemaTypeValid && Tag.SchemaType != SchemaType.Expected;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of base fields in a tag-delimited structure.
         /// </summary>
         /// <value><see langword="true" /> if this instance represents end of base fields in a tag-delimited structure; otherwise, <see langword="false" />.</value>
-        public bool IsEndBaseFields => Tag.HasExtendedWireType && Tag.ExtendedWireType == ExtendedWireType.EndBaseFields;
+        public bool IsEndBaseFields => Tag.IsEndBaseFields;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of a tag-delimited structure.
         /// </summary>
         /// <value><see langword="true" /> if this instance represents end of a tag-delimited structure; otherwise, <see langword="false" />.</value>
-        public bool IsEndObject => Tag.HasExtendedWireType && Tag.ExtendedWireType == ExtendedWireType.EndTagDelimited;
+        public bool IsEndObject => Tag.IsEndObject;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of a tag-delimited structure or the end of base fields in a tag-delimited structure.
@@ -220,7 +220,23 @@ namespace Orleans.Serialization.WireProtocol
         public bool IsEndBaseOrEndObject
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Tag.HasExtendedWireType && Tag.ExtendedWireType <= ExtendedWireType.EndBaseFields;
+            get => Tag.HasExtendedWireType/* && Tag.ExtendedWireType <= ExtendedWireType.EndBaseFields*/;
+        }
+
+        /// <summary>
+        /// Ensures that the wire type is supported.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureWireType(WireType expectedType)
+        {
+            if (Tag.WireType != expectedType)
+                UnsupportedWireType(Tag, FieldIdDeltaRaw, expectedType);
+        }
+
+        private static void UnsupportedWireType(Tag tag, uint fieldIdDeltaRaw, WireType expectedType)
+        {
+            var field = new Field(tag, fieldIdDeltaRaw, null);
+            throw new UnsupportedWireTypeException($"A WireType value of {expectedType} is expected by this codec. {field}");
         }
 
         /// <inheritdoc/>
@@ -248,7 +264,7 @@ namespace Orleans.Serialization.WireProtocol
                 builder.AppendFormatted(FieldType);
             }
 
-            if (WireType == WireType.Extended)
+            if (Tag.HasExtendedWireType)
             {
                 builder.AppendLiteral(": ");
                 builder.AppendFormatted(ExtendedWireType);

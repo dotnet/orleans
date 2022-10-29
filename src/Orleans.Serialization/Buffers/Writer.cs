@@ -349,8 +349,24 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByte(byte value)
         {
-            EnsureContiguous(1);
-            _currentSpan[_bufferPos++] = value;
+            int bufferPos = _bufferPos;
+            if ((uint)bufferPos < (uint)_currentSpan.Length)
+            {
+                Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), (uint)bufferPos) = value;
+                _bufferPos = bufferPos + 1;
+            }
+            else
+            {
+                WriteByteSlow(value);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void WriteByteSlow(byte value)
+        {
+            Allocate(1);
+            _currentSpan[0] = value;
+            _bufferPos = 1;
         }
 
         /// <summary>
@@ -415,8 +431,8 @@ namespace Orleans.Serialization.Buffers
             // Since this method writes a ulong worth of bytes unconditionally, ensure that there is sufficient space.
             EnsureContiguous(sizeof(ulong));
 
-            var pos = _bufferPos;
-            var neededBytes = BitOperations.Log2(value) / 7;
+            nuint pos = (uint)_bufferPos;
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
             _bufferPos += neededBytes + 1;
 
             ulong lower = value;
@@ -437,8 +453,8 @@ namespace Orleans.Serialization.Buffers
             // Since this method writes a ulong plus a ushort worth of bytes unconditionally, ensure that there is sufficient space.
             EnsureContiguous(sizeof(ulong) + sizeof(ushort));
 
-            var pos = _bufferPos;
-            var neededBytes = BitOperations.Log2(value) / 7;
+            nuint pos = (uint)_bufferPos;
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
             _bufferPos += neededBytes + 1;
 
             ulong lower = value;
@@ -450,9 +466,9 @@ namespace Orleans.Serialization.Buffers
             Unsafe.WriteUnaligned(ref writeHead, lower);
 
             // Write the 2 byte overflow unconditionally
-            ushort upper = (ushort)(value >> (63 - neededBytes));
+            var upper = value >> (63 - neededBytes);
             writeHead = ref Unsafe.Add(ref writeHead, sizeof(ulong));
-            Unsafe.WriteUnaligned(ref writeHead, upper);
+            Unsafe.WriteUnaligned(ref writeHead, (ushort)upper);
         }
     }
 }

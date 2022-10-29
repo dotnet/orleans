@@ -70,7 +70,7 @@ namespace Orleans.Serialization.Buffers
             writer.EnsureContiguous(sizeof(uint));
 
             var span = writer.WritableSpan;
-            var neededBytes = BitOperations.Log2(value) / 7;
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
             uint lower = value;
             lower <<= 1;
