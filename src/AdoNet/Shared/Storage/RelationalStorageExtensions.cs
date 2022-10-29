@@ -77,8 +77,8 @@ namespace Orleans.Tests.SqlUtils
                 //order as is the index iteration done.                                
                 var onlyOnceRow = new List<string>();
                 var properties = parameters.First().GetType().GetProperties();
-                columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.ContainsKey(pn.Name) ? nameMap[pn.Name] : pn.Name), endEscapeIndicator)));
-                if(onlyOnceColumns != null && onlyOnceColumns.Any())
+                columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.TryGetValue(pn.Name, out var pnName) ? pnName : pn.Name), endEscapeIndicator)));
+                if (onlyOnceColumns != null && onlyOnceColumns.Any())
                 {
                     var onlyOnceProperties = properties.Where(pn => onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                     var onlyOnceData = parameters.First();
@@ -88,7 +88,7 @@ namespace Orleans.Tests.SqlUtils
                         var parameterValue = currentProperty.GetValue(onlyOnceData, null);
                         if(useSqlParams)
                         {
-                            var parameterName = string.Format("@{0}", (nameMap.ContainsKey(onlyOnceProperties[i].Name) ? nameMap[onlyOnceProperties[i].Name] : onlyOnceProperties[i].Name));
+                            var parameterName = string.Format("@{0}", (nameMap.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
                             onlyOnceRow.Add(parameterName);
                             sqlParameters.Add(parameterName, parameterValue);
                         }

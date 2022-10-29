@@ -47,10 +47,10 @@ namespace Orleans.Metadata
                 }
 
                 var result = new GrainInterfaceProperties(properties.ToImmutableDictionary());
-                if (builder.ContainsKey(interfaceId))
+                if (builder.TryGetValue(interfaceId, out var graintInterfaceProperty))
                 {
                     throw new InvalidOperationException($"An entry with the key {interfaceId} is already present."
-                        + $"\nExisting: {builder[interfaceId].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
+                        + $"\nExisting: {graintInterfaceProperty.ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
                         + "\nConsider using the [GrainInterfaceType(\"name\")] attribute to give these interfaces unique names.");
                 }
 
@@ -77,10 +77,10 @@ namespace Orleans.Metadata
                 }
 
                 var result = new GrainProperties(properties.ToImmutableDictionary());
-                if (propertiesMap.ContainsKey(grainType))
+                if (propertiesMap.TryGetValue(grainType, out var grainProperty))
                 {
                     throw new InvalidOperationException($"An entry with the key {grainType} is already present."
-                        + $"\nExisting: {propertiesMap[grainType].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
+                        + $"\nExisting: {grainProperty.ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
                         + "\nConsider using the [GrainType(\"name\")] attribute to give these classes unique names.");
                 }
 

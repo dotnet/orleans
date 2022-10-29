@@ -10,11 +10,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.Storage
 {
@@ -143,7 +141,7 @@ namespace Orleans.Storage
                         GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
                         GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
                         ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N),
-                        State = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B?.ToArray() : null,
+                        State = fields.TryGetValue(BINARY_STATE_PROPERTY_NAME, out var propertyName) ? propertyName.B?.ToArray() : null,
                     };
                 }).ConfigureAwait(false);
 
