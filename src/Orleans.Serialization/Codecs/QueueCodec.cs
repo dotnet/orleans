@@ -59,10 +59,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Queue<T>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             Queue<T> result = null;
@@ -105,9 +102,6 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
     }

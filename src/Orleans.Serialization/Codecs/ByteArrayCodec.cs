@@ -34,11 +34,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<byte[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var length = reader.ReadVarUInt32();
             var result = reader.ReadBytes(length);
             ReferenceCodec.RecordObject(reader.Session, result);
@@ -67,9 +63,6 @@ namespace Orleans.Serialization.Codecs
             writer.WriteVarUInt32((uint)value.Length);
             writer.Write(value);
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for byte[] fields. {field}");
     }
 
     /// <summary>
@@ -129,11 +122,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<byte[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var length = reader.ReadVarUInt32();
             var result = reader.ReadBytes(length);
             ReferenceCodec.RecordObject(reader.Session, result);
@@ -162,9 +151,6 @@ namespace Orleans.Serialization.Codecs
             writer.WriteVarUInt32((uint)value.Length);
             writer.Write(value.Span);
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for ReadOnlyMemory<byte> fields. {field}");
     }
 
     /// <summary>
@@ -244,11 +230,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<byte[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var length = reader.ReadVarUInt32();
             var result = reader.ReadBytes(length);
             ReferenceCodec.RecordObject(reader.Session, result);
@@ -277,9 +259,6 @@ namespace Orleans.Serialization.Codecs
             writer.WriteVarUInt32((uint)value.Length);
             writer.Write(value.Span);
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for ReadOnlyMemory<byte> fields. {field}");
     }
 
     /// <summary>

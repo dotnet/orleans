@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks.Dataflow;
 
 namespace Orleans.Serialization.WireProtocol
 {
@@ -221,6 +222,22 @@ namespace Orleans.Serialization.WireProtocol
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => Tag.HasExtendedWireType/* && Tag.ExtendedWireType <= ExtendedWireType.EndBaseFields*/;
+        }
+
+        /// <summary>
+        /// Ensures that the wire type is <see cref="WireType.TagDelimited"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureWireTypeTagDelimited()
+        {
+            if (Tag.WireType != WireType.TagDelimited)
+                UnsupportedWireType(Tag, FieldIdDeltaRaw);
+        }
+
+        private static void UnsupportedWireType(Tag tag, uint fieldIdDeltaRaw)
+        {
+            var field = new Field(tag, fieldIdDeltaRaw, null);
+            throw new UnsupportedWireTypeException($"A WireType value of {nameof(WireType.TagDelimited)} is expected by this codec. {field}");
         }
 
         /// <summary>

@@ -83,6 +83,8 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference(ref reader, field, null);
             }
 
+            field.EnsureWireTypeTagDelimited();
+
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             Type type;
             var header = reader.ReadFieldHeader();

@@ -50,10 +50,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T);
@@ -172,10 +169,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -315,10 +309,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -478,10 +469,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3, T4>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -661,10 +649,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3, T4, T5>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -861,10 +846,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3, T4, T5, T6>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -1079,10 +1061,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3, T4, T5, T6, T7>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);
@@ -1313,10 +1292,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var item1 = default(T1);

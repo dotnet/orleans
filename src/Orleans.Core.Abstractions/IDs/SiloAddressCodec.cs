@@ -46,9 +46,7 @@ namespace Orleans.Runtime.Serialization
                 return ReferenceCodec.ReadReference<SiloAddress, TReaderInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-                ThrowUnsupportedWireTypeException(field);
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             Field header = default;
             int port = 0, generation = 0;
@@ -78,8 +76,5 @@ namespace Orleans.Runtime.Serialization
 
             return SiloAddress.New(address, port, generation);
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field)
-            => throw new UnsupportedWireTypeException($"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for {nameof(SiloAddress)} fields. {field}");
     }
 }

@@ -438,7 +438,7 @@ namespace Orleans.Runtime.Messaging
 
             public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
             {
-                field.EnsureWireType(WireType.TagDelimited);
+                field.EnsureWireTypeTagDelimited();
                 reader.ReadFieldHeader(ref field);
 
                 var holder = ResponsePool.Get<T>();

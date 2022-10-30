@@ -36,9 +36,7 @@ namespace Orleans.Serialization.Codecs
                 return (IPAddress)ReferenceCodec.ReadReference(ref reader, field, CodecFieldType);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-                ThrowUnsupportedWireTypeException(field);
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var result = ReadRaw(ref reader);
             ReferenceCodec.RecordObject(reader.Session, result);
             return result;
@@ -105,9 +103,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowNotSupported() => throw new NotSupportedException();
-
-        private static void ThrowUnsupportedWireTypeException(Field field)
-            => throw new UnsupportedWireTypeException($"Only a {nameof(WireType)} value of {nameof(WireType.LengthPrefixed)} is supported for {nameof(IPAddress)} fields. {field}");
 
     }
 

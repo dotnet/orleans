@@ -34,14 +34,7 @@ public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
     public static DateOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);
-        if (field.WireType != WireType.Fixed32)
-        {
-            ThrowUnsupportedWireTypeException(field);
-        }
-
+        field.EnsureWireType(WireType.Fixed32);
         return DateOnly.FromDayNumber(reader.ReadInt32());
     }
-
-    private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-        $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {nameof(DateOnly)} fields. {field}");
 }

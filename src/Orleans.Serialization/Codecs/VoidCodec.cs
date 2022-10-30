@@ -23,15 +23,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.Reference)
-            {
-                ThrowInvalidWireType(field);
-            }
-
+            field.EnsureWireType(WireType.Reference);
             return ReferenceCodec.ReadReference(ref reader, field, null);
         }
-
-        private static void ThrowInvalidWireType(Field field) => throw new UnsupportedWireTypeException($"Expected a reference, but encountered wire type of '{field.WireType}'.");
 
         private static void ThrowNotNullException(object value) => throw new InvalidOperationException(
             $"Expected a value of null, but encountered a value of '{value}'.");

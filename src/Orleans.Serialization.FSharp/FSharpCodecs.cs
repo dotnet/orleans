@@ -52,8 +52,7 @@ namespace Orleans.Serialization
             if (field.WireType == WireType.Reference)
                 return ReferenceCodec.ReadReference<FSharpOption<T>, TInput>(ref reader, field);
 
-            if (field.WireType != WireType.TagDelimited)
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var result = FSharpOption<T>.None;
@@ -155,11 +154,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         FSharpValueOption<T> IFieldCodec<FSharpValueOption<T>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             var result = FSharpValueOption<T>.None;
             uint fieldId = 0;
@@ -185,9 +180,6 @@ namespace Orleans.Serialization
 
             return result;
         }
-
-        internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported");
     }
 
     /// <summary>
@@ -271,10 +263,7 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference<FSharpChoice<T1, T2>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             FSharpChoice<T1, T2> result = default;
@@ -380,10 +369,7 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference<FSharpChoice<T1, T2, T3>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             FSharpChoice<T1, T2, T3> result = default;
@@ -501,10 +487,7 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference<FSharpChoice<T1, T2, T3, T4>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             FSharpChoice<T1, T2, T3, T4> result = default;
@@ -632,10 +615,7 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference<FSharpChoice<T1, T2, T3, T4, T5>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             FSharpChoice<T1, T2, T3, T4, T5> result = default;
@@ -773,10 +753,7 @@ namespace Orleans.Serialization
                 return ReferenceCodec.ReadReference<FSharpChoice<T1, T2, T3, T4, T5, T6>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             FSharpChoice<T1, T2, T3, T4, T5, T6> result = default;
@@ -1112,11 +1089,7 @@ namespace Orleans.Serialization
 
         FSharpResult<T, TError> IFieldCodec<FSharpResult<T, TError>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                FSharpValueOptionCodec<int>.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             FSharpResult<T, TError> result = default;
             uint fieldId = 0;

@@ -59,10 +59,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             T[] result = null;
@@ -118,9 +115,6 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
@@ -221,10 +215,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             T[] result = null;
@@ -274,9 +265,6 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
@@ -389,10 +377,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             T[] result = null;
@@ -442,9 +427,6 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
@@ -560,10 +542,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             T[] result = null;
@@ -613,9 +592,6 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for string fields. {field}");
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");

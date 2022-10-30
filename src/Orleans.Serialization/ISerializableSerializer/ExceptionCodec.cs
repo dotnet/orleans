@@ -315,6 +315,7 @@ namespace Orleans.Serialization
                                 
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
 
             uint fieldId = 0;
