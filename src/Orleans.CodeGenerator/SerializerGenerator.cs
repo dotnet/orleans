@@ -571,7 +571,7 @@ namespace Orleans.CodeGenerator
                 loopBody.Add(idUpdate);
 
                 members.Sort((x, y) => x.Member.FieldId.CompareTo(y.Member.FieldId));
-                var contigousIds = members[members.Count - 1].Member.FieldId == members.Count - 1;
+                var contiguousIds = members[members.Count - 1].Member.FieldId == members.Count - 1;
                 foreach (var member in members)
                 {
                     var description = member.Member;
@@ -604,10 +604,20 @@ namespace Orleans.CodeGenerator
 
                     var memberAssignment = ExpressionStatement(member.GetSetter(instanceParam, readValueExpression));
 
-                    if (member == members[members.Count - 1])
+                    BlockSyntax ifBody;
+                    if (member != members[members.Count - 1])
+                    {
+                        ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    }
+                    else if (contiguousIds)
+                    {
+                        ifBody = Block(memberAssignment, readFieldHeader);
+                    }
+                    else
+                    {
                         idUpdate = ExpressionStatement(PostfixUnaryExpression(SyntaxKind.PostIncrementExpression, idVar));
-
-                    var ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                        ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    }
 
                     // C#: if (id == <fieldId>) { ... }
                     var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)description.FieldId))),
@@ -617,10 +627,17 @@ namespace Orleans.CodeGenerator
                 }
 
                 // Consume any unknown fields
-                // C#: reader.ConsumeUnknownField(header);
-                var consumeUnknown = ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeUnknownField"),
-                    ArgumentList(SingletonSeparatedList(Argument(headerVar)))));
-                loopBody.Add(consumeUnknown);
+                if (contiguousIds)
+                {
+                    // C#: reader.ConsumeEndBaseOrEndObject(ref header); break;
+                    loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"), refHeaderVar)));
+                    loopBody.Add(BreakStatement());
+                }
+                else
+                {
+                    // C#: reader.ConsumeUnknownField(ref header);
+                    loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeUnknownField"), refHeaderVar)));
+                }
 
                 return WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(loopBody));
             }

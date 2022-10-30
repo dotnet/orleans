@@ -14,7 +14,15 @@ namespace Orleans.Serialization.Codecs
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
-        public static void ConsumeUnknownField<TInput>(this ref Reader<TInput> reader, Field field)
+        public static void ConsumeUnknownField<TInput>(this ref Reader<TInput> reader, Field field) => ConsumeUnknownField(ref reader, ref field);
+
+        /// <summary>
+        /// Consumes an unknown field.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        public static void ConsumeUnknownField<TInput>(this ref Reader<TInput> reader, scoped ref Field field)
         {
             // References cannot themselves be referenced.
             if (field.WireType == WireType.Reference)

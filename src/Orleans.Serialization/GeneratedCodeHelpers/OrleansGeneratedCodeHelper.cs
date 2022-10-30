@@ -178,7 +178,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         {
             do
             {
-                reader.ConsumeUnknownField(field);
+                reader.ConsumeUnknownField(ref field);
                 reader.ReadFieldHeader(ref field);
             } while (!field.IsEndBaseOrEndObject);
         }
