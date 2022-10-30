@@ -1,8 +1,8 @@
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Serializers
@@ -21,18 +21,7 @@ namespace Orleans.Serialization.Serializers
 
         public virtual void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField instance) where TBufferWriter : IBufferWriter<byte> { }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public virtual void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, TField instance)
-        {
-            while (true)
-            {
-                var header = reader.ReadFieldHeader();
-                if (header.IsEndBaseOrEndObject)
-                    break;
-
-                reader.ConsumeUnknownField(header);
-            }
-        }
+        public virtual void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, TField instance) => reader.ConsumeEndBaseOrEndObject();
     }
 
     // without the class type constraint

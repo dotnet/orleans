@@ -76,6 +76,8 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Type, TInput>(ref reader, field);
             }
 
+            field.EnsureWireTypeTagDelimited();
+
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             uint fieldId = 0;
             var schemaType = default(SchemaType);

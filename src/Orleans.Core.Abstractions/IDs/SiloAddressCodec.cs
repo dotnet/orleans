@@ -51,27 +51,28 @@ namespace Orleans.Runtime.Serialization
             Field header = default;
             int port = 0, generation = 0;
 
-            var id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, 0);
-            if (id != 0) throw new RequiredFieldMissingException("Serialized SiloAddress is missing its address field.");
+            reader.ReadFieldHeader(ref header);
+            if (!header.HasFieldId || header.FieldIdDelta != 0) throw new RequiredFieldMissingException("Serialized SiloAddress is missing its address field.");
             var address = IPAddressCodec.ReadValue(ref reader, header);
 
-            id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-            if (id == 1)
+            reader.ReadFieldHeader(ref header);
+            if (!field.IsEndBaseOrEndObject)
             {
-                port = UInt16Codec.ReadValue(ref reader, header);
-                id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-            }
+                var id = field.FieldIdDelta;
+                if (id == 1)
+                {
+                    port = UInt16Codec.ReadValue(ref reader, header);
+                    reader.ReadFieldHeader(ref header);
+                    if (field.HasFieldId) id += field.FieldIdDelta;
+                }
 
-            if (id == 2)
-            {
-                generation = Int32Codec.ReadValue(ref reader, header);
-                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
-            }
+                if (id == 2)
+                {
+                    generation = Int32Codec.ReadValue(ref reader, header);
+                    reader.ReadFieldHeader(ref header);
+                }
 
-            while (id >= 0)
-            {
-                reader.ConsumeUnknownField(header);
-                id = OrleansGeneratedCodeHelper.ReadHeaderExpectingEndBaseOrEndObject(ref reader, ref header, id);
+                reader.ConsumeEndBaseOrEndObject(ref field);
             }
 
             return SiloAddress.New(address, port, generation);

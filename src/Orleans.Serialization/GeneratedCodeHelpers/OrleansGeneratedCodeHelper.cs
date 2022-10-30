@@ -151,43 +151,36 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             => throw new ArgumentOutOfRangeException(message: $"The argument index value {index} must be between 0 and {maxArgs}", null);
 
         /// <summary>
-        /// Reads a field header.
+        /// Expects empty content (a single field header of either <see cref="ExtendedWireType.EndBaseFields"/> or <see cref="ExtendedWireType.EndTagDelimited"/>),
+        /// but will consume any unexpected fields also.
         /// </summary>
-        /// <typeparam name="TInput">The reader input type.</typeparam>
-        /// <param name="reader">The reader.</param>
-        /// <param name="header">The header.</param>
-        /// <param name="id">The identifier.</param>
-        /// <returns>The field id, if a new field header was written, otherwise <c>-1</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadHeader<TInput>(ref Reader<TInput> reader, scoped ref Field header, int id)
+        public static void ConsumeEndBaseOrEndObject<TInput>(this ref Reader<TInput> reader)
         {
-            reader.ReadFieldHeader(ref header);
-            if (header.IsEndBaseOrEndObject)
-            {
-                return -1;
-            }
-
-            return (int)(id + header.FieldIdDelta);
+            Unsafe.SkipInit(out Field field);
+            reader.ReadFieldHeader(ref field);
+            reader.ConsumeEndBaseOrEndObject(ref field);
         }
 
         /// <summary>
-        /// Reads the header expecting an end base tag or end object tag.
+        /// Expects empty content (a single field header of either <see cref="ExtendedWireType.EndBaseFields"/> or <see cref="ExtendedWireType.EndTagDelimited"/>),
+        /// but will consume any unexpected fields also.
         /// </summary>
-        /// <typeparam name="TInput">The reader input type.</typeparam>
-        /// <param name="reader">The reader.</param>
-        /// <param name="header">The header.</param>
-        /// <param name="id">The identifier.</param>
-        /// <returns>The field id, if a new field header was written, otherwise <c>-1</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadHeaderExpectingEndBaseOrEndObject<TInput>(ref Reader<TInput> reader, scoped ref Field header, int id)
+        public static void ConsumeEndBaseOrEndObject<TInput>(this ref Reader<TInput> reader, scoped ref Field field)
         {
-            reader.ReadFieldHeader(ref header);
-            if (header.IsEndBaseOrEndObject)
-            {
-                return -1;
-            }
+            if (!field.IsEndBaseOrEndObject)
+                ConsumeUnexpectedContent(ref reader, ref field);
+        }
 
-            return (int)(id + header.FieldIdDelta);
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ConsumeUnexpectedContent<TInput>(this ref Reader<TInput> reader, scoped ref Field field)
+        {
+            do
+            {
+                reader.ConsumeUnknownField(field);
+                reader.ReadFieldHeader(ref field);
+            } while (!field.IsEndBaseOrEndObject);
         }
 
         /// <summary>
