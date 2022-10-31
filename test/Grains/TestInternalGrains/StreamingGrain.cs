@@ -119,7 +119,7 @@ namespace UnitTests.Grains
             _streamId = streamId;
             ProviderName = streamProvider.Name;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
+            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
 
             _subscription = await stream.SubscribeAsync(this);
         }
@@ -128,7 +128,7 @@ namespace UnitTests.Grains
         {
             _logger = logger;
             _logger.LogInformation("RenewConsumer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
+            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
             _subscription = await stream.SubscribeAsync(this);
         }
 
@@ -208,7 +208,7 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             _logger.LogInformation("BecomeProducer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
+            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
             _observer = stream;
             _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
             _observerDisposedYet = true; // TODO BPETIT remove that
@@ -223,7 +223,7 @@ namespace UnitTests.Grains
 
             _logger = logger;
             _logger.LogInformation("RenewProducer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
+            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
             _observer = stream;
             _observerDisposedYet = true; // TODO BPETIT remove that
         }

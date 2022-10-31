@@ -91,7 +91,7 @@ namespace UnitTests.StreamingTests
             var count = new Counter();
             // get stream and subscribe
             IStreamProvider streamProvider = this.client.GetStreamProvider(streamProviderName);
-            var stream = streamProvider.GetStream<int>(streamGuid, streamNamespace);
+            var stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             StreamSubscriptionHandle<int> subscriptionHandle = await stream.SubscribeAsync((e, t) => count.Increment());
 
             // produce one message (PubSubRendezvousGrain will have one consumer and one producer)

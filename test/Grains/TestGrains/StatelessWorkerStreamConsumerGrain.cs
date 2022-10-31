@@ -29,7 +29,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
-            var stream = this.GetStreamProvider(providerToUse).GetStream<string>(streamId, StreamNamespace);
+            var stream = this.GetStreamProvider(providerToUse).GetStream<string>(StreamNamespace, streamId);
             _ = await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
         }
     }

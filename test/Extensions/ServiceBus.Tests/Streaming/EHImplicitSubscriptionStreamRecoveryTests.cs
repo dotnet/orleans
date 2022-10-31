@@ -103,7 +103,7 @@ namespace ServiceBus.Tests.StreamingTests
             IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
-                    .Select(i => streamProvider.GetStream<GeneratedEvent>(Guid.NewGuid(), streamNamespace))
+                    .Select(i => streamProvider.GetStream<GeneratedEvent>(streamNamespace, Guid.NewGuid()))
                     .ToArray();
 
             for (int i = 0; i < eventsInStream - 1; i++)

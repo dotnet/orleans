@@ -40,9 +40,37 @@ namespace Orleans.Streams
         /// <typeparam name="T">The stream element type.</typeparam>
         /// <param name="streamProvider">The stream provider.</param>
         /// <param name="id">The identifier.</param>
-        /// <param name="ns">The namespace.</param>
         /// <returns>The stream.</returns>
-        public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, Guid id, string ns) => streamProvider.GetStream<T>(StreamId.Create(ns, id));
+        public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, Guid id) => streamProvider.GetStream<T>(StreamId.Create(null, id));
+
+        /// <summary>
+        /// Gets the stream with the specified identity and namespace.
+        /// </summary>
+        /// <typeparam name="T">The stream element type.</typeparam>
+        /// <param name="streamProvider">The stream provider.</param>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="id">The identifier.</param>
+        /// <returns>The stream.</returns>
+        public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, string ns, Guid id) => streamProvider.GetStream<T>(StreamId.Create(ns, id));
+
+        /// <summary>
+        /// Gets the stream with the specified identity and namespace.
+        /// </summary>
+        /// <typeparam name="T">The stream element type.</typeparam>
+        /// <param name="streamProvider">The stream provider.</param>
+        /// <param name="id">The identifier.</param>
+        /// <returns>The stream.</returns>
+        public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, string id) => streamProvider.GetStream<T>(StreamId.Create(null, id));
+
+        /// <summary>
+        /// Gets the stream with the specified identity and namespace.
+        /// </summary>
+        /// <typeparam name="T">The stream element type.</typeparam>
+        /// <param name="streamProvider">The stream provider.</param>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="id">The identifier.</param>
+        /// <returns>The stream.</returns>
+        public static IAsyncStream<T> GetStream<T>(this IStreamProvider streamProvider, string ns, string id) => streamProvider.GetStream<T>(StreamId.Create(ns, id));
     }
 }
 

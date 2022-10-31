@@ -13,7 +13,7 @@ namespace UnitTests.Grains
 
         public async Task SubscribeToStream(Guid guid, string providerName)
         {
-            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(guid, "Namespace");
+            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>("Namespace", guid);
             _streamSubscriptionHandle = await stream.SubscribeAsync(OnNextAsync);
         }
 
@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public async Task SendTestObject(string providerName)
         {
-            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(this.GetPrimaryKey(), "Namespace");
+            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>("Namespace", this.GetPrimaryKey());
             await stream.OnNextAsync(_myObject);
         }
 

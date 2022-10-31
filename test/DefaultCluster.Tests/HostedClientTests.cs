@@ -172,7 +172,7 @@ namespace DefaultCluster.Tests.General
 
             var handle = new AsyncResultHandle();
             var vals = new List<int>();
-            var stream0 = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
+            var stream0 = client.GetStreamProvider("MemStream").GetStream<int>("hi", Guid.Empty);
             await stream0.SubscribeAsync(
                 (val, token) =>
                 {
@@ -180,7 +180,7 @@ namespace DefaultCluster.Tests.General
                     if (vals.Count >= 2) handle.Done = true;
                     return Task.CompletedTask;
                 });
-            var stream = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
+            var stream = client.GetStreamProvider("MemStream").GetStream<int>("hi", Guid.Empty);
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);
             Assert.True(await handle.WaitForFinished(_timeout));

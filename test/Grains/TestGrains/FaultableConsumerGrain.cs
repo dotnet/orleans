@@ -52,7 +52,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("BecomeConsumer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
-            consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
+            consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
             consumerHandle = await consumer.SubscribeAsync(
                 OnNextAsync,
                 OnErrorAsync,

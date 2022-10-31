@@ -286,7 +286,7 @@ namespace UnitTests.Grains
 #if USE_GENERICS
                 State.Stream = streamProvider.GetStream<T>(streamId);
 #else
-                State.Stream = streamProvider.GetStream<int>(streamId, StreamNamespace);
+                State.Stream = streamProvider.GetStream<int>(StreamNamespace, streamId);
 #endif
             }
         }
@@ -385,7 +385,7 @@ namespace UnitTests.Grains
             {
                 logger.LogInformation("InitStream StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
                 IStreamProvider streamProvider = this.GetStreamProvider(providerName);
-                State.Stream = streamProvider.GetStream<int>(streamId, StreamNamespace);
+                State.Stream = streamProvider.GetStream<int>(StreamNamespace, streamId);
             }
 
             var observer = new MyStreamObserver<int>(logger);

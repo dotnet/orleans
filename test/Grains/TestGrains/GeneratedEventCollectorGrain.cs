@@ -33,7 +33,7 @@ namespace TestGrains
             logger.LogInformation("OnActivateAsync");
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
-            stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
+            stream = streamProvider.GetStream<GeneratedEvent>(StreamNamespace, this.GetPrimaryKey());
 
             IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
             if (handles.Count == 0)

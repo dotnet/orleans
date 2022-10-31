@@ -205,7 +205,7 @@ namespace UnitTests.General
         {
             var streamProvider = this.fixture.Client.GetStreamProvider("SMSProvider");
             var id = Guid.NewGuid();
-            var stream = streamProvider.GetStream<int>(id, "InterceptedStream");
+            var stream = streamProvider.GetStream<int>("InterceptedStream", id);
             var grain = this.fixture.GrainFactory.GetGrain<IStreamInterceptionGrain>(id);
 
             // The intercepted grain should double the value passed to the stream.

@@ -24,7 +24,7 @@ namespace Tester.StreamingTests
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
-            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
+            var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // Data that will be sent to the grains
@@ -52,7 +52,7 @@ namespace Tester.StreamingTests
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
-            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
+            var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // Data that will be sent to the grains
@@ -81,8 +81,8 @@ namespace Tester.StreamingTests
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
-            var stream = streamProvider.GetStream<byte[]>(key, nameof(IImplicitSubscriptionCounterGrain));
-            var otherStream = streamProvider.GetStream<byte[]>(Guid.NewGuid(), nameof(IImplicitSubscriptionCounterGrain));
+            var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
+            var otherStream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid());
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
             await grain.DeactivateOnEvent(true);
 

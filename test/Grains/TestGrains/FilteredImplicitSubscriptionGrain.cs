@@ -29,7 +29,7 @@ namespace UnitTests.Grains
             foreach (var streamNamespace in streamNamespaces)
             {
                 counters[streamNamespace] = 0;
-                var stream = streamProvider.GetStream<int>(this.GetPrimaryKey(), streamNamespace);
+                var stream = streamProvider.GetStream<int>(streamNamespace, this.GetPrimaryKey());
                 await stream.SubscribeAsync(
                     (e, t) =>
                     {

@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,7 +74,7 @@ namespace Tester.StreamingTests
             foreach(Guid streamId in streamIds)
             {
                 IStreamProvider streamProvider = this.fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
-                IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamId, null);
+                IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamId);
                 await stream.SubscribeAsync(OnNextAsync);
             }
 
