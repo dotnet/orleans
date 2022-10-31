@@ -6,7 +6,7 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
     {
-        [Id(1)]
+        [Id(0)]
         public StreamSequenceToken Token { get; private set; }
         
         public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)

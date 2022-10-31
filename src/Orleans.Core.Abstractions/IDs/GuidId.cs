@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The underlying <see cref="Guid"/>.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public readonly Guid Guid;
 
         /// <summary>

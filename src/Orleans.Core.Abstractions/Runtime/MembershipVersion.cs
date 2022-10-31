@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the version.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public long Value { get; init; }
 
         /// <summary>

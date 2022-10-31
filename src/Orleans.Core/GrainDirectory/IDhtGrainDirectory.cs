@@ -75,13 +75,13 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// The address.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public readonly GrainAddress Address;
        
         /// <summary>
         /// The version of this entry.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public readonly int VersionTag;
 
         public AddressAndTag(GrainAddress address, int versionTag)

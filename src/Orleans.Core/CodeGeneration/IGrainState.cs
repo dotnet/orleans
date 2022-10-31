@@ -30,18 +30,18 @@ namespace Orleans
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public class GrainState<T> : IGrainState<T>
+    public sealed class GrainState<T> : IGrainState<T>
     {
         /// <inheritdoc />
-        [Id(1)]
+        [Id(0)]
         public T State { get; set; }
 
         /// <inheritdoc />
-        [Id(2)]
+        [Id(1)]
         public string ETag { get; set; }
 
         /// <inheritdoc />
-        [Id(3)]
+        [Id(2)]
         public bool RecordExists { get; set; }
 
         /// <summary>

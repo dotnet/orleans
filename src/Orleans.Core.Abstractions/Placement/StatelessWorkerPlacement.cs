@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the maximum number of local instances which can be simultaneously active for a given grain.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public int MaxLocal { get; private set; }
 
         /// <summary>

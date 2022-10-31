@@ -68,10 +68,10 @@ namespace Orleans
 
         private ITransactionAgent TransactionAgent => _transactionAgent ?? throw new OrleansTransactionsDisabledException();
 
-        [Id(1)]
+        [Id(0)]
         public TransactionOption TransactionOption { get; set; }
 
-        [Id(2)]
+        [Id(1)]
         public TransactionInfo TransactionInfo { get; set; }
 
         [GeneratedActivatorConstructor]

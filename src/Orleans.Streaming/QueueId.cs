@@ -12,11 +12,11 @@ namespace Orleans.Streams
     [GenerateSerializer]
     public readonly struct QueueId : IEquatable<QueueId>, IComparable<QueueId>, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly string queueNamePrefix;
-        [Id(2)]
+        [Id(1)]
         private readonly uint queueId;
-        [Id(3)]
+        [Id(2)]
         private readonly uint uniformHashCache;
 
         /// <summary>

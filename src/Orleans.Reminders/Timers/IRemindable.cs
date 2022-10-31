@@ -45,19 +45,19 @@ namespace Orleans
             /// <summary>
             /// Gets the time at which the first tick of this reminder is due, or was triggered.
             /// </summary>
-            [Id(1)]
+            [Id(0)]
             public DateTime FirstTickTime { get; }
 
             /// <summary>
             /// Gets the period of the reminder.
             /// </summary>
-            [Id(2)]
+            [Id(1)]
             public TimeSpan Period { get; }
 
             /// <summary>
             /// Gets the time on the runtime silo when the silo initiated the delivery of this tick.
             /// </summary>
-            [Id(3)]
+            [Id(2)]
             public DateTime CurrentTickTime { get; }
 
             /// <summary>

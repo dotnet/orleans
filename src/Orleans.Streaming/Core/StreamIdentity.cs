@@ -29,13 +29,13 @@ namespace Orleans.Streams
         /// <summary>
         /// Gets the stream identifier.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public Guid Guid { get; }
 
         /// <summary>
         /// Gets the stream namespace.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public string Namespace { get; }
 
         /// <inheritdoc />

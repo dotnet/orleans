@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly IdSpan _value;
 
         /// <summary>

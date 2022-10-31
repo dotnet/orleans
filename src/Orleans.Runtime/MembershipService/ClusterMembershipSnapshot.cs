@@ -25,14 +25,14 @@ namespace Orleans.Runtime
         /// Gets the cluster members.
         /// </summary>
         /// <value>The cluster members.</value>
-        [Id(1)]
+        [Id(0)]
         public ImmutableDictionary<SiloAddress, ClusterMember> Members { get; }
 
         /// <summary>
         /// Gets the cluster membership version.
         /// </summary>
         /// <value>The cluster membership version.</value>
-        [Id(2)]
+        [Id(1)]
         public MembershipVersion Version { get; }
 
         /// <summary>

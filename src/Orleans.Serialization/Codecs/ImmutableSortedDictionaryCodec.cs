@@ -47,16 +47,16 @@ namespace Orleans.Serialization.Codecs
         /// Gets or sets the values.
         /// </summary>
         /// <value>The values.</value>
-        [Id(1)]
+        [Id(0)]
         public List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
-        [Id(2)]
+        [Id(1)]
         public IComparer<TKey> KeyComparer;
-        [Id(3)]
+        [Id(2)]
         public IEqualityComparer<TValue> ValueComparer;
     }
 

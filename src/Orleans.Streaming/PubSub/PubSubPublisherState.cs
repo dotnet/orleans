@@ -13,10 +13,10 @@ namespace Orleans.Streams
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
-        [Id(1)]
+        [Id(0)]
         public QualifiedStreamId Stream;
         [JsonProperty]
-        [Id(2)]
+        [Id(1)]
         public GrainId Producer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         // This constructor has to be public for JSonSerialization to work!

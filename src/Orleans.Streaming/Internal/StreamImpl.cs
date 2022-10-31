@@ -14,10 +14,10 @@ namespace Orleans.Streams
     [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
     internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
-        [Id(1)]
+        [Id(0)]
         private readonly QualifiedStreamId                        streamId;
 
-        [Id(2)]
+        [Id(1)]
         private readonly bool                                    isRewindable;
 
         [NonSerialized]

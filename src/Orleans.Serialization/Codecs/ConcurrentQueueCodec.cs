@@ -38,7 +38,7 @@ namespace Orleans.Serialization.Codecs
         /// Gets or sets the values.
         /// </summary>
         /// <value>The values.</value>
-        [Id(1)]
+        [Id(0)]
         public Queue<T> Values;
     }
 

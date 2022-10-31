@@ -15,25 +15,25 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// The UTC timestamp of the last time at which the issue was observed
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public DateTime TimeStamp { get; set; }
 
         /// <summary>
         /// The UTC timestamp of the first time we observed this issue
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public DateTime TimeOfFirstFailure { get; set; }
 
         /// <summary>
         /// The number of times we have observed this issue since the first failure
         /// </summary>
-        [Id(3)]
+        [Id(2)]
         public int NumberOfConsecutiveFailures { get; set; }
 
         /// <summary>
         /// The delay we are waiting before the next retry
         /// </summary>
-        [Id(4)]
+        [Id(3)]
         public TimeSpan RetryDelay { get; set; }
 
         /// <summary>

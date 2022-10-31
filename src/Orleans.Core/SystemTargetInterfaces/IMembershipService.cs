@@ -31,25 +31,25 @@ namespace Orleans.Runtime
         /// <summary>
         /// The health score of the intermediary node.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public int IntermediaryHealthScore { get; init; }
 
         /// <summary>
         /// <see langword="true"/> if the probe succeeded; otherwise, <see langword="false"/>.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public bool Succeeded { get; init; }
 
         /// <summary>
         /// The duration of the probe attempt.
         /// </summary>
-        [Id(3)]
+        [Id(2)]
         public TimeSpan ProbeResponseTime { get; init; }
 
         /// <summary>
         /// The failure message if the probe did not succeed.
         /// </summary>
-        [Id(4)]
+        [Id(3)]
         public string FailureMessage { get; init; }
 
         /// <inheritdoc />

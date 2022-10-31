@@ -19,23 +19,23 @@ namespace Orleans.Streams
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
-        [Id(1)]
+        [Id(0)]
         public GuidId SubscriptionId;
 
         [JsonProperty]
-        [Id(2)]
+        [Id(1)]
         public QualifiedStreamId Stream;
 
         [JsonProperty]
-        [Id(3)]
+        [Id(2)]
         public GrainId Consumer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
-        [Id(4)]
+        [Id(3)]
         public string FilterData; // Serialized func info
 
         [JsonProperty]
-        [Id(5)]
+        [Id(4)]
         public SubscriptionStates state;
 
         [JsonIgnore]

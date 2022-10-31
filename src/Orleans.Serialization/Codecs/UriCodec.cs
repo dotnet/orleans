@@ -35,7 +35,7 @@ namespace Orleans.Serialization.Codecs
         /// Gets or sets the value.
         /// </summary>
         /// <value>The value.</value>
-        [Id(1)]
+        [Id(0)]
         public string Value;
     }
 
