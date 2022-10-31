@@ -48,60 +48,55 @@ namespace Orleans.Runtime.MembershipService
 
         public SiloInstanceRecord(Dictionary<string, AttributeValue> fields)
         {
-            if (fields.ContainsKey(DEPLOYMENT_ID_PROPERTY_NAME))
-                DeploymentId = fields[DEPLOYMENT_ID_PROPERTY_NAME].S;
+            if (fields.TryGetValue(DEPLOYMENT_ID_PROPERTY_NAME, out var deploymentId))
+                DeploymentId = deploymentId.S;
 
-            if (fields.ContainsKey(SILO_IDENTITY_PROPERTY_NAME))
-                SiloIdentity = fields[SILO_IDENTITY_PROPERTY_NAME].S;
+            if (fields.TryGetValue(SILO_IDENTITY_PROPERTY_NAME, out var siloIdentity))
+                SiloIdentity = siloIdentity.S;
 
-            if (fields.ContainsKey(ADDRESS_PROPERTY_NAME))
-                Address = fields[ADDRESS_PROPERTY_NAME].S;
+            if (fields.TryGetValue(ADDRESS_PROPERTY_NAME, out var address))
+                Address = address.S;
 
-            int port;
-            if (fields.ContainsKey(PORT_PROPERTY_NAME) &&
-                int.TryParse(fields[PORT_PROPERTY_NAME].N, out port))
+            if (fields.TryGetValue(PORT_PROPERTY_NAME, out var sPort) &&
+                int.TryParse(sPort.N, out var port))
                 Port = port;
 
-            int generation;
-            if (fields.ContainsKey(GENERATION_PROPERTY_NAME) &&
-                int.TryParse(fields[GENERATION_PROPERTY_NAME].N, out generation))
+            if (fields.TryGetValue(GENERATION_PROPERTY_NAME, out var sGeneration) &&
+                int.TryParse(sGeneration.N, out var generation))
                 Generation = generation;
 
-            if (fields.ContainsKey(HOSTNAME_PROPERTY_NAME))
-                HostName = fields[HOSTNAME_PROPERTY_NAME].S;
+            if (fields.TryGetValue(HOSTNAME_PROPERTY_NAME, out var hostName))
+                HostName = hostName.S;
 
-            int status;
-            if (fields.ContainsKey(STATUS_PROPERTY_NAME) &&
-                int.TryParse(fields[STATUS_PROPERTY_NAME].N, out status))
+            if (fields.TryGetValue(STATUS_PROPERTY_NAME, out var sStatus) &&
+                int.TryParse(sStatus.N, out var status))
                 Status = status;
 
-            int proxyPort;
-            if (fields.ContainsKey(PROXY_PORT_PROPERTY_NAME) &&
-                int.TryParse(fields[PROXY_PORT_PROPERTY_NAME].N, out proxyPort))
+            if (fields.TryGetValue(PROXY_PORT_PROPERTY_NAME, out var sProxyPort) &&
+                int.TryParse(sProxyPort.N, out var proxyPort))
                 ProxyPort = proxyPort;
 
-            if (fields.ContainsKey(SILO_NAME_PROPERTY_NAME))
-                SiloName = fields[SILO_NAME_PROPERTY_NAME].S;
+            if (fields.TryGetValue(SILO_NAME_PROPERTY_NAME, out var siloName))
+                SiloName = siloName.S;
 
-            if (fields.ContainsKey(SUSPECTING_SILOS_PROPERTY_NAME))
-                SuspectingSilos = fields[SUSPECTING_SILOS_PROPERTY_NAME].S;
+            if (fields.TryGetValue(SUSPECTING_SILOS_PROPERTY_NAME, out var suspectingSilos))
+                SuspectingSilos = suspectingSilos.S;
 
-            if (fields.ContainsKey(SUSPECTING_TIMES_PROPERTY_NAME))
-                SuspectingTimes = fields[SUSPECTING_TIMES_PROPERTY_NAME].S;
+            if (fields.TryGetValue(SUSPECTING_TIMES_PROPERTY_NAME, out var suspectingTimes))
+                SuspectingTimes = suspectingTimes.S;
 
-            if (fields.ContainsKey(START_TIME_PROPERTY_NAME))
-                StartTime = fields[START_TIME_PROPERTY_NAME].S;
+            if (fields.TryGetValue(START_TIME_PROPERTY_NAME, out var startTime))
+                StartTime = startTime.S;
 
-            if (fields.ContainsKey(I_AM_ALIVE_TIME_PROPERTY_NAME))
-                IAmAliveTime = fields[I_AM_ALIVE_TIME_PROPERTY_NAME].S;
+            if (fields.TryGetValue(I_AM_ALIVE_TIME_PROPERTY_NAME, out var aliveTime))
+                IAmAliveTime = aliveTime.S;
 
-            int etag;
-            if (fields.ContainsKey(ETAG_PROPERTY_NAME) &&
-                int.TryParse(fields[ETAG_PROPERTY_NAME].N, out etag))
+            if (fields.TryGetValue(ETAG_PROPERTY_NAME, out var sETag) &&
+                int.TryParse(sETag.N, out var etag))
                 ETag = etag;
 
-            if (fields.ContainsKey(MEMBERSHIP_VERSION_PROPERTY_NAME) &&
-                int.TryParse(fields[MEMBERSHIP_VERSION_PROPERTY_NAME].N, out int version))
+            if (fields.TryGetValue(MEMBERSHIP_VERSION_PROPERTY_NAME, out var value) &&
+                int.TryParse(value.N, out var version))
                 MembershipVersion = version;
         }
 
