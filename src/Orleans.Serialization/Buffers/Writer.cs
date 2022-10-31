@@ -352,6 +352,7 @@ namespace Orleans.Serialization.Buffers
             int bufferPos = _bufferPos;
             if ((uint)bufferPos < (uint)_currentSpan.Length)
             {
+                // https://github.com/dotnet/runtime/issues/72004
                 Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), (uint)bufferPos) = value;
                 _bufferPos = bufferPos + 1;
             }

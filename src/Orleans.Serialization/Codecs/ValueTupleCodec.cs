@@ -24,19 +24,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.VarInt)
-            {
-                ThrowUnsupportedWireTypeException();
-            }
+            field.EnsureWireType(WireType.VarInt);
 
             ReferenceCodec.MarkValueField(reader.Session);
             _ = reader.ReadVarUInt64();
 
             return default;
         }
-
-        internal static void ThrowUnsupportedWireTypeException() => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for tuple fields.");
     }
 
     /// <summary>
@@ -77,11 +71,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             var item1 = default(T);
             uint fieldId = 0;
@@ -180,11 +170,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public (T1, T2) ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2) res = default;
             uint fieldId = 0;
@@ -299,11 +285,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public (T1, T2, T3) ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2, T3) res = default;
             uint fieldId = 0;
@@ -434,11 +416,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public (T1, T2, T3, T4) ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2, T3, T4) res = default;
             uint fieldId = 0;
@@ -582,11 +560,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public (T1, T2, T3, T4, T5) ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2, T3, T4, T5) res = default;
             uint fieldId = 0;
@@ -745,11 +719,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public (T1, T2, T3, T4, T5, T6) ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2, T3, T4, T5, T6) res = default;
             uint fieldId = 0;
@@ -924,11 +894,7 @@ namespace Orleans.Serialization.Codecs
             ref Reader<TInput> reader,
             Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             (T1, T2, T3, T4, T5, T6, T7) res = default;
             uint fieldId = 0;
@@ -1116,11 +1082,7 @@ namespace Orleans.Serialization.Codecs
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> ReadValue<TInput>(ref Reader<TInput> reader,
             Field field)
         {
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ValueTupleCodec.ThrowUnsupportedWireTypeException();
-            }
-
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> res = default;
             uint fieldId = 0;

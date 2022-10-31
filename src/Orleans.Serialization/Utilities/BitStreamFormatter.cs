@@ -110,10 +110,17 @@ namespace Orleans.Serialization.Utilities
             {
                 ReferenceCodec.MarkValueField(reader.Session);
                 var refId = reader.ReadVarUInt32();
-                var exists = reader.Session.ReferencedObjects.TryGetReferencedObject(refId, out var refd);
                 res.Append('[');
                 FormatFieldHeader(res, reader.Session, field, id, typeName);
-                res.Append($" Reference: {refId} ({(exists ? $"{refd}" : "unknown")})");
+                if (refId == 0)
+                {
+                    res.Append($" Reference: 0");
+                }
+                else
+                {
+                    var refd = reader.Session.ReferencedObjects.TryGetReferencedObject(refId);
+                    res.Append($" Reference: {refId} ({refd}{(refd is null ? "unknown" : null)})");
+                }
                 res.Append(']');
                 return;
             }

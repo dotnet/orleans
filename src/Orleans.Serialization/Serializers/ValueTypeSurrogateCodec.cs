@@ -62,6 +62,7 @@ public sealed class ValueTypeSurrogateCodec<TField, TSurrogate, TConverter>
     /// <inheritdoc/>
     public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
+        field.EnsureWireTypeTagDelimited();
         ReferenceCodec.MarkValueField(reader.Session);
         TField result = default;
         Deserialize(ref reader, ref result);

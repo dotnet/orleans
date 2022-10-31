@@ -33,6 +33,8 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<TField, TInput>(ref reader, field);
             }
 
+            field.EnsureWireTypeTagDelimited();
+
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             TSurrogate surrogate = default;
             _surrogateSerializer.Deserialize(ref reader, ref surrogate);

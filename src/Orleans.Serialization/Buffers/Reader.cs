@@ -562,15 +562,15 @@ namespace Orleans.Serialization.Buffers
             if (IsReadOnlySequenceInput || IsSpanInput)
             {
                 var pos = _bufferPos;
-                var span = _currentSpan;
-                if ((uint)pos >= (uint)span.Length)
+                if ((uint)pos < (uint)_currentSpan.Length)
                 {
-                    return ReadByteSlow(ref this);
+                    // https://github.com/dotnet/runtime/issues/72004
+                    var result = Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), (uint)pos);
+                    _bufferPos = pos + 1;
+                    return result;
                 }
 
-                var result = span[pos];
-                _bufferPos = pos + 1;
-                return result;
+                return ReadByteSlow(ref this);
             }
             else if (_input is ReaderInput readerInput)
             {
@@ -836,16 +836,14 @@ namespace Orleans.Serialization.Buffers
                 ref byte readHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
 
                 ulong result = Unsafe.ReadUnaligned<ulong>(ref readHead);
-                var bytesNeeded = BitOperations.TrailingZeroCount(result) + 1;
+                var bytesNeeded = BitOperations.TrailingZeroCount((uint)result) + 1;
                 result >>= bytesNeeded;
-                _bufferPos += bytesNeeded;
+                _bufferPos = pos + bytesNeeded;
 
                 // Mask off invalid data
-                var fullWidthReadMask = ~((ulong)bytesNeeded - 6 + 1);
-                var mask = ((1UL << (bytesNeeded * 7)) - 1) | fullWidthReadMask;
-                result &= mask;
-
-                return (uint)result;
+                var fullWidthReadMask = ~((uint)bytesNeeded - 6 + 1);
+                var mask = ((1U << (bytesNeeded * 7)) - 1) | fullWidthReadMask;
+                return (uint)result & mask;
             }
             else
             {

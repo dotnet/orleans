@@ -24,12 +24,12 @@ namespace Orleans.Serialization.WireProtocol
         /// <summary>
         /// The field identifier mask.
         /// </summary>
-        public const byte FieldIdMask = 0b000_0111; // The final 3 bits are used for the field id delta, if the delta is expected.
+        public const byte FieldIdMask = 0b0000_0111; // The final 3 bits are used for the field id delta, if the delta is expected.
 
         /// <summary>
         /// The field identifier complete mask.
         /// </summary>
-        public const byte FieldIdCompleteMask = 0b0000_0111;
+        public const byte FieldIdCompleteMask = FieldIdMask;
 
         /// <summary>
         /// The extended wire type mask.
@@ -41,16 +41,15 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         public const int MaxEmbeddedFieldIdDelta = 6;
 
-        private byte _tag;
+        private uint _tag;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Tag"/> struct.
         /// </summary>
         /// <param name="tag">The tag byte.</param>
-        public Tag(byte tag)
-        {
-            _tag = tag;
-        }
+        public Tag(byte tag) => _tag = tag;
+
+        internal Tag(uint tag) => _tag = tag;
 
         /// <summary>
         /// Performs an implicit conversion from <see cref="System.Byte"/> to <see cref="Tag"/>.
@@ -64,7 +63,7 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>
-        public static implicit operator byte(Tag tag) => tag._tag;
+        public static implicit operator byte(Tag tag) => (byte)tag._tag;
 
         /// <summary>
         /// Gets or sets the wire type of the data following this tag.
@@ -73,7 +72,7 @@ namespace Orleans.Serialization.WireProtocol
         {
             get => (WireType)(_tag & WireTypeMask);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set => _tag = (byte)((_tag & ~WireTypeMask) | ((byte)value & WireTypeMask));
+            set => _tag = (_tag & ~(uint)WireTypeMask) | ((uint)value & WireTypeMask);
         }
 
         /// <summary>
@@ -95,7 +94,7 @@ namespace Orleans.Serialization.WireProtocol
             get => (ExtendedWireType)(_tag & ExtendedWireTypeMask);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set => _tag = (byte)((_tag & ~ExtendedWireTypeMask) | ((byte)value & ExtendedWireTypeMask));
+            set => _tag = (_tag & ~(uint)ExtendedWireTypeMask) | ((uint)value & ExtendedWireTypeMask);
         }
 
         internal bool IsEndBaseFields => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndBaseFields);
@@ -111,7 +110,7 @@ namespace Orleans.Serialization.WireProtocol
             get => (SchemaType)(_tag & SchemaTypeMask);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set => _tag = (byte)((_tag & ~SchemaTypeMask) | ((byte)value & SchemaTypeMask));
+            set => _tag = (_tag & ~(uint)SchemaTypeMask) | ((uint)value & SchemaTypeMask);
         }
 
         /// <summary>
@@ -133,10 +132,10 @@ namespace Orleans.Serialization.WireProtocol
         public uint FieldIdDelta
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => (uint)(_tag & FieldIdMask);
+            get => _tag & FieldIdMask;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set => _tag = (byte)((_tag & ~FieldIdMask) | ((byte)value & FieldIdMask));
+            set => _tag = (_tag & ~(uint)FieldIdMask) | (value & FieldIdMask);
         }
 
         /// <summary>
@@ -153,7 +152,7 @@ namespace Orleans.Serialization.WireProtocol
         /// </value>
         /// <remarks>
         /// If all bits are set in the field id portion of the tag, this field id is not valid and this tag must be followed by a field id.
-        /// Therefore, field ids 0-7 can be represented without additional bytes.
+        /// Therefore, field ids 0-6 can be represented without additional bytes.
         /// </remarks>
         public bool IsFieldIdValid
         {

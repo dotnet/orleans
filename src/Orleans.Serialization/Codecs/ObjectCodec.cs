@@ -27,9 +27,9 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         public static object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
+            if (field.IsReference)
             {
-                return ReferenceCodec.ReadReference(ref reader, field, ObjectType);
+                return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? ObjectType);
             }
 
             if (field.FieldType is null || field.FieldType == ObjectType)

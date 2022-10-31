@@ -34,10 +34,11 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<TField, TInput>(ref reader, field);
             }
 
-            var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             var fieldType = field.FieldType;
             if (fieldType is null || fieldType == CodecFieldType)
             {
+                field.EnsureWireTypeTagDelimited();
+                var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
                 TSurrogate surrogate = default;
                 _surrogateSerializer.Deserialize(ref reader, ref surrogate);
                 var result = ConvertFromSurrogate(ref surrogate);
@@ -69,7 +70,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
             }
         }
 

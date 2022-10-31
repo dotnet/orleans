@@ -78,6 +78,7 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe IdSpan ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
+        field.EnsureWireType(WireType.LengthPrefixed);
         ReferenceCodec.MarkValueField(reader.Session);
 
         var length = reader.ReadVarUInt32();

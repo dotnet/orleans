@@ -229,7 +229,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
             }
         }
 
@@ -299,7 +299,7 @@ namespace Orleans.Serialization
                 return DeserializeException(ref reader, field);
             }
 
-            return OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TInput, Exception>(ref reader, field);
+            return reader.DeserializeUnexpectedType<TInput, Exception>(ref field);
         }
 
         /// <inheritdoc />
@@ -315,6 +315,7 @@ namespace Orleans.Serialization
                                 
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
 
             uint fieldId = 0;

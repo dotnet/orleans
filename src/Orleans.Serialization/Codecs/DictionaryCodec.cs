@@ -78,10 +78,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<Dictionary<TKey, TValue>, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             TKey key = default;
@@ -143,9 +140,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported. {field}");
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");

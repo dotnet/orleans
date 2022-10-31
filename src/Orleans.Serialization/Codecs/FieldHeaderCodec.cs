@@ -129,8 +129,8 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ReadFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
-            var tag = reader.ReadByte();
-            field.Tag = tag;
+            var tag = (uint)reader.ReadByte();
+            field.Tag = new(tag);
             // If the id or schema type are required and were not encoded into the tag, read the extended header data.
             if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
             {
@@ -138,7 +138,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                field.FieldIdDeltaRaw = default;
+                field.FieldIdDeltaRaw = tag & Tag.FieldIdMask;
                 field.FieldTypeRaw = default;
             }
         }
@@ -153,8 +153,8 @@ namespace Orleans.Serialization.Codecs
         public static Field ReadFieldHeader<TInput>(ref this Reader<TInput> reader)
         {
             Unsafe.SkipInit(out Field field);
-            var tag = reader.ReadByte();
-            field.Tag = tag;
+            var tag = (uint)reader.ReadByte();
+            field.Tag = new(tag);
             // If the id or schema type are required and were not encoded into the tag, read the extended header data.
             if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
             {
@@ -162,7 +162,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                field.FieldIdDeltaRaw = default;
+                field.FieldIdDeltaRaw = tag & Tag.FieldIdMask;
                 field.FieldTypeRaw = default;
             }
 
@@ -178,17 +178,18 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ReadExtendedFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field)
         {
-            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask)
+            var fieldId = field.Tag.FieldIdDelta;
+            if (fieldId == Tag.FieldIdCompleteMask)
             {
                 field.FieldIdDeltaRaw = reader.ReadVarUInt32NoInlining();
             }
             else
             {
-                field.FieldIdDeltaRaw = 0;
+                field.FieldIdDeltaRaw = fieldId;
             }
 
             // If schema type is valid, read the type.
-            var schemaType = (SchemaType)(field.Tag & Tag.SchemaTypeMask);
+            var schemaType = field.Tag.SchemaType;
             if (schemaType != SchemaType.Expected)
             {
                 field.FieldTypeRaw = reader.ReadType(schemaType);
@@ -258,16 +259,15 @@ namespace Orleans.Serialization.Codecs
         {
             Unsafe.SkipInit(out Field field);
             string type = default;
-            var tag = reader.ReadByte();
+            var tag = (uint)reader.ReadByte();
+            field.Tag = new(tag);
             if (tag < (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))
             {
-                field.Tag = tag;
                 ReadFieldHeaderForAnalysisSlow(ref reader, ref field, ref type);
             }
             else
             {
-                field.Tag = tag;
-                field.FieldIdDeltaRaw = default;
+                field.FieldIdDeltaRaw = tag & Tag.FieldIdMask;
                 field.FieldTypeRaw = default;
                 type = "Expected";
             }
@@ -278,17 +278,18 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ReadFieldHeaderForAnalysisSlow<TInput>(ref this Reader<TInput> reader, scoped ref Field field, scoped ref string type)
         {
-            if ((field.Tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask)
+            var fieldId = field.Tag.FieldIdDelta;
+            if (fieldId == Tag.FieldIdCompleteMask)
             {
                 field.FieldIdDeltaRaw = reader.ReadVarUInt32NoInlining();
             }
             else
             {
-                field.FieldIdDeltaRaw = 0;
+                field.FieldIdDeltaRaw = fieldId;
             }
 
             // If schema type is valid, read the type.
-            var schemaType = (SchemaType)(field.Tag & Tag.SchemaTypeMask);
+            var schemaType = field.Tag.SchemaType;
             if (schemaType != SchemaType.Expected)
             {
                 (field.FieldTypeRaw, type) = reader.ReadTypeForAnalysis(schemaType);

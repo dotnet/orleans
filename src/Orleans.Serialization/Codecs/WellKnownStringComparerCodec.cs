@@ -57,6 +57,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             uint type = default;
             CompareOptions options = default;
@@ -234,10 +235,6 @@ namespace Orleans.Serialization.Codecs
             return false;
         }
 #endif
-
-        [DoesNotReturn]
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for OrdinalComparer fields. {field}");
 
         [DoesNotReturn]
         private static void ThrowNotSupported(Field field, uint value) => throw new NotSupportedException($"Values of type {field.FieldType} are not supported. Value: {value}");

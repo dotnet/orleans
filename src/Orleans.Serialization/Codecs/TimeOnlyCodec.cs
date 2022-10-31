@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
@@ -34,14 +34,7 @@ public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
     public static TimeOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);
-        if (field.WireType != WireType.Fixed64)
-        {
-            ThrowUnsupportedWireTypeException(field);
-        }
-
+        field.EnsureWireType(WireType.Fixed64);
         return new TimeOnly(reader.ReadInt64());
     }
-
-    private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-        $"Only a {nameof(WireType)} value of {WireType.Fixed64} is supported for {nameof(TimeOnly)} fields. {field}");
 }

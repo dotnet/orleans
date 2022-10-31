@@ -37,11 +37,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<string, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var length = reader.ReadVarUInt32();
 
             string result;
@@ -111,8 +107,5 @@ namespace Orleans.Serialization.Codecs
 #endif
 
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for string fields. {field}");
     }
 }

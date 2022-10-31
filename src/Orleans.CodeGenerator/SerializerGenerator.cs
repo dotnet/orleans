@@ -458,8 +458,6 @@ namespace Orleans.CodeGenerator
             var instanceParam = "instance".ToIdentifierName();
             var idVar = "id".ToIdentifierName();
             var headerVar = "header".ToIdentifierName();
-            var readHeaderLocalFunc = "ReadHeader".ToIdentifierName();
-            var readHeaderEndLocalFunc = "ReadHeaderExpectingEndBaseOrEndObject".ToIdentifierName();
 
             var body = new List<StatementSyntax>();
 
@@ -479,52 +477,39 @@ namespace Orleans.CodeGenerator
 
             AddSerializationCallbacks(type, instanceParam, "OnDeserializing", body);
 
-            // C#: int id = 0;
-            body.Add(LocalDeclarationStatement(
-                VariableDeclaration(
-                    PredefinedType(Token(SyntaxKind.IntKeyword)),
-                    SingletonSeparatedList(VariableDeclarator(idVar.Identifier)
-                        .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
-
-            // C#: Field header = default;
-            body.Add(LocalDeclarationStatement(
-                VariableDeclaration(
-                    libraryTypes.Field.ToTypeSyntax(),
-                    SingletonSeparatedList(VariableDeclarator(headerVar.Identifier)
-                        .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.DefaultLiteralExpression)))))));
-
-            int emptyBodyCount = 2;
-
-            if (type.SupportsPrimaryConstructorParameters)
+            int emptyBodyCount;
+            var normalMembers = members.FindAll(m => !m.IsPrimaryConstructorParameter);
+            if (members.Count == 0 || normalMembers.Count == 0 && !type.SupportsPrimaryConstructorParameters)
             {
-                body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => m.IsPrimaryConstructorParameter)))));
-                body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
-
-                body.Add(
-                    IfStatement(
-                        IdentifierName(headerVar.Identifier).Member("IsEndBaseFields"),
-                        WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(members.Where(m => !m.IsPrimaryConstructorParameter))))));
+                // C#: reader.ConsumeEndBaseOrEndObject();
+                body.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"))));
+                emptyBodyCount = 1;
             }
             else
             {
-                var normalMembers = members.FindAll(m => !m.IsPrimaryConstructorParameter);
-                if (normalMembers.Count == 0 && type.IsAbstractType)
+                // C#: uint id = 0;
+                body.Add(LocalDeclarationStatement(
+                    VariableDeclaration(
+                        PredefinedType(Token(SyntaxKind.UIntKeyword)),
+                        SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
+
+                // C#: Field header = default;
+                body.Add(LocalDeclarationStatement(
+                    VariableDeclaration(
+                        libraryTypes.Field.ToTypeSyntax(),
+                        SingletonSeparatedList(VariableDeclarator(headerVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.DefaultLiteralExpression)))))));
+
+                emptyBodyCount = 2;
+
+                if (type.SupportsPrimaryConstructorParameters)
                 {
-                    emptyBodyCount = 1;
-                    // C#: base.Deserialize(ref reader, instance);
-                    body.RemoveRange(body.Count - 2, 2);
-                    body.Add(
-                        ExpressionStatement(
-                            InvocationExpression(
-                                IdentifierName("base").Member(DeserializeMethodName),
-                                ArgumentList(SeparatedList(new[] { Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam) })))));
+                    body.Add(GetDeserializerLoop(members.FindAll(m => m.IsPrimaryConstructorParameter)));
+                    body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
+                    body.Add(IfStatement(headerVar.Member("IsEndBaseFields"), GetDeserializerLoop(normalMembers)));
                 }
                 else
                 {
-                    body.Add(WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(GetDeserializerLoopBody(normalMembers))));
-
-                    if (normalMembers.Count == 0)
-                        emptyBodyCount++;
+                    body.Add(GetDeserializerLoop(normalMembers));
                 }
             }
 
@@ -558,36 +543,36 @@ namespace Orleans.CodeGenerator
             return res;
 
             // Create the loop body.
-            List<StatementSyntax> GetDeserializerLoopBody(IEnumerable<ISerializableMember> members)
+            StatementSyntax GetDeserializerLoop(List<ISerializableMember> members)
             {
+                var refHeaderVar = ArgumentList(SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), headerVar)));
+                if (members.Count == 0)
+                {
+                    // C#: reader.ReadFieldHeader(ref header);
+                    // C#: reader.ConsumeEndBaseOrEndObject(ref header);
+                    return Block(
+                        ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), refHeaderVar)),
+                        ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"), refHeaderVar)));
+                }
+
                 var loopBody = new List<StatementSyntax>();
                 var codecs = serializerFields.OfType<ICodecDescription>()
                         .Concat(libraryTypes.StaticCodecs)
                         .ToList();
 
-                var orderedMembers = members.OrderBy(m => m.Member.FieldId).ToList();
-                var lastMember = orderedMembers.LastOrDefault();
+                // C#: reader.ReadFieldHeader(ref header);
+                // C#: if (header.IsEndBaseOrEndObject) break;
+                // C#: id += header.FieldIdDelta;
+                var readFieldHeader = ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), ArgumentList(SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), headerVar)))));
+                var endObjectCheck = IfStatement(headerVar.Member("IsEndBaseOrEndObject"), BreakStatement());
+                var idUpdate = ExpressionStatement(AssignmentExpression(SyntaxKind.AddAssignmentExpression, idVar, headerVar.Member("FieldIdDelta")));
+                loopBody.Add(readFieldHeader);
+                loopBody.Add(endObjectCheck);
+                loopBody.Add(idUpdate);
 
-                // C#: id = OrleansGeneratedCodeHelper.ReadHeader(ref reader, ref header, id);
-                {
-                    var readHeaderMethodName = orderedMembers.Count == 0 ? "ReadHeaderExpectingEndBaseOrEndObject" : "ReadHeader";
-                    var readFieldHeader =
-                        ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                IdentifierName(idVar.Identifier),
-                                InvocationExpression(
-                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName(readHeaderMethodName)),
-                                    ArgumentList(SeparatedList(new[]
-                                    {
-                                        Argument(readerParam).WithRefKindKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(headerVar).WithRefKindKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(idVar)
-                                    })))));
-                    loopBody.Add(readFieldHeader);
-                }
-
-                foreach (var member in orderedMembers)
+                members.Sort((x, y) => x.Member.FieldId.CompareTo(y.Member.FieldId));
+                var contiguousIds = members[members.Count - 1].Member.FieldId == members.Count - 1;
+                foreach (var member in members)
                 {
                     var description = member.Member;
 
@@ -619,41 +604,42 @@ namespace Orleans.CodeGenerator
 
                     var memberAssignment = ExpressionStatement(member.GetSetter(instanceParam, readValueExpression));
 
-                    var readHeaderMethodName = ReferenceEquals(member, lastMember) ? "ReadHeaderExpectingEndBaseOrEndObject" : "ReadHeader";
-                    var readFieldHeader =
-                        ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                IdentifierName(idVar.Identifier),
-                                InvocationExpression(
-                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName(readHeaderMethodName)),
-                                    ArgumentList(SeparatedList(new[]
-                                    {
-                                        Argument(readerParam).WithRefKindKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(headerVar).WithRefKindKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(idVar)
-                                    })))));
-
-                    var ifBody = Block(memberAssignment, readFieldHeader);
+                    BlockSyntax ifBody;
+                    if (member != members[members.Count - 1])
+                    {
+                        ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    }
+                    else if (contiguousIds)
+                    {
+                        ifBody = Block(memberAssignment, readFieldHeader);
+                    }
+                    else
+                    {
+                        idUpdate = ExpressionStatement(PostfixUnaryExpression(SyntaxKind.PostIncrementExpression, idVar));
+                        ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    }
 
                     // C#: if (id == <fieldId>) { ... }
-                    var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)description.FieldId))),
+                    var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)description.FieldId))),
                         ifBody);
 
                     loopBody.Add(ifStatement);
                 }
 
-                // C#: if (id == -1) break;
-                loopBody.Add(IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, IdentifierName(idVar.Identifier), LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(-1))),
-                    BreakStatement()));
-
                 // Consume any unknown fields
-                // C#: reader.ConsumeUnknownField(header);
-                var consumeUnknown = ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeUnknownField"),
-                    ArgumentList(SeparatedList(new[] { Argument(headerVar) }))));
-                loopBody.Add(consumeUnknown);
+                if (contiguousIds)
+                {
+                    // C#: reader.ConsumeEndBaseOrEndObject(ref header); break;
+                    loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"), refHeaderVar)));
+                    loopBody.Add(BreakStatement());
+                }
+                else
+                {
+                    // C#: reader.ConsumeUnknownField(ref header);
+                    loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeUnknownField"), refHeaderVar)));
+                }
 
-                return loopBody;
+                return WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(loopBody));
             }
         }
 
@@ -781,7 +767,7 @@ namespace Orleans.CodeGenerator
                 body = new()
                 {
                     // C#: if (value is null || value.GetType() == typeof(TField)) { <inner body> }
-                    // C#: else OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                    // C#: else writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
                     IfStatement(
                         BinaryExpression(SyntaxKind.LogicalOrExpression,
                             IsPatternExpression(valueParam, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
@@ -789,10 +775,9 @@ namespace Orleans.CodeGenerator
                         Block(innerBody),
                         ElseClause(ExpressionStatement(
                             InvocationExpression(
-                                IdentifierName("OrleansGeneratedCodeHelper").Member("SerializeUnexpectedType"),
+                                writerParam.Member("SerializeUnexpectedType"),
                                 ArgumentList(
                                     SeparatedList(new [] {
-                                        Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                                         Argument(fieldIdDeltaParam),
                                         Argument(expectedTypeParam),
                                         Argument(valueParam)
@@ -833,10 +818,10 @@ namespace Orleans.CodeGenerator
 
             if (!type.IsValueType)
             {
-                // C#: if (field.WireType == WireType.Reference) return ReferenceCodec.ReadReference<TField, TReaderInput>(ref reader, field);
+                // C#: if (field.IsReference) return ReferenceCodec.ReadReference<TField, TReaderInput>(ref reader, field);
                 body.Add(
                     IfStatement(
-                        BinaryExpression(SyntaxKind.EqualsExpression, fieldParam.Member("WireType"), libraryTypes.WireType.ToTypeSyntax().Member("Reference")),
+                        fieldParam.Member("IsReference"),
                         ReturnStatement(InvocationExpression(
                             IdentifierName("ReferenceCodec").Member("ReadReference", new[] { type.TypeSyntax, readerInputTypeParam }),
                             ArgumentList(SeparatedList(new[]
@@ -846,6 +831,9 @@ namespace Orleans.CodeGenerator
                             })))))
                     );
             }
+
+            // C#: field.EnsureWireTypeTagDelimited();
+            body.Add(ExpressionStatement(InvocationExpression(fieldParam.Member("EnsureWireTypeTagDelimited"))));
 
             ExpressionSyntax createValueExpression = type.UseActivator switch
             {
@@ -912,14 +900,11 @@ namespace Orleans.CodeGenerator
 
                 body.Add(ReturnStatement(
                                 InvocationExpression(
-                                    IdentifierName("OrleansGeneratedCodeHelper").Member("DeserializeUnexpectedType", new[] { readerInputTypeParam, type.TypeSyntax }),
+                                    readerParam.Member("DeserializeUnexpectedType", new[] { readerInputTypeParam, type.TypeSyntax }),
                                     ArgumentList(
-                                        SeparatedList(new[] {
-                                            Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                            Argument(fieldParam)
-                                        })))));
+                                        SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), fieldParam))))));
             }
-            
+
             var parameters = new[]
             {
                 Parameter(readerParam.Identifier).WithType(libraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),

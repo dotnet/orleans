@@ -28,6 +28,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             TSurrogate surrogate = default;
             _surrogateSerializer.Deserialize(ref reader, ref surrogate);

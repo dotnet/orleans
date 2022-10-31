@@ -44,18 +44,11 @@ namespace Orleans.Serialization.Codecs
         public static T ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
-            if (field.WireType != WireType.Fixed32)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
-
+            field.EnsureWireType(WireType.Fixed32);
             var intValue = reader.ReadInt32();
             var result = Unsafe.As<int, T>(ref intValue);
             return result;
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.Fixed32} is supported for {typeof(T).GetType()} fields. {field}");
 
         [StructLayout(LayoutKind.Sequential)]
         private struct HolderStruct

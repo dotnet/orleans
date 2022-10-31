@@ -78,10 +78,12 @@ namespace Orleans.Serialization
         [SecurityCritical]
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
+            if (field.IsReference)
             {
-                return ReferenceCodec.ReadReference(ref reader, field, null);
+                return ReferenceCodec.ReadReference(ref reader, field.FieldType);
             }
+
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             Type type;

@@ -32,6 +32,7 @@ namespace Orleans.Serialization
         [SecurityCritical]
         public SerializationEntrySurrogate ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
             var result = new SerializationEntrySurrogate();
             uint fieldId = 0;

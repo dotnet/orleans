@@ -71,15 +71,12 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
     object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
-        if (field.WireType == WireType.Reference)
+        if (field.IsReference)
         {
-            return ReferenceCodec.ReadReference(ref reader, field, null);
+            return ReferenceCodec.ReadReference(ref reader, field.FieldType);
         }
 
-        if (field.WireType != WireType.TagDelimited)
-        {
-            ThrowUnsupportedWireTypeException(field);
-        }
+        field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
         object result = null;
@@ -191,9 +188,6 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
         return false;
     }
-
-    private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-        $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for JSON fields. {field}");
 
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");
 

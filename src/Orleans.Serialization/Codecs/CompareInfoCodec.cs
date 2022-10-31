@@ -21,10 +21,7 @@ namespace Orleans.Serialization.Codecs
                 return ReferenceCodec.ReadReference<CompareInfo, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.TagDelimited)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             uint fieldId = 0;
@@ -66,8 +63,5 @@ namespace Orleans.Serialization.Codecs
             StringCodec.WriteField(ref writer, 0, StringCodec.CodecFieldType, value.Name);
             writer.WriteEndObject();
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {nameof(WireType.TagDelimited)} is supported for {nameof(CompareInfo)} fields. {field}");
     }
 }

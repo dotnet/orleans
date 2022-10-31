@@ -59,10 +59,7 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(reader.Session);
 
-            if (field.WireType != WireType.LengthPrefixed)
-            {
-                ThrowUnsupportedWireTypeException(field);
-            }
+            field.EnsureWireType(WireType.LengthPrefixed);
 
             uint length = reader.ReadVarUInt32();
             if (length != Width)
@@ -120,8 +117,5 @@ namespace Orleans.Serialization.Codecs
             return new Guid(reader.ReadBytes(Width));
 #endif
         }
-
-        private static void ThrowUnsupportedWireTypeException(Field field) => throw new UnsupportedWireTypeException(
-            $"Only a {nameof(WireType)} value of {WireType.LengthPrefixed} is supported for {nameof(Guid)} fields. {field}");
     }
 }

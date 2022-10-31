@@ -31,14 +31,12 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         public static IPAddress ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
+            if (field.IsReference)
             {
-                return (IPAddress)ReferenceCodec.ReadReference(ref reader, field, CodecFieldType);
+                return ReferenceCodec.ReadReference<IPAddress, TInput>(ref reader, field);
             }
 
-            if (field.WireType != WireType.LengthPrefixed)
-                ThrowUnsupportedWireTypeException(field);
-
+            field.EnsureWireType(WireType.LengthPrefixed);
             var result = ReadRaw(ref reader);
             ReferenceCodec.RecordObject(reader.Session, result);
             return result;
@@ -105,9 +103,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowNotSupported() => throw new NotSupportedException();
-
-        private static void ThrowUnsupportedWireTypeException(Field field)
-            => throw new UnsupportedWireTypeException($"Only a {nameof(WireType)} value of {nameof(WireType.LengthPrefixed)} is supported for {nameof(IPAddress)} fields. {field}");
 
     }
 
