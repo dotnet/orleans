@@ -56,7 +56,7 @@ namespace Orleans.Serialization.Codecs
                 reader.ReadFieldHeader(ref header);
             }
 
-            reader.ConsumeEndBaseOrEndObject(ref field);
+            reader.ConsumeEndBaseOrEndObject(ref header);
 
             var result = new IPEndPoint(address, port);
             ReferenceCodec.RecordObject(reader.Session, result, referencePlaceholder);

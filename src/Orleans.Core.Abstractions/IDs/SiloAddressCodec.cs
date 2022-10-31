@@ -56,14 +56,14 @@ namespace Orleans.Runtime.Serialization
             var address = IPAddressCodec.ReadValue(ref reader, header);
 
             reader.ReadFieldHeader(ref header);
-            if (!field.IsEndBaseOrEndObject)
+            if (!header.IsEndBaseOrEndObject)
             {
-                var id = field.FieldIdDelta;
+                var id = header.FieldIdDelta;
                 if (id == 1)
                 {
                     port = UInt16Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
-                    if (field.HasFieldId) id += field.FieldIdDelta;
+                    if (header.HasFieldId) id += header.FieldIdDelta;
                 }
 
                 if (id == 2)
@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Serialization
                     reader.ReadFieldHeader(ref header);
                 }
 
-                reader.ConsumeEndBaseOrEndObject(ref field);
+                reader.ConsumeEndBaseOrEndObject(ref header);
             }
 
             return SiloAddress.New(address, port, generation);
