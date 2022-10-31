@@ -595,7 +595,7 @@ namespace Orleans.CodeGenerator
 
                     ExpressionSyntax readValueExpression = InvocationExpression(
                         codecExpression.Member("ReadValue"),
-                        ArgumentList(SeparatedList(new[] { Argument(null, Token(SyntaxKind.RefKeyword), readerParam), Argument(headerVar) })));
+                        ArgumentList(SeparatedList(new[] { Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(headerVar) })));
                     if (!codec.UnderlyingType.Equals(member.TypeSyntax))
                     {
                         // If the member type type differs from the codec type (eg because the member is an array), cast the result.

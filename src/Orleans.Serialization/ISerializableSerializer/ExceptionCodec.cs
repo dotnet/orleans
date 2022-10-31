@@ -229,7 +229,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
             }
         }
 

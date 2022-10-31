@@ -100,7 +100,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
         }
         else
         {
-            OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+            writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
         }
     }
 

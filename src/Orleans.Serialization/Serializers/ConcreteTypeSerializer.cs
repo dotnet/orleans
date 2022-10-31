@@ -46,7 +46,7 @@ namespace Orleans.Serialization.Serializers
             }
             else
             {
-                OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
             }
         }
 

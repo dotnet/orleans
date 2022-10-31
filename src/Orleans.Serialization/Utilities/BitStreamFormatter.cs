@@ -106,7 +106,7 @@ namespace Orleans.Serialization.Utilities
             res.Append(indentString);
 
             // References cannot themselves be referenced.
-            if (field.IsReference)
+            if (field.WireType == WireType.Reference)
             {
                 ReferenceCodec.MarkValueField(reader.Session);
                 var refId = reader.ReadVarUInt32();
