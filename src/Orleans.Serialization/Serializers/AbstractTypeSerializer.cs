@@ -55,8 +55,8 @@ namespace Orleans.Serialization.Serializers
 
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
-                return ReferenceCodec.ReadReference(ref reader, field, _fieldType);
+            if (field.IsReference)
+                return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? _fieldType);
 
             var fieldType = field.FieldType;
             if (fieldType is null)

@@ -31,9 +31,9 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         public static IPAddress ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
+            if (field.IsReference)
             {
-                return (IPAddress)ReferenceCodec.ReadReference(ref reader, field, CodecFieldType);
+                return ReferenceCodec.ReadReference<IPAddress, TInput>(ref reader, field);
             }
 
             field.EnsureWireType(WireType.LengthPrefixed);

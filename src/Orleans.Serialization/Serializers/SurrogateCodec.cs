@@ -80,7 +80,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
             return result;
         }
 
-        return OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TInput, TField>(ref reader, field);
+        return reader.DeserializeUnexpectedType<TInput, TField>(ref field);
     }
 
     /// <inheritdoc/>

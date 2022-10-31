@@ -20,7 +20,6 @@ namespace Orleans.CodeGenerator
                 Action_2 = Type("System.Action`2"),
                 ITypeManifestProvider = Type("Orleans.Serialization.Configuration.ITypeManifestProvider"),
                 Field = Type("Orleans.Serialization.WireProtocol.Field"),
-                WireType = Type("Orleans.Serialization.WireProtocol.WireType"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
                 AbstractTypeSerializer = Type("Orleans.Serialization.Serializers.AbstractTypeSerializer`1"),
                 DeepCopier_1 = Type("Orleans.Serialization.Cloning.IDeepCopier`1"),
@@ -195,7 +194,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Action_2 { get; private set; }
         public INamedTypeSymbol ITypeManifestProvider { get; private set; }
         public INamedTypeSymbol Field { get; private set; }
-        public INamedTypeSymbol WireType { get; private set; }
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
         public INamedTypeSymbol ShallowCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }

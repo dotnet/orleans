@@ -30,7 +30,7 @@ namespace Orleans.Serialization.WireProtocol
         public Field(Tag tag)
         {
             Tag = tag;
-            FieldIdDeltaRaw = 0;
+            FieldIdDeltaRaw = tag.FieldIdDelta;
             FieldTypeRaw = null;
         }
 
@@ -58,15 +58,8 @@ namespace Orleans.Serialization.WireProtocol
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                if (Tag.IsFieldIdValid)
-                {
-                    return Tag.FieldIdDelta;
-                }
 #if DEBUG
-                if (!HasFieldId)
-                {
-                    throw new FieldIdNotPresentException();
-                }
+                if (!HasFieldId) throw new FieldIdNotPresentException();
 #endif
                 return FieldIdDeltaRaw;
             }
@@ -75,16 +68,15 @@ namespace Orleans.Serialization.WireProtocol
             set
             {
                 // If the field id delta can fit into the tag, embed it there, otherwise invalidate the embedded field id delta and set the full field id delta.
-                if (value < 7)
+                if (value < Tag.FieldIdCompleteMask)
                 {
                     Tag.FieldIdDelta = value;
-                    FieldIdDeltaRaw = 0;
                 }
                 else
                 {
                     Tag.SetFieldIdInvalid();
-                    FieldIdDeltaRaw = value;
                 }
+                FieldIdDeltaRaw = value;
             }
         }
 
@@ -224,20 +216,21 @@ namespace Orleans.Serialization.WireProtocol
         }
 
         /// <summary>
+        /// Gets a value indicating whether this instance has a wire type of <see cref="WireType.Reference"/>.
+        /// </summary>
+        public bool IsReference => Tag.WireType == WireType.Reference;
+
+        /// <summary>
         /// Ensures that the wire type is <see cref="WireType.TagDelimited"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureWireTypeTagDelimited()
         {
             if (Tag.WireType != WireType.TagDelimited)
-                UnsupportedWireType(Tag, FieldIdDeltaRaw);
+                UnsupportedWireType();
         }
 
-        private static void UnsupportedWireType(Tag tag, uint fieldIdDeltaRaw)
-        {
-            var field = new Field(tag, fieldIdDeltaRaw, null);
-            throw new UnsupportedWireTypeException($"A WireType value of {nameof(WireType.TagDelimited)} is expected by this codec. {field}");
-        }
+        private void UnsupportedWireType() => throw new UnsupportedWireTypeException($"A WireType value of {nameof(WireType.TagDelimited)} is expected by this codec. {this}");
 
         /// <summary>
         /// Ensures that the wire type is supported.
@@ -246,14 +239,10 @@ namespace Orleans.Serialization.WireProtocol
         public void EnsureWireType(WireType expectedType)
         {
             if (Tag.WireType != expectedType)
-                UnsupportedWireType(Tag, FieldIdDeltaRaw, expectedType);
+                UnsupportedWireType(expectedType);
         }
 
-        private static void UnsupportedWireType(Tag tag, uint fieldIdDeltaRaw, WireType expectedType)
-        {
-            var field = new Field(tag, fieldIdDeltaRaw, null);
-            throw new UnsupportedWireTypeException($"A WireType value of {expectedType} is expected by this codec. {field}");
-        }
+        private void UnsupportedWireType(WireType expectedType) => throw new UnsupportedWireTypeException($"A WireType value of {expectedType} is expected by this codec. {this}");
 
         /// <inheritdoc/>
         public override string ToString()

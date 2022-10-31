@@ -99,39 +99,43 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field, typeof(T));
+        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T));
 
         /// <summary>
         /// Reads the reference.
         /// </summary>
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
-        /// <param name="field">The field.</param>
-        /// <param name="expectedType">The expected type.</param>
+        /// <param name="fieldType">The field type.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static object ReadReference<TInput>(ref Reader<TInput> reader, Field field, Type expectedType)
+        public static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType)
         {
             MarkValueField(reader.Session);
             var reference = reader.ReadVarUInt32();
-            if (!reader.Session.ReferencedObjects.TryGetReferencedObject(reference, out var value))
-            {
-                ThrowReferenceNotFound(expectedType, reference);
-            }
+            if (reference == 0)
+                return null;
+
+            return ReadReference(ref reader, fieldType, reference);
+        }
+
+        private static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType, uint reference)
+        {
+            var value = reader.Session.ReferencedObjects.TryGetReferencedObject(reference);
+            if (value is null) throw new ReferenceNotFoundException(fieldType, reference);
 
             return value switch
             {
-                UnknownFieldMarker marker => DeserializeFromMarker(ref reader, field, marker, reference, expectedType),
+                UnknownFieldMarker marker => DeserializeFromMarker(ref reader, fieldType, marker, reference),
                 _ => value,
             };
         }
 
         private static object DeserializeFromMarker<TInput>(
             ref Reader<TInput> reader,
-            Field field,
+            Type fieldType,
             UnknownFieldMarker marker,
-            uint reference,
-            Type lastResortFieldType)
+            uint reference)
         {
             // Capture state from the reader and session.
             var session = reader.Session;
@@ -147,7 +151,7 @@ namespace Orleans.Serialization.Codecs
                 reader.ForkFrom(marker.Position, out var referencedReader);
 
                 // Determine the correct type for the field.
-                var fieldType = marker.Field.FieldType ?? field.FieldType ?? lastResortFieldType;
+                fieldType = marker.Field.FieldType ?? fieldType;
 
                 // Get a serializer for that type.
                 var specificSerializer = session.CodecProvider.GetCodec(fieldType);
@@ -186,12 +190,6 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="session">The session.</param>
         /// <returns>The placeholder reference id.</returns>
-        public static uint CreateRecordPlaceholder(SerializerSession session)
-        {
-            var referencedObject = session.ReferencedObjects;
-            return ++referencedObject.CurrentReferenceId;
-        }
-
-        private static void ThrowReferenceNotFound(Type expectedType, uint reference) => throw new ReferenceNotFoundException(expectedType, reference);
+        public static uint CreateRecordPlaceholder(SerializerSession session) => session.ReferencedObjects.CreateRecordPlaceholder();
     }
 }

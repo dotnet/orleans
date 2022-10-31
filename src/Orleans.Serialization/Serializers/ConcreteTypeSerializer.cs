@@ -67,7 +67,7 @@ namespace Orleans.Serialization.Serializers
                 return result;
             }
 
-            return OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TInput, TField>(ref reader, field);
+            return reader.DeserializeUnexpectedType<TInput, TField>(ref field);
         }
 
         public TField ReadValueSealed<TInput>(ref Reader<TInput> reader, Field field)

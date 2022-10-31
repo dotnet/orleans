@@ -34,9 +34,9 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         public static IPEndPoint ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
-            if (field.WireType == WireType.Reference)
+            if (field.IsReference)
             {
-                return (IPEndPoint)ReferenceCodec.ReadReference(ref reader, field, CodecFieldType);
+                return ReferenceCodec.ReadReference<IPEndPoint, TInput>(ref reader, field);
             }
 
             field.EnsureWireTypeTagDelimited();

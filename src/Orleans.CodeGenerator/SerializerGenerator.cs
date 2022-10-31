@@ -767,7 +767,7 @@ namespace Orleans.CodeGenerator
                 body = new()
                 {
                     // C#: if (value is null || value.GetType() == typeof(TField)) { <inner body> }
-                    // C#: else OrleansGeneratedCodeHelper.SerializeUnexpectedType(ref writer, fieldIdDelta, expectedType, value);
+                    // C#: else writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
                     IfStatement(
                         BinaryExpression(SyntaxKind.LogicalOrExpression,
                             IsPatternExpression(valueParam, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
@@ -775,10 +775,9 @@ namespace Orleans.CodeGenerator
                         Block(innerBody),
                         ElseClause(ExpressionStatement(
                             InvocationExpression(
-                                IdentifierName("OrleansGeneratedCodeHelper").Member("SerializeUnexpectedType"),
+                                writerParam.Member("SerializeUnexpectedType"),
                                 ArgumentList(
                                     SeparatedList(new [] {
-                                        Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                                         Argument(fieldIdDeltaParam),
                                         Argument(expectedTypeParam),
                                         Argument(valueParam)
@@ -819,10 +818,10 @@ namespace Orleans.CodeGenerator
 
             if (!type.IsValueType)
             {
-                // C#: if (field.WireType == WireType.Reference) return ReferenceCodec.ReadReference<TField, TReaderInput>(ref reader, field);
+                // C#: if (field.IsReference) return ReferenceCodec.ReadReference<TField, TReaderInput>(ref reader, field);
                 body.Add(
                     IfStatement(
-                        BinaryExpression(SyntaxKind.EqualsExpression, fieldParam.Member("WireType"), libraryTypes.WireType.ToTypeSyntax().Member("Reference")),
+                        fieldParam.Member("IsReference"),
                         ReturnStatement(InvocationExpression(
                             IdentifierName("ReferenceCodec").Member("ReadReference", new[] { type.TypeSyntax, readerInputTypeParam }),
                             ArgumentList(SeparatedList(new[]
@@ -901,14 +900,11 @@ namespace Orleans.CodeGenerator
 
                 body.Add(ReturnStatement(
                                 InvocationExpression(
-                                    IdentifierName("OrleansGeneratedCodeHelper").Member("DeserializeUnexpectedType", new[] { readerInputTypeParam, type.TypeSyntax }),
+                                    readerParam.Member("DeserializeUnexpectedType", new[] { readerInputTypeParam, type.TypeSyntax }),
                                     ArgumentList(
-                                        SeparatedList(new[] {
-                                            Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                            Argument(fieldParam)
-                                        })))));
+                                        SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), fieldParam))))));
             }
-            
+
             var parameters = new[]
             {
                 Parameter(readerParam.Identifier).WithType(libraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),

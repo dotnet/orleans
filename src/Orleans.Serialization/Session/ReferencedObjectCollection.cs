@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -38,47 +39,35 @@ namespace Orleans.Serialization.Session
 
         private Dictionary<uint, object> _referenceToObjectOverflow;
         private Dictionary<object, uint> _objectToReferenceOverflow;
+        private uint _currentReferenceId;
 
         /// <summary>
         /// Tries to get the referenced object with the specified id.
         /// </summary>
         /// <param name="reference">The reference.</param>
-        /// <param name="value">The value.</param>
-        /// <returns><see langword="true" /> if there was a referenced object with the specified id, <see langword="false" /> otherwise.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetReferencedObject(uint reference, [NotNullWhen(true)] out object value)
+        /// <returns>The referenced object with the specified id if found, <see langword="null" /> otherwise.</returns>
+        public object TryGetReferencedObject(uint reference)
         {
-            // Reference 0 is always null.
-            if (reference == 0)
-            {
-                value = null;
-                return true;
-            }
-
             var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
             for (int i = 0; i < refs.Length; ++i)
             {
                 if (refs[i].Id == reference)
-                {
-                    value = refs[i].Object;
-                    return true;
-                }
+                    return refs[i].Object;
             }
 
-            if (_referenceToObjectOverflow is { } overflow)
-            {
-                return overflow.TryGetValue(reference, out value);
-            }
+            if (_referenceToObjectOverflow is { } overflow && overflow.TryGetValue(reference, out var value))
+                return value;
 
-            value = default;
-            return false;
+            return null;
         }
 
         /// <summary>
         /// Marks a value field.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MarkValueField() => ++CurrentReferenceId;
+        public void MarkValueField() => ++_currentReferenceId;
+
+        internal uint CreateRecordPlaceholder() => ++_currentReferenceId;
 
         /// <summary>
         /// Gets or adds a reference.
@@ -90,7 +79,7 @@ namespace Orleans.Serialization.Session
         public bool GetOrAddReference(object value, out uint reference)
         {
             // Unconditionally bump the reference counter since a call to this method signifies a potential reference.
-            var nextReference = ++CurrentReferenceId;
+            var nextReference = ++_currentReferenceId;
 
             // Null is always at reference 0
             if (value is null)
@@ -240,7 +229,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value) => RecordReferenceField(value, ++CurrentReferenceId);
+        public void RecordReferenceField(object value) => RecordReferenceField(value, ++_currentReferenceId);
 
         /// <summary>
         /// Records a reference field with the specified identifier.
@@ -274,7 +263,7 @@ namespace Orleans.Serialization.Session
         /// Gets or sets the current reference identifier.
         /// </summary>
         /// <value>The current reference identifier.</value>
-        public uint CurrentReferenceId { get; set; }
+        public uint CurrentReferenceId { get => _currentReferenceId; set => _currentReferenceId = value; }
 
         /// <summary>
         /// Resets this instance.

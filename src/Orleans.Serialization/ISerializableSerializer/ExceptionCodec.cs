@@ -299,7 +299,7 @@ namespace Orleans.Serialization
                 return DeserializeException(ref reader, field);
             }
 
-            return OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TInput, Exception>(ref reader, field);
+            return reader.DeserializeUnexpectedType<TInput, Exception>(ref field);
         }
 
         /// <inheritdoc />

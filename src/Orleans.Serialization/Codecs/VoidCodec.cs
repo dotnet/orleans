@@ -24,7 +24,7 @@ namespace Orleans.Serialization.Codecs
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireType(WireType.Reference);
-            return ReferenceCodec.ReadReference(ref reader, field, null);
+            return ReferenceCodec.ReadReference(ref reader, field.FieldType);
         }
 
         private static void ThrowNotNullException(object value) => throw new InvalidOperationException(
