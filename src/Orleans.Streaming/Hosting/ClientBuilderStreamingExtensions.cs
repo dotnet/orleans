@@ -21,6 +21,22 @@ namespace Orleans.Hosting
         public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(services => services.AddClientStreaming());
 
         /// <summary>
+        /// Adds a new in-memory stream provider to the client, using the default message serializer
+        /// (<see cref="DefaultMemoryMessageBodySerializer"/>).
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configure">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
+        public static IClientBuilder AddMemoryStreams(
+            this IClientBuilder builder,
+            string name,
+            Action<IClusterClientMemoryStreamConfigurator> configure = null)
+        {
+            return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
+        }
+
+        /// <summary>
         /// Adds a new in-memory stream provider to the client.
         /// </summary>
         /// <typeparam name="TSerializer">The type of the t serializer.</typeparam>

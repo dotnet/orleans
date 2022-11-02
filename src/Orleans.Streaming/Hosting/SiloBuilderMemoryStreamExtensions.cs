@@ -8,6 +8,22 @@ namespace Orleans.Hosting
     /// </summary>
     public static class SiloBuilderMemoryStreamExtensions
     {
+
+        /// <summary>
+        /// Configure silo to use memory streams, using the default message serializer
+        /// (<see cref="DefaultMemoryMessageBodySerializer"/>).
+        /// </summary>
+        /// using the default built-in serializer
+        /// <param name="builder">The builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configure">The configuration delegate.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddMemoryStreams(this ISiloBuilder builder, string name,
+                Action<ISiloMemoryStreamConfigurator> configure = null)
+        {
+            return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
+        }
+
         /// <summary>
         /// Configure silo to use memory streams.
         /// </summary>
