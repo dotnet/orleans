@@ -5,13 +5,13 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     internal struct SerializationEntrySurrogate
     {
+        [Id(0)]
+        public string Name;
+
         [Id(1)]
-        public string Name { get; set; }
+        public object Value;
 
         [Id(2)]
-        public object Value { get; set; }
-
-        [Id(3)]
-        public Type ObjectType { get; set; }
+        public Type ObjectType;
     }
 }

@@ -10,12 +10,12 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class StreamConsumerCollection
     {
-        [Id(1)]
+        [Id(0)]
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
-        [Id(2)]
+        [Id(1)]
         private DateTime lastActivityTime;
 
-        [Id(3)]
+        [Id(2)]
         public bool StreamRegistered { get; set; }
 
         public StreamConsumerCollection(DateTime now)

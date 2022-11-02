@@ -30,13 +30,13 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the interfaces available on this silo.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> Interfaces { get; }
 
         /// <summary>
         /// Gets the grain types available on this silo.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public ImmutableDictionary<GrainType, GrainProperties> Grains { get; }
     }
 }

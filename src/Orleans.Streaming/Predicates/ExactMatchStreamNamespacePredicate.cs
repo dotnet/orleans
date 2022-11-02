@@ -10,7 +10,7 @@ namespace Orleans.Streams
     {
         internal const string Prefix = "namespace:";
 
-        [Id(1)]
+        [Id(0)]
         private readonly string targetStreamNamespace;
 
         /// <summary>

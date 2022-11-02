@@ -11,16 +11,16 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
-        [Id(1)]
+        [Id(0)]
         [JsonProperty]
         private StreamImpl<T> streamImpl;
-        [Id(2)]
+        [Id(1)]
         [JsonProperty]
         private readonly string filterData;
-        [Id(3)]
+        [Id(2)]
         [JsonProperty]
         private readonly GuidId subscriptionId;
-        [Id(4)]
+        [Id(3)]
         private readonly bool isRewindable;
 
         [NonSerialized]

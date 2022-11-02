@@ -16,7 +16,7 @@ namespace Orleans.Concurrency
     public readonly struct Immutable<T>
     {
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
-        [Id(1)]
+        [Id(0)]
         public readonly T Value;
 
         /// <summary>

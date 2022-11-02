@@ -27,13 +27,13 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the most significant version component.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public long Major { get; }
 
         /// <summary>
         /// Gets the least significant version component.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public long Minor { get; }
 
         /// <inheritdoc />

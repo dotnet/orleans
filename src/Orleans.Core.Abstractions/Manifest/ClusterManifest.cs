@@ -35,19 +35,19 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the version of this instance.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public MajorMinorVersion Version { get; }
 
         /// <summary>
         /// Gets the manifests for each silo in the cluster.
         /// </summary>
-        [Id(2)]
+        [Id(1)]
         public ImmutableDictionary<SiloAddress, GrainManifest> Silos { get; }
 
         /// <summary>
         /// Gets all grain manifests.
         /// </summary>
-        [Id(3)]
+        [Id(2)]
         public ImmutableArray<GrainManifest> AllGrainManifests { get; }
     }
 }

@@ -44,14 +44,14 @@ namespace Orleans.Serialization.Codecs
         /// Gets or sets the values.
         /// </summary>
         /// <value>The values.</value>
-        [Id(1)]
+        [Id(0)]
         public List<T> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
-        [Id(2)]
+        [Id(1)]
         public IEqualityComparer<T> KeyComparer;
     }
 

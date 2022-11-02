@@ -20,7 +20,7 @@ namespace Orleans.Serialization.Codecs
     [GenerateSerializer]
     public struct ReadOnlyDictionarySurrogate<TKey, TValue>
     {
-        [Id(1)]
+        [Id(0)]
         public Dictionary<TKey, TValue> Values;
     }
 

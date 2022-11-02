@@ -26,7 +26,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the properties.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         public ImmutableDictionary<string, string> Properties { get; }
 
         /// <summary>

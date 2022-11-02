@@ -17,7 +17,7 @@ namespace Orleans.Runtime
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
-        [Id(1)]
+        [Id(0)]
         internal readonly UniqueKey Key;
 
         public UniqueKey.Category Category => Key.IdCategory;

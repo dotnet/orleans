@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The underlying value.
         /// </summary>
-        [Id(1)]
+        [Id(0)]
         private readonly IdSpan _value;
 
         /// <summary>

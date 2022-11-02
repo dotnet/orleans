@@ -14,10 +14,10 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(GrainIdJsonConverter))]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly GrainType _type;
 
-        [Id(2)]
+        [Id(1)]
         private readonly IdSpan _key;
 
         /// <summary>

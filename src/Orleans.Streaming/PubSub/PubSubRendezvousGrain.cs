@@ -55,9 +55,9 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class PubSubGrainState
     {
-        [Id(1)]
+        [Id(0)]
         public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
-        [Id(2)]
+        [Id(1)]
         public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
 

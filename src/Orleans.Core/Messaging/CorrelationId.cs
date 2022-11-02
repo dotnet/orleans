@@ -6,7 +6,7 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly long id;
         private static long lastUsed;
 

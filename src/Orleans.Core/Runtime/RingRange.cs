@@ -53,9 +53,9 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly uint begin;
-        [Id(2)]
+        [Id(1)]
         private readonly uint end;
 
         /// <summary>
@@ -238,9 +238,9 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     internal sealed class GeneralMultiRange : IRingRangeInternal, ISpanFormattable
     {
-        [Id(1)]
+        [Id(0)]
         private readonly List<SingleRange> ranges;
-        [Id(2)]
+        [Id(1)]
         private readonly long rangeSize;
 
         internal List<SingleRange> Ranges => ranges;

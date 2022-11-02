@@ -31,21 +31,21 @@ namespace Orleans.Runtime
         /// Gets the silo address.
         /// </summary>
         /// <value>The silo address.</value>
-        [Id(1)]
+        [Id(0)]
         public SiloAddress SiloAddress { get; }
 
         /// <summary>
         /// Gets the silo status.
         /// </summary>
         /// <value>The silo status.</value>
-        [Id(2)]
+        [Id(1)]
         public SiloStatus Status { get; }
 
         /// <summary>
         /// Gets the silo name.
         /// </summary>
         /// <value>The silo name.</value>
-        [Id(3)]
+        [Id(2)]
         public string Name { get; }
 
         /// <inheritdoc/>
