@@ -25,56 +25,9 @@ namespace UnitTests.StorageTests.Relational
             Parallel.For(0, 1000000, i =>
             {
                 //These parameters can be null in this test.
-                int grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, null, default, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
+                int grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, default, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
                 Assert.Equal(TestGrainHash, grainTypeHash);
             });
-        }
-
-        [TestCategory("Functional"), TestCategory("Persistence")]
-        [Fact]
-        public void LongGrainIdToN1KeyAreSame()
-        {
-            const long LongGrainId = 1001;
-            var longGrainIdAsN1 = new AdoGrainKey(LongGrainId, null);
-
-            Assert.Equal(LongGrainId, longGrainIdAsN1.N1Key);
-        }
-
-        [TestCategory("Functional"), TestCategory("Persistence")]
-        [Fact]
-        public void LongGrainIdToStringAreSame()
-        {
-            const long LongGrainId = 1001;
-            var longGrainIdAsString = new AdoGrainKey(LongGrainId, null).ToString();
-
-            Assert.Equal(longGrainIdAsString, LongGrainId.ToString(CultureInfo.InvariantCulture));
-        }
-
-        [TestCategory("Functional"), TestCategory("Persistence")]
-        [Fact]
-        public void LongGrainIdWithExtensionAreSame()
-        {
-            const long LongGrainId = 1001;
-            const string ExtensionKey = "ExtensionKey";
-            var longGrainIdWitExtensionAsString = new AdoGrainKey(LongGrainId, ExtensionKey).ToString();
-
-            //AdoGrainKey helper class splits the grain key and extension key using character '#'.
-            //The key and its extension are the two distinct elements.
-            var grainKeys = longGrainIdWitExtensionAsString.Split(new[] { "#" }, StringSplitOptions.RemoveEmptyEntries);
-            Assert.Equal(2, grainKeys.Length);
-
-            Assert.Equal(grainKeys[0], LongGrainId.ToString(CultureInfo.InvariantCulture));
-            Assert.Equal(ExtensionKey, grainKeys[1]);
-        }
-
-        [TestCategory("Functional"), TestCategory("Persistence")]
-        [Fact]
-        public void GuidGrainIdWithExtensionAreSame()
-        {
-            Guid guidId = Guid.Parse("751D8030-9C84-4A91-816E-E95F64CE7588");
-            var guidIdAsString = new AdoGrainKey(guidId, null).ToString();
-
-            Assert.Equal(guidIdAsString, guidId.ToString());
         }
     }
 }

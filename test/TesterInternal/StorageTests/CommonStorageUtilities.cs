@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 
 
 namespace UnitTests.StorageTests.Relational
@@ -16,7 +16,6 @@ namespace UnitTests.StorageTests.Relational
         {
             Assert.Contains("ServiceId=", exceptionMessage);
             Assert.Contains("ProviderName=", exceptionMessage);
-            Assert.Contains("GrainType=", exceptionMessage);
             Assert.Contains($"GrainId=", exceptionMessage);
             Assert.Contains($"ETag=", exceptionMessage);
         }
