@@ -131,30 +131,13 @@ namespace Orleans.Runtime.Messaging
         {
             var field = reader.ReadFieldHeader();
 
-            IFieldCodec bodyCodec;
-            if (message.Result == ResponseTypes.Success)
-            {
-                bodyCodec = GetRawResponseCodec(field.FieldType);
-                message.Result = ResponseTypes.None; // reset raw response indicator
-            }
-            else
-            {
-                bodyCodec = _codecProvider.GetCodec(field.FieldType);
-            }
-
+            var bodyCodec = _codecProvider.GetCodec(field.FieldType);
             message.BodyObject = bodyCodec.ReadValue(ref reader, field);
         }
 
         public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var headers = message.Headers;
-            IFieldCodec? bodyCodec = null;
-            if (headers.ResponseType is ResponseTypes.None && (message.BodyObject as Response)?.GetSimpleResultType() is { } simpleType)
-            {
-                bodyCodec = GetRawResponseCodec(simpleType);
-                headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
-            }
-
             try
             {
                 if (_bufferWriter is not PrefixingBufferWriter<byte, TBufferWriter> bufferWriter)
@@ -176,7 +159,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (message.BodyObject is not null)
                 {
-                    bodyCodec ??= _codecProvider.GetCodec(message.BodyObject.GetType());
+                    var bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
                     var bodyWriter = Writer.Create(buffer, _serializationSession);
                     bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
                     bodyWriter.Commit();
@@ -412,44 +395,6 @@ namespace Orleans.Runtime.Messaging
         {
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
-        }
-
-        private IFieldCodec GetRawResponseCodec(Type resultType)
-        {
-            return _rawResponseCodecs.GetOrAdd(resultType,
-                static (key, provider) => (IFieldCodec)Activator.CreateInstance(typeof(RawResponseCodec<>).MakeGenericType(key), provider)!, _codecProvider);
-        }
-
-        private sealed class RawResponseCodec<T> : IFieldCodec
-        {
-            private readonly Type _resultType = typeof(T);
-            private readonly IFieldCodec<T> _codec;
-
-            public RawResponseCodec(CodecProvider codecProvider) => _codec = codecProvider.GetCodec<T>();
-
-            public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
-            {
-                writer.WriteStartObject(0, null, _resultType);
-                var holder = (Response<T>)value;
-                if (holder.TypedResult is not null)
-                    _codec.WriteField(ref writer, 0, _resultType, holder.TypedResult);
-                writer.WriteEndObject();
-            }
-
-            public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
-            {
-                field.EnsureWireTypeTagDelimited();
-                reader.ReadFieldHeader(ref field);
-
-                var holder = ResponsePool.Get<T>();
-                if (!field.IsEndObject)
-                {
-                    holder.TypedResult = _codec.ReadValue(ref reader, field);
-                    reader.ReadFieldHeader(ref field);
-                    if (!field.IsEndObject) ThrowEndObjectExpected();
-                }
-                return holder;
-            }
         }
 
         private static void ThrowEndObjectExpected() => throw new UnsupportedWireTypeException($"Expected a {nameof(ExtendedWireType.EndTagDelimited)} field");
