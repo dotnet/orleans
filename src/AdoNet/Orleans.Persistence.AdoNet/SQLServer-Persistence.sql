@@ -51,15 +51,13 @@ CREATE TABLE OrleansStorage
     -- The mapping is done in the code. The
     -- *String columns contain the corresponding clear name fields.
     --
-    -- If there are duplicates, they are resolved by using GrainIdN0,
-    -- GrainIdN1, GrainIdExtensionString and GrainTypeString fields.
+    -- If there are duplicates, they are resolved by using GrainIdKey,
+    -- and GrainTypeString fields.
     -- It is assumed these would be rarely needed.
     GrainIdHash                INT NOT NULL,
-    GrainIdN0                BIGINT NOT NULL,
-    GrainIdN1                BIGINT NOT NULL,
+    GrainIdKey                 NVARCHAR(512) NOT NULL,
     GrainTypeHash            INT NOT NULL,
     GrainTypeString            NVARCHAR(512) NOT NULL,
-    GrainIdExtensionString    NVARCHAR(512) NULL,
     ServiceId                NVARCHAR(150) NOT NULL,
 
     -- Payload
@@ -130,10 +128,8 @@ VALUES
         WHERE
             GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
             AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-            AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
-            AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+            AND (GrainIdKey = @GrainIdKey AND @GrainIdKey IS NOT NULL)
             AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
-            AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
             AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
             AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
             OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
@@ -146,11 +142,9 @@ VALUES
         INSERT INTO OrleansStorage
         (
             GrainIdHash,
-            GrainIdN0,
-            GrainIdN1,
+            GrainIdKey,
             GrainTypeHash,
             GrainTypeString,
-            GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
             ModifiedOn,
@@ -158,11 +152,9 @@ VALUES
         )
         SELECT
             @GrainIdHash,
-            @GrainIdN0,
-            @GrainIdN1,
+            @GrainIdKey,
             @GrainTypeHash,
             @GrainTypeString,
-            @GrainIdExtensionString,
             @ServiceId,
             @PayloadBinary,
             GETUTCDATE(),
@@ -175,10 +167,8 @@ VALUES
             WHERE
                 GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
                 AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-                AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
-                AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+                AND (GrainIdKey = @GrainIdKey AND @GrainIdKey IS NOT NULL)
                 AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
-                AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
                 AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
          ) OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
 
@@ -208,10 +198,8 @@ VALUES
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-        AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
-        AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+        AND (GrainIdKey = @GrainIdKey AND @GrainIdKey IS NOT NULL)
         AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
-        AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
@@ -239,10 +227,8 @@ VALUES
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-        AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
-        AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+        AND (GrainIdKey = @GrainIdKey AND @GrainIdKey IS NOT NULL)
         AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
-        AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));'
 );
