@@ -32,11 +32,18 @@ namespace Orleans.Providers
         /// <param name="serializer">The serializer.</param>
         /// <param name="cacheMonitor">The cache monitor.</param>
         /// <param name="monitorWriteInterval">The monitor write interval.</param>
-        public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, ILogger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public MemoryPooledCache(
+            IObjectPool<FixedSizeBuffer> bufferPool,
+            TimePurgePredicate purgePredicate,
+            ILogger logger,
+            TSerializer serializer,
+            ICacheMonitor cacheMonitor,
+            TimeSpan? monitorWriteInterval,
+            TimeSpan? purgeMetadataInterval)
         {
             this.bufferPool = bufferPool;
             this.serializer = serializer;
-            this.cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
+            this.cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval, purgeMetadataInterval);
             this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
         }
 
