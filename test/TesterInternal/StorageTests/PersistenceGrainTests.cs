@@ -52,12 +52,15 @@ namespace UnitTests.StorageTests
             }
         }
 
+        const string DefaultGrainStateName = "state";
         const string MockStorageProviderName1 = "test1";
         const string MockStorageProviderName2 = "test2";
         const string MockStorageProviderNameLowerCase = "lowercase";
         const string ErrorInjectorProviderName = "ErrorInjector";
         private readonly ITestOutputHelper output;
+
         protected TestCluster HostedCluster { get; }
+
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
@@ -147,7 +150,6 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_Activate_StoredValue()
         {
             const string providerName = MockStorageProviderName1;
-            string grainType = typeof(PersistenceTestGrain).FullName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
 
@@ -155,7 +157,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", initialValue);
+            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", initialValue);
 
             int readValue = await grain.GetValue();
             Assert.Equal(initialValue, readValue); // Read previously stored value
@@ -165,7 +167,6 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_Activate_StoredValue_Generic() 
         {
             const string providerName = MockStorageProviderName1;
-            string grainType = typeof(PersistenceTestGenericGrain<int>).FullName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
 
@@ -173,7 +174,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", initialValue);
+            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", initialValue);
 
             int readValue = await grain.GetValue();
             Assert.Equal(initialValue, readValue); // Read previously stored value
@@ -241,7 +242,6 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_ReRead()
         {
             const string providerName = MockStorageProviderName1;
-            string grainType = typeof(PersistenceTestGrain).FullName;
 
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
@@ -253,7 +253,7 @@ namespace UnitTests.StorageTests
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", 42);
+            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
             
             await grain.DoRead();
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
@@ -532,7 +532,6 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_ReRead_Error()
         {
             const string providerName = "test1";
-            string grainType = typeof(PersistenceErrorGrain).FullName;
 
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
@@ -544,7 +543,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", 42);
+            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
 
             await grain.DoRead();
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
@@ -614,7 +613,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeRead()
         {
-            string grainType = typeof(PersistenceProviderErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
@@ -624,7 +622,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
 
             Assert.Equal(expectedVal, val); // Returned value
@@ -641,7 +639,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterRead()
         {
-            string grainType = typeof(PersistenceProviderErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
@@ -651,7 +648,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 52;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
@@ -665,7 +662,7 @@ namespace UnitTests.StorageTests
 
             int newVal = 53;
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
 
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
@@ -809,7 +806,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeReRead()
         {
-            string grainType = typeof(PersistenceProviderErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
@@ -817,7 +813,7 @@ namespace UnitTests.StorageTests
 
             var val = await grain.GetValue();
             int expectedVal = 72;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.Equal(expectedVal, val); // Returned value
 
@@ -837,7 +833,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterReRead()
         {
-            string grainType = typeof(PersistenceProviderErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
@@ -846,7 +841,7 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue();
 
             int expectedVal = 92;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.Equal(expectedVal, val); // Returned value
 
@@ -856,7 +851,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             expectedVal = 94;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
             await CheckStorageProviderErrors(grain.DoRead);
 
@@ -868,7 +863,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Read()
         {
-            string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
@@ -877,7 +871,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
 
@@ -885,14 +879,14 @@ namespace UnitTests.StorageTests
 
             int newVal = expectedVal + 1;
 
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
             val = await grain.DoRead(true);
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             expectedVal = newVal;
 
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", newVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
             val = await grain.DoRead(false);
             Assert.Equal(expectedVal, val); // Returned value
         }
@@ -900,7 +894,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Write()
         {
-            string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
@@ -909,7 +902,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
 
@@ -932,7 +925,6 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_NotHandled_Write()
         {
-            string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
@@ -942,7 +934,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
+            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead(false);
 
             Assert.Equal(expectedVal, val); // Returned value after read
@@ -973,8 +965,6 @@ namespace UnitTests.StorageTests
         {
             const int numIterations = 100;
 
-            string grainType = typeof(PersistenceTestGrain).FullName;
-
             Task<int>[] promises = new Task<int>[numIterations];
             for (int i = 0; i < numIterations; i++)
             {
@@ -983,7 +973,7 @@ namespace UnitTests.StorageTests
                 Guid guid = grain.GetPrimaryKey();
                 _ = guid.ToString("N");
 
-                SetStoredValue(MockStorageProviderName1, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", expectedVal); // Update state data behind grain
+                SetStoredValue(MockStorageProviderName1, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal); // Update state data behind grain
                 promises[i] = grain.DoRead();
             }
             await Task.WhenAll(promises);
