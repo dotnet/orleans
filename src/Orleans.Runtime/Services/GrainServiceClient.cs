@@ -41,9 +41,22 @@ namespace Orleans.Runtime.Services
         /// </summary>
         protected TGrainService GetGrainService(GrainId callingGrainId)
         {
-            var hashCode = callingGrainId.GetUniformHashCode();
-            var destination = ringProvider.GetPrimaryTargetSilo(hashCode);
+            return GetGrainService(callingGrainId.GetUniformHashCode());
+        }
 
+        /// <summary>
+        /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <paramref name="key"/>.
+        /// </summary>
+        protected TGrainService GetGrainService(uint key)
+        {
+            return GetGrainService(ringProvider.GetPrimaryTargetSilo(key));
+        }
+
+        /// <summary>
+        /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <paramref name="destination"/>.
+        /// </summary>
+        protected TGrainService GetGrainService(SiloAddress destination)
+        {
             var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainType, destination);
             var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
 
