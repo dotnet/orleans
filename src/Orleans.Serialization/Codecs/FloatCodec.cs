@@ -4,7 +4,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -69,6 +68,8 @@ namespace Orleans.Serialization.Codecs
                 case WireType.LengthPrefixed:
                     return (float)DecimalCodec.ReadDecimalRaw(ref reader);
 
+                case WireType.VarInt:
+                    return (float)HalfCodec.ReadHalfRaw(ref reader);
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
@@ -87,7 +88,7 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
 
-        private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
+        private static void ThrowValueOutOfRange<T>(T value) => throw new OverflowException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(float)}.");
     }
 
@@ -141,6 +142,8 @@ namespace Orleans.Serialization.Codecs
                     return ReadDoubleRaw(ref reader);
                 case WireType.LengthPrefixed:
                     return (double)DecimalCodec.ReadDecimalRaw(ref reader);
+                case WireType.VarInt:
+                    return (double)HalfCodec.ReadHalfRaw(ref reader);
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
@@ -229,12 +232,20 @@ namespace Orleans.Serialization.Codecs
                     }
                 case WireType.LengthPrefixed:
                     return ReadDecimalRaw(ref reader);
+                case WireType.VarInt:
+                    return (decimal)HalfCodec.ReadHalfRaw(ref reader);
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
             }
         }
 
+        /// <summary>
+        /// Reads a value without protocol framing.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The value.</returns>
         public static decimal ReadDecimalRaw<TInput>(ref Reader<TInput> reader)
         {
             var length = reader.ReadVarUInt32();
@@ -266,7 +277,7 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
 
-        private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
+        private static void ThrowValueOutOfRange<T>(T value) => throw new OverflowException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(decimal)}.");
     }
 
@@ -311,13 +322,14 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         public static Half ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            ReferenceCodec.MarkValueField(reader.Session);
             switch (field.WireType)
             {
                 case WireType.VarInt:
-                    return BitConverter.UInt16BitsToHalf(UInt16Codec.ReadValue(ref reader, field));
+                    return ReadHalfRaw(ref reader);
                 case WireType.Fixed32:
                     {
-                        var value = FloatCodec.ReadValue(ref reader, field);
+                        var value = FloatCodec.ReadFloatRaw(ref reader);
                         if (value > (float)Half.MaxValue || value < (float)Half.MinValue && !float.IsInfinity(value) && !float.IsNaN(value))
                         {
                             ThrowValueOutOfRange(value);
@@ -338,7 +350,6 @@ namespace Orleans.Serialization.Codecs
 
                 case WireType.LengthPrefixed:
                     {
-                        ReferenceCodec.MarkValueField(reader.Session);
                         var width = reader.ReadVarUInt32();
                         if (width == Width)
                         {
@@ -370,12 +381,23 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <summary>
+        /// Reads a value without protocol framing.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The value.</returns>
+        internal static Half ReadHalfRaw<TInput>(ref Reader<TInput> reader)
+        {
+            return BitConverter.UInt16BitsToHalf(reader.ReadVarUInt16());
+        }
+
         [DoesNotReturn]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
             $"{nameof(wireType)} {wireType} is not supported by this codec.");
 
         [DoesNotReturn]
-        private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
+        private static void ThrowValueOutOfRange<T>(T value) => throw new OverflowException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(Half)}.");
 
         [DoesNotReturn]

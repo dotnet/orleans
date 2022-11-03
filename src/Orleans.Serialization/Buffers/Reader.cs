@@ -837,6 +837,12 @@ namespace Orleans.Serialization.Buffers
 
                 ulong result = Unsafe.ReadUnaligned<ulong>(ref readHead);
                 var bytesNeeded = BitOperations.TrailingZeroCount((uint)result) + 1;
+
+                if (bytesNeeded > 9)
+                {
+                    ThrowOverflowException();
+                }
+
                 result >>= bytesNeeded;
                 _bufferPos = pos + bytesNeeded;
 
@@ -850,6 +856,8 @@ namespace Orleans.Serialization.Buffers
                 return ReadVarUInt32Slow();
             }
         }
+
+        private void ThrowOverflowException() => throw new OverflowException();
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private uint ReadVarUInt32Slow()
@@ -870,7 +878,7 @@ namespace Orleans.Serialization.Buffers
             }
 
             result >>= numBytes;
-            return (uint)result;
+            return checked((uint)result);
         }
 
         /// <summary>

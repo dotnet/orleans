@@ -777,6 +777,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
+                ReferenceCodec.MarkValueField(writer.Session);
                 SignedBinaryIntegerCodec<Int128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
             }
         }
@@ -799,8 +800,22 @@ namespace Orleans.Serialization.Codecs
                 return Int64Codec.ReadValue(ref reader, field);
             }
 
+            ReferenceCodec.MarkValueField(reader.Session);
             Int128 result;
-            SignedBinaryIntegerCodec<Int128>.ReadValue(ref reader, field, out result);
+            SignedBinaryIntegerCodec<Int128>.ReadLengthPrefixed(ref reader, out result);
+            return result;
+        }
+
+        /// <summary>
+        /// Reads a value without protocol framing.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The value.</returns>
+        internal static Int128 ReadRaw<TInput>(ref Reader<TInput> reader)
+        {
+            Int128 result;
+            SignedBinaryIntegerCodec<Int128>.ReadLengthPrefixed(ref reader, out result);
             return result;
         }
     }
@@ -832,6 +847,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
+                ReferenceCodec.MarkValueField(writer.Session);
                 UnsignedBinaryIntegerCodec<UInt128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
             }
         }
@@ -854,8 +870,22 @@ namespace Orleans.Serialization.Codecs
                 return UInt64Codec.ReadValue(ref reader, field);
             }
 
+            ReferenceCodec.MarkValueField(reader.Session);
             UInt128 result;
-            UnsignedBinaryIntegerCodec<UInt128>.ReadValue(ref reader, field, out result);
+            UnsignedBinaryIntegerCodec<UInt128>.ReadLengthPrefixed(ref reader, out result);
+            return result;
+        }
+
+        /// <summary>
+        /// Reads a value without protocol framing.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <returns>The value.</returns>
+        internal static UInt128 ReadRaw<TInput>(ref Reader<TInput> reader)
+        {
+            UInt128 result;
+            UnsignedBinaryIntegerCodec<UInt128>.ReadLengthPrefixed(ref reader, out result);
             return result;
         }
     }
@@ -863,9 +893,8 @@ namespace Orleans.Serialization.Codecs
     internal static class SignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, ISignedNumber<T>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, in T value) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(scoped ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, scoped in T value) where TBufferWriter : IBufferWriter<byte>
         {
-            ReferenceCodec.MarkValueField(writer.Session);
             var byteCount = value.GetByteCount();
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)byteCount);
@@ -875,10 +904,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadValue<TInput>(ref Reader<TInput> reader, Field field, out T value)
+        public static void ReadLengthPrefixed<TInput>(scoped ref Reader<TInput> reader, out T value)
         {
-            ReferenceCodec.MarkValueField(reader.Session);
-            field.EnsureWireType(WireType.LengthPrefixed);
             var byteCount = reader.ReadVarUInt32();
             ReadOnlySpan<byte> bytes;
             if (!reader.TryReadBytes((int)byteCount, out bytes))
@@ -899,9 +926,8 @@ namespace Orleans.Serialization.Codecs
     internal static class UnsignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, IUnsignedNumber<T>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, in T value) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(scoped ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, scoped in T value) where TBufferWriter : IBufferWriter<byte>
         {
-            ReferenceCodec.MarkValueField(writer.Session);
             var byteCount = value.GetByteCount();
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)byteCount);
@@ -911,10 +937,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadValue<TInput>(ref Reader<TInput> reader, Field field, out T value)
+        public static void ReadLengthPrefixed<TInput>(scoped ref Reader<TInput> reader, out T value)
         {
-            ReferenceCodec.MarkValueField(reader.Session);
-            field.EnsureWireType(WireType.LengthPrefixed);
             var byteCount = reader.ReadVarUInt32();
             ReadOnlySpan<byte> bytes;
             if (!reader.TryReadBytes((int)byteCount, out bytes))
