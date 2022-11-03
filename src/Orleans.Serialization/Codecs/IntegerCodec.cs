@@ -1,9 +1,13 @@
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -561,7 +565,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= int.MaxValue && value >= int.MinValue)
+            if (value is <= int.MaxValue and >= int.MinValue)
             {
                 if (value > 1L << 20 || -value > 1L << 20)
                 {
@@ -598,7 +602,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= int.MaxValue && value >= int.MinValue)
+            if (value is <= int.MaxValue and >= int.MinValue)
             {
                 if (value > 1L << 20 || -value > 1L << 20)
                 {
@@ -744,5 +748,187 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt64(field.WireType);
         }
+    }
+
+    /// <summary>
+    /// Serializer for <see cref="Int128"/>.
+    /// </summary>
+    [RegisterSerializer]
+    public sealed class Int128Codec : IFieldCodec<Int128>
+    {
+        private static readonly Type CodecFieldType = typeof(Int128);
+
+        /// <inheritdoc/>
+        void IFieldCodec<Int128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (value <= (Int128)long.MaxValue && value >= (Int128)long.MinValue)
+            {
+                Int64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (long)value, CodecFieldType);
+            }
+            else
+            {
+                SignedBinaryIntegerCodec<Int128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
+            }
+        }
+
+        /// <inheritdoc/>
+        Int128 IFieldCodec<Int128>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Int128 ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (field.WireType != WireType.LengthPrefixed)
+            {
+                return Int64Codec.ReadValue(ref reader, field);
+            }
+
+            Int128 result;
+            SignedBinaryIntegerCodec<Int128>.ReadValue(ref reader, field, out result);
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Serializer for <see cref="UInt128"/>.
+    /// </summary>
+    [RegisterSerializer]
+    public sealed class UInt128Codec : IFieldCodec<UInt128>
+    {
+        private static readonly Type CodecFieldType = typeof(UInt128);
+
+        /// <inheritdoc/>
+        void IFieldCodec<UInt128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (value <= (UInt128)ulong.MaxValue && value >= (UInt128)ulong.MinValue)
+            {
+                UInt64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (ulong)value, CodecFieldType);
+            }
+            else
+            {
+                UnsignedBinaryIntegerCodec<UInt128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
+            }
+        }
+
+        /// <inheritdoc/>
+        UInt128 IFieldCodec<UInt128>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static UInt128 ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (field.WireType != WireType.LengthPrefixed)
+            {
+                return UInt64Codec.ReadValue(ref reader, field);
+            }
+
+            UInt128 result;
+            UnsignedBinaryIntegerCodec<UInt128>.ReadValue(ref reader, field, out result);
+            return result;
+        }
+    }
+
+    internal static class SignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, ISignedNumber<T>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, in T value) where TBufferWriter : IBufferWriter<byte>
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            var byteCount = value.GetByteCount();
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
+            writer.WriteVarUInt32((uint)byteCount);
+            Span<byte> bytes = byteCount < 64 ? stackalloc byte[byteCount] : new byte[byteCount];
+            value.WriteLittleEndian(bytes);
+            writer.Write(bytes);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ReadValue<TInput>(ref Reader<TInput> reader, Field field, out T value)
+        {
+            ReferenceCodec.MarkValueField(reader.Session);
+            field.EnsureWireType(WireType.LengthPrefixed);
+            var byteCount = reader.ReadVarUInt32();
+            ReadOnlySpan<byte> bytes;
+            if (!reader.TryReadBytes((int)byteCount, out bytes))
+            {
+                bytes = reader.ReadBytes(byteCount);
+            }
+
+            if (!T.TryReadLittleEndian(bytes, isUnsigned: false, out value))
+            {
+                ThrowReadFailure();
+            }
+        }
+
+        [DoesNotReturn]
+        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {typeof(T)} value");
+    }
+
+    internal static class UnsignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, IUnsignedNumber<T>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, in T value) where TBufferWriter : IBufferWriter<byte>
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            var byteCount = value.GetByteCount();
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
+            writer.WriteVarUInt32((uint)byteCount);
+            Span<byte> bytes = byteCount < 64 ? stackalloc byte[byteCount] : new byte[byteCount];
+            value.WriteLittleEndian(bytes);
+            writer.Write(bytes);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ReadValue<TInput>(ref Reader<TInput> reader, Field field, out T value)
+        {
+            ReferenceCodec.MarkValueField(reader.Session);
+            field.EnsureWireType(WireType.LengthPrefixed);
+            var byteCount = reader.ReadVarUInt32();
+            ReadOnlySpan<byte> bytes;
+            if (!reader.TryReadBytes((int)byteCount, out bytes))
+            {
+                bytes = reader.ReadBytes(byteCount);
+            }
+
+            if (!T.TryReadLittleEndian(bytes, isUnsigned: true, out value))
+            {
+                ThrowReadFailure();
+            }
+        }
+
+        [DoesNotReturn]
+        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {typeof(T)} value");
     }
 }

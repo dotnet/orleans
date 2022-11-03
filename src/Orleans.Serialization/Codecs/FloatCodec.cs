@@ -1,6 +1,8 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
@@ -164,7 +166,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class DecimalCodec : IFieldCodec<decimal>
     {
-        private const int Width = 16;
+        internal const int Width = 16;
         private static readonly Type CodecFieldType = typeof(decimal);
 
         /// <inheritdoc/>
@@ -241,6 +243,12 @@ namespace Orleans.Serialization.Codecs
                 throw new UnexpectedLengthPrefixValueException("decimal", Width, length);
             }
 
+            return ReadDecimalRawNoValidation(ref reader);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static decimal ReadDecimalRawNoValidation<TInput>(ref Reader<TInput> reader)
+        {
             DecimalConverter holder;
             holder.Flags = reader.ReadUInt32();
             holder.Hi32 = reader.ReadUInt32();
@@ -260,5 +268,118 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(decimal)}.");
+    }
+
+    /// <summary>
+    /// Serializer for <see cref="Half"/>.
+    /// </summary>
+    [RegisterSerializer]
+    public sealed class HalfCodec : IFieldCodec<Half>
+    {
+        private const int Width = 2;
+        private static readonly Type CodecFieldType = typeof(Half);
+
+        /// <inheritdoc/>
+        void IFieldCodec<Half>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
+            uint fieldIdDelta,
+            Type expectedType,
+            Half value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Half value) where TBufferWriter : IBufferWriter<byte>
+        {
+            var asUShort = BitConverter.HalfToUInt16Bits(value);
+            UInt16Codec.WriteField(ref writer, fieldIdDelta, expectedType, asUShort, typeof(Half));
+        }
+
+        /// <inheritdoc/>
+        Half IFieldCodec<Half>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
+        public static Half ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            switch (field.WireType)
+            {
+                case WireType.VarInt:
+                    return BitConverter.UInt16BitsToHalf(UInt16Codec.ReadValue(ref reader, field));
+                case WireType.Fixed32:
+                    {
+                        var value = FloatCodec.ReadValue(ref reader, field);
+                        if (value > (float)Half.MaxValue || value < (float)Half.MinValue && !float.IsInfinity(value) && !float.IsNaN(value))
+                        {
+                            ThrowValueOutOfRange(value);
+                        }
+
+                        return (Half)value;
+                    }
+                case WireType.Fixed64:
+                    {
+                        var value = DoubleCodec.ReadDoubleRaw(ref reader);
+                        if ((value > (double)Half.MaxValue || value < (double)Half.MinValue) && !double.IsInfinity(value) && !double.IsNaN(value))
+                        {
+                            ThrowValueOutOfRange(value);
+                        }
+
+                        return (Half)value;
+                    }
+
+                case WireType.LengthPrefixed:
+                    {
+                        ReferenceCodec.MarkValueField(reader.Session);
+                        var width = reader.ReadVarUInt32();
+                        if (width == Width)
+                        {
+                            ushort value;
+                            Unsafe.SkipInit(out value);
+                            var bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1));
+                            reader.ReadBytes(bytes);
+                            return BitConverter.UInt16BitsToHalf(value);
+                        }
+                        else if (width == DecimalCodec.Width)
+                        {
+                            var value = DecimalCodec.ReadDecimalRawNoValidation(ref reader);
+                            if (value > (decimal)Half.MaxValue || value < (decimal)Half.MinValue)
+                            {
+                                ThrowValueOutOfRange(value);
+                            }
+
+                            return (Half)value;
+                        }
+                        else
+                        {
+                            ThrowUnsupportedWidth(width);
+                            return default;
+                        }
+                    }
+                default:
+                    ThrowWireTypeOutOfRange(field.WireType);
+                    return default;
+            }
+        }
+
+        [DoesNotReturn]
+        private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
+            $"{nameof(wireType)} {wireType} is not supported by this codec.");
+
+        [DoesNotReturn]
+        private static void ThrowValueOutOfRange<T>(T value) => throw new ArgumentOutOfRangeException(
+            $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(Half)}.");
+
+        [DoesNotReturn]
+        private static void ThrowUnsupportedWidth(uint width) => throw new ArgumentOutOfRangeException(
+            $"Expected a width of {Width} or {DecimalCodec.Width} but encountered {width}, which is unsupported for {typeof(Half)} values.");
     }
 }
