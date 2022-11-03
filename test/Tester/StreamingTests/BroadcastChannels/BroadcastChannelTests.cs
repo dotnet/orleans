@@ -202,7 +202,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 while (!cts.IsCancellationRequested)
                 {
                     counter = await badGrain.GetOnPublishedCounter();
-                    if (counter == 1) break;
+                    if (counter == 2) break;
                     await Task.Delay(10);
                 }
                 Assert.Equal(2, counter);
