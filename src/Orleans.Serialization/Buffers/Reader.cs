@@ -837,19 +837,11 @@ namespace Orleans.Serialization.Buffers
 
                 ulong result = Unsafe.ReadUnaligned<ulong>(ref readHead);
                 var bytesNeeded = BitOperations.TrailingZeroCount((uint)result) + 1;
-
-                if (bytesNeeded > 9)
-                {
-                    ThrowOverflowException();
-                }
-
-                result >>= bytesNeeded;
+                if (bytesNeeded > 5) ThrowOverflowException();
                 _bufferPos = pos + bytesNeeded;
-
-                // Mask off invalid data
-                var fullWidthReadMask = ~((uint)bytesNeeded - 6 + 1);
-                var mask = ((1U << (bytesNeeded * 7)) - 1) | fullWidthReadMask;
-                return (uint)result & mask;
+                result &= (1UL << (bytesNeeded * 8)) - 1;
+                result >>= bytesNeeded;
+                return checked((uint)result);
             }
             else
             {
@@ -857,7 +849,7 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-        private void ThrowOverflowException() => throw new OverflowException();
+        private static void ThrowOverflowException() => throw new OverflowException();
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private uint ReadVarUInt32Slow()

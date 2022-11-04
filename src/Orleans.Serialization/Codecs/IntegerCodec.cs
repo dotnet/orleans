@@ -670,7 +670,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= int.MaxValue)
+            if (value <= uint.MaxValue)
             {
                 if (value > 1UL << 20)
                 {
@@ -680,7 +680,7 @@ namespace Orleans.Serialization.Codecs
                 else
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                    writer.WriteVarUInt64(value);
+                    writer.WriteVarUInt32((uint)value);
                 }
             }
             else if (value > 1UL << 41)
@@ -707,7 +707,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= int.MaxValue)
+            if (value <= uint.MaxValue)
             {
                 if (value > 1UL << 20)
                 {
@@ -717,7 +717,7 @@ namespace Orleans.Serialization.Codecs
                 else
                 {
                     writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                    writer.WriteVarUInt64(value);
+                    writer.WriteVarUInt32((uint)value);
                 }
             }
             else if (value > 1UL << 41)
