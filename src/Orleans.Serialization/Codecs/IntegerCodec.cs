@@ -778,7 +778,12 @@ namespace Orleans.Serialization.Codecs
             else
             {
                 ReferenceCodec.MarkValueField(writer.Session);
-                SignedBinaryIntegerCodec<Int128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
+                var byteCount = ((IBinaryInteger<Int128>)value).GetByteCount();
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
+                writer.WriteVarUInt32((uint)byteCount);
+                Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
+                ((IBinaryInteger<Int128>)value).WriteLittleEndian(bytes);
+                writer.Write(bytes);
             }
         }
 
@@ -801,9 +806,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
-            Int128 result;
-            SignedBinaryIntegerCodec<Int128>.ReadLengthPrefixed(ref reader, out result);
-            return result;
+            return ReadRaw(ref reader);
         }
 
         /// <summary>
@@ -814,10 +817,26 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         internal static Int128 ReadRaw<TInput>(ref Reader<TInput> reader)
         {
-            Int128 result;
-            SignedBinaryIntegerCodec<Int128>.ReadLengthPrefixed(ref reader, out result);
-            return result;
+            var byteCount = reader.ReadVarUInt32();
+            ReadOnlySpan<byte> bytes;
+            if (!reader.TryReadBytes((int)byteCount, out bytes))
+            {
+                bytes = reader.ReadBytes(byteCount);
+            }
+
+            if (!TryReadLittleEndian<Int128>(bytes, out var value))
+            {
+                ThrowReadFailure();
+            }
+
+            return value;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool TryReadLittleEndian<T>(ReadOnlySpan<byte> source, out T value) where T : IBinaryInteger<T> => T.TryReadLittleEndian(source, isUnsigned: false, out value);
+
+        [DoesNotReturn]
+        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {nameof(Int128)} value");
     }
 
     /// <summary>
@@ -841,14 +860,19 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value <= (UInt128)ulong.MaxValue && value >= (UInt128)ulong.MinValue)
+            if (value <= (UInt128)ulong.MaxValue)
             {
                 UInt64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (ulong)value, CodecFieldType);
             }
             else
             {
                 ReferenceCodec.MarkValueField(writer.Session);
-                UnsignedBinaryIntegerCodec<UInt128>.WriteField(ref writer, fieldIdDelta, expectedType, in value);
+                var byteCount = ((IBinaryInteger<UInt128>)value).GetByteCount();
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
+                writer.WriteVarUInt32((uint)byteCount);
+                Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
+                ((IBinaryInteger<UInt128>)value).WriteLittleEndian(bytes);
+                writer.Write(bytes);
             }
         }
 
@@ -871,9 +895,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             ReferenceCodec.MarkValueField(reader.Session);
-            UInt128 result;
-            UnsignedBinaryIntegerCodec<UInt128>.ReadLengthPrefixed(ref reader, out result);
-            return result;
+            return ReadRaw(ref reader);
         }
 
         /// <summary>
@@ -884,28 +906,6 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The value.</returns>
         internal static UInt128 ReadRaw<TInput>(ref Reader<TInput> reader)
         {
-            UInt128 result;
-            UnsignedBinaryIntegerCodec<UInt128>.ReadLengthPrefixed(ref reader, out result);
-            return result;
-        }
-    }
-
-    internal static class SignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, ISignedNumber<T>
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(scoped ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, scoped in T value) where TBufferWriter : IBufferWriter<byte>
-        {
-            var byteCount = value.GetByteCount();
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
-            writer.WriteVarUInt32((uint)byteCount);
-            Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
-            value.WriteLittleEndian(bytes);
-            writer.Write(bytes);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadLengthPrefixed<TInput>(scoped ref Reader<TInput> reader, out T value)
-        {
             var byteCount = reader.ReadVarUInt32();
             ReadOnlySpan<byte> bytes;
             if (!reader.TryReadBytes((int)byteCount, out bytes))
@@ -913,46 +913,18 @@ namespace Orleans.Serialization.Codecs
                 bytes = reader.ReadBytes(byteCount);
             }
 
-            if (!T.TryReadLittleEndian(bytes, isUnsigned: false, out value))
+            if (!TryReadLittleEndian<UInt128>(bytes, out var value))
             {
                 ThrowReadFailure();
             }
-        }
 
-        [DoesNotReturn]
-        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {typeof(T)} value");
-    }
-
-    internal static class UnsignedBinaryIntegerCodec<T> where T : struct, IBinaryInteger<T>, IUnsignedNumber<T>
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(scoped ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, scoped in T value) where TBufferWriter : IBufferWriter<byte>
-        {
-            var byteCount = value.GetByteCount();
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
-            writer.WriteVarUInt32((uint)byteCount);
-            Span<byte> bytes = byteCount < 64 ? stackalloc byte[byteCount] : new byte[byteCount];
-            value.WriteLittleEndian(bytes);
-            writer.Write(bytes);
+            return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadLengthPrefixed<TInput>(scoped ref Reader<TInput> reader, out T value)
-        {
-            var byteCount = reader.ReadVarUInt32();
-            ReadOnlySpan<byte> bytes;
-            if (!reader.TryReadBytes((int)byteCount, out bytes))
-            {
-                bytes = reader.ReadBytes(byteCount);
-            }
-
-            if (!T.TryReadLittleEndian(bytes, isUnsigned: true, out value))
-            {
-                ThrowReadFailure();
-            }
-        }
+        private static bool TryReadLittleEndian<T>(ReadOnlySpan<byte> source, out T value) where T : IBinaryInteger<T> => T.TryReadLittleEndian(source, isUnsigned: true, out value);
 
         [DoesNotReturn]
-        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {typeof(T)} value");
+        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {nameof(UInt128)} value");
     }
 }
