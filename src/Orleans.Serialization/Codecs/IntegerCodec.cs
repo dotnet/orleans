@@ -898,7 +898,7 @@ namespace Orleans.Serialization.Codecs
             var byteCount = value.GetByteCount();
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(T), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)byteCount);
-            Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(byteCount) : new byte[byteCount];
+            Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
             value.WriteLittleEndian(bytes);
             writer.Write(bytes);
         }
