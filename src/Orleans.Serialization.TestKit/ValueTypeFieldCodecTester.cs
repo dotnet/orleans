@@ -4,11 +4,16 @@ using Microsoft.Extensions.DependencyInjection;
 using System.IO.Pipelines;
 using Xunit;
 using Orleans.Serialization.Serializers;
+using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit
 {
     public abstract class ValueTypeFieldCodecTester<TField, TCodec> : FieldCodecTester<TField, TCodec> where TField : struct where TCodec : class, IFieldCodec<TField>
     {
+        protected ValueTypeFieldCodecTester(ITestOutputHelper output) : base(output)
+        {
+        }
+
         [Fact]
         public void ValueSerializerRoundTrip()
         {
