@@ -307,7 +307,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Half value) where TBufferWriter : IBufferWriter<byte>
         {
             var asUShort = BitConverter.HalfToUInt16Bits(value);
-            UInt16Codec.WriteField(ref writer, fieldIdDelta, expectedType, asUShort, typeof(Half));
+            UInt16Codec.WriteField(ref writer, fieldIdDelta, expectedType, asUShort, CodecFieldType);
         }
 
         /// <inheritdoc/>
@@ -330,7 +330,7 @@ namespace Orleans.Serialization.Codecs
                 case WireType.Fixed32:
                     {
                         var value = FloatCodec.ReadFloatRaw(ref reader);
-                        if (value > (float)Half.MaxValue || value < (float)Half.MinValue && !float.IsInfinity(value) && !float.IsNaN(value))
+                        if ((value > (float)Half.MaxValue || value < (float)Half.MinValue) && !float.IsInfinity(value) && !float.IsNaN(value))
                         {
                             ThrowValueOutOfRange(value);
                         }
@@ -350,30 +350,13 @@ namespace Orleans.Serialization.Codecs
 
                 case WireType.LengthPrefixed:
                     {
-                        var width = reader.ReadVarUInt32();
-                        if (width == Width)
+                        var value = DecimalCodec.ReadDecimalRaw(ref reader);
+                        if (value > (decimal)Half.MaxValue || value < (decimal)Half.MinValue)
                         {
-                            ushort value;
-                            Unsafe.SkipInit(out value);
-                            var bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1));
-                            reader.ReadBytes(bytes);
-                            return BitConverter.UInt16BitsToHalf(value);
+                            ThrowValueOutOfRange(value);
                         }
-                        else if (width == DecimalCodec.Width)
-                        {
-                            var value = DecimalCodec.ReadDecimalRawNoValidation(ref reader);
-                            if (value > (decimal)Half.MaxValue || value < (decimal)Half.MinValue)
-                            {
-                                ThrowValueOutOfRange(value);
-                            }
 
-                            return (Half)value;
-                        }
-                        else
-                        {
-                            ThrowUnsupportedWidth(width);
-                            return default;
-                        }
+                        return (Half)value;
                     }
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
@@ -387,10 +370,7 @@ namespace Orleans.Serialization.Codecs
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
-        internal static Half ReadHalfRaw<TInput>(ref Reader<TInput> reader)
-        {
-            return BitConverter.UInt16BitsToHalf(reader.ReadVarUInt16());
-        }
+        internal static Half ReadHalfRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt16BitsToHalf(reader.ReadVarUInt16());
 
         [DoesNotReturn]
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new ArgumentOutOfRangeException(
@@ -399,9 +379,5 @@ namespace Orleans.Serialization.Codecs
         [DoesNotReturn]
         private static void ThrowValueOutOfRange<T>(T value) => throw new OverflowException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(Half)}.");
-
-        [DoesNotReturn]
-        private static void ThrowUnsupportedWidth(uint width) => throw new ArgumentOutOfRangeException(
-            $"Expected a width of {Width} or {DecimalCodec.Width} but encountered {width}, which is unsupported for {typeof(Half)} values.");
     }
 }
