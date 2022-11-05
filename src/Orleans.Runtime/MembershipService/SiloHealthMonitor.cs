@@ -43,7 +43,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// The time since the last ping response was received from either the node being monitored or an intermediary.
         /// </summary>
-        public TimeSpan? ElapsedSinceLastResponse => _elapsedSinceLastSuccessfulResponse.IsRunning ? (Nullable<TimeSpan>)_elapsedSinceLastSuccessfulResponse.Elapsed : null;
+        public TimeSpan? ElapsedSinceLastResponse => _elapsedSinceLastSuccessfulResponse.IsRunning ? (TimeSpan?)_elapsedSinceLastSuccessfulResponse.Elapsed : null;
 
         /// <summary>
         /// The duration of time measured from just prior to sending the last probe which received a response until just after receiving and processing the response.

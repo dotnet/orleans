@@ -320,7 +320,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         private (ImmutableHashSet<GrainId> Clients, long Version) GetConnectedClients(ImmutableHashSet<GrainId> previousClients, long previousVersion)
         {
-            var connectedClientsVersion = _connectedClients.Version; 
+            var connectedClientsVersion = _connectedClients.Version;
             if (connectedClientsVersion <= _observedConnectedClientsVersion)
             {
                 return (previousClients, previousVersion);
@@ -354,35 +354,42 @@ namespace Orleans.Runtime.GrainDirectory
 
             while (true)
             {
-                membershipTask ??= membershipUpdates.MoveNextAsync().AsTask();
-                timerTask ??= _refreshTimer.NextTick();
-
-                // Wait for either of the tasks to complete.
-                await Task.WhenAny(membershipTask, timerTask);
-
-                if (timerTask.IsCompleted)
+                try
                 {
-                    if (!await timerTask)
+                    membershipTask ??= membershipUpdates.MoveNextAsync().AsTask();
+                    timerTask ??= _refreshTimer.NextTick();
+
+                    // Wait for either of the tasks to complete.
+                    await Task.WhenAny(membershipTask, timerTask);
+
+                    if (timerTask.IsCompleted)
                     {
-                        break;
+                        if (!await timerTask)
+                        {
+                            break;
+                        }
+
+                        timerTask = null;
                     }
 
-                    timerTask = null;
-                }
-
-                if (membershipTask.IsCompleted)
-                {
-                    if (!await membershipTask)
+                    if (membershipTask.IsCompleted)
                     {
-                        break;
+                        if (!await membershipTask)
+                        {
+                            break;
+                        }
+
+                        membershipTask = null;
                     }
 
-                    membershipTask = null;
+                    if (ShouldPublish())
+                    {
+                        await PublishUpdates();
+                    }
                 }
-
-                if (ShouldPublish())
+                catch (Exception exception)
                 {
-                    await PublishUpdates();
+                    _logger.LogError(exception, "Exception publishing client routing table");
                 }
             }
         }
