@@ -1254,7 +1254,10 @@ namespace Orleans.Serialization.UnitTests
             uint.MaxValue,
             (ulong)uint.MaxValue + 1,
             ulong.MaxValue,
-        };
+        }
+        .Concat(Enumerable.Range(1, 63).Select(i => 1ul << i))
+        .ToArray();
+
 
         protected override Action<Action<ulong>> ValueProvider => Gen.ULong.ToValueProvider();
     }
@@ -1310,14 +1313,16 @@ namespace Orleans.Serialization.UnitTests
             ushort.MaxValue,
             (uint)ushort.MaxValue + 1,
             uint.MaxValue,
-        };
+        }
+        .Concat(Enumerable.Range(1, 31).Select(i => 1u << i))
+        .ToArray();
 
         protected override Action<Action<uint>> ValueProvider => Gen.UInt.ToValueProvider();
     }
 
-    public class UInt32CopiercTests : CopierTester<uint, IDeepCopier<uint>>
+    public class UInt32CopierTests : CopierTester<uint, IDeepCopier<uint>>
     {
-        public UInt32CopiercTests(ITestOutputHelper output) : base(output)
+        public UInt32CopierTests(ITestOutputHelper output) : base(output)
         {
         }
 
