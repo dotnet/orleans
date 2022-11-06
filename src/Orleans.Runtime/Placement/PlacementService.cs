@@ -237,6 +237,7 @@ namespace Orleans.Runtime.Placement
 
             private async Task ProcessLoop()
             {
+                Action signalWaiter = _workSignal.Signal;
                 while (true)
                 {
                     try
@@ -263,7 +264,7 @@ namespace Orleans.Runtime.Placement
                                     workItem.Result = GetOrPlaceActivationAsync(message.Message);
 
                                     // Wake up this processing loop when the task completes
-                                    workItem.Result.SignalOnCompleted(_workSignal);
+                                    workItem.Result.GetAwaiter().UnsafeOnCompleted(signalWaiter);
                                 }
                             }
                         }
