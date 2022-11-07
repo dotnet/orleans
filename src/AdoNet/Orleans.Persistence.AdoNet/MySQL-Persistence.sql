@@ -51,15 +51,13 @@ CREATE TABLE OrleansStorage
     -- The mapping is done in the code. The
     -- *String columns contain the corresponding clear name fields.
     --
-    -- If there are duplicates, they are resolved by using GrainIdN0,
-    -- GrainIdN1, GrainIdExtensionString and GrainTypeString fields.
+    -- If there are duplicates, they are resolved by using GrainIKey,
+    -- and GrainTypeString fields.
     -- It is assumed these would be rarely needed.
     GrainIdHash                INT NOT NULL,
-    GrainIdN0                BIGINT NOT NULL,
-    GrainIdN1                BIGINT NOT NULL,
+    GrainIdKey                NVARCHAR(512) NOT NULL,
     GrainTypeHash            INT NOT NULL,
     GrainTypeString            NVARCHAR(512) NOT NULL,
-    GrainIdExtensionString    NVARCHAR(512) NULL,
     ServiceId                NVARCHAR(150) NOT NULL,
 
     -- Payload
@@ -88,11 +86,9 @@ DELIMITER $$
 CREATE PROCEDURE ClearStorage
 (
     in _GrainIdHash INT,
-    in _GrainIdN0 BIGINT,
-    in _GrainIdN1 BIGINT,
+    in _GrainIdKey NVARCHAR(512),
     in _GrainTypeHash INT,
     in _GrainTypeString NVARCHAR(512),
-    in _GrainIdExtensionString NVARCHAR(512),
     in _ServiceId NVARCHAR(150),
     in _GrainStateVersion INT
 )
@@ -113,10 +109,8 @@ BEGIN
     WHERE
         GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
         AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
-        AND GrainIdN0 = _GrainIdN0 AND _GrainIdN0 IS NOT NULL
-        AND GrainIdN1 = _GrainIdN1 AND _GrainIdN1 IS NOT NULL
+        AND GrainIdKey = GrainIdKey AND GrainIdKey IS NOT NULL
         AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
-        AND ((_GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = _GrainIdExtensionString) OR _GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = _GrainStateVersion AND _GrainStateVersion IS NOT NULL
         LIMIT 1;
@@ -134,11 +128,9 @@ DELIMITER $$
 CREATE PROCEDURE WriteToStorage
 (
     in _GrainIdHash INT,
-    in _GrainIdN0 BIGINT,
-    in _GrainIdN1 BIGINT,
+    in _GrainIdKey NVARCHAR(512),
     in _GrainTypeHash INT,
     in _GrainTypeString NVARCHAR(512),
-    in _GrainIdExtensionString NVARCHAR(512),
     in _ServiceId NVARCHAR(150),
     in _GrainStateVersion INT,
     in _PayloadBinary BLOB
@@ -183,10 +175,8 @@ BEGIN
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
             AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
-            AND GrainIdN0 = _GrainIdN0 AND _GrainIdN0 IS NOT NULL
-            AND GrainIdN1 = _GrainIdN1 AND _GrainIdN1 IS NOT NULL
+            AND GrainIdKey = GrainIdKey AND GrainIdKey IS NOT NULL
             AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
-            AND ((_GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = _GrainIdExtensionString) OR _GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
             AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
             AND Version IS NOT NULL AND Version = _GrainStateVersion AND _GrainStateVersion IS NOT NULL
             LIMIT 1;
@@ -205,11 +195,9 @@ BEGIN
         INSERT INTO OrleansStorage
         (
             GrainIdHash,
-            GrainIdN0,
-            GrainIdN1,
+            GrainIdKey,
             GrainTypeHash,
             GrainTypeString,
-            GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
             ModifiedOn,
@@ -217,11 +205,9 @@ BEGIN
         )
         SELECT * FROM ( SELECT
             _GrainIdHash,
-            _GrainIdN0,
-            _GrainIdN1,
+            _GrainIdKey,
             _GrainTypeHash,
             _GrainTypeString,
-            _GrainIdExtensionString,
             _ServiceId,
             _PayloadBinary,
             UTC_TIMESTAMP(),
@@ -234,10 +220,8 @@ BEGIN
             WHERE
                 GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
                 AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
-                AND GrainIdN0 = _GrainIdN0 AND _GrainIdN0 IS NOT NULL
-                AND GrainIdN1 = _GrainIdN1 AND _GrainIdN1 IS NOT NULL
+                AND GrainIdKey = GrainIdKey AND GrainIdKey IS NOT NULL
                 AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
-                AND ((_GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = _GrainIdExtensionString) OR _GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
                 AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
         ) LIMIT 1;
 
@@ -266,10 +250,8 @@ VALUES
     WHERE
         GrainIdHash = @GrainIdHash
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-        AND GrainIdN0 = @GrainIdN0 AND @GrainIdN0 IS NOT NULL
-        AND GrainIdN1 = @GrainIdN1 AND @GrainIdN1 IS NOT NULL
+        AND GrainIdKey = @GrainIdKey AND @GrainIdKey IS NOT NULL
         AND GrainTypeString = @GrainTypeString AND GrainTypeString IS NOT NULL
-        AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         LIMIT 1;'
 );
@@ -278,12 +260,12 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'WriteToStorageKey','
-    call WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary);'
+    call WriteToStorage(@GrainIdHash, @GrainIdKey, @GrainTypeHash, @GrainTypeString, @ServiceId, @GrainStateVersion, @PayloadBinary);'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'ClearStorageKey','
-    call ClearStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion);'
+    call ClearStorage(@GrainIdHash, @GrainIdKey, @GrainTypeHash, @GrainTypeString, @ServiceId, @GrainStateVersion);'
 );

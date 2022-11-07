@@ -52,15 +52,13 @@ CREATE TABLE "ORLEANSSTORAGE"
     -- The mapping is done in the code. The
     -- *String columns contain the corresponding clear name fields.
     --
-    -- If there are duplicates, they are resolved by using GrainIdN0,
-    -- GrainIdN1, GrainIdExtensionString and GrainTypeString fields.
+    -- If there are duplicates, they are resolved by using GrainIdKey,
+    -- and GrainTypeString fields.
     -- It is assumed these would be rarely needed.
     "GRAINIDHASH" NUMBER(*,0) NOT NULL ENABLE,
-    "GRAINIDN0" NUMBER(19,0) NOT NULL ENABLE,
-    "GRAINIDN1" NUMBER(19,0) NOT NULL ENABLE,
+    "GRAINIDKEY" NVARCHAR2(512) NOT NULL ENABLE,
     "GRAINTYPEHASH" NUMBER(*,0) NOT NULL ENABLE,
     "GRAINTYPESTRING" NVARCHAR2(512) NOT NULL ENABLE,
-    "GRAINIDEXTENSIONSTRING" NVARCHAR2(512),
     "SERVICEID" NVARCHAR2(150) NOT NULL ENABLE,
 
     -- Payload
@@ -80,8 +78,8 @@ CREATE INDEX "IX_ORLEANSSTORAGE" ON "ORLEANSSTORAGE" ("GRAINIDHASH", "GRAINTYPEH
 COMPRESS;
 /
 
-CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
-                                             PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB)
+CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDKEY IN NVARCHAR2, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
+                                             PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB)
   RETURN NUMBER IS
   rowcount NUMBER;
   newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
@@ -115,10 +113,8 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         WHERE
             GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
             AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
-            AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
-            AND (GrainIdN1 = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
+            AND GrainIdKey = PARAM_GRAINIDKEY OR PARAM_GRAINIDKEY IS NOT NULL
             AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
-            AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
             AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
             AND Version IS NOT NULL AND Version = PARAM_GRAINSTATEVERSION AND PARAM_GRAINSTATEVERSION IS NOT NULL
     RETURNING Version INTO newGrainStateVersion;
@@ -137,11 +133,9 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         INSERT INTO OrleansStorage
         (
             GrainIdHash,
-            GrainIdN0,
-            GrainIdN1,
+            GrainIdKey,
             GrainTypeHash,
             GrainTypeString,
-            GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
             ModifiedOn,
@@ -149,11 +143,9 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         )
         SELECT
             PARAM_GRAINIDHASH,
-            PARAM_GRAINIDN0,
-            PARAM_GRAINIDN1,
+            PARAM_GRAINIDKEY,
             PARAM_GRAINTYPEHASH,
             PARAM_GRAINTYPESTRING,
-            PARAM_GRAINIDEXTENSIONSTRING,
             PARAM_SERVICEID,
             PARAM_PAYLOADBINARY,
             sys_extract_utc(systimestamp),
@@ -166,10 +158,8 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
             WHERE
                 GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
                 AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
-                AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
-                AND (GrainIdN1 = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
+                AND GrainIdKey = PARAM_GRAINIDKEY AND PARAM_GRAINIDKEY IS NOT NULL
                 AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
-                AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
                 AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
          );
 
@@ -184,8 +174,8 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
   END;
 /
 
-CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
-                                             PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER)
+CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDKEY IN NVARCHAR2, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
+                                             PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER)
   RETURN NUMBER IS
   rowcount NUMBER;
   newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
@@ -198,10 +188,8 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
         Version = Version + 1
     WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
       AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
-      AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
-      AND (GrainIdN1  = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
+      AND GrainIdKey = PARAM_GRAINIDKEY AND PARAM_GRAINIDKEY IS NOT NULL
       AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
-      AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
       AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
       AND Version IS NOT NULL AND Version = PARAM_GRAINSTATEVERSION AND PARAM_GRAINSTATEVERSION IS NOT NULL
     RETURNING Version INTO newGrainStateVersion;
@@ -215,8 +203,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'WriteToStorageKey','
-  SELECT WriteToStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
-                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion, :PayloadBinary)
+  SELECT WriteToStorage(:GrainIdHash, :GrainIdKey, :GrainTypeHash, :GrainTypeString,
+                                             :ServiceId, :GrainStateVersion, :PayloadBinary)
                                              AS NewGrainStateVersion FROM DUAL
 ');
 /
@@ -225,8 +213,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'ClearStorageKey',
-    'SELECT ClearStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
-                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
+    'SELECT ClearStorage(:GrainIdHash, :GrainIdKey, :GrainTypeHash, :GrainTypeString,
+                                             :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
 );
 /
 
@@ -238,11 +226,9 @@ VALUES
      SELECT PayloadBinary, Version
      FROM OrleansStorage
      WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
-       AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
-       AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
+       AND GrainIdKey = :GrainIdKey AND :GrainIdKey IS NOT NULL
        AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
        AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
-       AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
        AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL'
 );
 /
