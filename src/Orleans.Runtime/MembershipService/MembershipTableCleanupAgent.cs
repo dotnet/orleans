@@ -70,7 +70,7 @@ namespace Orleans.Runtime.MembershipService
                         var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
                         await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
                     }
-                    catch (Exception exception) when (exception is NotImplementedException || exception is MissingMethodException)
+                    catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
                     {
                         this.cleanupDefunctSilosTimer.Dispose();
                         this.log.LogWarning(

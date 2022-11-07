@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         private readonly string name;
         private readonly ILogger log;
         private DateTime lastFired = DateTime.MinValue;
-        private DateTime? expected;
+        private DateTime expected;
 
         public AsyncTimer(TimeSpan period, string name, ILogger log)
         {
@@ -36,22 +36,12 @@ namespace Orleans.Runtime
             if (cancellation.IsCancellationRequested) return false;
 
             var start = DateTime.UtcNow;
-            TimeSpan delay;
-            if (overrideDelay.HasValue)
+            var delay = overrideDelay switch
             {
-                delay = overrideDelay.Value;
-            }
-            else
-            {
-                if (this.lastFired == DateTime.MinValue)
-                {
-                    delay = this.period;
-                }
-                else
-                {
-                    delay = this.lastFired.Add(this.period).Subtract(start);
-                }
-            }
+                { } value => value,
+                _ when lastFired == DateTime.MinValue => period,
+                _ => lastFired.Add(period).Subtract(start)
+            };
 
             if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
 
@@ -68,6 +58,7 @@ namespace Orleans.Runtime
                     if (task2.IsCanceled)
                     {
                         await Task.Yield();
+                        expected = default;
                         return false;
                     }
                 }
@@ -76,6 +67,7 @@ namespace Orleans.Runtime
                 if (task.IsCanceled)
                 {
                     await Task.Yield();
+                    expected = default;
                     return false;
                 }
             }
@@ -91,12 +83,13 @@ namespace Orleans.Runtime
                     overshoot);
             }
 
+            expected = default;
             return true;
         }
 
         private static TimeSpan GetOvershootDelay(DateTime now, DateTime dueTime)
         {
-            if (dueTime == DateTime.MinValue) return TimeSpan.Zero;
+            if (dueTime == default) return TimeSpan.Zero;
             if (dueTime > now) return TimeSpan.Zero;
 
             var overshoot = now.Subtract(dueTime);
@@ -108,11 +101,11 @@ namespace Orleans.Runtime
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
             var now = DateTime.UtcNow;
-            var dueTime = this.expected.GetValueOrDefault();
-            var overshoot = GetOvershootDelay(now, dueTime);
+            var due = this.expected;
+            var overshoot = GetOvershootDelay(now, due);
             if (overshoot > TimeSpan.Zero)
             {
-                reason = $"{this.name} timer should have fired at {dueTime}, which is {overshoot} ago";
+                reason = $"{this.name} timer should have fired at {due}, which is {overshoot} ago";
                 return false;
             }
 
