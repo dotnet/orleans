@@ -105,13 +105,13 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
-        protected virtual async Task RunInternal()
+        protected virtual Task RunInternal()
         {
             _transport = this.Context.Transport;
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
             _initializationTcs.TrySetResult(0);
-            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            return Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
 
         /// <summary>

@@ -1,7 +1,14 @@
 using System;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Orleans.Serialization.Activators;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Invocation
 {
@@ -131,7 +138,7 @@ namespace Orleans.Serialization.Invocation
     /// A <see cref="Response"/> which represents a typed value.
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
-    [GenerateSerializer, UseActivator, SuppressReferenceTracking]
+    [UseActivator, SuppressReferenceTracking]
     public sealed class Response<TResult> : Response
     {
         [Id(0)]
@@ -168,6 +175,101 @@ namespace Orleans.Serialization.Invocation
         }
 
         public override string ToString() => _result is { } r ? r.ToString() : "[null]";
+    }
+
+    /// <summary>
+    /// Supports raw serialization of <see cref="Response{TResult}"/> values.
+    /// </summary>
+    public abstract class ResponseCodec
+    {
+        public abstract void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte>;
+        public abstract object ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field);
+    }
+
+    [RegisterSerializer]
+    internal sealed class PooledResponseCodec<TResult> : ResponseCodec, IFieldCodec<Response<TResult>>
+    {
+        private readonly Type _codecFieldType = typeof(Response<TResult>);
+        private readonly Type _resultType = typeof(TResult);
+        private readonly IFieldCodec<TResult> _codec;
+
+        public PooledResponseCodec(ICodecProvider codecProvider)
+            => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(this, codecProvider);
+
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
+            if (value.TypedResult is not null)
+                _codec.WriteField(ref writer, 0, _resultType, value.TypedResult);
+            writer.WriteEndObject();
+        }
+
+        public Response<TResult> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (field.IsReference)
+                return ReferenceCodec.ReadReference<Response<TResult>, TInput>(ref reader, field);
+
+            field.EnsureWireTypeTagDelimited();
+            ReferenceCodec.MarkValueField(reader.Session);
+            var result = ResponsePool.Get<TResult>();
+            reader.ReadFieldHeader(ref field);
+            if (!field.IsEndBaseOrEndObject)
+            {
+                result.TypedResult = _codec.ReadValue(ref reader, field);
+                reader.ReadFieldHeader(ref field);
+                OrleansGeneratedCodeHelper.ConsumeEndBaseOrEndObject(ref reader, ref field);
+            }
+            return result;
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
+        {
+            writer.WriteStartObject(0, null, _resultType);
+            var holder = (Response<TResult>)value;
+            if (holder.TypedResult is not null)
+                _codec.WriteField(ref writer, 0, _resultType, holder.TypedResult);
+            writer.WriteEndObject();
+        }
+
+        public override object ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = ResponsePool.Get<TResult>();
+            reader.ReadFieldHeader(ref field);
+            if (!field.IsEndBaseOrEndObject)
+            {
+                result.TypedResult = _codec.ReadValue(ref reader, field);
+                reader.ReadFieldHeader(ref field);
+                OrleansGeneratedCodeHelper.ConsumeEndBaseOrEndObject(ref reader, ref field);
+            }
+            return result;
+        }
+    }
+
+    [RegisterCopier]
+    internal sealed class PooledResponseCopier<TResult> : IDeepCopier<Response<TResult>>
+    {
+        private readonly IDeepCopier<TResult> _copier;
+
+        public PooledResponseCopier(ICodecProvider codecProvider)
+            => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(this, codecProvider);
+
+        public Response<TResult> DeepCopy(Response<TResult> input, CopyContext context)
+        {
+            if (input is null)
+                return null;
+
+            var result = ResponsePool.Get<TResult>();
+            result.TypedResult = _copier.DeepCopy(input.TypedResult, context);
+            return result;
+        }
     }
 
     [RegisterActivator]

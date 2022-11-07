@@ -3,21 +3,18 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
-using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Orleans.Serialization.WireProtocol;
 using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
@@ -26,7 +23,7 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
-        private static readonly ConcurrentDictionary<Type, IFieldCodec> _rawResponseCodecs = new();
+        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddress> _activationAddressCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
@@ -131,13 +128,37 @@ namespace Orleans.Runtime.Messaging
         {
             var field = reader.ReadFieldHeader();
 
-            var bodyCodec = _codecProvider.GetCodec(field.FieldType);
-            message.BodyObject = bodyCodec.ReadValue(ref reader, field);
+            if (message.Result == ResponseTypes.Success)
+            {
+                message.Result = ResponseTypes.None; // reset raw response indicator
+                if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
+                    rawCodec = GetRawCodec(field.FieldType);
+                message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
+            }
+            else
+            {
+                var bodyCodec = _codecProvider.GetCodec(field.FieldType);
+                message.BodyObject = bodyCodec.ReadValue(ref reader, field);
+            }
+        }
+
+        private ResponseCodec GetRawCodec(Type fieldType)
+        {
+            var rawCodec = (ResponseCodec)_codecProvider.GetCodec(typeof(Response<>).MakeGenericType(fieldType));
+            _rawResponseCodecs.Add(fieldType, rawCodec);
+            return rawCodec;
         }
 
         public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var headers = message.Headers;
+            var bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
+            ResponseCodec? rawCodec = null;
+            if (headers.ResponseType is ResponseTypes.None && (rawCodec = bodyCodec as ResponseCodec) != null)
+            {
+                headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
+            }
+
             try
             {
                 if (_bufferWriter is not PrefixingBufferWriter<byte, TBufferWriter> bufferWriter)
@@ -159,9 +180,9 @@ namespace Orleans.Runtime.Messaging
 
                 if (message.BodyObject is not null)
                 {
-                    var bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
                     var bodyWriter = Writer.Create(buffer, _serializationSession);
-                    bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref bodyWriter, message.BodyObject);
+                    else bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
                     bodyWriter.Commit();
                 }
 
@@ -396,7 +417,5 @@ namespace Orleans.Runtime.Messaging
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
         }
-
-        private static void ThrowEndObjectExpected() => throw new UnsupportedWireTypeException($"Expected a {nameof(ExtendedWireType.EndTagDelimited)} field");
     }
 }
