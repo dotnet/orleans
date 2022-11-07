@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             // Indicate that there is a waiter.
             var status = Interlocked.Or(ref _status, WaitingFlag);
 
-            // If there was already a waiter, that is a catastrophic error since this class is designed for use with a single waiter.
+            // If there was already a waiter, that is an error since this class is designed for use with a single waiter.
             if ((status & WaitingFlag) == WaitingFlag)
             {
                 ThrowConcurrentWaitersNotSupported();
@@ -84,7 +84,7 @@ namespace Orleans.Runtime
             if ((status & SignaledFlag) == SignaledFlag)
             {
                 // Reset just the status because the _waitSource has not been set.
-                // We know this _waitSource has not been set because _waitSource is only set when
+                // We know that _waitSource has not been set because _waitSource is only set when
                 // Signal() observes that the "Waiting" flag had been set but not the "Signaled" flag.
                 ResetStatus();
                 return default;
