@@ -8,19 +8,19 @@ using System.Threading.Tasks.Sources;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Represents a synchronization event that, when signalled, resets automatically after releasing a single waiter.
+    /// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.
     /// This type supports concurrent signallers but only a single waiter.
     /// </summary>
     internal sealed class SingleWaiterAutoResetEvent : IValueTaskSource
     {
-        // Signalled indicates that the event has been signalled and not yet reset.
-        private const uint SignalledFlag = 1;
+        // Signaled indicates that the event has been signaled and not yet reset.
+        private const uint SignaledFlag = 1;
 
-        // Waiting indicates that a waiter is present and waiting for the event to be signalled.
+        // Waiting indicates that a waiter is present and waiting for the event to be signaled.
         private const uint WaitingFlag = 1 << 1;
 
         // ResetMask is used to clear both status flags.
-        private const uint ResetMask = ~SignalledFlag & ~WaitingFlag;
+        private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
 
         private ManualResetValueTaskSourceCore<bool> _waitSource;
         private volatile uint _status;
@@ -51,22 +51,22 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Signal()
         {
-            // Set the signalled flag.
-            var status = Interlocked.Or(ref _status, SignalledFlag);
+            // Set the signaled flag.
+            var status = Interlocked.Or(ref _status, SignaledFlag);
 
-            // If there was a waiter and the signalled flag was unset, wake the waiter now.
-            if ((status & SignalledFlag) != SignalledFlag && (status & WaitingFlag) == WaitingFlag)
+            // If there was a waiter and the signaled flag was unset, wake the waiter now.
+            if ((status & SignaledFlag) != SignaledFlag && (status & WaitingFlag) == WaitingFlag)
             {
                 // Note that in this assert we are checking the volatile _status field.
                 // This is a sanity check to ensure that the signalling conditions are true:
-                // that "Signalled" and "Waiting" flags are both set.
-                Debug.Assert((_status & (SignalledFlag | WaitingFlag)) == (SignalledFlag | WaitingFlag));
+                // that "Signaled" and "Waiting" flags are both set.
+                Debug.Assert((_status & (SignaledFlag | WaitingFlag)) == (SignaledFlag | WaitingFlag));
                 _waitSource.SetResult(true);
             }
         }
 
         /// <summary>
-        /// Wait for the event to be signalled.
+        /// Wait for the event to be signaled.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask WaitAsync()
@@ -80,12 +80,12 @@ namespace Orleans.Runtime
                 ThrowConcurrencyViolation();
             }
 
-            // If the event was already signalled, immediately wake the waiter.
-            if ((status & SignalledFlag) == SignalledFlag)
+            // If the event was already signaled, immediately wake the waiter.
+            if ((status & SignaledFlag) == SignaledFlag)
             {
                 // Reset just the status because the _waitSource has not been set.
                 // We know this _waitSource has not been set because _waitSource is only set when
-                // Signal() observes that the "Waiting" flag had been set but not the "Signalled" flag.
+                // Signal() observes that the "Waiting" flag had been set but not the "Signaled" flag.
                 ResetStatus();
                 return default;
             }
@@ -99,12 +99,12 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResetStatus()
         {
-            // The event is being handled, so clear the "Signalled" flag now.
+            // The event is being handled, so clear the "Signaled" flag now.
             // The waiter is no longer waiting, so clear the "Waiting" flag, too.
             var status = Interlocked.And(ref _status, ResetMask);
 
-            // If both the "Waiting" and "Signalled" flags were not already set, something has gone catastrophically wrong.
-            Debug.Assert((status & (WaitingFlag | SignalledFlag)) != (WaitingFlag | SignalledFlag));
+            // If both the "Waiting" and "Signaled" flags were not already set, something has gone catastrophically wrong.
+            Debug.Assert((status & (WaitingFlag | SignaledFlag)) != (WaitingFlag | SignaledFlag));
         }
 
         private static void ThrowConcurrencyViolation() => throw new InvalidOperationException("Concurrent use is not supported");
