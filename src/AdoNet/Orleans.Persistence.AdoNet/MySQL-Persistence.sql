@@ -175,7 +175,7 @@ BEGIN
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
             AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
-            AND GrainIdKey = GrainIdKey AND GrainIdKey IS NOT NULL
+            AND GrainIdKey = _GrainIdKey AND _GrainIdKey IS NOT NULL
             AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
             AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
             AND Version IS NOT NULL AND Version = _GrainStateVersion AND _GrainStateVersion IS NOT NULL
@@ -220,7 +220,7 @@ BEGIN
             WHERE
                 GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
                 AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
-                AND GrainIdKey = GrainIdKey AND GrainIdKey IS NOT NULL
+                AND GrainIdKey = _GrainIdKey AND _GrainIdKey IS NOT NULL
                 AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
                 AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
         ) LIMIT 1;
