@@ -65,6 +65,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
@@ -103,6 +104,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
@@ -138,6 +140,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
@@ -173,6 +176,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-azure-storage:
     if: ${{ false }}
     name: Azure Storage provider tests
@@ -210,6 +214,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
@@ -244,6 +249,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
@@ -275,6 +281,7 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
@@ -314,3 +321,4 @@ jobs:
         retention-days: 5
         path: |
           **/TestResults/*
+          **/logs/*
