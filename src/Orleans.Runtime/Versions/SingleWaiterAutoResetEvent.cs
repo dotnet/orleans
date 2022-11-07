@@ -104,7 +104,7 @@ namespace Orleans.Runtime
             var status = Interlocked.And(ref _status, ResetMask);
 
             // If both the "Waiting" and "Signaled" flags were not already set, something has gone catastrophically wrong.
-            Debug.Assert((status & (WaitingFlag | SignaledFlag)) != (WaitingFlag | SignaledFlag));
+            Debug.Assert((status & (WaitingFlag | SignaledFlag)) == (WaitingFlag | SignaledFlag));
         }
 
         private static void ThrowConcurrentWaitersNotSupported() => throw new InvalidOperationException("Concurrent waiters are not supported");
