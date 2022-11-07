@@ -77,7 +77,7 @@ namespace Orleans.Runtime
             // If there was already a waiter, that is a catastrophic error since this class is designed for use with a single waiter.
             if ((status & WaitingFlag) == WaitingFlag)
             {
-                ThrowConcurrencyViolation();
+                ThrowConcurrentWaitersNotSupported();
             }
 
             // If the event was already signaled, immediately wake the waiter.
@@ -107,6 +107,6 @@ namespace Orleans.Runtime
             Debug.Assert((status & (WaitingFlag | SignaledFlag)) != (WaitingFlag | SignaledFlag));
         }
 
-        private static void ThrowConcurrencyViolation() => throw new InvalidOperationException("Concurrent use is not supported");
+        private static void ThrowConcurrentWaitersNotSupported() => throw new InvalidOperationException("Concurrent waiters are not supported");
     }
 }
