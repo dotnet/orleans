@@ -31,8 +31,6 @@ jobs:
         retention-days: 5
         path: |
           **/*.binlog
-          **/*.log
-          **/*.dmp
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
@@ -59,7 +57,9 @@ jobs:
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -95,7 +95,9 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -128,7 +130,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -161,7 +165,9 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -196,7 +202,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -228,7 +236,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -257,7 +267,9 @@ jobs:
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
@@ -294,7 +306,9 @@ jobs:
         ORLEANSDYNAMODBACCESSKEY: "root"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBSECRETKEY: "pass"
-    - uses: actions/upload-artifact@v3
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
       with:
         name: test_output
         retention-days: 5
