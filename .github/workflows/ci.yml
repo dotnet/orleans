@@ -27,7 +27,7 @@ jobs:
       run: dotnet build
     - uses: actions/upload-artifact@v3
       with:
-        name: test_output
+        name: build_output
         retention-days: 5
         path: |
           **/*.binlog
@@ -64,8 +64,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
@@ -101,8 +100,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
@@ -135,8 +133,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
@@ -169,8 +166,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-azure-storage:
     if: ${{ false }}
     name: Azure Storage provider tests
@@ -205,8 +201,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
@@ -238,8 +233,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
@@ -268,8 +262,7 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
@@ -306,5 +299,4 @@ jobs:
         name: test_output
         retention-days: 5
         path: |
-          **/*.log
-          **/*.dmp
+          **/TestResults/*
