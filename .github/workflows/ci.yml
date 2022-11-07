@@ -28,7 +28,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: build_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/*.binlog
   test-redis:
@@ -62,7 +62,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -101,7 +101,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -137,7 +137,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -173,7 +173,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -211,7 +211,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -246,7 +246,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -278,7 +278,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
@@ -318,7 +318,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: test_output
-        retention-days: 5
+        retention-days: 1
         path: |
           **/TestResults/*
           **/logs/*
