@@ -152,11 +152,16 @@ namespace Orleans.Runtime.Messaging
         public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var headers = message.Headers;
-            var bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
+            IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (headers.ResponseType is ResponseTypes.None && (rawCodec = bodyCodec as ResponseCodec) != null)
+            if (message.BodyObject is not null)
             {
-                headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
+                bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
+                if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
+                {
+                    rawCodec = responseCodec;
+                    headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
+                }
             }
 
             try
@@ -182,7 +187,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     var bodyWriter = Writer.Create(buffer, _serializationSession);
                     if (rawCodec != null) rawCodec.WriteRaw(ref bodyWriter, message.BodyObject);
-                    else bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
+                    else bodyCodec!.WriteField(ref bodyWriter, 0, null, message.BodyObject);
                     bodyWriter.Commit();
                 }
 
