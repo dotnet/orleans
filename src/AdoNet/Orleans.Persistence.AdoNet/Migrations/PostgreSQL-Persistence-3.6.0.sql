@@ -18,9 +18,7 @@ CREATE OR REPLACE FUNCTION writetostorage(
     _grainidextensionstring character varying,
     _serviceid character varying,
     _grainstateversion integer,
-    _payloadbinary bytea,
-    _payloadjson text,
-    _payloadxml xml)
+    _payloadbinary bytea)
     RETURNS TABLE(newgrainstateversion integer)
     LANGUAGE 'plpgsql'
 AS $function$
@@ -53,8 +51,6 @@ AS $function$
         UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
-            PayloadJson = _PayloadJson,
-            PayloadXml = _PayloadXml,
             ModifiedOn = (now() at time zone 'utc'),
             Version = Version + 1
 
@@ -89,8 +85,6 @@ AS $function$
             GrainIdExtensionString,
             ServiceId,
             PayloadBinary,
-            PayloadJson,
-            PayloadXml,
             ModifiedOn,
             Version
         )
@@ -103,8 +97,6 @@ AS $function$
             _GrainIdExtensionString,
             _ServiceId,
             _PayloadBinary,
-            _PayloadJson,
-            _PayloadXml,
            now(),
             1
         WHERE NOT EXISTS

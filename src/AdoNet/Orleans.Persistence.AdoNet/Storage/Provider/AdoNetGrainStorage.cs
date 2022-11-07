@@ -73,7 +73,7 @@ namespace Orleans.Storage
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
     public class AdoNetGrainStorage: IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private Serializer serializer;
+        public IGrainStorageSerializer Serializer { get; set; }
 
         /// <summary>
         /// Tag for BinaryFormatSerializer
@@ -118,15 +118,6 @@ namespace Orleans.Storage
         public RelationalStorageProviderQueries CurrentOperationalQueries { get; set; }
 
         /// <summary>
-        /// A strategy to pick a serializer or a deserializer for storage operations. This can be used to:
-        /// 1) Add a custom serializer or deserializer for use in storage provider operations.
-        /// 2) In combination with serializer or deserializer to update stored object version.
-        /// 3) Per-grain storage format selection
-        /// 4) Switch storage format first by reading using the save format and then writing in the new format.
-        /// </summary>
-        public IStorageSerializationPicker StorageSerializationPicker { get; set; }
-
-        /// <summary>
         /// The hash generator used to hash natural keys, grain ID and grain type to a more narrow index.
         /// </summary>
         public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
@@ -147,6 +138,7 @@ namespace Orleans.Storage
             this.name = name;
             this.logger = logger;
             this.serviceId = clusterOptions.Value.ServiceId;
+            this.Serializer = options.Value.GrainStorageSerializer;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -251,91 +243,36 @@ namespace Orleans.Storage
 
             try
             {
-                SerializationChoice choice =StorageSerializationPicker.PickDeserializer(serviceId, this.name, baseGrainType, grainReference, grainState, null);
-                if(choice.Deserializer == null)
-                {
-                    var errorString = $"No deserializer found: ServiceId={serviceId} ProviderName={name} GrainType={baseGrainType} GrainId={grainId} ETag={grainState.ETag}.";
-                    logger.LogError((int)RelationalStorageProviderCodes.RelationalProviderNoDeserializer, errorString);
-                    throw new InvalidOperationException(errorString);
-                }
-
-                var commandBehavior = choice.PreferStreaming ? CommandBehavior.SequentialAccess : CommandBehavior.Default;
+                var commandBehavior = CommandBehavior.Default;
                 var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
                 var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
-                var readRecords = (await Storage.ReadAsync(CurrentOperationalQueries.ReadFromStorage, (command =>
-                {
-                    command.AddParameter("GrainIdHash", grainIdHash);
-                    command.AddParameter("GrainIdN0", grainId.N0Key);
-                    command.AddParameter("GrainIdN1", grainId.N1Key);
-                    command.AddParameter("GrainTypeHash", grainTypeHash);
-                    command.AddParameter("GrainTypeString", baseGrainType);
-                    command.AddParameter("GrainIdExtensionString", grainId.StringKey);
-                    command.AddParameter("ServiceId", serviceId);
-                }), async (selector, resultSetCount, token) =>
-                {
-                    object storageState = null;
-                    int? version;
-                    if(choice.PreferStreaming)
+                var readRecords = (await Storage.ReadAsync(
+                    CurrentOperationalQueries.ReadFromStorage,
+                    command =>
                     {
-                        //When streaming via ADO.NET, using CommandBehavior.SequentialAccess, the order of
-                        //the columns on how they are read needs to be exactly this.
-                        const int binaryColumnPositionInSelect = 0;
-                        const int xmlColumnPositionInSelect = 1;
-                        const int jsonColumnPositionInSelect = 2;
-                        var streamSelector = (DbDataReader)selector;
-                        if(!(await streamSelector.IsDBNullAsync(binaryColumnPositionInSelect)))
-                        {
-                            using(var downloadStream = streamSelector.GetStream(binaryColumnPositionInSelect, Storage))
-                            {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
-                            }
-                        }
-
-                        if(!(await streamSelector.IsDBNullAsync(xmlColumnPositionInSelect)))
-                        {
-                            using(var downloadStream = streamSelector.GetTextReader(xmlColumnPositionInSelect))
-                            {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
-                            }
-                        }
-
-                        if(!(await streamSelector.IsDBNullAsync(jsonColumnPositionInSelect)))
-                        {
-                            using(var downloadStream = streamSelector.GetTextReader(jsonColumnPositionInSelect))
-                            {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, typeof(T));
-                            }
-                        }
-
-                        version = await streamSelector.GetValueAsync<int?>("Version");
-                    }
-                    else
+                        command.AddParameter("GrainIdHash", grainIdHash);
+                        command.AddParameter("GrainIdN0", grainId.N0Key);
+                        command.AddParameter("GrainIdN1", grainId.N1Key);
+                        command.AddParameter("GrainTypeHash", grainTypeHash);
+                        command.AddParameter("GrainTypeString", baseGrainType);
+                        command.AddParameter("GrainIdExtensionString", grainId.StringKey);
+                        command.AddParameter("ServiceId", serviceId);
+                    },
+                    (selector, resultSetCount, token) =>
                     {
-                        //All but one of these should be null. All will be read and an appropriate deserializer picked.
-                        //NOTE: When streaming will be implemented, it is worthwhile to optimize this so that the defined
-                        //serializer will be picked and then streaming tried according to its tag.
-                        object payload;
+                        object storageState = null;
+                        int? version;
+                        byte[] payload;
                         payload = selector.GetValueOrDefault<byte[]>("PayloadBinary");
-                        if(payload == null)
+                        if (payload != null)
                         {
-                            payload = selector.GetValueOrDefault<string>("PayloadXml");
+                            storageState = Serializer.Deserialize<T>(new BinaryData(payload));
                         }
-
-                        if(payload == null)
-                        {
-                            payload = selector.GetValueOrDefault<string>("PayloadJson");
-                        }
-
-                        if(payload != null)
-                        {
-                            storageState = choice.Deserializer.Deserialize(payload, typeof(T));
-                        }
-
                         version = selector.GetNullableInt32("Version");
-                    }
-
-                    return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
-                }, CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
+                        var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
+                        return Task.FromResult(result);
+                    },
+                    CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
 
                 T state = readRecords != null ? (T) readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
@@ -412,6 +349,8 @@ namespace Orleans.Storage
                 var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var writeRecord = await Storage.ReadAsync(CurrentOperationalQueries.WriteToStorage, command =>
                 {
+                    var serialized = this.Serializer.Serialize<T>(grainState.State);
+
                     command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
                     command.AddParameter("GrainIdN1", grainId.N1Key);
@@ -420,11 +359,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
-
-                    SerializationChoice serializer = StorageSerializationPicker.PickSerializer(serviceId, this.name, baseGrainType, grainReference, grainState);
-                    command.AddParameter("PayloadBinary", (byte[])(serializer.Serializer.Tag == BinaryFormatSerializerTag ? serializer.Serializer.Serialize(data) : null));
-                    command.AddParameter("PayloadJson", (string)(serializer.Serializer.Tag == JsonFormatSerializerTag ? serializer.Serializer.Serialize(data) : null));
-                    command.AddParameter("PayloadXml", (string)(serializer.Serializer.Tag == XmlFormatSerializerTag ? serializer.Serializer.Serialize(data) : null));
+                    command.AddParameter("PayloadBinary", serialized.ToArray());
                 }, (selector, resultSetCount, token) =>
                 { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
@@ -470,13 +405,6 @@ namespace Orleans.Storage
         /// <summary> Initialization function for this storage provider. </summary>
         private async Task Init(CancellationToken cancellationToken)
         {
-            this.serializer = providerRuntime.ServiceProvider.GetRequiredService<Serializer>();
-
-            //NOTE: StorageSerializationPicker should be defined outside and given as a parameter in constructor or via Init in IProviderConfiguration perhaps.
-            //Currently this limits one's options to much to the current situation of providing only one serializer for serialization and deserialization
-            //with no regard to state update or serializer changes. Maybe have this serialized as a JSON in props and read via a key?
-            StorageSerializationPicker = new DefaultRelationalStoragePicker(this.ConfigureDeserializers(options, providerRuntime), this.ConfigureSerializers(options, providerRuntime));
-
             Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString);
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
@@ -617,55 +545,6 @@ namespace Orleans.Storage
 
                 return 0;
             }
-        }
-
-        private ICollection<IStorageDeserializer> ConfigureDeserializers(AdoNetGrainStorageOptions options, IProviderRuntime providerRuntime)
-        {
-            var deserializers = new List<IStorageDeserializer>();
-            if(options.UseJsonFormat)
-            {
-                var jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(OrleansJsonSerializerSettings.GetDefaultSerializerSettings(providerRuntime.ServiceProvider), options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
-                options.ConfigureJsonSerializerSettings?.Invoke(jsonSettings);
-
-                deserializers.Add(new OrleansStorageDefaultJsonDeserializer(jsonSettings, JsonFormatSerializerTag));
-            }
-
-            if(options.UseXmlFormat)
-            {
-                deserializers.Add(new OrleansStorageDefaultXmlDeserializer(XmlFormatSerializerTag));
-            }
-            //if none are set true, configure binary format serializer by default
-            if(!options.UseXmlFormat && !options.UseJsonFormat)
-            {
-                deserializers.Add(new OrleansStorageDefaultBinaryDeserializer(this.serializer, BinaryFormatSerializerTag));
-            }
-
-            return deserializers;
-        }
-
-
-        private ICollection<IStorageSerializer> ConfigureSerializers(AdoNetGrainStorageOptions options, IProviderRuntime providerRuntime)
-        {
-            var serializers = new List<IStorageSerializer>();
-            if(options.UseJsonFormat)
-            {
-                var jsonSettings = OrleansJsonSerializerSettings.UpdateSerializerSettings(OrleansJsonSerializerSettings.GetDefaultSerializerSettings(providerRuntime.ServiceProvider),
-                    options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
-                options.ConfigureJsonSerializerSettings?.Invoke(jsonSettings);
-                serializers.Add(new OrleansStorageDefaultJsonSerializer(jsonSettings, JsonFormatSerializerTag));
-            }
-            if(options.UseXmlFormat)
-            {
-                serializers.Add(new OrleansStorageDefaultXmlSerializer(XmlFormatSerializerTag));
-            }
-
-            //if none are set true, configure binary format serializer by default
-            if (!options.UseXmlFormat && !options.UseJsonFormat)
-            {
-                serializers.Add(new OrleansStorageDefaultBinarySerializer(this.serializer, BinaryFormatSerializerTag));
-            }
-
-            return serializers;
         }
     }
 }

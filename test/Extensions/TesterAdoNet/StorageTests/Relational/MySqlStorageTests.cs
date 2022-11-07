@@ -65,14 +65,6 @@ namespace UnitTests.StorageTests.Relational
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
         }
 
-        [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]
-        [TestCategory("Functional")]
-        internal async Task ChangeStorageFormatFromBinaryToJson_WriteRead(int testNum)
-        {
-            var (grainType, getGrain, grainState) = StorageDataSetPlain<long>.GetTestData(testNum);
-            await this.Relational_ChangeStorageFormatFromBinaryToJsonInMemory_WriteRead(grainType, getGrain, grainState);
-        }
-
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]
         [TestCategory("Functional")]
         internal async Task DataSet2_Cyrillic_WriteClearRead(int testNum)
@@ -123,26 +115,10 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
         [TestCategory("Functional")]
-        internal async Task StorageDataSetGeneric_Xml_WriteRead(int testNum)
+        internal async Task StorageDataSetGeneric_Binary_WriteRead(int testNum)
         {
             var (grainType, getGrain, grainState) = StorageDataSetGeneric<string, string>.GetTestData(testNum);
-            await this.Relational_Xml_WriteRead(grainType, getGrain, grainState);
-        }
-
-        [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
-        [TestCategory("Functional")]
-        internal async Task StorageDataSetGenericHuge_Json_WriteReadStreaming(int testNum)
-        {
-            var (grainType, getGrain, grainState) = StorageDataSetGenericHuge<string, string>.GetTestData(testNum);
-            await this.Relational_Json_WriteReadStreaming(grainType, getGrain, grainState);
-        }
-
-        [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
-        [TestCategory("Functional")]
-        internal async Task StorageDataSetGenericHuge_Xml_WriteReadStreaming(int testNum)
-        {
-            var (grainType, getGrain, grainState) = StorageDataSetGenericHuge<string, string>.GetTestData(testNum);
-            await this.Relational_Xml_WriteReadStreaming(grainType, getGrain, grainState);
+            await this.Relational_Binary_WriteRead(grainType, getGrain, grainState);
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<Guid>))]
