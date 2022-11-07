@@ -28,6 +28,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.binlog
           **/*.log
@@ -61,6 +62,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -97,6 +99,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -130,6 +133,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -163,6 +167,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -198,6 +203,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -230,6 +236,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -259,6 +266,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
@@ -296,6 +304,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: test_output
+        retention-days: 5
         path: |
           **/*.log
           **/*.dmp
