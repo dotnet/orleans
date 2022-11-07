@@ -51,7 +51,7 @@ CREATE TABLE OrleansStorage
     -- The mapping is done in the code. The
     -- *String columns contain the corresponding clear name fields.
     --
-    -- If there are duplicates, they are resolved by using GrainIKey,
+    -- If there are duplicates, they are resolved by using GrainIdKey,
     -- and GrainTypeString fields.
     -- It is assumed these would be rarely needed.
     GrainIdHash                INT NOT NULL,
