@@ -258,7 +258,7 @@ namespace Orleans.Storage
                         command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                         command.AddParameter("ServiceId", serviceId);
                     },
-                    async (selector, resultSetCount, token) =>
+                    (selector, resultSetCount, token) =>
                     {
                         object storageState = null;
                         int? version;
@@ -269,11 +269,8 @@ namespace Orleans.Storage
                             storageState = Serializer.Deserialize<T>(new BinaryData(payload));
                         }
                         version = selector.GetNullableInt32("Version");
-
-                        // TODO BPETIT REMOVE
-                        await Task.Yield();
-
-                        return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
+                        var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
+                        return Task.FromResult(result);
                     },
                     CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
 
