@@ -51,29 +51,29 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemDiagnosticsPerformanceCounterVersion>7.0.0-rc.2.22472.3</SystemDiagnosticsPerformanceCounterVersion>
-    <SystemIOHashingVersion>7.0.0-rc.2.22472.3</SystemIOHashingVersion>
+    <SystemDiagnosticsPerformanceCounterVersion>7.0.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemIOHashingVersion>7.0.0</SystemIOHashingVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
-    <SystemIoPipelinesVersion>7.0.0-rc.2.22472.3</SystemIoPipelinesVersion>
-    <SystemMemoryDataVersion>7.0.0-rc.2.22472.3</SystemMemoryDataVersion>
+    <SystemIoPipelinesVersion>7.0.0</SystemIoPipelinesVersion>
+    <SystemMemoryDataVersion>7.0.0</SystemMemoryDataVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>17.3.2</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>4.4.0-2.final</MicrosoftCodeAnalysisVersion>
-    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.4-beta1.22403.2</MicrosoftCodeAnalysisAnalyzersVersion>
+    <MicrosoftCodeAnalysisVersion>4.4.0-4.final</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
-    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>7.0.0-rc.2.22476.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
-    <MicrosoftExtensionsConfigurationVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsDependencyInjectionVersion>
-    <MicrosoftExtensionsDependencyModelVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsObjectPoolVersion>7.0.0-rc.2.22476.2</MicrosoftExtensionsObjectPoolVersion>
-    <MicrosoftExtensionsOptionsVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsHttpVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsHttpVersion>
-    <MicrosoftExtensionsHostingAbstractionsVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsHostingAbstractionsVersion>
-    <MicrosoftExtensionsHostingVersion>7.0.0-rc.2.22472.3</MicrosoftExtensionsHostingVersion>
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>7.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
+    <MicrosoftExtensionsConfigurationVersion>7.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>7.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsDependencyModelVersion>7.0.0</MicrosoftExtensionsDependencyModelVersion>
+    <MicrosoftExtensionsLoggingVersion>7.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsObjectPoolVersion>7.0.0</MicrosoftExtensionsObjectPoolVersion>
+    <MicrosoftExtensionsOptionsVersion>7.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>7.0.0</MicrosoftExtensionsHttpVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>7.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>7.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.20.0</MicrosoftApplicationInsightsVersion>
     <AzureDataTablesVersion>12.6.1</AzureDataTablesVersion>
@@ -108,11 +108,11 @@
     <NodaTimeVersion>3.1.4</NodaTimeVersion>
     <AutofacExtensionsDependencyInjectionVersion>8.0.0</AutofacExtensionsDependencyInjectionVersion>
     <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
-    <SystemCodeDomVersion>7.0.0-rc.2.22472.3</SystemCodeDomVersion>
+    <SystemCodeDomVersion>7.0.0</SystemCodeDomVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.3</MicrosoftNETFrameworkReferenceAssembliesVersion>
     <AzureIdentityVersion>1.7.0</AzureIdentityVersion>
     <AzureKeyVaultVersion>4.4.0</AzureKeyVaultVersion>
-    <FSharpCoreVersion>6.0.6</FSharpCoreVersion>
+    <FSharpCoreVersion>7.0.0</FSharpCoreVersion>
     <NSubstituteVersion>4.4.0</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.15</NSubstituteAnalyzersCSharpVersion>
     <CoverletVersion>3.0.3</CoverletVersion>
