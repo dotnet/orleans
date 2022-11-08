@@ -46,6 +46,9 @@ namespace Orleans.Serialization.Configuration
             wellKnownTypes[34] = typeof(IPEndPoint);
             wellKnownTypes[35] = typeof(ExceptionResponse);
             wellKnownTypes[36] = typeof(CompletedResponse);
+            wellKnownTypes[37] = typeof(Int128);
+            wellKnownTypes[38] = typeof(UInt128);
+            wellKnownTypes[39] = typeof(Half);
 
             var allowedTypes = typeManifest.AllowedTypes;
             allowedTypes.Add("System.Globalization.CompareOptions");

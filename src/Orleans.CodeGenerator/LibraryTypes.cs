@@ -66,6 +66,9 @@ namespace Orleans.CodeGenerator
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
                 Type = Type("System.Type"),
                 Uri = Type("System.Uri"),
+                Int128 = Type("System.Int128"),
+                UInt128 = Type("System.UInt128"),
+                Half = Type("System.Half"),
                 DateOnly = Type("System.DateOnly"),
                 DateTimeOffset = Type("System.DateTimeOffset"),
                 BitVector32 = Type("System.Collections.Specialized.BitVector32"),
@@ -112,6 +115,9 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Memory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.MemoryOfByteCodec")),
                     new(Type("System.Net.IPAddress"), Type("Orleans.Serialization.Codecs.IPAddressCodec")),
                     new(Type("System.Net.IPEndPoint"), Type("Orleans.Serialization.Codecs.IPEndPointCodec")),
+                    new(Type("System.UInt128"), Type("Orleans.Serialization.Codecs.UInt128Codec")),
+                    new(Type("System.Int128"), Type("Orleans.Serialization.Codecs.Int128Codec")),
+                    new(Type("System.Half"), Type("Orleans.Serialization.Codecs.HalfCodec")),
                 },
                 WellKnownCodecs = new WellKnownCodecDescription[]
                 {
@@ -256,6 +262,9 @@ namespace Orleans.CodeGenerator
         private INamedTypeSymbol CompareInfo;
         private INamedTypeSymbol CultureInfo;
         private INamedTypeSymbol Version;
+        private INamedTypeSymbol Int128;
+        private INamedTypeSymbol UInt128;
+        private INamedTypeSymbol Half;
         private INamedTypeSymbol[] _regularShallowCopyableTypes;
         private INamedTypeSymbol[] RegularShallowCopyableType => _regularShallowCopyableTypes ??= new[]
         {
@@ -272,9 +281,11 @@ namespace Orleans.CodeGenerator
             IPEndPoint,
             CancellationToken,
             Type,
-            Uri
+            Uri,
+            UInt128,
+            Int128,
+            Half
         };
-
 
         public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }

@@ -13,6 +13,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 using Orleans.Serialization.Serializers;
+using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit
 {
@@ -23,8 +24,11 @@ namespace Orleans.Serialization.TestKit
         private readonly IServiceProvider _serviceProvider;
         private readonly SerializerSessionPool _sessionPool;
 
-        protected FieldCodecTester()
+        protected FieldCodecTester(ITestOutputHelper output)
         {
+            var seed = Random.Shared.Next();
+            output.WriteLine($"Random seed: {seed}");
+            Random = new(seed);
             var services = new ServiceCollection();
             _ = services.AddSerializer(builder => builder.Configure(config => config.FieldCodecs.Add(typeof(TCodec))));
 
@@ -38,6 +42,8 @@ namespace Orleans.Serialization.TestKit
             _serviceProvider = services.BuildServiceProvider();
             _sessionPool = _serviceProvider.GetService<SerializerSessionPool>();
         }
+
+        protected Random Random { get; }
 
         protected IServiceProvider ServiceProvider => _serviceProvider;
 

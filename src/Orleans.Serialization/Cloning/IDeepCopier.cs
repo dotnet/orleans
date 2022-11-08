@@ -288,6 +288,9 @@ namespace Orleans.Serialization.Cloning
             [typeof(CultureInfo)] = true,
             [typeof(Version)] = true,
             [typeof(Uri)] = true,
+            [typeof(UInt128)] = true,
+            [typeof(Int128)] = true,
+            [typeof(Half)] = true,
         };
 
         public static bool Contains(Type type)

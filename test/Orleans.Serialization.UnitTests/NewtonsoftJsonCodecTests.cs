@@ -5,12 +5,17 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests
 {
     [Trait("Category", "BVT")]
     public class NewtonsoftJsonCodecTests : FieldCodecTester<MyJsonClass, IFieldCodec<MyJsonClass>>
     {
+        public NewtonsoftJsonCodecTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
@@ -75,6 +80,10 @@ namespace Orleans.Serialization.UnitTests
     [Trait("Category", "BVT")]
     public class NewtonsoftJsonCodecCopierTests : CopierTester<MyJsonClass, IDeepCopier<MyJsonClass>>
     {
+        public NewtonsoftJsonCodecCopierTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);

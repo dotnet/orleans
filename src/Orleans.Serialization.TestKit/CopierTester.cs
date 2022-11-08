@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit
 {
@@ -15,8 +16,11 @@ namespace Orleans.Serialization.TestKit
         private readonly IServiceProvider _serviceProvider;
         private readonly CodecProvider _codecProvider;
 
-        protected CopierTester()
+        protected CopierTester(ITestOutputHelper output)
         {
+            var seed = Random.Shared.Next();
+            output.WriteLine($"Random seed: {seed}");
+            Random = new(seed);
             var services = new ServiceCollection();
             _ = services.AddSerializer(builder => builder.Configure(config => config.Copiers.Add(typeof(TCopier))));
 
@@ -30,6 +34,8 @@ namespace Orleans.Serialization.TestKit
             _serviceProvider = services.BuildServiceProvider();
             _codecProvider = _serviceProvider.GetRequiredService<CodecProvider>();
         }
+
+        protected Random Random { get; }
 
         protected IServiceProvider ServiceProvider => _serviceProvider;
 
