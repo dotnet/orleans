@@ -39,10 +39,10 @@ namespace Orleans.Runtime.Messaging
                     var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
                     connectionBuilder.Use(next =>
                     {
-                        return async context =>
+                        return context =>
                         {
                             context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                            await next(context);
+                            return next(context);
                         };
                     });
                     this.ConfigureConnectionBuilder(connectionBuilder);

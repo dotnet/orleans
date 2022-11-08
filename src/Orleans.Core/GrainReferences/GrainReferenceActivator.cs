@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Versions;
+using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
@@ -349,10 +350,10 @@ namespace Orleans.GrainReferences
         /// <summary>
         /// Creates grain references for a given grain type and grain interface type.
         /// </summary>
-        private class GrainReferenceActivator : IGrainReferenceActivator
+        private sealed class GrainReferenceActivator : IGrainReferenceActivator
         {
-            private readonly Type _referenceType;
             private readonly GrainReferenceShared _shared;
+            private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
@@ -361,20 +362,22 @@ namespace Orleans.GrainReferences
             /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
             public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
             {
-                _referenceType = referenceType;
                 _shared = shared;
+
+                var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
+                    ?? throw new SerializerException("Invalid proxy type: " + referenceType);
+
+                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
+                var il = method.GetILGenerator();
+                // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Newobj, ctor);
+                il.Emit(OpCodes.Ret);
+                _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
             }
 
-            /// <inheritdoc />
-            public GrainReference CreateReference(GrainId grainId)
-            {
-                return (GrainReference)Activator.CreateInstance(
-                    type: _referenceType,
-                    bindingAttr: BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    binder: null,
-                    args: new object[] { _shared, grainId.Key },
-                    culture: CultureInfo.InvariantCulture);
-            }
+            public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
         }
     }
 
