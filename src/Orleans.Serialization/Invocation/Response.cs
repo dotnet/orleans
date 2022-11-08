@@ -224,7 +224,7 @@ namespace Orleans.Serialization.Invocation
             {
                 result.TypedResult = _codec.ReadValue(ref reader, field);
                 reader.ReadFieldHeader(ref field);
-                OrleansGeneratedCodeHelper.ConsumeEndBaseOrEndObject(ref reader, ref field);
+                reader.ConsumeEndBaseOrEndObject(ref field);
             }
             return result;
         }
@@ -247,7 +247,7 @@ namespace Orleans.Serialization.Invocation
             {
                 result.TypedResult = _codec.ReadValue(ref reader, field);
                 reader.ReadFieldHeader(ref field);
-                OrleansGeneratedCodeHelper.ConsumeEndBaseOrEndObject(ref reader, ref field);
+                reader.ConsumeEndBaseOrEndObject(ref field);
             }
             return result;
         }
