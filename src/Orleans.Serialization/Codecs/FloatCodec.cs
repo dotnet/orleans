@@ -33,8 +33,16 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, float value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
+<<<<<<< HEAD
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed32);
+=======
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
+#if NET6_0_OR_GREATER
+>>>>>>> netstandard2.1 compatible serialization
             writer.WriteUInt32(BitConverter.SingleToUInt32Bits(value));
+#else
+            writer.WriteUInt32((uint)BitConverter.SingleToInt32Bits(value));
+#endif
         }
 
         /// <inheritdoc/>
@@ -83,7 +91,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET6_0_OR_GREATER
         public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt32BitsToSingle(reader.ReadUInt32());
+#else
+        public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int32BitsToSingle((int)reader.ReadUInt32());
+#endif
 
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new UnsupportedWireTypeException(
             $"WireType {wireType} is not supported by this codec.");
@@ -116,8 +128,16 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, double value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
+<<<<<<< HEAD
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed64);
+=======
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
+#if NET6_0_OR_GREATER
+>>>>>>> netstandard2.1 compatible serialization
             writer.WriteUInt64(BitConverter.DoubleToUInt64Bits(value));
+#else
+            writer.WriteUInt64((ulong)BitConverter.DoubleToInt64Bits(value));
+#endif
         }
 
         /// <inheritdoc/>
@@ -156,7 +176,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET6_0_OR_GREATER
         public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt64BitsToDouble(reader.ReadUInt64());
+#else
+        public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int64BitsToDouble((long)reader.ReadUInt64());
+#endif
 
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new UnsupportedWireTypeException(
             $"WireType {wireType} is not supported by this codec.");

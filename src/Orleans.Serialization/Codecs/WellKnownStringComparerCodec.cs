@@ -9,6 +9,10 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
+#if !NET6_0_OR_GREATER
+using System.Runtime.Serialization;
+#endif
+
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

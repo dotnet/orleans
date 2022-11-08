@@ -20,7 +20,11 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Writer<TBufferWriter> CreateWriter<TBufferWriter>(this TBufferWriter buffer, SerializerSession session) where TBufferWriter : IBufferWriter<byte>
         {
+#if NET6_0_OR_GREATER
             ArgumentNullException.ThrowIfNull(session);
+#else
+            if (session is null) throw new ArgumentNullException(nameof(session));
+#endif
             return Writer.Create(buffer, session);
         }
     }

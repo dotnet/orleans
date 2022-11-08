@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Orleans.Serialization.WireProtocol
 {
@@ -247,6 +248,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <inheritdoc/>
         public override string ToString()
         {
+#if NET6_0_OR_GREATER
             var builder = new DefaultInterpolatedStringHandler(0, 0);
             builder.AppendLiteral("[");
             builder.AppendFormatted(WireType);
@@ -277,6 +279,38 @@ namespace Orleans.Serialization.WireProtocol
 
             builder.AppendLiteral("]");
             return builder.ToStringAndClear();
+#else
+            var builder = new StringBuilder();
+            builder.Append("[");
+            builder.Append(WireType);
+
+            if (HasFieldId)
+            {
+                builder.Append(", IdDelta:");
+                builder.Append(FieldIdDelta);
+            }
+
+            if (IsSchemaTypeValid)
+            {
+                builder.Append(", SchemaType:");
+                builder.Append(SchemaType);
+            }
+
+            if (HasExtendedSchemaType)
+            {
+                builder.Append(", RuntimeType:");
+                builder.Append(FieldType);
+            }
+
+            if (WireType == WireType.Extended)
+            {
+                builder.Append(": ");
+                builder.Append(ExtendedWireType);
+            }
+
+            builder.Append("]");
+            return builder.ToString();
+#endif
         }
     }
 }

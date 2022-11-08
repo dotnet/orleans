@@ -60,22 +60,22 @@ namespace Orleans.Serialization
 
                 if (method.IsDefined(typeof(OnDeserializingAttribute), false))
                 {
-                    onDeserializing = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
+                    onDeserializing = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
                 }
 
                 if (method.IsDefined(typeof(OnDeserializedAttribute), false))
                 {
-                    onDeserialized = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
+                    onDeserialized = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
                 }
 
                 if (method.IsDefined(typeof(OnSerializingAttribute), false))
                 {
-                    onSerializing = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
+                    onSerializing = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
                 }
 
                 if (method.IsDefined(typeof(OnSerializedAttribute), false))
                 {
-                    onSerialized = GetSerializationMethod(type, method, owner).CreateDelegate<TDelegate>();
+                    onSerialized = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
                 }
             }
 
@@ -154,7 +154,7 @@ namespace Orleans.Serialization
             public readonly TDelegate OnSerializing;
 
             /// <summary>
-            /// Gets the callback invoked once a value has been serialized. 
+            /// Gets the callback invoked once a value has been serialized.
             /// </summary>
             public readonly TDelegate OnSerialized;
         }
