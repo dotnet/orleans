@@ -4,6 +4,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -782,7 +783,8 @@ namespace Orleans.Serialization.Codecs
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
                 writer.WriteVarUInt32((uint)byteCount);
                 Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
-                ((IBinaryInteger<Int128>)value).WriteLittleEndian(bytes);
+                ((IBinaryInteger<Int128>)value).TryWriteLittleEndian(bytes, out var bytesWritten);
+                Debug.Assert(bytesWritten == byteCount);
                 writer.Write(bytes);
             }
         }
@@ -871,7 +873,8 @@ namespace Orleans.Serialization.Codecs
                 writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
                 writer.WriteVarUInt32((uint)byteCount);
                 Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
-                ((IBinaryInteger<UInt128>)value).WriteLittleEndian(bytes);
+                ((IBinaryInteger<UInt128>)value).TryWriteLittleEndian(bytes, out var bytesWritten);
+                Debug.Assert(bytesWritten == byteCount);
                 writer.Write(bytes);
             }
         }
