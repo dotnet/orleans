@@ -8,17 +8,19 @@ using IHost host = Host.CreateDefaultBuilder(args)
         client.UseLocalhostClustering()
             .UseTransactions();
     })
+    .UseConsoleLifetime()
     .Build();
 
 await host.StartAsync();
 
 var client = host.Services.GetRequiredService<IClusterClient>();
 var transactionClient = host.Services.GetRequiredService<ITransactionClient>();
+var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
 var accountNames = new[] { "Xaawo", "Pasqualino", "Derick", "Ida", "Stacy", "Xiao" };
 var random = Random.Shared;
 
-while (!Console.KeyAvailable)
+while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
     // Choose some random accounts to exchange money
     var fromIndex = random.Next(accountNames.Length);
