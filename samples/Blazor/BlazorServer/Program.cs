@@ -1,5 +1,4 @@
 using BlazorServer.Services;
-using Orleans.Hosting;
 using Orleans.Providers;
 
 var builder = WebApplication.CreateBuilder(args);
