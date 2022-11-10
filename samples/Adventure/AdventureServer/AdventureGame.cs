@@ -1,10 +1,9 @@
 using AdventureGrainInterfaces;
 using Newtonsoft.Json;
-using Orleans;
 
 namespace AdventureSetup;
 
-public class AdventureGame
+public sealed class AdventureGame
 {
     private readonly IGrainFactory _client;
 

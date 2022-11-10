@@ -1,5 +1,4 @@
 using AdventureGrainInterfaces;
-using Orleans;
 
 namespace AdventureGrains;
 
@@ -8,7 +7,7 @@ public class MonsterGrain : Grain, IMonsterGrain
     private MonsterInfo _monsterInfo = new();
     private IRoomGrain? _roomGrain; // Current room
 
-    public override Task OnActivateAsync()
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _monsterInfo = _monsterInfo with { Id = this.GetPrimaryKeyLong() };
 
@@ -18,7 +17,7 @@ public class MonsterGrain : Grain, IMonsterGrain
             TimeSpan.FromSeconds(150),
             TimeSpan.FromMinutes(150));
 
-        return base.OnActivateAsync();
+        return base.OnActivateAsync(cancellationToken);
     }
 
     Task IMonsterGrain.SetInfo(MonsterInfo info)

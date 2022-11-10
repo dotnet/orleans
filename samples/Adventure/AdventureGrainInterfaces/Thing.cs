@@ -1,8 +1,6 @@
-using Orleans.Concurrency;
-
 namespace AdventureGrainInterfaces;
 
-[Immutable]
+[GenerateSerializer, Immutable]
 public record class Thing(
     long Id,
     string Name,
@@ -10,7 +8,7 @@ public record class Thing(
     long FoundIn,
     List<string> Commands);
 
-[Immutable]
+[GenerateSerializer, Immutable]
 public record class MapInfo(
     string Name,
     List<RoomInfo> Rooms,
@@ -18,14 +16,14 @@ public record class MapInfo(
     List<Thing> Things,
     List<MonsterInfo> Monsters);
 
-[Immutable]
+[GenerateSerializer, Immutable]
 public record class RoomInfo(
     long Id,
     string Name,
     string Description,
     Dictionary<string, long> Directions);
 
-[Immutable]
+[GenerateSerializer, Immutable]
 public record class CategoryInfo(
     long Id,
     string Name,

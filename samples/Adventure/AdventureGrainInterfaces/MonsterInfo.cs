@@ -1,8 +1,6 @@
-using Orleans.Concurrency;
-
 namespace AdventureGrainInterfaces;
 
-[Immutable]
+[GenerateSerializer, Immutable]
 public record class MonsterInfo(
     long Id = 0,
     string? Name = null,

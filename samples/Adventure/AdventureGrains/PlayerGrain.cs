@@ -1,6 +1,6 @@
 using System.Text;
+using System.Threading;
 using AdventureGrainInterfaces;
-using Orleans;
 
 namespace AdventureGrains;
 
@@ -12,10 +12,10 @@ public class PlayerGrain : Grain, IPlayerGrain
     private bool _killed = false;
     private PlayerInfo _myInfo = null!;
 
-    public override Task OnActivateAsync()
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _myInfo = new(this.GetPrimaryKey(), "nobody");
-        return base.OnActivateAsync();
+        return base.OnActivateAsync(cancellationToken);
     }
 
     Task<string?> IPlayerGrain.Name() => Task.FromResult(_myInfo?.Name);
