@@ -1,15 +1,13 @@
-using Orleans;
-
 namespace AccountTransfer.Interfaces;
 
 public interface IAccountGrain : IGrainWithStringKey
 {
     [Transaction(TransactionOption.Join)]
-    Task Withdraw(uint amount);
+    Task Withdraw(int amount);
 
     [Transaction(TransactionOption.Join)]
-    Task Deposit(uint amount);
+    Task Deposit(int amount);
 
     [Transaction(TransactionOption.CreateOrJoin)]
-    Task<uint> GetBalance();
+    Task<int> GetBalance();
 }
