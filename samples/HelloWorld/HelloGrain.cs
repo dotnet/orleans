@@ -1,10 +1,14 @@
-using System.Threading.Tasks;
-using Orleans;
+using Orleans.Runtime;
 
-namespace HelloWorld
+namespace HelloWorld;
+
+public sealed class HelloGrain : IGrainBase, IHelloGrain
 {
-    public class HelloGrain : Grain, IHelloGrain
-    {
-        public Task<string> SayHello(string greeting) => Task.FromResult($"Hello, {greeting}!");
-    }
+    public IGrainContext GrainContext { get; }
+
+    public HelloGrain(IGrainContext context) =>
+        GrainContext = context;
+
+    public ValueTask<string> SayHello(string greeting) =>
+        ValueTask.FromResult($"Hello, {greeting}!");
 }
