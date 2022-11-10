@@ -1,24 +1,29 @@
 using AdventureGrainInterfaces;
-using Orleans;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-using var client = new ClientBuilder()
-    .UseLocalhostClustering()
+using var host = Host.CreateDefaultBuilder(args)
+    .UseOrleansClient(clientBuilder =>
+        clientBuilder.UseLocalhostClustering())
     .Build();
 
-await client.Connect();
+await host.StartAsync();
 
-Console.WriteLine(@"
-  ___      _                 _                  
- / _ \    | |               | |                 
-/ /_\ \ __| |_   _____ _ __ | |_ _   _ _ __ ___ 
-|  _  |/ _` \ \ / / _ \ '_ \| __| | | | '__/ _ \
-| | | | (_| |\ V /  __/ | | | |_| |_| | | |  __/
-\_| |_/\__,_| \_/ \___|_| |_|\__|\__,_|_|  \___|");
+Console.WriteLine("""
+     ______      __                         __                           
+    /\  _  \    /\ \                       /\ \__                        
+    \ \ \L\ \   \_\ \  __  __     __    ___\ \ ,_\  __  __  _ __    __   
+     \ \  __ \  /'_` \/\ \/\ \  /'__`\/' _ `\ \ \/ /\ \/\ \/\`'__\/'__`\ 
+      \ \ \/\ \/\ \L\ \ \ \_/ |/\  __//\ \/\ \ \ \_\ \ \_\ \ \ \//\  __/ 
+       \ \_\ \_\ \___,_\ \___/ \ \____\ \_\ \_\ \__\\ \____/\ \_\\ \____\
+        \/_/\/_/\/__,_ /\/__/   \/____/\/_/\/_/\/__/ \/___/  \/_/ \/____/
+    """);
 
 Console.WriteLine();
 Console.WriteLine("What's your name?");
 var name = Console.ReadLine()!;
 
+var client = host.Services.GetRequiredService<IClusterClient>();
 var player = client.GetGrain<IPlayerGrain>(Guid.NewGuid());
 await player.SetName(name);
 
@@ -42,5 +47,5 @@ finally
 {
     await player.Die();
     Console.WriteLine("Game over!");
-    await client.Close();
+    await host.StopAsync();
 }
