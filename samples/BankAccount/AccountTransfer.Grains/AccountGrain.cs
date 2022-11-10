@@ -29,11 +29,10 @@ public sealed class AccountGrain : Grain, IAccountGrain
         {
             if (balance.Value < amount)
             {
-                throw new InvalidOperationException($"""
-                    Withdrawing {amount} credits from account 
-                    "{this.GetPrimaryKeyString()}" would overdraw it.
-                    This account has {balance.Value} credits.
-                    """);
+                throw new InvalidOperationException(
+                    $"Withdrawing {amount} credits from account " +
+                    $"\"{this.GetPrimaryKeyString()}\" would overdraw it." +
+                    $" This account has {balance.Value} credits.");
             }
 
             balance.Value -= amount;

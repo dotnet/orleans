@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using IHost host = Host.CreateDefaultBuilder(args)
-    .UseOrleansClient((_, client) =>
+    .UseOrleansClient(client =>
     {
         client.UseLocalhostClustering()
             .UseTransactions();
