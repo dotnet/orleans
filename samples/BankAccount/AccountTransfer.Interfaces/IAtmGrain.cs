@@ -1,5 +1,3 @@
-using Orleans;
-
 namespace AccountTransfer.Interfaces;
 
 public interface IAtmGrain : IGrainWithIntegerKey
@@ -8,5 +6,5 @@ public interface IAtmGrain : IGrainWithIntegerKey
     Task Transfer(
         IAccountGrain fromAccount,
         IAccountGrain toAccount,
-        uint amountToTransfer);
+        int amountToTransfer);
 }
