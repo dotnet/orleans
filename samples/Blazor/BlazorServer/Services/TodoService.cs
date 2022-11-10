@@ -1,12 +1,11 @@
-using BlazorServer.Models;
-using Orleans;
-using Orleans.Streams;
 using System.Buffers;
 using System.Collections.Immutable;
+using BlazorServer.Models;
+using Orleans.Streams;
 
 namespace BlazorServer.Services;
 
-public class TodoService
+public sealed class TodoService
 {
     private readonly ILogger<TodoService> _logger;
     private readonly IClusterClient _client;
@@ -69,33 +68,33 @@ public class TodoService
     public Task<StreamSubscriptionHandle<TodoNotification>> SubscribeAsync(
         Guid ownerKey, Func<TodoNotification, Task> action) =>
         _client.GetStreamProvider("MemoryStreams")
-            .GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
+            .GetStream<TodoNotification>(ownerKey)
             .SubscribeAsync(new TodoItemObserver(_logger, action));
+}
 
-    private class TodoItemObserver : IAsyncObserver<TodoNotification>
+sealed file class TodoItemObserver : IAsyncObserver<TodoNotification>
+{
+    private readonly ILogger<TodoService> _logger;
+    private readonly Func<TodoNotification, Task> _onNext;
+
+    public TodoItemObserver(
+        ILogger<TodoService> logger,
+        Func<TodoNotification, Task> action)
     {
-        private readonly ILogger<TodoService> _logger;
-        private readonly Func<TodoNotification, Task> _onNext;
-
-        public TodoItemObserver(
-            ILogger<TodoService> logger,
-            Func<TodoNotification, Task> action)
-        {
-            _logger = logger;
-            _onNext = action;
-        }
-
-        public Task OnCompletedAsync() => Task.CompletedTask;
-
-        public Task OnErrorAsync(Exception ex)
-        {
-            _logger.LogError(ex, ex.Message);
-            return Task.CompletedTask;
-        }
-
-        public Task OnNextAsync(
-            TodoNotification item,
-            StreamSequenceToken? token = null) =>
-            _onNext(item);
+        _logger = logger;
+        _onNext = action;
     }
+
+    public Task OnCompletedAsync() => Task.CompletedTask;
+
+    public Task OnErrorAsync(Exception ex)
+    {
+        _logger.LogError(ex, ex.Message);
+        return Task.CompletedTask;
+    }
+
+    public Task OnNextAsync(
+        TodoNotification item,
+        StreamSequenceToken? token = null) =>
+        _onNext(item);
 }
