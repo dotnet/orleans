@@ -71,31 +71,31 @@ public class TodoService
         _client.GetStreamProvider("MemoryStreams")
             .GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
             .SubscribeAsync(new TodoItemObserver(_logger, action));
+}
 
-    private class TodoItemObserver : IAsyncObserver<TodoNotification>
+file class TodoItemObserver : IAsyncObserver<TodoNotification>
+{
+    private readonly ILogger<TodoService> _logger;
+    private readonly Func<TodoNotification, Task> _onNext;
+
+    public TodoItemObserver(
+        ILogger<TodoService> logger,
+        Func<TodoNotification, Task> action)
     {
-        private readonly ILogger<TodoService> _logger;
-        private readonly Func<TodoNotification, Task> _onNext;
-
-        public TodoItemObserver(
-            ILogger<TodoService> logger,
-            Func<TodoNotification, Task> action)
-        {
-            _logger = logger;
-            _onNext = action;
-        }
-
-        public Task OnCompletedAsync() => Task.CompletedTask;
-
-        public Task OnErrorAsync(Exception ex)
-        {
-            _logger.LogError(ex, ex.Message);
-            return Task.CompletedTask;
-        }
-
-        public Task OnNextAsync(
-            TodoNotification item,
-            StreamSequenceToken? token = null) =>
-            _onNext(item);
+        _logger = logger;
+        _onNext = action;
     }
+
+    public Task OnCompletedAsync() => Task.CompletedTask;
+
+    public Task OnErrorAsync(Exception ex)
+    {
+        _logger.LogError(ex, ex.Message);
+        return Task.CompletedTask;
+    }
+
+    public Task OnNextAsync(
+        TodoNotification item,
+        StreamSequenceToken? token = null) =>
+        _onNext(item);
 }
