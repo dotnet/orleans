@@ -11,10 +11,10 @@ The sample consists of a single project which starts the Orleans-based applicati
 
 To start our tour of the application, open [`IHelloGrain.cs`](./IHelloGrain.cs) and you will find the following interface declaration:
 
-``` C#
+```csharp
 public interface IHelloGrain : IGrainWithStringKey
 {
-    Task<string> SayHello(string greeting);
+    ValueTask<string> SayHello(string greeting);
 }
 ```
 
@@ -23,16 +23,17 @@ We know it's a grain interface because it implements `IGrainWithStringKey`.
 This means that when we want to get a reference to a grain implementing `IHelloGrain`, we will identify the grain instance using an string value.
 In our case, as you will see later in [`Program.cs`](./Program.cs), we will use the string `"friend"` to identify the grain we wish to communicate with, but this could be any string:
 
-``` C#
+```csharp
 var friend = grainFactory.GetGrain<IHelloGrain>("friend");
 ```
 
 Now, open [`HelloGrain.cs`](./HelloGrain.cs) and we will see the implementation of our `IHelloGrain` interface:
 
-``` C#
+```csharp
 public class HelloGrain : Grain, IHelloGrain
 {
-    public Task<string> SayHello(string greeting) => Task.FromResult($"Hello, {greeting}!");
+    public ValueTask<string> SayHello(string greeting) => 
+        ValueTask.FromResult($"Hello, {greeting}!");
 }
 ```
 
@@ -43,7 +44,7 @@ That type is used to identify the grain classes in an application.
 
 Open [`Program.cs`](./Program.cs) to see how Orleans is configured:
 
-``` C#
+```csharp
 using var host = new HostBuilder()
     .UseOrleans(builder =>
     {

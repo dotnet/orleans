@@ -1,9 +1,6 @@
-using System;
 using HelloWorld;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Hosting; 
 
 // Configure the host
 using var host = new HostBuilder()
@@ -20,8 +17,12 @@ var grainFactory = host.Services.GetRequiredService<IGrainFactory>();
 var friend = grainFactory.GetGrain<IHelloGrain>("friend");
 
 // Call the grain and print the result to the console
-var result = await friend.SayHello("Good morning!"); 
-Console.WriteLine("\n\n{0}\n\n", result);
+var result = await friend.SayHello("Good morning!");
+Console.WriteLine($"""
+
+    {result}
+
+    """);
 
 Console.WriteLine("Orleans is running.\nPress Enter to terminate...");
 Console.ReadLine();
