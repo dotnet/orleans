@@ -9,6 +9,8 @@ public sealed class HelloGrain : IGrainBase, IHelloGrain
     public HelloGrain(IGrainContext context) =>
         GrainContext = context;
 
-    public ValueTask<string> SayHello(string greeting) =>
-        ValueTask.FromResult($"Hello, {greeting}!");
+    public ValueTask<string> SayHello(string greeting)
+    {
+        return ValueTask.FromResult($"Hello, {greeting}!");
+    }
 }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 
 // Configure the host
 using var host = new HostBuilder()
-    .UseOrleansClient(builder => builder.UseLocalhostClustering())
+    .UseOrleans(builder => builder.UseLocalhostClustering())
     .Build();
 
 // Start the host
