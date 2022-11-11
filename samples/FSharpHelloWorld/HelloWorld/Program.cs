@@ -3,10 +3,9 @@ using HelloWorldInterfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Hosting;
 
-[assembly: KnownAssembly(typeof(Grains.HelloGrain))]
+//[assembly: KnownAssembly(typeof(Grains.HelloGrain))]
 
 using var host = new HostBuilder()
     .UseOrleans(builder =>
