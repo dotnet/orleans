@@ -52,7 +52,7 @@ internal class UserAgentGrain : Grain, IUserAgentGrain
         var pollId = Guid.NewGuid().ToString("N")[..6];
         var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
 
-        // Create the poll. We could avoid colitions here by making this return an error if a poll
+        // Create the poll. We could avoid collisions here by making this return an error if a poll
         // with that id already exists.
         await pollGrain.CreatePoll(initialState);
 
