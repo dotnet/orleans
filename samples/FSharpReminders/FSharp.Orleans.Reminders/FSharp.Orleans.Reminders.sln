@@ -1,10 +1,28 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Orleans.Reminders.Grains", "FSharp.Orleans.Reminders.Grains\FSharp.Orleans.Reminders.Grains.fsproj", "{7D5060AD-EDEB-4CAA-95BE-5A0697645DE5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FSharp.Orleans.Reminders.Codegen", "FSharp.Orleans.Reminders.Codegen\FSharp.Orleans.Reminders.Codegen.csproj", "{38FD4FE5-5A32-47C9-B9E6-75158220DD4E}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Orleans.Reminders", "FSharp.Orleans.Reminders\FSharp.Orleans.Reminders.fsproj", "{17C2F4AC-ED4B-4693-884F-C5678C7D5679}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7D5060AD-EDEB-4CAA-95BE-5A0697645DE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D5060AD-EDEB-4CAA-95BE-5A0697645DE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D5060AD-EDEB-4CAA-95BE-5A0697645DE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D5060AD-EDEB-4CAA-95BE-5A0697645DE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38FD4FE5-5A32-47C9-B9E6-75158220DD4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38FD4FE5-5A32-47C9-B9E6-75158220DD4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38FD4FE5-5A32-47C9-B9E6-75158220DD4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38FD4FE5-5A32-47C9-B9E6-75158220DD4E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{17C2F4AC-ED4B-4693-884F-C5678C7D5679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{17C2F4AC-ED4B-4693-884F-C5678C7D5679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{17C2F4AC-ED4B-4693-884F-C5678C7D5679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{17C2F4AC-ED4B-4693-884F-C5678C7D5679}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
