@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="GrainActivatorHostedService.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
+        <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="3.6.5" />
+        <PackageReference Include="OrleansDashboard" Version="3.6.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\FSharp.Orleans.Reminders.Codegen\FSharp.Orleans.Reminders.Codegen.csproj" />
+    </ItemGroup>
+
+</Project>
