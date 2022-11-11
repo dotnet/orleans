@@ -1,9 +1,6 @@
-using System.Threading.Tasks;
+namespace HelloWorldInterfaces;
 
-namespace HelloWorldInterfaces
+public interface IHelloGrain : IGrainWithIntegerKey
 {
-    public interface IHelloGrain : Orleans.IGrainWithIntegerKey
-    {
-        Task<string> SayHello(string greeting);
-    }
+    ValueTask<string> SayHello(string greeting);
 }
