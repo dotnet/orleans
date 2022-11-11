@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 
 namespace Presence.Shared;
@@ -14,7 +13,7 @@ public sealed class ClusterClientHostedService : IHostedService, IAsyncDisposabl
     {
         _logger = loggerFactory.CreateLogger<ClusterClientHostedService>();
         Client = new ClientBuilder()
-            .UseLocalhostClustering()
+            .UseLocalhostClustering(
             .ConfigureServices(services =>
             {
                 // Add logging from the host's container.

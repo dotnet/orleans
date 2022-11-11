@@ -1,4 +1,3 @@
-using Orleans;
 using Presence.Grains.Models;
 
 namespace Presence.Grains;
