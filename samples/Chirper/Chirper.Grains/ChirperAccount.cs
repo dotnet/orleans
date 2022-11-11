@@ -1,14 +1,13 @@
 using System.Collections.Immutable;
 using Chirper.Grains.Models;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace Chirper.Grains;
 
 [Reentrant]
-public class ChirperAccount : Grain, IChirperAccount
+public sealed class ChirperAccount : Grain, IChirperAccount
 {
     /// <summary>
     /// Size for the recently received message cache.
@@ -49,14 +48,14 @@ public class ChirperAccount : Grain, IChirperAccount
     private static string GrainType => nameof(ChirperAccount);
     private string GrainKey => this.GetPrimaryKeyString();
 
-    public override Task OnActivateAsync()
+    public override Task OnActivateAsync(CancellationToken _)
     {
         _logger.LogInformation("{GrainType} {GrainKey} activated.", GrainType, GrainKey);
 
         return Task.CompletedTask;
     }
 
-    public async Task PublishMessageAsync(string message)
+    public async ValueTask PublishMessageAsync(string message)
     {
         var chirp = CreateNewChirpMessage(message);
 
@@ -85,7 +84,7 @@ public class ChirperAccount : Grain, IChirperAccount
         await Task.WhenAll(_state.State.Followers.Values.Select(_ => _.NewChirpAsync(chirp)).ToArray());
     }
 
-    public Task<ImmutableList<ChirperMessage>> GetReceivedMessagesAsync(int number, int start)
+    public ValueTask<ImmutableList<ChirperMessage>> GetReceivedMessagesAsync(int number, int start)
     {
         if (start < 0) start = 0;
         if (start + number > _state.State.RecentReceivedMessages.Count)
@@ -93,14 +92,14 @@ public class ChirperAccount : Grain, IChirperAccount
             number = _state.State.RecentReceivedMessages.Count - start;
         }
 
-        return Task.FromResult(
+        return ValueTask.FromResult(
             _state.State.RecentReceivedMessages
                 .Skip(start)
                 .Take(number)
                 .ToImmutableList());
     }
 
-    public async Task FollowUserIdAsync(string username)
+    public async ValueTask FollowUserIdAsync(string username)
     {
         _logger.LogInformation(
             "{GrainType} {UserName} > FollowUserName({TargetUserName}).",
@@ -120,7 +119,7 @@ public class ChirperAccount : Grain, IChirperAccount
         _viewers.ForEach(cv => cv.SubscriptionAdded(username));
     }
 
-    public async Task UnfollowUserIdAsync(string username)
+    public async ValueTask UnfollowUserIdAsync(string username)
     {
         _logger.LogInformation(
             "{GrainType} {GrainKey} > UnfollowUserName({TargetUserName}).",
@@ -142,46 +141,46 @@ public class ChirperAccount : Grain, IChirperAccount
         _viewers.ForEach(cv => cv.SubscriptionRemoved(username));
     }
 
-    public Task<ImmutableList<string>> GetFollowingListAsync() =>
-        Task.FromResult(_state.State.Subscriptions.Keys.ToImmutableList());
+    public ValueTask<ImmutableList<string>> GetFollowingListAsync() =>
+        ValueTask.FromResult(_state.State.Subscriptions.Keys.ToImmutableList());
 
-    public Task<ImmutableList<string>> GetFollowersListAsync() =>
-        Task.FromResult(_state.State.Followers.Keys.ToImmutableList());
+    public ValueTask<ImmutableList<string>> GetFollowersListAsync() =>
+        ValueTask.FromResult(_state.State.Followers.Keys.ToImmutableList());
 
-    public Task SubscribeAsync(IChirperViewer viewer)
+    public ValueTask SubscribeAsync(IChirperViewer viewer)
     {
         _viewers.Add(viewer);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task UnsubscribeAsync(IChirperViewer viewer)
+    public ValueTask UnsubscribeAsync(IChirperViewer viewer)
     {
         _viewers.Remove(viewer);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task<ImmutableList<ChirperMessage>> GetPublishedMessagesAsync(int number, int start)
+    public ValueTask<ImmutableList<ChirperMessage>> GetPublishedMessagesAsync(int number, int start)
     {
         if (start < 0) start = 0;
         if (start + number > _state.State.MyPublishedMessages.Count)
         {
             number = _state.State.MyPublishedMessages.Count - start;
         }
-        return Task.FromResult(
+        return ValueTask.FromResult(
             _state.State.MyPublishedMessages
                 .Skip(start)
                 .Take(number)
                 .ToImmutableList());
     }
 
-    public async Task AddFollowerAsync(string username, IChirperSubscriber follower)
+    public async ValueTask AddFollowerAsync(string username, IChirperSubscriber follower)
     {
         _state.State.Followers[username] = follower;
         await WriteStateAsync();
         _viewers.ForEach(cv => cv.NewFollower(username));
     }
 
-    public Task RemoveFollowerAsync(string username)
+    public ValueTask RemoveFollowerAsync(string username)
     {
         _state.State.Followers.Remove(username);
         return WriteStateAsync();
@@ -220,7 +219,7 @@ public class ChirperAccount : Grain, IChirperAccount
 
     // When reentrant grain is doing WriteStateAsync, etag violations are possible due to concurrent writes.
     // The solution is to serialize and batch writes, and make sure only a single write is outstanding at any moment in time.
-    private async Task WriteStateAsync()
+    private async ValueTask WriteStateAsync()
     {
         if (_outstandingWriteStateOperation is Task currentWriteStateOperation)
         {
