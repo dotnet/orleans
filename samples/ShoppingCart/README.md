@@ -13,7 +13,7 @@ A canonical shopping cart sample application, built using Microsoft Orleans. Thi
 ## Features
 
 - [.NET 7](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-7)
-- [ASP.NET Core Blazor](https://docs.microsoft.com/aspnet/core/blazor/?view=aspnetcore-6.7)
+- [ASP.NET Core Blazor](https://docs.microsoft.com/aspnet/core/blazor/?view=aspnetcore-7.0)
 - [Orleans: Grain persistence](https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence)
   - [Azure Storage grain persistence](https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence/azure-storage)
 - [Orleans: Cluster management](https://docs.microsoft.com/dotnet/orleans/implementation/cluster-management)
