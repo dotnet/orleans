@@ -1,19 +1,19 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT License.
 
 namespace Orleans.ShoppingCart.Abstractions;
 
-[Serializable, Immutable]
+[GenerateSerializer, Immutable]
 public sealed record class ProductDetails
 {
-    public string Id { get; set; } = null!;
-    public string Name { get; set; } = null!;
-    public string Description { get; set; } = null!;
-    public ProductCategory Category { get; set; }
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-    public string DetailsUrl { get; set; } = null!;
-    public string ImageUrl { get; set; } = null!;
+    [Id(0)] public string Id { get; set; } = null!;
+    [Id(1)] public string Name { get; set; } = null!;
+    [Id(2)] public string Description { get; set; } = null!;
+    [Id(3)] public ProductCategory Category { get; set; }
+    [Id(4)] public int Quantity { get; set; }
+    [Id(5)] public decimal UnitPrice { get; set; }
+    [Id(6)] public string DetailsUrl { get; set; } = null!;
+    [Id(7)] public string ImageUrl { get; set; } = null!;
 
     [JsonIgnore]
     public decimal TotalPrice =>

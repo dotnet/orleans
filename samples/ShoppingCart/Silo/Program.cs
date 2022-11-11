@@ -14,9 +14,9 @@ await Host.CreateDefaultBuilder(args)
             else
             {
                 var endpointAddress =
-                    IPAddress.Parse(context.Configuration["WEBSITE_PRIVATE_IP"]);
+                    IPAddress.Parse(context.Configuration["WEBSITE_PRIVATE_IP"] ?? "");
                 var strPorts =
-                    context.Configuration["WEBSITE_PRIVATE_PORTS"].Split(',');
+                    (context.Configuration["WEBSITE_PRIVATE_PORTS"] ?? "").Split(',');
                 if (strPorts.Length < 2)
                     throw new Exception("Insufficient private ports configured.");
                 var (siloPort, gatewayPort) =
