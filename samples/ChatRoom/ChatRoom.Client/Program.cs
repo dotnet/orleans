@@ -33,7 +33,7 @@ static Task StartAsync(IHost host) =>
         ctx.Status = "Connecting...";
 
         await host.StartAsync();
-        
+
         ctx.Status = "Connected!";
     });
 
@@ -64,22 +64,22 @@ static async Task ProcessLoopAsync(ClientContext context)
         }
 
         if (firstTwoCharacters switch
-            {
-                "/j" => JoinChannel(context, input.Replace("/j", "").Trim()),
-                "/l" => LeaveChannel(context),
-                _ => null
-            } is Task<ClientContext> cxtTask)
+        {
+            "/j" => JoinChannel(context, input.Replace("/j", "").Trim()),
+            "/l" => LeaveChannel(context),
+            _ => null
+        } is Task<ClientContext> cxtTask)
         {
             context = await cxtTask;
             continue;
         }
 
         if (firstTwoCharacters switch
-            {
-                "/h" => ShowCurrentChannelHistory(context),
-                "/m" => ShowChannelMembers(context),
-                _ => null
-            } is Task task)
+        {
+            "/h" => ShowCurrentChannelHistory(context),
+            "/m" => ShowChannelMembers(context),
+            _ => null
+        } is Task task)
         {
             await task;
             continue;
@@ -226,7 +226,7 @@ static async Task<ClientContext> JoinChannel(
         var stream =
             context.Client
                 .GetStreamProvider("chat")
-                .GetStream<ChatMsg>(streamId);        
+                .GetStream<ChatMsg>(streamId);
 
         // Subscribe to the stream to receive furthur messages sent to the chatroom
         await stream.SubscribeAsync(new StreamObserver(channelName));
@@ -261,6 +261,6 @@ static async Task<ClientContext> LeaveChannel(ClientContext context)
     });
 
     AnsiConsole.MarkupLine("[bold olive]Left channel [/]{0}", context.CurrentChannel!);
-    
+
     return context with { CurrentChannel = null };
 }

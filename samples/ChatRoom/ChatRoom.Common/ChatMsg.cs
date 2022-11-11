@@ -9,5 +9,5 @@ public record class ChatMsg(
     public string Author { get; init; } = Author ?? "Alexey";
 
     [Id(3)]
-    public DateTimeOffset Created { get; init; } = DateTimeOffset.Now;    
+    public DateTimeOffset Created { get; init; } = DateTimeOffset.Now;
 }
