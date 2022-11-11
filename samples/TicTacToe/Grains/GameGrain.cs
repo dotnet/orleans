@@ -1,5 +1,3 @@
-
-using Orleans;
 using Orleans.Concurrency;
 
 namespace TicTacToe.Grains;
@@ -30,7 +28,7 @@ public class GameGrain : Grain, IGameGrain
     private string _name = null!;
 
     // initialise 
-    public override Task OnActivateAsync()
+    public override Task OnActivateAsync(CancellationToken token)
     {
         // make sure newly formed game is in correct state 
         _playerIds = new List<Guid>();
@@ -42,7 +40,7 @@ public class GameGrain : Grain, IGameGrain
         _winnerId = Guid.Empty;
         _loserId = Guid.Empty;
 
-        return base.OnActivateAsync();
+        return base.OnActivateAsync(token);
     }
 
     // add a player into a game
