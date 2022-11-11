@@ -265,13 +265,13 @@ public sealed partial class ShellHostedService : BackgroundService
 
     [GeneratedRegex("/user (?<username>\\w{1,100})")]
     private static partial Regex SetUsernameRegex();
-
-    [GeneratedRegex("/follow (?<username>\\w{1,100})")]
-    private static partial Regex FollowUsernameRegex();
-
-    [GeneratedRegex("/unfollow (?<username>\\w{1,100})")]
-    private static partial Regex UnfollowUsernameRegex();
-
+    
     [GeneratedRegex("/chirp (?<message>.+)")]
     private static partial Regex ChirpMessageRegex();
+    
+    [GeneratedRegex("/unfollow (?<username>\\w{1,100})")]
+    private static partial Regex UnfollowUsernameRegex();
+    
+    [GeneratedRegex("/follow (?<username>\\w{1,100})")]
+    private static partial Regex FollowUsernameRegex();
 }
