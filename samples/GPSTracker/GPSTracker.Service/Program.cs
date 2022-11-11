@@ -1,4 +1,3 @@
-using Orleans.Hosting;
 using GPSTracker;
 using System.Net;
 var builder = WebApplication.CreateBuilder(args);
@@ -33,9 +32,5 @@ app.UseDefaultFiles();
 app.UseRouting();
 
 app.UseAuthorization();
-
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapHub<LocationHub>("/locationHub");
-});
+app.MapHub<LocationHub>("/locationHub");
 app.Run();

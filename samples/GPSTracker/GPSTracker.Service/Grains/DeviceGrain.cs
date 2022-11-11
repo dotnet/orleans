@@ -1,6 +1,5 @@
 using GPSTracker.Common;
 using GPSTracker.GrainInterface;
-using Orleans;
 using Orleans.Concurrency;
 
 namespace GPSTracker.GrainImplementation;

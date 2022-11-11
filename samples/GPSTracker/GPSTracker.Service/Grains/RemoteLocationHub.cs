@@ -6,7 +6,7 @@ namespace GPSTracker;
 /// <summary>
 /// Broadcasts location messages to clients which are connected to the local SignalR hub.
 /// </summary>
-internal class RemoteLocationHub : IRemoteLocationHub
+internal sealed class RemoteLocationHub : IRemoteLocationHub
 {
     private readonly IHubContext<LocationHub> _hub;
 
