@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Hosting;
 using System.Security.Cryptography.X509Certificates;
 using HelloWorld.Grains;
 using HelloWorld.Interfaces;
@@ -32,8 +30,7 @@ await new HostBuilder()
                         // NOTE: Do not do this in a production environment
                         options.AllowAnyRemoteCertificate();
                     }
-                })
-            .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).AddApplicationPart(typeof(IHelloGrain).Assembly));
+                });
     })
     .ConfigureLogging(logging => logging.AddConsole())
     .RunConsoleAsync();
