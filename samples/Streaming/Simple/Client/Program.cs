@@ -1,11 +1,10 @@
 using GrainInterfaces;
-using Orleans;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Orleans.Streams;
-using Orleans.Hosting;
 using Common;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 
 internal class Program
 {
@@ -50,11 +49,12 @@ internal class Program
             // Now you should see that a consumer grain was activated on the silo, and is logging when it is receiving event
 
             // Client can also subscribe to streams
+            var streamId = StreamId.Create(Constants.StreamNamespace, key);
             var stream = client
                 .GetStreamProvider(Constants.StreamProvider)
-                .GetStream<int>(key, Constants.StreamNamespace);
+                .GetStream<int>(streamId);
             await stream.SubscribeAsync(OnNextAsync);
-
+            
             // Now the client will also log received events
 
             await Task.Delay(TimeSpan.FromSeconds(15));
@@ -86,7 +86,7 @@ internal class Program
             {
                 return false;
             }
-            await Task.Delay(TimeSpan.FromSeconds(4));
+            await Task.Delay(TimeSpan.FromSeconds(4), cancellationToken);
             return true;
         }
     }
