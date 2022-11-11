@@ -6,7 +6,7 @@ namespace HelloWorld.Grains;
 /// <summary>
 /// Orleans grain implementation class HelloGrain.
 /// </summary>
-public class HelloGrain : Orleans.Grain, IHelloGrain
+public sealed class HelloGrain : Grain, IHelloGrain
 {
     private readonly ILogger _logger;
 
