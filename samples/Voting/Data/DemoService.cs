@@ -19,7 +19,7 @@ public partial class DemoService
         {
             var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
             var results = await pollGrain.GetCurrentResults();
-            var random = new Random();
+            var random = Random.Shared;
             while (numVotes-- > 0)
             {
                 var optionId = random.Next(0, results.Options.Count);
