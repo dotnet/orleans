@@ -7,7 +7,7 @@ using Orleans.Networking.Shared;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
-public class UnixSocketConnectionOptions
+public partial class UnixSocketConnectionOptions
 {
     /// <summary>
     /// Get or sets to function used to get a filename given an endpoint
@@ -19,5 +19,8 @@ public class UnixSocketConnectionOptions
     /// </summary>
     internal Func<MemoryPool<byte>> MemoryPoolFactory { get; set; } = () => KestrelMemoryPool.Create();
 
-    private static string DefaultConvertEndpointToPath(EndPoint endPoint) => Path.Combine(Path.GetTempPath(), Regex.Replace(endPoint.ToString(), "[^a-zA-Z0-9]", "_"));
+    [GeneratedRegex("[^a-zA-Z0-9]")]
+    private static partial Regex ConvertEndpointRegex();
+
+    private static string DefaultConvertEndpointToPath(EndPoint endPoint) => Path.Combine(Path.GetTempPath(), ConvertEndpointRegex().Replace(endPoint.ToString(), "_"));
 }

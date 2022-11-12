@@ -18,13 +18,14 @@ namespace Orleans.Streaming.AzureStorage
     /// <summary>
     /// General utility functions related to Azure Blob storage.
     /// </summary>
-    internal static class AzureBlobUtils
+    internal static partial class AzureBlobUtils
     {
-        private static readonly Regex ContainerNameRegex = new Regex("^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.ExplicitCapture | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.ExplicitCapture | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+        private static partial Regex ContainerNameRegex();
 
         internal static void ValidateContainerName(string containerName)
         {
-            if (string.IsNullOrWhiteSpace(containerName) || containerName.Length < 3 || containerName.Length > 63 || !ContainerNameRegex.IsMatch(containerName))
+            if (string.IsNullOrWhiteSpace(containerName) || containerName.Length < 3 || containerName.Length > 63 || !ContainerNameRegex().IsMatch(containerName))
             {
                 throw new ArgumentException("Invalid container name", nameof(containerName));
             }

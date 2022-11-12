@@ -48,7 +48,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// <summary>
     /// General utility functions related to Azure Table storage (also applies to Table endpoints in Cosmos DB).
     /// </summary>
-    internal static class AzureTableUtils
+    internal static partial class AzureTableUtils
     {
         /// <summary>
         /// ETag of value "*" to match any etag for conditional table operations (update, merge, delete).
@@ -186,10 +186,13 @@ namespace Orleans.GrainDirectory.AzureStorage
             return false;
         }
 
+        [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{2,62}$")]
+        private static partial Regex TableNameRegex();
+
         internal static void ValidateTableName(string tableName)
         {
             // Regular expression from documentation: https://docs.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
-            if (!Regex.IsMatch(tableName, "^[A-Za-z][A-Za-z0-9]{2,62}$"))
+            if (!TableNameRegex().IsMatch(tableName))
             {
                 throw new ArgumentException($"Table name \"{tableName}\" is invalid according to the following rules:"
                     + " 1. Table names may contain only alphanumeric characters."
