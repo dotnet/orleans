@@ -38,7 +38,7 @@ dotnet run --project GPSTracker.Service
 In the second terminal, launch another instance of the host, specifying that it's the second host by passing an `InstanceId` value as follows:
 
 ```bash
-dotnet run --project GPSTracker.Service -- --InstanceId 1
+dotnet run --project GPSTracker.Service --InstanceId 1
 ```
 
 Now open a web browser to `http://localhost:5001/index.html`. At this point, there will be no points moving around the map.
