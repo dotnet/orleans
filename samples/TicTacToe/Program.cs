@@ -1,4 +1,3 @@
-using Orleans.Hosting;
 using System.Net;
 
 await Host.CreateDefaultBuilder(args)
@@ -7,10 +6,11 @@ await Host.CreateDefaultBuilder(args)
         // In order to support multiple hosts forming a cluster, they must listen on different ports.
         // Use the --InstanceId X option to launch subsequent hosts.
         var instanceId = ctx.Configuration.GetValue<int>("InstanceId");
+        var port = 11_111;
         siloBuilder.UseLocalhostClustering(
-            siloPort: 11111 + instanceId,
+            siloPort: port + instanceId,
             gatewayPort: 30000 + instanceId,
-            primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, 11111));
+            primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, port));
     })
     .ConfigureWebHostDefaults(webBuilder =>
     {

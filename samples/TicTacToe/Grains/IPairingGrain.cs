@@ -1,6 +1,3 @@
-using Orleans;
-using Orleans.Concurrency;
-
 namespace TicTacToe.Grains;
 
 public interface IPairingGrain : IGrainWithIntegerKey
@@ -13,9 +10,9 @@ public interface IPairingGrain : IGrainWithIntegerKey
 }
 
 [Immutable]
-[Serializable]
+[GenerateSerializer]
 public class PairingSummary
 {
-    public Guid GameId { get; set; }
-    public string? Name { get; set; }
+    [Id(0)] public Guid GameId { get; set; }
+    [Id(1)] public string? Name { get; set; }
 }
