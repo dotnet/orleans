@@ -45,8 +45,8 @@ namespace Tester.AzureUtils
         [SkippableFact]
         public async Task UnregisterMany()
         {
-            const int N = 250;
-            const int R = 40;
+            const int N = 25;
+            const int R = 4;
 
             // Create and insert N entries
             var addresses = new List<GrainAddress>();
@@ -56,7 +56,8 @@ namespace Tester.AzureUtils
                 {
                     ActivationId = ActivationId.NewId(),
                     GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
-                    SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
+                    SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+                    MembershipVersion = new MembershipVersion(51)
                 };
                 addresses.Add(addr);
                 await this.grainDirectory.Register(addr);
