@@ -19,7 +19,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
         private readonly string clusterId;
 
-        private class GrainDirectoryEntity : ITableEntity
+        internal class GrainDirectoryEntity : ITableEntity
         {
             public string SiloAddress { get; set; }
             public string  ActivationId { get; set; }

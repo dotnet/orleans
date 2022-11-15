@@ -92,5 +92,19 @@ namespace Tester.AzureUtils
                 }
             }
         }
+
+        [Fact]
+        public void ConversionTest()
+        {
+            var addr = new GrainAddress
+            {
+                ActivationId = ActivationId.NewId(),
+                GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+                MembershipVersion = new MembershipVersion(806)
+            };
+            var entity = AzureTableGrainDirectory.GrainDirectoryEntity.FromGrainAddress("MyClusterId", addr);
+            Assert.Equal(addr, entity.ToGrainAddress());
+        }
     }
 }
