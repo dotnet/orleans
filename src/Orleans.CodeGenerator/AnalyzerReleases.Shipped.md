@@ -11,4 +11,5 @@ ORLEANS0104 | Usage | Error | The proxy base class specified is not a valid prox
 ORLEANS0105 | Usage | Error | RPC interfaces must not contain properties
 ORLEANS0106 | Usage | Error | An error is preventing implicit field identifier generation
 ORLEANS0107 | Usage | Error | Serializable type is not accessible from generated code
+ORLEANS0108 | Usage | Error | No declaring assembly for type passed to GenerateCodeForDeclaringAssemblyAttribute
 
