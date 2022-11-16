@@ -5,7 +5,7 @@
 - :octocat: [dotnet/samples](https://github.com/dotnet/samples/tree/main/orleans)
 - :eyes: [Samples browser](https://learn.microsoft.com/samples/browse/?expanded=dotnet&products=dotnet-orleans)
 
-## [Hello, World!](./HelloWorld/#readme)
+## [Hello, World!](https://learn.microsoft.com/samples/dotnet/samples/orleans-hello-world-sample-app)
 
 <p align="center">
     <img src="./HelloWorld/code.png" />
@@ -19,7 +19,7 @@ A *Hello, World!* application which demonstrates how to create and use your firs
 - How to define and implement grain interface
 - How to get a reference to a grain and call a grain
 
-## [Adventure](./Adventure/#readme)
+## [Adventure](https://learn.microsoft.com/samples/dotnet/samples/orleans-text-adventure-game)
 
 <p align="center">
     <img src="./Adventure/assets/BoxArt.jpg" />
@@ -34,7 +34,7 @@ It's the inspiration for this sample.
 - How to structure an application (in this case, a game) using grains
 - How to connect an external client to an Orleans cluster (`ClientBuilder`)
 
-## [Chirper](./Chirper/#readme)
+## [Chirper](https://learn.microsoft.com/samples/dotnet/samples/orleans-chirper-social-media-sample-app)
 
 <p align="center">
     <img src="./Chirper/screenshot.png" />
@@ -51,7 +51,7 @@ Publishers send out short *"Chirp"* messages (not to be confused with *"Tweets"*
 - Reentrant grains, which allow for multiple grain calls to be executed concurrently, in a single-threaded, interleaving fashion
 - Using a *grain observer* (`IGrainObserver`) to receive push notifications from grains
 
-## [GPS Tracker](./GPSTracker/#readme)
+## [GPS Tracker](https://learn.microsoft.com/samples/dotnet/samples/orleans-gps-device-tracker-sample)
 
 <p align="center">
     <img src="./GPSTracker/screenshot.jpeg" />
@@ -85,7 +85,7 @@ An English-Mandarin dictionary Web application demonstrating deployment to Kuber
 - How to cache results lazily and temporarily
 - How to fan-out requests to many grains and collect the results
 
-## [Presence Service](./Presence/#readme)
+## [Presence Service](https://learn.microsoft.com/samples/dotnet/samples/orleans-gaming-presence-service-sample)
 
 <p align="center">
     <img src="./Presence/screenshot.png" />
@@ -99,7 +99,7 @@ A presence service tracks players and game sessions in near-real-time.
 - A simplified version of a real-world use of Orleans
 - Using a *grain observer* (`IGrainObserver`) to receive push notifications from grains
 
-## [Tic Tac Toe](./TicTacToe/#readme)
+## [Tic Tac Toe](https://learn.microsoft.com/samples/dotnet/samples/orleans-tictactoe-web-based-game)
 
 <p align="center">
     <img src="./TicTacToe/logo.png"/>
@@ -113,7 +113,7 @@ A Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game using 
 - How to build a basic game lobby system
 - How to access Orleans grains from an ASP.NET Core MVC application
 
-## [Voting](./Voting/#readme)
+## [Voting](https://learn.microsoft.com/samples/dotnet/samples/orleans-voting-sample-app-on-kubernetes)
 
 <p align="center">
     <img src="./Voting/screenshot.png"/>
@@ -131,7 +131,7 @@ The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/
 - How to deploy an Orleans-based application to Kubernetes
 - How to configure the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard)
 
-## [Chat Room](./ChatRoom/#readme)
+## [Chat Room](https://learn.microsoft.com/samples/dotnet/samples/orleans-chat-room-sample)
 
 <p align="center">
     <img src="./ChatRoom/screenshot.png" />
@@ -144,7 +144,7 @@ A terminal-based chat application built using [Orleans Streams](https://docs.mic
 - How to build a chat application using Orleans
 - How to use [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming)
 
-## [Bank Account](./BankAccount/#readme)
+## [Bank Account](https://learn.microsoft.com/samples/dotnet/samples/orleans-bank-account-acid-transactions)
 
 <p align="center">
     <img src="./BankAccount/assets/BankClient.png"/>
@@ -156,7 +156,7 @@ Simulates bank accounts, using ACID transactions to transfer random amounts betw
 
 - How to use Orleans Transactions to safely perform operations involving multiple stateful grains with ACID guarantees and serializable isolation.
 
-## [Blazor Server](./Blazor/BlazorServer/#readme) and [Blazor WebAssembly](./Blazor/BlazorWasm/#readme)
+## [Blazor Server](https://learn.microsoft.com/samples/dotnet/samples/orleans-aspnet-core-blazor-server-sample) and [Blazor WebAssembly](https://learn.microsoft.com/samples/dotnet/samples/orleans-aspnet-core-blazor-wasm-sample)
 
 <p align="center">
     <img src="./Blazor/BlazorServer/screenshot.jpeg"/>
@@ -172,7 +172,7 @@ They include an interactive counter, a TODO list, and a Weather service.
 - How to integrate ASP.NET Core Blazor Server with Orleans
 - How to integrate ASP.NET Core Blazor WebAssembly (WASM) with Orleans
 
-## [Stocks](./Stocks/#readme)
+## [Stocks](https://learn.microsoft.com/samples/dotnet/samples/orleans-stocks-sample-app)
 
 <p align="center">
     <img src="./Stocks/screenshot.png" />
@@ -187,7 +187,7 @@ A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host
 - How to use timers within a grain
 - How to make external service calls using .NET's `HttpClient` and cache the results within a grain.
 
-## [Transport Layer Security](./TransportLayerSecurity/#readme)
+## [Transport Layer Security](https://learn.microsoft.com/samples/dotnet/samples/orleans-transport-layer-security-tls)
 
 <p align="center">
     <img src="./TransportLayerSecurity/screenshot.png" />
@@ -207,7 +207,7 @@ A compiled list of examples varying in difficulty.
 
 - How to develop Orleans-based applications
 
-## [Visual Basic Hello World](./VBHelloWorld/#readme)
+## [Visual Basic Hello World](https://github.com/dotnet/samples/tree/main/orleans/VBHelloWorld/README.md)
 
 A *Hello, World!* application using Visual Basic.
 
@@ -215,7 +215,7 @@ A *Hello, World!* application using Visual Basic.
 
 - How to develop Orleans-based applications using Visual Basic
 
-## [F# Hello World](./FSharpHelloWorld/#readme)
+## [F# Hello World](https://github.com/dotnet/samples/tree/main/orleans/FSharpHelloWorld/README.md)
 
 A *Hello, World!* application using F#.
 
@@ -236,7 +236,7 @@ In-memory clustering example where everything is written in F#:
 
 - How to develop Orleans-based applications using F# end to end
 
-## [Streaming: Pub/Sub Streams over Azure Event Hubs](./Streaming/Simple/#readme)
+## [Streaming: Pub/Sub Streams over Azure Event Hubs](https://learn.microsoft.com/samples/dotnet/samples/orleans-streaming-pubsub-with-azure-event-hub)
 
 An application using Orleans Streams with [Azure Event Hubs](https://azure.microsoft.com/services/event-hubs/) as the provider and implicit subscribers.
 
@@ -246,7 +246,7 @@ An application using Orleans Streams with [Azure Event Hubs](https://azure.micro
 - How to use the `[ImplicitStreamSubscription(namespace)]` attribute to implicitly subscribe a grain to the stream with the corresponding id
 - How to configure Orleans Streams for use with [Azure Event Hubs](https://azure.microsoft.com/services/event-hubs/)
 
-## [Streaming: Custom Data Adapter](./Streaming/CustomDataAdapter/#readme)
+## [Streaming: Custom Data Adapter](https://learn.microsoft.com/samples/dotnet/samples/orleans-streaming-custom-data-adapter)
 
 An application using Orleans Streams with a non-Orleans publisher pushing to a stream which a grain consumes via a *custom data adapter* which tells Orleans how to interpret stream messages.
 
