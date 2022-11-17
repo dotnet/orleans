@@ -26,6 +26,8 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("CodeGenerator.Tests")]
 
+[assembly: InternalsVisibleTo("Orleans.Persistence.Migration")]
+
 [assembly: KnownAssembly(typeof(IGrain))]
 
 // Mocking libraries

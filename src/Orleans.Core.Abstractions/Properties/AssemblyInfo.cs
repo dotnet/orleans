@@ -13,5 +13,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 
+[assembly: InternalsVisibleTo("Orleans.Persistence.Migration")]
+
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
