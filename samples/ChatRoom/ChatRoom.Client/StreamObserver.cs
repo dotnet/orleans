@@ -3,7 +3,7 @@ using Spectre.Console;
 
 namespace ChatRoom;
 
-public class StreamObserver : IAsyncObserver<ChatMsg>
+public sealed class StreamObserver : IAsyncObserver<ChatMsg>
 {
     private readonly string _roomName;
 
