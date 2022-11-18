@@ -1,9 +1,9 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT License.
 
 namespace Orleans.ShoppingCart.Abstractions;
 
-[Serializable, Immutable]
+[GenerateSerializer, Immutable]
 public sealed record class CartItem(
     string UserId,
     int Quantity,
