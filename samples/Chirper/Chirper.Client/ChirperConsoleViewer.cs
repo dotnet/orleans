@@ -7,7 +7,7 @@ namespace Chirper.Client;
 /// <summary>
 /// Implements an <see cref="IChirperViewer"/> that outputs notifications to the console.
 /// </summary>
-public class ChirperConsoleViewer : IChirperViewer
+public sealed class ChirperConsoleViewer : IChirperViewer
 {
     /// <summary>
     /// The user name of the account being observed.
