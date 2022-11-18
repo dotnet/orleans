@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace GPSTracker.FakeDeviceGateway;
 
-internal class Program
+internal static class Program
 {
     private static Random Random => Random.Shared;
 
@@ -22,6 +22,7 @@ internal class Program
     {
         var host = new HostBuilder()
             .UseOrleansClient(builder => builder.UseLocalhostClustering())
+            .UseConsoleLifetime()
             .Build();
 
         await host.StartAsync();
@@ -40,24 +41,18 @@ internal class Program
             });
         }
 
-        var timer = new System.Timers.Timer
-        {
-            Interval = 1000
-        };
-        timer.Elapsed += (s, e) =>
+        await using Timer timer = new(_ =>
         {
             Console.Write(". ");
             Interlocked.Exchange(ref _counter, 0);
-        };
-        timer.Start();
-        var cancellation = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, _) => cancellation.Cancel();
+        }, null, 1_000, 1_000);
 
         IGrainFactory factory = host.Services.GetRequiredService<IGrainFactory>();
+        IHostApplicationLifetime lifeTime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
         // Update each device in a loop.
-        var tasks = new List<Task>();
-        while (!cancellation.IsCancellationRequested)
+        var tasks = new List<Task>(capacity: devices.Count);
+        while (!lifeTime.ApplicationStopping.IsCancellationRequested)
         {
             foreach (var model in devices)
             {
