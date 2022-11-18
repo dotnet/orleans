@@ -1,11 +1,10 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Stocks.Interfaces;
 
 namespace Stocks;
 
-public class StocksHostedService : BackgroundService
+public sealed class StocksHostedService : BackgroundService
 {
     private readonly ILogger<StocksHostedService> _logger;
     private readonly IClusterClient _client;

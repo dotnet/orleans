@@ -1,9 +1,8 @@
-using Orleans;
 using Stocks.Interfaces;
 
 namespace Stocks.Grains;
 
-public class StockGrain : Grain, IStockGrain
+public sealed class StockGrain : Grain, IStockGrain
 {
     // Request api key from here https://www.alphavantage.co/support/#api-key
     private const string ApiKey = "5NVLFTOEC34MVTDE";
@@ -11,9 +10,9 @@ public class StockGrain : Grain, IStockGrain
 
     private string _price = null!;
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        this.GetPrimaryKey(out var stock);
+        var stock = this.GetPrimaryKeyString();
         await UpdatePrice(stock);
 
         RegisterTimer(
@@ -22,7 +21,7 @@ public class StockGrain : Grain, IStockGrain
             TimeSpan.FromMinutes(2),
             TimeSpan.FromMinutes(2));
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
     private async Task UpdatePrice(object stock)
