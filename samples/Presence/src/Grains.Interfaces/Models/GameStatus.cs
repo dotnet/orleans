@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Orleans.Concurrency;
 
 namespace Presence.Grains.Models;
 
@@ -8,8 +7,7 @@ namespace Presence.Grains.Models;
 /// This class is immutable.
 /// Operations on this class always return a new copy.
 /// </summary>
-[Serializable]
-[Immutable]
+[GenerateSerializer]
 public record class GameStatus(
     ImmutableHashSet<Guid> PlayerKeys,
     string Score)

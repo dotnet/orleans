@@ -1,13 +1,12 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Presence.Grains;
 using Presence.Grains.Models;
 
 namespace Presence.LoadGenerator;
 
-public class LoadGeneratorHostedService : BackgroundService
+public sealed class LoadGeneratorHostedService : BackgroundService
 {
     private readonly ILogger<LoadGeneratorHostedService> _logger;
     private readonly IClusterClient _client;

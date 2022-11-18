@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Presence.Grains.Models;
 
 namespace Presence.Grains;
