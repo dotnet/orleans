@@ -1,6 +1,7 @@
 using GPSTracker.Common;
 using GPSTracker.GrainInterface;
-using Orleans;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
 
 namespace GPSTracker.FakeDeviceGateway;
@@ -19,11 +20,11 @@ internal class Program
 
     private static async Task Main(string[] args)
     {
-        var client = new ClientBuilder()
-            .UseLocalhostClustering()
+        var host = new HostBuilder()
+            .UseOrleansClient(builder => builder.UseLocalhostClustering())
             .Build();
 
-        await client.Connect();
+        await host.StartAsync();
 
         // Simulate 20 devices
         var devices = new List<Model>();
@@ -52,13 +53,15 @@ internal class Program
         var cancellation = new CancellationTokenSource();
         Console.CancelKeyPress += (_, _) => cancellation.Cancel();
 
+        IGrainFactory factory = host.Services.GetRequiredService<IGrainFactory>();
+
         // Update each device in a loop.
         var tasks = new List<Task>();
         while (!cancellation.IsCancellationRequested)
         {
             foreach (var model in devices)
             {
-                tasks.Add(SendMessage(client, model));
+                tasks.Add(SendMessage(factory, model));
             }
 
             await Task.WhenAll(tasks);
@@ -126,7 +129,7 @@ internal class Program
 
     public static double NextDouble(double min, double max) => Random.NextDouble() * (max - min) + min;
 
-    private class Model
+    private sealed class Model
     {
         public Stopwatch TimeSinceLastUpdate { get; } = Stopwatch.StartNew();
         public int DeviceId { get; set; }

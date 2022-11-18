@@ -1,4 +1,3 @@
-using Orleans;
 using Orleans.Runtime;
 
 namespace GPSTracker.GrainImplementation;
