@@ -1,6 +1,5 @@
 using GPSTracker.Common;
 using GPSTracker.GrainInterface;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -16,7 +15,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     public PushNotifierGrain(ILogger<PushNotifierGrain> logger) => _logger = logger;
     private Task _flushTask = Task.CompletedTask;
 
-    public override async Task OnActivateAsync()
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         // Set up a timer to regularly flush the message queue
         RegisterTimer(
@@ -37,15 +36,15 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
             dueTime: TimeSpan.FromSeconds(60),
             period: TimeSpan.FromSeconds(60));
 
-        await base.OnActivateAsync();
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public override async Task OnDeactivateAsync()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         Flush();
         await _flushTask;
 
-        await base.OnDeactivateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     private async Task RefreshHubs()

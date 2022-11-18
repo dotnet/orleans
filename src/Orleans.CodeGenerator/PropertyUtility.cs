@@ -9,6 +9,8 @@ namespace Orleans.CodeGenerator
 {
     public static class PropertyUtility
     {
+        private static readonly Regex PropertyMatchRegex = new("^<([^>]+)>.*$", RegexOptions.Compiled);
+
         public static IPropertySymbol? GetMatchingProperty(IFieldSymbol field)
         {
             if (field.ContainingType is null)
@@ -18,7 +20,7 @@ namespace Orleans.CodeGenerator
 
         public static IPropertySymbol? GetMatchingProperty(IFieldSymbol field, IEnumerable<ISymbol> memberSymbols)
         {
-            var propertyName = Regex.Match(field.Name, "^<([^>]+)>.*$");
+            var propertyName = PropertyMatchRegex.Match(field.Name);
             if (!propertyName.Success)
             {
                 return null;

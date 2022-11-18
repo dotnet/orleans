@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Presence.Grains.Models;
 
 namespace Presence.Grains;
@@ -56,7 +55,7 @@ public class GameGrain : Grain, IGameGrain
         {
             if (!_status.PlayerKeys.Contains(player))
             {
-                // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
+                // Here we do a fan-out with multiple calls going out in parallel. We join the promises later.
                 // More code to write but we get lower latency when calling multiple player grains.
                 promises.Add((player, GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGameAsync(this.AsReference<IGameGrain>())));
             }

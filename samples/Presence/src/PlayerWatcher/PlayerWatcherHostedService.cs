@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Presence.Grains;
 
 namespace Presence.PlayerWatcher;
 
-public class PlayerWatcherHostedService : IHostedService
+public sealed class PlayerWatcherHostedService : IHostedService
 {
     private readonly ILogger<PlayerWatcherHostedService> _logger;
     private readonly IClusterClient _client;
@@ -63,7 +62,7 @@ public class PlayerWatcherHostedService : IHostedService
         _logger.LogInformation("Observing updates for game {GameKey}", _game.GetPrimaryKey());
 
         // subscribe for updates
-        var reference = await _client.CreateObjectReference<IGameObserver>(_observer);
+        var reference = _client.CreateObjectReference<IGameObserver>(_observer);
         await _game.ObserveGameUpdatesAsync(reference);
 
         _logger.LogInformation("Subscribed successfully to game {GameKey}", _game.GetPrimaryKey());
@@ -73,7 +72,7 @@ public class PlayerWatcherHostedService : IHostedService
     {
         try
         {
-            var reference = await _client.CreateObjectReference<IGameObserver>(_observer);
+            var reference = _client.CreateObjectReference<IGameObserver>(_observer);
             if (_game is not null && reference is not null)
             {
                 await _game.UnobserveGameUpdatesAsync(reference);

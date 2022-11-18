@@ -23,6 +23,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<BroadcastChannelOptions> configureOptions)
         {
             @this.Services.AddBroadcastChannel(name, ob => ob.Configure(configureOptions));
+            @this.AddGrainExtension<IBroadcastChannelConsumerExtension, BroadcastChannelConsumerExtension>();
             return @this;
         }
 

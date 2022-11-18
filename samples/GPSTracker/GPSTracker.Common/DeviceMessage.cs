@@ -1,8 +1,6 @@
-using Orleans.Concurrency;
-
 namespace GPSTracker.Common;
 
-[Immutable, Serializable]
+[Immutable, GenerateSerializer]
 public record class DeviceMessage(
     double Latitude,
     double Longitude,

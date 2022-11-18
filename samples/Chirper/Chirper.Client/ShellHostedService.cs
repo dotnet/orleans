@@ -3,12 +3,11 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Chirper.Grains;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Spectre.Console;
 
 namespace Chirper.Client;
 
-public class ShellHostedService : BackgroundService
+public sealed partial class ShellHostedService : BackgroundService
 {
     private readonly IClusterClient _client;
     private readonly IHostApplicationLifetime _applicationLifetime;
@@ -41,7 +40,7 @@ public class ShellHostedService : BackgroundService
             }
             else if (command.StartsWith("/user "))
             {
-                if (Regex.Match(command, @"/user (?<username>\w{1,100})") is { Success: true } match)
+                if (SetUsernameRegex().Match(command) is { Success: true } match)
                 {
                     await Unobserve();
                     var username = match.Groups["username"].Value;
@@ -58,7 +57,7 @@ public class ShellHostedService : BackgroundService
             {
                 if (EnsureActiveAccount(_account))
                 {
-                    if (Regex.Match(command, @"/follow (?<username>\w{1,100})") is { Success: true } match)
+                    if (FollowUsernameRegex().Match(command) is { Success: true } match)
                     {
                         var targetName = match.Groups["username"].Value;
                         await _account.FollowUserIdAsync(targetName);
@@ -122,7 +121,7 @@ public class ShellHostedService : BackgroundService
                     if (_viewerRef is null)
                     {
                         _viewer = new ChirperConsoleViewer(_account.GetPrimaryKeyString());
-                        _viewerRef = await _client.CreateObjectReference<IChirperViewer>(_viewer);
+                        _viewerRef = _client.CreateObjectReference<IChirperViewer>(_viewer);
                     }
 
                     await _account.SubscribeAsync(_viewerRef);
@@ -142,7 +141,7 @@ public class ShellHostedService : BackgroundService
             {
                 if (EnsureActiveAccount(_account))
                 {
-                    if (Regex.Match(command, @"/unfollow (?<username>\w{1,100})") is { Success: true } match)
+                    if (UnfollowUsernameRegex().Match(command) is { Success: true } match)
                     {
                         var targetName = match.Groups["username"].Value;
                         await _account.UnfollowUserIdAsync(targetName);
@@ -157,7 +156,7 @@ public class ShellHostedService : BackgroundService
             {
                 if (EnsureActiveAccount(_account))
                 {
-                    if (Regex.Match(command, @"/chirp (?<message>.+)") is { Success: true } match)
+                    if (ChirpMessageRegex().Match(command) is { Success: true } match)
                     {
                         var message = match.Groups["message"].Value;
                         await _account.PublishMessageAsync(message);
@@ -201,17 +200,18 @@ public class ShellHostedService : BackgroundService
 
     private static void ShowHelp(bool title = false)
     {
-        var markup = new Markup(
-            "[bold fuchsia]/help[/]: Shows this [underline green]help[/] text.\n"
-            + "[bold fuchsia]/user[/] [aqua]<username>[/]: Switches to the specified [underline green]user[/] account.\n"
-            + "[bold fuchsia]/chirp[/] [aqua]<message>[/]: [underline green]Chirps[/] a [aqua]message[/] from the active account.\n"
-            + "[bold fuchsia]/follow[/] [aqua]<username>[/]: [underline green]Follows[/] the account with the specified [aqua]username[/].\n"
-            + "[bold fuchsia]/unfollow[/] [aqua]<username>[/]: [underline green]Unfollows[/] the account with the specified [aqua]username[/].\n"
-            + "[bold fuchsia]/following[/]: Lists the accounts that the active account is [underline green]following[/].\n"
-            + "[bold fuchsia]/followers[/]: Lists the accounts [underline green]followers[/] the active account.\n"
-            + "[bold fuchsia]/observe[/]: [underline green]Start observing[/] the active account.\n"
-            + "[bold fuchsia]/unobserve[/]: [underline green]Stop observing[/] the active account.\n"
-            + "[bold fuchsia]/quit[/]: Closes this client.\n");
+        var markup = new Markup("""
+            [bold fuchsia]/help[/]: Shows this [underline green]help[/] text.
+            [bold fuchsia]/user[/] [aqua]<username>[/]: Switches to the specified [underline green]user[/] account.
+            [bold fuchsia]/chirp[/] [aqua]<message>[/]: [underline green]Chirps[/] a [aqua]message[/] from the active account.
+            [bold fuchsia]/follow[/] [aqua]<username>[/]: [underline green]Follows[/] the account with the specified [aqua]username[/].
+            [bold fuchsia]/unfollow[/] [aqua]<username>[/]: [underline green]Unfollows[/] the account with the specified [aqua]username[/].
+            [bold fuchsia]/following[/]: Lists the accounts that the active account is [underline green]following[/].
+            [bold fuchsia]/followers[/]: Lists the accounts [underline green]followers[/] the active account.
+            [bold fuchsia]/observe[/]: [underline green]Start observing[/] the active account.
+            [bold fuchsia]/unobserve[/]: [underline green]Stop observing[/] the active account.
+            [bold fuchsia]/quit[/]: Closes this client.
+            """);
         if (title)
         {
             // Add some flair for the title screen
@@ -262,4 +262,16 @@ public class ShellHostedService : BackgroundService
             AnsiConsole.Write(markup);
         }
     }
+
+    [GeneratedRegex("/user (?<username>\\w{1,100})")]
+    private static partial Regex SetUsernameRegex();
+    
+    [GeneratedRegex("/chirp (?<message>.+)")]
+    private static partial Regex ChirpMessageRegex();
+    
+    [GeneratedRegex("/unfollow (?<username>\\w{1,100})")]
+    private static partial Regex UnfollowUsernameRegex();
+    
+    [GeneratedRegex("/follow (?<username>\\w{1,100})")]
+    private static partial Regex FollowUsernameRegex();
 }

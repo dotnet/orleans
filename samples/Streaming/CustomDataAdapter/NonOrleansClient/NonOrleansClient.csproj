@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Messaging.EventHubs" Version="5.6.2" />
-    <PackageReference Include="System.Text.Json" Version="7.0.0-rc.2.22472.3" />
+    <PackageReference Include="Azure.Messaging.EventHubs" Version="5.7.4" />
+    <PackageReference Include="System.Text.Json" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>

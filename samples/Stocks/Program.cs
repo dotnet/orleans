@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Hosting;
 using Stocks;
 
 await Host.CreateDefaultBuilder(args)

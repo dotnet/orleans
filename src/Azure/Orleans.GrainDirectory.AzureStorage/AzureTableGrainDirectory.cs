@@ -19,10 +19,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
         private readonly string clusterId;
 
-        private class GrainDirectoryEntity : ITableEntity
+        internal class GrainDirectoryEntity : ITableEntity
         {
             public string SiloAddress { get; set; }
-            public string  ActivationId { get; set; }
+            public string ActivationId { get; set; }
+            public long MembershipVersion { get; set; }
             public string PartitionKey { get; set; }
             public string RowKey { get; set; }
             public DateTimeOffset? Timestamp { get; set; }
@@ -35,6 +36,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     GrainId = RowKeyToGrainId(this.RowKey),
                     SiloAddress = Runtime.SiloAddress.FromParsableString(this.SiloAddress),
                     ActivationId = Runtime.ActivationId.FromParsableString(this.ActivationId),
+                    MembershipVersion = new MembershipVersion(this.MembershipVersion)
                 };
             }
 
@@ -46,6 +48,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     RowKey = GrainIdToRowKey(address.GrainId),
                     SiloAddress = address.SiloAddress.ToParsableString(),
                     ActivationId = address.ActivationId.ToParsableString(),
+                    MembershipVersion = address.MembershipVersion.Value,
                 };
             }
 

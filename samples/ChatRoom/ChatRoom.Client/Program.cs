@@ -1,42 +1,38 @@
 using System.Reflection;
 using ChatRoom;
-using Orleans;
-using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Runtime;
 using Spectre.Console;
 
-var client = new ClientBuilder()
-    .UseLocalhostClustering()
-    .ConfigureApplicationParts(
-        parts => parts.AddApplicationPart(typeof(IChannelGrain).Assembly).WithReferences())
-    .AddSimpleMessageStreamProvider("chat")
+using var host = new HostBuilder()
+    .UseOrleansClient(clientBuilder =>
+    {
+        clientBuilder.UseLocalhostClustering()
+            .AddMemoryStreams("chat");
+    })
     .Build();
 
 PrintUsage();
 
+var client = host.Services.GetRequiredService<IClusterClient>();
+
 ClientContext context = new(client);
-await StartAsync(context);
+await StartAsync(host);
 context = context with
 {
     UserName = AnsiConsole.Ask<string>("What is your [aqua]name[/]?")
 };
 await ProcessLoopAsync(context);
-await StopAsync(context);
+await StopAsync(host);
 
-static Task StartAsync(ClientContext context) =>
+static Task StartAsync(IHost host) =>
     AnsiConsole.Status().StartAsync("Connecting to server", async ctx =>
     {
         ctx.Spinner(Spinner.Known.Dots);
         ctx.Status = "Connecting...";
 
-        await context.Client.Connect(async error =>
-        {
-            AnsiConsole.MarkupLine("[bold red]Error:[/] error connecting to server!");
-            AnsiConsole.WriteException(error);
-            ctx.Status = "Waiting to retry...";
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            ctx.Status = "Retrying connection...";
-            return true;
-        });
+        await host.StartAsync();
 
         ctx.Status = "Connected!";
     });
@@ -68,22 +64,22 @@ static async Task ProcessLoopAsync(ClientContext context)
         }
 
         if (firstTwoCharacters switch
-            {
-                "/j" => JoinChannel(context, input.Replace("/j", "").Trim()),
-                "/l" => LeaveChannel(context),
-                _ => null
-            } is Task<ClientContext> cxtTask)
+        {
+            "/j" => JoinChannel(context, input.Replace("/j", "").Trim()),
+            "/l" => LeaveChannel(context),
+            _ => null
+        } is Task<ClientContext> cxtTask)
         {
             context = await cxtTask;
             continue;
         }
 
         if (firstTwoCharacters switch
-            {
-                "/h" => ShowCurrentChannelHistory(context),
-                "/m" => ShowChannelMembers(context),
-                _ => null
-            } is Task task)
+        {
+            "/h" => ShowCurrentChannelHistory(context),
+            "/m" => ShowChannelMembers(context),
+            _ => null
+        } is Task task)
         {
             await task;
             continue;
@@ -93,11 +89,11 @@ static async Task ProcessLoopAsync(ClientContext context)
     } while (input is not "/exit");
 }
 
-static Task StopAsync(ClientContext context) =>
+static Task StopAsync(IHost host) =>
     AnsiConsole.Status().StartAsync("Disconnecting...", async ctx =>
     {
         ctx.Spinner(Spinner.Known.Dots);
-        await context.Client.Close();
+        await host.StopAsync();
     });
 
 static void PrintUsage()
@@ -225,13 +221,14 @@ static async Task<ClientContext> JoinChannel(
     await AnsiConsole.Status().StartAsync("Joining channel...", async ctx =>
     {
         var room = context.Client.GetGrain<IChannelGrain>(context.CurrentChannel);
-        var streamId = await room.Join(context.UserName!);
+        await room.Join(context.UserName!);
+        var streamId = StreamId.Create("ChatRoom", context.CurrentChannel!);
         var stream =
             context.Client
                 .GetStreamProvider("chat")
-                .GetStream<ChatMsg>(streamId, "default");
+                .GetStream<ChatMsg>(streamId);
 
-        //subscribe to the stream to receive furthur messages sent to the chatroom
+        // Subscribe to the stream to receive furthur messages sent to the chatroom
         await stream.SubscribeAsync(new StreamObserver(channelName));
     });
     AnsiConsole.MarkupLine("[bold aqua]Joined channel [/]{0}", context.CurrentChannel!);
@@ -247,14 +244,15 @@ static async Task<ClientContext> LeaveChannel(ClientContext context)
     await AnsiConsole.Status().StartAsync("Leaving channel...", async ctx =>
     {
         var room = context.Client.GetGrain<IChannelGrain>(context.CurrentChannel);
-        var streamId = await room.Leave(context.UserName!);
+        await room.Leave(context.UserName!);
+        var streamId = StreamId.Create("ChatRoom", context.CurrentChannel!);
         var stream =
             context.Client
                 .GetStreamProvider("chat")
-                .GetStream<ChatMsg>(streamId, "default");
+                .GetStream<ChatMsg>(streamId);
 
-        //unsubscribe from the channel/stream since client left, so that client won't
-        //receive future messages from this channel/stream
+        // Unsubscribe from the channel/stream since client left, so that client won't
+        // receive future messages from this channel/stream.
         var subscriptionHandles = await stream.GetAllSubscriptionHandles();
         foreach (var handle in subscriptionHandles)
         {
@@ -263,5 +261,6 @@ static async Task<ClientContext> LeaveChannel(ClientContext context)
     });
 
     AnsiConsole.MarkupLine("[bold olive]Left channel [/]{0}", context.CurrentChannel!);
+
     return context with { CurrentChannel = null };
 }

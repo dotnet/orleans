@@ -443,7 +443,16 @@ namespace Orleans.CodeGenerator
                     var type = (ITypeSymbol)param.Value;
 
                     // Recurse on the assemblies which the type was declared in.
-                    ComputeAssembliesToExamine(type.OriginalDefinition.ContainingAssembly, expandedAssemblies);
+                    var declaringAsm = type.OriginalDefinition.ContainingAssembly;
+                    if (declaringAsm is null)
+                    {
+                        var diagnostic = GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.CreateDiagnostic(attr, type);
+                        throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
+                    }
+                    else
+                    {
+                        ComputeAssembliesToExamine(declaringAsm, expandedAssemblies);
+                    }
                 }
             }
         }

@@ -1,9 +1,8 @@
 using System.Text.Json;
 using Azure.Messaging.EventHubs;
-using Newtonsoft.Json.Serialization;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 
 namespace Silo;

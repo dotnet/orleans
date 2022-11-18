@@ -1,4 +1,4 @@
-using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace ChatRoom;
@@ -10,17 +10,20 @@ public class ChannelGrain : Grain, IChannelGrain
 
     private IAsyncStream<ChatMsg> _stream = null!;
 
-    public override Task OnActivateAsync()
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        var streamProvider = GetStreamProvider("chat");
+        var streamProvider = this.GetStreamProvider("chat");
+
+        var streamId = StreamId.Create(
+            "ChatRoom", this.GetPrimaryKeyString());
 
         _stream = streamProvider.GetStream<ChatMsg>(
-            Guid.NewGuid(), "default");
+            streamId);
 
-        return base.OnActivateAsync();
+        return base.OnActivateAsync(cancellationToken);
     }
 
-    public async Task<Guid> Join(string nickname)
+    public async Task<StreamId> Join(string nickname)
     {
         _onlineMembers.Add(nickname);
 
@@ -29,10 +32,10 @@ public class ChannelGrain : Grain, IChannelGrain
                 "System",
                 $"{nickname} joins the chat '{this.GetPrimaryKeyString()}' ..."));
 
-        return _stream.Guid;
+        return _stream.StreamId;
     }
 
-    public async Task<Guid> Leave(string nickname)
+    public async Task<StreamId> Leave(string nickname)
     {
         _onlineMembers.Remove(nickname);
 
@@ -41,7 +44,7 @@ public class ChannelGrain : Grain, IChannelGrain
                 "System",
                 $"{nickname} leaves the chat..."));
 
-        return _stream.Guid;
+        return _stream.StreamId;
     }
 
     public async Task<bool> Message(ChatMsg msg)

@@ -1,7 +1,7 @@
 using Common;
 using GrainInterfaces;
 using Microsoft.Extensions.Logging;
-using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Grains;
@@ -26,8 +26,9 @@ public class ProducerGrain : Grain, IProducerGrain
             throw new Exception("This grain is already producing events");
 
         // Get the stream
+        var streamId = StreamId.Create(ns, key);
         _stream = this.GetStreamProvider(Constants.StreamProvider)
-            .GetStream<int>(key, ns);
+            .GetStream<int>(streamId);
 
         // Register a timer that produce an event every second
         var period = TimeSpan.FromSeconds(1);
