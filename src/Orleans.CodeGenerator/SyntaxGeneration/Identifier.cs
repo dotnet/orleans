@@ -116,6 +116,8 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
         }
 
-        public static string SanitizeIdentifierName(string input) => Regex.Replace(input, "[-\\.]", "_");
+        private static readonly Regex SanitizeIdentifierRegex = new("[-\\.]", RegexOptions.Compiled);
+
+        public static string SanitizeIdentifierName(string input) => SanitizeIdentifierRegex.Replace(input, "");
     }
 }
