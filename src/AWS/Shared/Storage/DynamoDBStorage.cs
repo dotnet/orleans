@@ -71,18 +71,17 @@ namespace Orleans.Transactions.DynamoDB
             bool createIfNotExists = true,
             bool updateIfExists = true)
         {
-            if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
             this.secretKey = secretKey;
-            this.service = service;
+            this.service = service ?? throw new ArgumentNullException(nameof(service));
             this.useProvisionedThroughput = useProvisionedThroughput;
             this.provisionedThroughput = this.useProvisionedThroughput
                 ? new ProvisionedThroughput(readCapacityUnits, writeCapacityUnits)
                 : null;
             this.createIfNotExists = createIfNotExists;
             this.updateIfExists = updateIfExists;
-            Logger = logger;
-            CreateClient();
+            this.Logger = logger;
+            this.CreateClient();
         }
 
         /// <summary>
@@ -105,7 +104,7 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 TableDescription tableDescription = await GetTableDescription(tableName);
-                await (tableDescription == null
+                await (tableDescription is null
                     ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName)
                     : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName));
             }
@@ -143,7 +142,7 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 var description = await ddbClient.DescribeTableAsync(tableName);
-                if (description.Table != null)
+                if (description.Table is not null)
                     return description.Table;
             }
             catch (ResourceNotFoundException)
@@ -170,7 +169,7 @@ namespace Orleans.Transactions.DynamoDB
                 ProvisionedThroughput = provisionedThroughput
             };
 
-            if (secondaryIndexes != null && secondaryIndexes.Count > 0)
+            if (secondaryIndexes is not null && secondaryIndexes.Count > 0)
             {
                 if (this.useProvisionedThroughput)
                 {
@@ -349,7 +348,7 @@ namespace Orleans.Transactions.DynamoDB
 
             do
             {
-                if (ret != null)
+                if (ret is not null)
                 {
                     await Task.Delay(delay);
                 }
@@ -372,7 +371,7 @@ namespace Orleans.Transactions.DynamoDB
 
             do
             {
-                if (index != null)
+                if (index is not null)
                 {
                     await Task.Delay(delay);
                 }
@@ -381,7 +380,7 @@ namespace Orleans.Transactions.DynamoDB
                 index = ret.GlobalSecondaryIndexes.FirstOrDefault(index => index.IndexName == indexName);
             } while (index.IndexStatus == whileStatus);
 
-            if (desiredStatus != null && index.IndexStatus != desiredStatus)
+            if (desiredStatus is not null && index.IndexStatus != desiredStatus)
             {
                 throw new InvalidOperationException($"Index {indexName} in table {tableName} has failed to reach the desired status of {desiredStatus}");
             }
@@ -425,7 +424,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
 
-                if (conditionValues != null && conditionValues.Keys.Count > 0)
+                if (conditionValues is not null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
                 return ddbClient.PutItemAsync(request);
@@ -515,7 +514,7 @@ namespace Orleans.Transactions.DynamoDB
             else
             {
                 updateExpression.Append($" {extraExpression}");
-                if (extraExpressionValues != null && extraExpressionValues.Count > 0)
+                if (extraExpressionValues is not null && extraExpressionValues.Count > 0)
                 {
                     foreach (var key in extraExpressionValues.Keys)
                     {
@@ -524,7 +523,7 @@ namespace Orleans.Transactions.DynamoDB
                 }
             }
 
-            if (conditionValues != null && conditionValues.Keys.Count > 0)
+            if (conditionValues is not null && conditionValues.Keys.Count > 0)
             {
                 foreach (var item in conditionValues)
                 {
@@ -558,7 +557,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
 
-                if (conditionValues != null && conditionValues.Keys.Count > 0)
+                if (conditionValues is not null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
                 return ddbClient.DeleteItemAsync(request);
@@ -581,7 +580,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
 
-            if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
+            if (toDelete is null) throw new ArgumentNullException(nameof(toDelete));
 
             if (toDelete.Count == 0)
                 return Task.CompletedTask;
@@ -616,7 +615,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <typeparam name="TResult">The result type</typeparam>
         /// <param name="tableName">The name of the table to search for the entry</param>
         /// <param name="keys">The table entry keys to search for</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is not null</param>
         /// <returns>The object translated by the resolver function</returns>
         public async Task<TResult> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
@@ -654,7 +653,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The name of the table to search for the entries</param>
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="keyConditionExpression">the expression that will filter the keys</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is not null and will be called for each entry that match the query and added to the results list</param>
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
@@ -703,7 +702,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The name of the table to search for the entries</param>
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="keyConditionExpression">the expression that will filter the keys</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is not null and will be called for each entry that match the query and added to the results list</param>
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
@@ -719,7 +718,7 @@ namespace Orleans.Transactions.DynamoDB
                 List<TResult> results;
                 (results, lastEvaluatedKey) = await QueryAsync(tableName, keys, keyConditionExpression, resolver,
                     indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
-                if (resultList == null)
+                if (resultList is null)
                 {
                     resultList = results;
                 }
@@ -739,7 +738,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The name of the table to search for the entries</param>
         /// <param name="attributes">The attributes used on the expression</param>
         /// <param name="expression">The filter expression</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is not null and will be called for each entry that match the query and added to the results list</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
         public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
@@ -804,7 +803,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
 
-            if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
+            if (toCreate is null) throw new ArgumentNullException(nameof(toCreate));
 
             if (toCreate.Count == 0)
                 return Task.CompletedTask;
@@ -839,7 +838,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <typeparam name="TResult">The result type</typeparam>
         /// <param name="tableName">The name of the table to search for the entry</param>
         /// <param name="keys">The table entry keys to search for</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is not null</param>
         /// <returns>The object translated by the resolver function</returns>
         public async Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
@@ -881,19 +880,19 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 var transactItems = new List<TransactWriteItem>();
-                if (puts != null)
+                if (puts is not null)
                 {
                     transactItems.AddRange(puts.Select(p => new TransactWriteItem { Put = p }));
                 }
-                if (updates != null)
+                if (updates is not null)
                 {
                     transactItems.AddRange(updates.Select(u => new TransactWriteItem { Update = u }));
                 }
-                if (deletes != null)
+                if (deletes is not null)
                 {
                     transactItems.AddRange(deletes.Select(d => new TransactWriteItem { Delete = d }));
                 }
-                if (conditionChecks != null)
+                if (conditionChecks is not null)
                 {
                     transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem { ConditionCheck = c }));
                 }
