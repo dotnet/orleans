@@ -1,5 +1,5 @@
 {
-  "areaPath": "DevDiv\\ASP.NET Core",
+  "areaPath": "DevDiv\\ASP.NET Core\\Orleans",
   "codebaseName": "Orleans",
   "instanceUrl": "https://devdiv.visualstudio.com/",
   "iterationPath": "DevDiv",
