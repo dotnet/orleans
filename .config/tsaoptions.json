@@ -1,0 +1,13 @@
+{
+  "areaPath": "DevDiv\\ASP.NET Core\\Orleans",
+  "codebaseName": "Orleans",
+  "instanceUrl": "https://devdiv.visualstudio.com/",
+  "iterationPath": "DevDiv",
+  "notificationAliases": [
+    "bpetit@microsoft.com",
+    "reuben.bond@microsoft.com"
+  ],
+  "projectName": "DEVDIV",
+  "repositoryName": "Orleans",
+  "template": "TFSDEVDIV"
+}
