@@ -3,7 +3,7 @@ namespace Orleans.Serialization.WireProtocol
     /// <summary>
     /// Represents an extended wire type
     /// </summary>
-    public enum ExtendedWireType : byte
+    public enum ExtendedWireType : uint
     {        
         /// <summary>
         /// Marks the end of a tag-delimited field.

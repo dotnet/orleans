@@ -68,7 +68,7 @@ namespace Orleans.Serialization.WireProtocol
             set
             {
                 // If the field id delta can fit into the tag, embed it there, otherwise invalidate the embedded field id delta and set the full field id delta.
-                if (value < Tag.FieldIdCompleteMask)
+                if (value <= Tag.MaxEmbeddedFieldIdDelta)
                 {
                     Tag.FieldIdDelta = value;
                 }

@@ -1,12 +1,17 @@
+using System.Buffers;
+using System.IO.Pipelines;
 using BenchmarkDotNet.Attributes;
 using Benchmarks.Models;
 using Benchmarks.Utilities;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
+using Orleans.Networking.Shared;
+using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Buffers;
 using Xunit;
 
 namespace Benchmarks
@@ -26,7 +31,11 @@ namespace Benchmarks
         private readonly SerializerSession _session;
         private readonly ReadOnlySequence<byte> _serializedPayload;
         private readonly long _readBytesLength;
-        private SimpleStruct _structValue;
+        private readonly Pipe _pipe;
+        private readonly MessageSerializer _messageSerializer;
+        private readonly SimpleStruct _structValue;
+        private readonly Message _message;
+        private readonly Message _structMessage;
 
         public ComplexTypeBenchmarks()
         {
@@ -48,6 +57,7 @@ namespace Benchmarks
                 //MultiDimensionalArray = new[,] {{0, 2, 4}, {1, 5, 6}}
             };
             _value.AlsoSelf = _value.BaseSelf = _value.Self = _value;
+            _message = new() { BodyObject = new Response<ComplexClass> { TypedResult = _value } };
 
             _structValue = new SimpleStruct
             {
@@ -55,15 +65,20 @@ namespace Benchmarks
                 Bool = true,
                 Guid = Guid.NewGuid()
             };
+            _structMessage = new() { BodyObject = new Response<SimpleStruct> { TypedResult = _structValue } };
+
             _session = _sessionPool.GetSession();
             var writer = Buffer.CreateWriter(_session);
 
             _serializer.Serialize(_value, ref writer);
             var bytes = new byte[writer.Output.GetMemory().Length];
-            writer.Output.GetReadOnlySequence().CopyTo(bytes);
+            writer.Output.GetReadOnlySpan().CopyTo(bytes);
             _serializedPayload = new ReadOnlySequence<byte>(bytes);
             Buffer.Reset();
             _readBytesLength = _serializedPayload.Length;
+
+            _pipe = new Pipe(new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, pauseWriterThreshold: 0));
+            _messageSerializer = new(_sessionPool, new SharedMemoryPool(), new SiloMessagingOptions());
         }
 
         [Fact]
@@ -74,7 +89,7 @@ namespace Benchmarks
             _serializer.Serialize(_value, ref writer);
 
             _session.FullReset();
-            var reader = Reader.Create(writer.Output.GetReadOnlySequence(), _session);
+            var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             _ = _serializer.Deserialize(ref reader);
             Buffer.Reset();
         }
@@ -100,10 +115,28 @@ namespace Benchmarks
             _structSerializer.Serialize(_structValue, ref writer);
 
             _session.FullReset();
-            var reader = Reader.Create(writer.Output.GetReadOnlySequence(), _session);
+            var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _structSerializer.Deserialize(ref reader);
             Buffer.Reset();
             return result;
+        }
+
+        [Fact]
+        [Benchmark]
+        public void OrleansMessageSerializerStructRoundTrip()
+        {
+            _messageSerializer.Write(_pipe.Writer, _message);
+            _pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            _pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            _messageSerializer.TryRead(ref reader, out var result);
+
+            ((Response<SimpleStruct>)result.BodyObject).Dispose();
+
+            _pipe.Writer.Complete();
+            _pipe.Reader.Complete();
+            _pipe.Reset();
         }
 
         [Fact]
@@ -115,10 +148,28 @@ namespace Benchmarks
             _serializer.Serialize(_value, ref writer);
 
             _session.FullReset();
-            var reader = Reader.Create(writer.Output.GetReadOnlySequence(), _session);
+            var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _serializer.Deserialize(ref reader);
             Buffer.Reset();
             return result;
+        }
+
+        [Fact]
+        //[Benchmark]
+        public void OrleansMessageSerializerClassRoundTrip()
+        {
+            _messageSerializer.Write(_pipe.Writer, _message);
+            _pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            _pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            _messageSerializer.TryRead(ref reader, out var result);
+
+            ((Response<ComplexClass>)result.BodyObject).Dispose();
+
+            _pipe.Writer.Complete();
+            _pipe.Reader.Complete();
+            _pipe.Reset();
         }
 
         [Fact]

@@ -283,7 +283,7 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
             try
             {
                 var input = this._transport.Input;
@@ -341,7 +341,6 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _transport.Input.Complete();
-                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
         }
@@ -351,7 +350,7 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
             try
             {
                 var output = this._transport.Output;
@@ -371,7 +370,7 @@ namespace Orleans.Runtime.Messaging
                         while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
                             inflight.Add(message);
-                            var (headerLength, bodyLength) = serializer.Write(ref output, message);
+                            var (headerLength, bodyLength) = serializer.Write(output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
                             message = null;
                         }
@@ -405,7 +404,6 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _transport.Output.Complete();
-                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
         }

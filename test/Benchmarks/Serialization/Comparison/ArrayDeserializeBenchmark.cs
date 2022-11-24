@@ -1,7 +1,5 @@
 using System.Buffers;
-using System.IO;
-using System.Linq;
-using System.Numerics;
+using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
@@ -27,6 +25,7 @@ public class ArraySerializeBenchmark
     private static readonly ArrayBufferWriter<byte> _arrayBufferWriter;
     private static readonly Utf8JsonWriter _jsonWriter;
     private static readonly MemoryStream _stream;
+    private static readonly Pipe _pipe;
 
     static ArraySerializeBenchmark()
     {
@@ -49,6 +48,8 @@ public class ArraySerializeBenchmark
 
         _arrayBufferWriter = new ArrayBufferWriter<byte>(new[] { serialize1, serialize2, serialize3, serialize4 }.Max(x => x.Length));
         _jsonWriter = new Utf8JsonWriter(_arrayBufferWriter);
+
+        _pipe = new Pipe(new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, pauseWriterThreshold: 0));
     }
 
     // return byte[]
@@ -123,7 +124,7 @@ public class ArraySerializeBenchmark
         finally
         {
             writer.Dispose();
-            _session.PartialReset();
+            _session.FullReset();
         }
     }
 
@@ -140,9 +141,22 @@ public class ArraySerializeBenchmark
         finally
         {
             writer.Dispose();
-            _session.PartialReset();
+            _session.FullReset();
         }
 
         _arrayBufferWriter.Clear(); // clear ArrayBufferWriter<byte>
+    }
+
+    [Fact]
+    [Benchmark]
+    public void OrleansPipeWriter()
+    {
+        var writer = _pipe.Writer.CreateWriter(_session);
+        _orleansSerializer.Serialize(_value, ref writer);
+        _session.FullReset();
+
+        _pipe.Writer.Complete();
+        _pipe.Reader.Complete();
+        _pipe.Reset();
     }
 }

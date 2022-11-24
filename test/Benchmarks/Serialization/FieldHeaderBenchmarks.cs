@@ -47,7 +47,7 @@ namespace Benchmarks
             var writer = new SingleSegmentBuffer(OrleansBuffer).CreateWriter(Session);
 
             // Use an expected type and a field id with a value small enough to be embedded.
-            writer.WriteFieldHeaderExpectedEmbedded(4, WireType.VarInt);
+            writer.WriteFieldHeaderExpected(4, WireType.VarInt);
         }
 
         [Benchmark]
@@ -56,7 +56,7 @@ namespace Benchmarks
             var writer = new SingleSegmentBuffer(OrleansBuffer).CreateWriter(Session);
 
             // Use a field id delta which is too large to be embedded.
-            writer.WriteFieldHeaderExpectedExtended(Tag.MaxEmbeddedFieldIdDelta + 20, WireType.VarInt);
+            writer.WriteFieldHeaderExpected(Tag.MaxEmbeddedFieldIdDelta + 20, WireType.VarInt);
         }
 
         [Benchmark]

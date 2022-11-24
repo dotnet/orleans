@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
         {
             writer.Session.ReferencedObjects.MarkValueField();
             writer.WriteFieldHeaderExpected(fieldId, WireType.Reference);
-            writer.WriteVarUInt32(0U);
+            writer.WriteByte(1); // writer.WriteVarUInt32(0U);
         }
 
         /// <summary>

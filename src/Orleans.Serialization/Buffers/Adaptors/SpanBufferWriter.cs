@@ -31,33 +31,16 @@ namespace Orleans.Serialization.Buffers.Adaptors
         public void Advance(int count) => _bytesWritten += count;
 
         /// <inheritdoc />
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            if (_bytesWritten + sizeHint > _maxLength)
-            {
-                ThrowInsufficientCapacity(sizeHint);
-            }
-
-            ThrowNotSupported();
-            return default;
-
-            static void ThrowNotSupported() => throw new NotSupportedException("Method is not supported on this instance");
-        }
+        public Memory<byte> GetMemory(int sizeHint = 0) => throw GetException(sizeHint);
 
         /// <inheritdoc />
-        public Span<byte> GetSpan(int sizeHint = 0)
+        public Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
+
+        private Exception GetException(int sizeHint)
         {
-            if (_bytesWritten + sizeHint > _maxLength)
-            {
-                ThrowInsufficientCapacity(sizeHint);
-            }
-
-            ThrowNotSupported();
-            return default;
-
-            static void ThrowNotSupported() => throw new NotSupportedException("Method is not supported on this instance");
+            return _bytesWritten + sizeHint > _maxLength
+                ? new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {_bytesWritten} and requested size increase is {sizeHint}")
+                : new NotSupportedException("Method is not supported on this instance");
         }
-
-        private void ThrowInsufficientCapacity(int sizeHint) => throw new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {_bytesWritten} and requested size increase is {sizeHint}");
     }
 }

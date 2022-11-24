@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.Session
@@ -52,17 +53,15 @@ namespace Orleans.Serialization.Session
         /// <summary>
         /// Gets or adds the identifier for the specified type.
         /// </summary>
-        public bool GetOrAddTypeReference(Type type, out uint reference)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint GetOrAddTypeReference(Type type)
         {
             ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_referencedTypeToIdMap, type, out var exists);
             if (exists)
-            {
-                reference = refValue;
-                return true;
-            }
+                return refValue;
 
-            refValue = reference = ++_currentReferenceId;
-            return false;
+            refValue = ++_currentReferenceId;
+            return 0;
         }
 
         /// <summary>

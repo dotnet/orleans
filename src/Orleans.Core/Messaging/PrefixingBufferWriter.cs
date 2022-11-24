@@ -1,8 +1,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
@@ -10,15 +10,13 @@ namespace Orleans.Runtime.Messaging
     /// <summary>
     /// An <see cref="IBufferWriter{T}"/> that reserves some fixed size for a header.
     /// </summary>
-    /// <typeparam name="T">The type of element written by this writer.</typeparam>
-    /// <typeparam name="TBufferWriter">The type of underlying buffer writer.</typeparam>
     /// <remarks>
     /// This type is used for inserting the length of list in the header when the length is not known beforehand.
     /// It is optimized to minimize or avoid copying.
     /// </remarks>
-    internal class PrefixingBufferWriter<T, TBufferWriter> : IBufferWriter<T>, IDisposable where TBufferWriter : IBufferWriter<T> 
+    internal sealed class PrefixingBufferWriter : IBufferWriter<byte>, IDisposable
     {
-        private readonly MemoryPool<T> memoryPool;
+        private readonly MemoryPool<byte> memoryPool;
 
         /// <summary>
         /// The length of the header.
@@ -33,19 +31,19 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// The underlying buffer writer.
         /// </summary>
-        private TBufferWriter innerWriter;
+        private PipeWriter innerWriter;
 
         /// <summary>
         /// The memory reserved for the header from the <see cref="innerWriter"/>.
         /// This memory is not reserved until the first call from this writer to acquire memory.
         /// </summary>
-        private Memory<T> prefixMemory;
+        private Memory<byte> prefixMemory;
 
         /// <summary>
         /// The memory acquired from <see cref="innerWriter"/>.
         /// This memory is not reserved until the first call from this writer to acquire memory.
         /// </summary>
-        private Memory<T> realMemory;
+        private Memory<byte> realMemory;
 
         /// <summary>
         /// The number of elements written to a buffer belonging to <see cref="innerWriter"/>.
@@ -58,13 +56,15 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private Sequence privateWriter;
 
+        private int _committedBytes;
+
         /// <summary>
-        /// Initializes a new instance of the <see cref="PrefixingBufferWriter{T, TBufferWriter}"/> class.
+        /// Initializes a new instance of the <see cref="PrefixingBufferWriter"/> class.
         /// </summary>
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
         /// <param name="memoryPool"></param>
-        public PrefixingBufferWriter(int prefixSize, int payloadSizeHint, MemoryPool<T> memoryPool)
+        public PrefixingBufferWriter(int prefixSize, int payloadSizeHint, MemoryPool<byte> memoryPool)
         {
             if (prefixSize <= 0)
             {
@@ -74,76 +74,74 @@ namespace Orleans.Runtime.Messaging
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
             this.memoryPool = memoryPool;
-            void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
+            static void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
         }
 
-        public int CommittedBytes { get; private set; }
+        public int CommittedBytes => _committedBytes;
 
         /// <inheritdoc />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Advance(int count)
         {
-            if (this.privateWriter != null)
+            if (privateWriter == null)
             {
-                this.privateWriter.Advance(count);
+                advanced += count;
+                _committedBytes += count;
             }
             else
             {
-                this.advanced += count;
-            }
-
-            this.CommittedBytes += count;
-        }
-
-        /// <inheritdoc />
-        public Memory<T> GetMemory(int sizeHint = 0)
-        {
-            this.EnsureInitialized(sizeHint);
-
-            if (this.privateWriter != null || sizeHint > this.realMemory.Length - this.advanced)
-            {
-                if (this.privateWriter == null)
-                {
-                    this.privateWriter = new Sequence(this.memoryPool);
-                }
-
-                return this.privateWriter.GetMemory(sizeHint);
-            }
-            else
-            {
-                return this.realMemory.Slice(this.advanced);
+                AdvancePrivateWriter(count);
             }
         }
 
-        /// <inheritdoc />
-        public Span<T> GetSpan(int sizeHint = 0)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void AdvancePrivateWriter(int count)
         {
-            this.EnsureInitialized(sizeHint);
+            privateWriter.Advance(count);
+            _committedBytes += count;
+        }
 
-            if (this.privateWriter != null || sizeHint >= this.realMemory.Length - this.advanced)
+        /// <inheritdoc />
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            if (privateWriter == null)
             {
-                if (this.privateWriter == null)
-                {
-                    this.privateWriter = new Sequence(this.memoryPool);
-                }
+                if (prefixMemory.IsEmpty)
+                    Initialize(sizeHint);
 
-                return this.privateWriter.GetSpan(sizeHint);
+                var res = realMemory.Slice(advanced);
+                if (!res.IsEmpty && (uint)sizeHint <= (uint)res.Length)
+                    return res;
+
+                privateWriter = new(memoryPool);
             }
-            else
+
+            return privateWriter.GetMemory(sizeHint);
+        }
+
+        /// <inheritdoc />
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            if (privateWriter == null)
             {
-                return this.realMemory.Span.Slice(this.advanced);
+                var res = realMemory.Span.Slice(advanced);
+                if ((uint)sizeHint < (uint)res.Length)
+                    return res;
             }
+
+            return GetMemory(sizeHint).Span;
         }
 
         /// <summary>
         /// Inserts the prefix and commits the payload to the underlying <see cref="IBufferWriter{T}"/>.
         /// </summary>
         /// <param name="prefix">The prefix to write in. The length must match the one given in the constructor.</param>
-        public void Complete(ReadOnlySpan<T> prefix)
+        public void Complete(ReadOnlySpan<byte> prefix)
         {
             if (prefix.Length != this.expectedPrefixSize)
             {
                 ThrowPrefixLength();
-                void ThrowPrefixLength() => throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
+                static void ThrowPrefixLength() => throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
             }
 
             if (this.prefixMemory.Length == 0)
@@ -157,33 +155,36 @@ namespace Orleans.Runtime.Messaging
                 prefix.CopyTo(this.prefixMemory.Span);
                 this.innerWriter.Advance(prefix.Length + this.advanced);
                 if (this.privateWriter != null)
-                {
-                    // Try to minimize segments in the target writer by hinting at the total size.
-                    this.innerWriter.GetSpan((int)this.privateWriter.Length);
-                    foreach (var segment in this.privateWriter.AsReadOnlySequence)
-                    {
-                        this.innerWriter.Write(segment.Span);
-                    }
-                }
+                    CompletePrivateWriter();
             }
         }
+
+        private void CompletePrivateWriter()
+        {
+            var sequence = privateWriter.AsReadOnlySequence;
+            var sequenceLength = checked((int)sequence.Length);
+            sequence.CopyTo(innerWriter.GetSpan(sequenceLength));
+            innerWriter.Advance(sequenceLength);
+        }
+
+        /// <summary>
+        /// Sets this instance to a usable state.
+        /// </summary>
+        /// <param name="writer">The underlying writer that should ultimately receive the prefix and payload.</param>
+        public void Init(PipeWriter writer) => innerWriter = writer;
 
         /// <summary>
         /// Resets this instance to a reusable state.
         /// </summary>
-        /// <param name="writer">The underlying writer that should ultimately receive the prefix and payload.</param>
-        public void Reset(TBufferWriter writer)
+        public void Reset()
         {
-            this.advanced = 0;
-            this.CommittedBytes = 0;
-            this.privateWriter?.Dispose();
-            this.privateWriter = null;
-            this.prefixMemory = default;
-            this.realMemory = default;
-
-            if (writer.Equals(default(TBufferWriter))) ThrowInnerWriter();
-            void ThrowInnerWriter() => throw new ArgumentNullException(nameof(writer));
-            this.innerWriter = writer;
+            privateWriter?.Dispose();
+            privateWriter = null;
+            prefixMemory = default;
+            realMemory = default;
+            innerWriter = null;
+            advanced = 0;
+            _committedBytes = 0;
         }
 
         public void Dispose()
@@ -192,18 +193,15 @@ namespace Orleans.Runtime.Messaging
         }
 
         /// <summary>
-        /// Makes the initial call to acquire memory from the underlying writer if it has not been done already.
+        /// Makes the initial call to acquire memory from the underlying writer.
         /// </summary>
         /// <param name="sizeHint">The size requested by the caller to either <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.</param>
-        private void EnsureInitialized(int sizeHint)
+        private void Initialize(int sizeHint)
         {
-            if (this.prefixMemory.Length == 0)
-            {
-                int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
-                var memory = this.innerWriter.GetMemory(sizeToRequest);
-                this.prefixMemory = memory.Slice(0, this.expectedPrefixSize);
-                this.realMemory = memory.Slice(this.expectedPrefixSize);
-            }
+            int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
+            var memory = this.innerWriter.GetMemory(sizeToRequest);
+            this.prefixMemory = memory.Slice(0, this.expectedPrefixSize);
+            this.realMemory = memory.Slice(this.expectedPrefixSize);
         }
 
         /// <summary>
@@ -213,13 +211,13 @@ namespace Orleans.Runtime.Messaging
         /// Instance members are not thread-safe.
         /// </remarks>
         [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
-        public class Sequence : IBufferWriter<T>, IDisposable
+        private sealed class Sequence
         {
             private const int DefaultBufferSize = 4 * 1024;
 
             private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
-            private readonly MemoryPool<T> memoryPool;
+            private readonly MemoryPool<byte> memoryPool;
 
             private SequenceSegment first;
 
@@ -229,23 +227,19 @@ namespace Orleans.Runtime.Messaging
             /// Initializes a new instance of the <see cref="Sequence"/> class.
             /// </summary>
             /// <param name="memoryPool">The pool to use for recycling backing arrays.</param>
-            public Sequence(MemoryPool<T> memoryPool)
+            public Sequence(MemoryPool<byte> memoryPool)
             {
-                this.memoryPool = memoryPool ?? ThrowNull();
+                if (memoryPool is null) ThrowNull();
+                this.memoryPool = memoryPool;
 
-                MemoryPool<T> ThrowNull() => throw new ArgumentNullException(nameof(memoryPool));
+                static void ThrowNull() => throw new ArgumentNullException(nameof(memoryPool));
             }
 
             /// <summary>
             /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
             /// </summary>
             /// <returns>A read only sequence representing the data in this object.</returns>
-            public ReadOnlySequence<T> AsReadOnlySequence => this;
-
-            /// <summary>
-            /// Gets the length of the sequence.
-            /// </summary>
-            public long Length => this.AsReadOnlySequence.Length;
+            public ReadOnlySequence<byte> AsReadOnlySequence => first != null ? new(first, first.Start, last, last.End) : default;
 
             /// <summary>
             /// Gets the value to display in a debugger datatip.
@@ -253,135 +247,26 @@ namespace Orleans.Runtime.Messaging
             private string DebuggerDisplay => $"Length: {AsReadOnlySequence.Length}";
 
             /// <summary>
-            /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
-            /// </summary>
-            /// <param name="sequence">The sequence to convert.</param>
-            public static implicit operator ReadOnlySequence<T>(Sequence sequence)
-            {
-                return sequence.first != null
-                    ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last.End)
-                    : ReadOnlySequence<T>.Empty;
-            }
-
-            /// <summary>
-            /// Removes all elements from the sequence from its beginning to the specified position,
-            /// considering that data to have been fully processed.
-            /// </summary>
-            /// <param name="position">
-            /// The position of the first element that has not yet been processed.
-            /// This is typically <see cref="ReadOnlySequence{T}.End"/> after reading all elements from that instance.
-            /// </param>
-            public void AdvanceTo(SequencePosition position)
-            {
-                var firstSegment = (SequenceSegment)position.GetObject();
-                int firstIndex = position.GetInteger();
-
-                // Before making any mutations, confirm that the block specified belongs to this sequence.
-                var current = this.first;
-                while (current != firstSegment && current != null)
-                {
-                    current = current.Next;
-                }
-
-                if (current == null) ThrowCurrentNull();
-                void ThrowCurrentNull() => throw new ArgumentException("Position does not represent a valid position in this sequence.", nameof(position));
-
-                // Also confirm that the position is not a prior position in the block.
-                if (firstIndex < current.Start) ThrowEarlierPosition();
-                void ThrowEarlierPosition() => throw new ArgumentException("Position must not be earlier than current position.", nameof(position));
-
-                // Now repeat the loop, performing the mutations.
-                current = this.first;
-                while (current != firstSegment)
-                {
-                    var next = current.Next;
-                    current.ResetMemory();
-                    current = next;
-                }
-
-                firstSegment.AdvanceTo(firstIndex);
-
-                if (firstSegment.Length == 0)
-                {
-                    firstSegment = this.RecycleAndGetNext(firstSegment);
-                }
-
-                this.first = firstSegment;
-
-                if (this.first == null)
-                {
-                    this.last = null;
-                }
-            }
-
-            /// <summary>
             /// Advances the sequence to include the specified number of elements initialized into memory
             /// returned by a prior call to <see cref="GetMemory(int)"/>.
             /// </summary>
             /// <param name="count">The number of elements written into memory.</param>
-            public void Advance(int count)
-            {
-                if (count < 0) ThrowNegative();
-                this.last.End += count;
-
-                void ThrowNegative() => throw new ArgumentOutOfRangeException(
-                    nameof(count),
-                    "Value must be greater than or equal to 0");
-            }
+            public void Advance(int count) => last.Advance(count);
 
             /// <summary>
             /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
             /// </summary>
             /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
             /// <returns>The requested memory.</returns>
-            public Memory<T> GetMemory(int sizeHint)
-            {
-                if (sizeHint < 0) ThrowNegative();
-
-                if (sizeHint == 0)
-                {
-                    if (this.last?.WritableBytes > 0)
-                    {
-                        sizeHint = this.last.WritableBytes;
-                    }
-                    else
-                    {
-                        sizeHint = DefaultBufferSize;
-                    }
-                }
-
-                if (this.last == null || this.last.WritableBytes < sizeHint)
-                {
-                    this.Append(this.memoryPool.Rent(Math.Min(sizeHint, this.memoryPool.MaxBufferSize)));
-                }
-
-                return this.last.TrailingSlack;
-
-                void ThrowNegative() => throw new ArgumentOutOfRangeException(
-                   nameof(sizeHint),
-                   "Value for must be greater than or equal to 0");
-            }
-
-            /// <summary>
-            /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
-            /// </summary>
-            /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
-            /// <returns>The requested memory.</returns>
-            public Span<T> GetSpan(int sizeHint) => this.GetMemory(sizeHint).Span;
+            public Memory<byte> GetMemory(int sizeHint)
+                => last?.TrailingSlack is { Length: > 0 } slack && (uint)slack.Length >= (uint)sizeHint ? slack : Append(sizeHint);
 
             /// <summary>
             /// Clears the entire sequence, recycles associated memory into pools,
             /// and resets this instance for reuse.
             /// This invalidates any <see cref="ReadOnlySequence{T}"/> previously produced by this instance.
             /// </summary>
-            [EditorBrowsable(EditorBrowsableState.Never)]
-            public void Dispose() => this.Reset();
-
-            /// <summary>
-            /// Clears the entire sequence and recycles associated memory into pools.
-            /// This invalidates any <see cref="ReadOnlySequence{T}"/> previously produced by this instance.
-            /// </summary>
-            public void Reset()
+            public void Dispose()
             {
                 var current = this.first;
                 while (current != null)
@@ -392,12 +277,12 @@ namespace Orleans.Runtime.Messaging
                 this.first = this.last = null;
             }
 
-            private void Append(IMemoryOwner<T> array)
+            private Memory<byte> Append(int sizeHint)
             {
-                if (array == null) ThrowNull();
+                var array = memoryPool.Rent(Math.Min(sizeHint > 0 ? sizeHint : DefaultBufferSize, memoryPool.MaxBufferSize));
 
                 var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
-                segment.SetMemory(array, 0, 0);
+                segment.SetMemory(array);
 
                 if (this.last == null)
                 {
@@ -433,7 +318,7 @@ namespace Orleans.Runtime.Messaging
                     this.last = segment;
                 }
 
-                void ThrowNull() => throw new ArgumentNullException(nameof(array));
+                return segment.AvailableMemory;
             }
 
             private SequenceSegment RecycleAndGetNext(SequenceSegment segment)
@@ -445,13 +330,8 @@ namespace Orleans.Runtime.Messaging
                 return segment;
             }
 
-            private class SequenceSegment : ReadOnlySequenceSegment<T>
+            private sealed class SequenceSegment : ReadOnlySequenceSegment<byte>
             {
-                /// <summary>
-                /// Backing field for the <see cref="End"/> property.
-                /// </summary>
-                private int end;
-
                 /// <summary>
                 /// Gets the index of the first element in <see cref="AvailableMemory"/> to consider part of the sequence.
                 /// </summary>
@@ -470,42 +350,15 @@ namespace Orleans.Runtime.Messaging
                 /// the <see cref="End"/> is guaranteed to be equal to <see cref="Start"/>. The value of <see cref="Start"/> may be assigned anywhere between 0 and
                 /// <see cref="AvailableMemory"/>.Length, and must be equal to or less than <see cref="End"/>.
                 /// </remarks>
-                internal int End
-                {
-                    get => this.end;
-                    set
-                    {
-                        if (value > this.AvailableMemory.Length) ThrowOutOfRange();
+                internal int End { get; private set; }
 
-                        this.end = value;
+                internal Memory<byte> TrailingSlack => this.AvailableMemory.Slice(this.End);
 
-                        // If we ever support creating these instances on existing arrays, such that
-                        // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
-                        // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
-                        this.Memory = this.AvailableMemory.Slice(0, value);
+                private IMemoryOwner<byte> MemoryOwner;
 
-                        void ThrowOutOfRange() =>
-                            throw new ArgumentOutOfRangeException(nameof(value), "Value must be less than or equal to AvailableMemory.Length");
-                    }
-                }
-
-                internal Memory<T> TrailingSlack => this.AvailableMemory.Slice(this.End);
-
-                internal IMemoryOwner<T> MemoryOwner { get; private set; }
-
-                internal Memory<T> AvailableMemory { get; private set; }
+                internal Memory<byte> AvailableMemory;
 
                 internal int Length => this.End - this.Start;
-
-                /// <summary>
-                /// Gets the amount of writable bytes in this segment.
-                /// It is the amount of bytes between <see cref="Length"/> and <see cref="End"/>.
-                /// </summary>
-                internal int WritableBytes
-                {
-                    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                    get => this.AvailableMemory.Length - this.End;
-                }
 
                 internal new SequenceSegment Next
                 {
@@ -513,21 +366,10 @@ namespace Orleans.Runtime.Messaging
                     set => base.Next = value;
                 }
 
-                internal void SetMemory(IMemoryOwner<T> memoryOwner)
-                {
-                    this.SetMemory(memoryOwner, 0, memoryOwner.Memory.Length);
-                }
-
-                internal void SetMemory(IMemoryOwner<T> memoryOwner, int start, int end)
+                internal void SetMemory(IMemoryOwner<byte> memoryOwner)
                 {
                     this.MemoryOwner = memoryOwner;
-
-                    this.AvailableMemory = this.MemoryOwner.Memory;
-
-                    this.RunningIndex = 0;
-                    this.Start = start;
-                    this.End = end;
-                    this.Next = null;
+                    this.AvailableMemory = memoryOwner.Memory;
                 }
 
                 internal void ResetMemory()
@@ -538,26 +380,33 @@ namespace Orleans.Runtime.Messaging
 
                     this.Memory = default;
                     this.Next = null;
+                    this.RunningIndex = 0;
                     this.Start = 0;
-                    this.end = 0;
+                    this.End = 0;
                 }
 
                 internal void SetNext(SequenceSegment segment)
                 {
-                    if (segment == null) ThrowNull();
-
-                    this.Next = segment;
                     segment.RunningIndex = this.RunningIndex + this.End;
-
-                    SequenceSegment ThrowNull() => throw new ArgumentNullException(nameof(segment));
+                    this.Next = segment;
                 }
 
-                internal void AdvanceTo(int offset)
+                public void Advance(int count)
                 {
-                    if (offset > this.End) ThrowOutOfRange();
-                    this.Start = offset;
-                    void ThrowOutOfRange() => throw new ArgumentOutOfRangeException(nameof(offset));
+                    if (count < 0) ThrowNegative();
+                    var value = End + count;
+
+                    // If we ever support creating these instances on existing arrays, such that
+                    // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
+                    // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
+                    this.Memory = AvailableMemory.Slice(0, value);
+                    this.End = value;
+
+                    static void ThrowNegative() => throw new ArgumentOutOfRangeException(
+                        nameof(count),
+                        "Value must be greater than or equal to 0");
                 }
+
             }
         }
     }
