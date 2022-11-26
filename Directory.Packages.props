@@ -1,7 +1,6 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-
     <!-- Shared Package Versions -->
     <MicrosoftCodeAnalysisVersion>4.4.0-4.final</MicrosoftCodeAnalysisVersion>
     <MicrosoftExtensionsConfigurationVersion>7.0.0</MicrosoftExtensionsConfigurationVersion>
@@ -12,7 +11,6 @@
     <xUnitVersion>2.4.2</xUnitVersion>
     <SourceLinkVersion>1.1.1</SourceLinkVersion>
   </PropertyGroup>
-  
   <ItemGroup>
     <!-- System packages -->
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="7.0.0" />
@@ -20,18 +18,15 @@
     <PackageVersion Include="System.IO.Pipelines" Version="7.0.0" />
     <PackageVersion Include="System.Memory.Data" Version="7.0.0" />
     <PackageVersion Include="System.Net.NameResolution" Version="4.3.0" />
-
     <!-- Microsoft packages -->
     <PackageVersion Include="Microsoft.Build" Version="17.3.2" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
-
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3" />
-
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="$(MicrosoftExtensionsConfigurationVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsConfigurationVersion)" />
@@ -47,13 +42,11 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
-
     <PackageVersion Include="Azure.Data.Tables" Version="12.6.1" />
     <PackageVersion Include="Azure.Core" Version="1.25.0" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.7.3" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.14.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.12.0" />
-
     <!-- 3rd party packages -->
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.5.16" />
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.2.119" />
@@ -65,7 +58,6 @@
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.6.70" />
     <PackageVersion Include="KubernetesClient" Version="7.0.7" />
-
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
@@ -100,7 +92,6 @@
     <PackageVersion Include="SpanJson" Version="3.3.1" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.50.0" />
-
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="$(SourceLinkVersion)" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="$(SourceLinkVersion)" />
