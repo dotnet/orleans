@@ -22,10 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
-    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="$(AzureStorageBlobsVersion)" />
-    <PackageReference Include="Azure.Storage.Queues" Version="$(AzureStorageQueuesVersion)" />
-    <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
-    <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Azure.Storage.Queues" />
+    <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="System.Net.NameResolution" />
   </ItemGroup>
 </Project>

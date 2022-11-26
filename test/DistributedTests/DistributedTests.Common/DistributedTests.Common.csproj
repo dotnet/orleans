@@ -12,14 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
-    <PackageReference Include="Azure.Storage.Queues" Version="$(AzureStorageQueuesVersion)" />
-    <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
-    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="$(AzureKeyVaultVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="$(MicrosoftExtensionsConfigurationVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="$(MicrosoftExtensionsConfigurationAzureKeyVaultVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsConfigurationVersion)" />
-    <PackageReference Include="System.CommandLine" Version="$(SystemCommandLineVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Azure.Storage.Queues" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.AzureKeyVault" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 
 </Project>

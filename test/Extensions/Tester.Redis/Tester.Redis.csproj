@@ -6,8 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="$(SystemDiagnosticsPerformanceCounterVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
   </ItemGroup>
 
   <ItemGroup>

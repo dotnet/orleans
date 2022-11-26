@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="StackExchange.Redis" Version="$(StackExchangeRedisVersion)" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="$(SystemDiagnosticsPerformanceCounterVersion)" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
   </ItemGroup>
 
   <ItemGroup>

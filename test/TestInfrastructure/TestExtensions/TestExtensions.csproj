@@ -9,11 +9,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.assert" Version="$(xUnitVersion)" />
-    <PackageReference Include="xunit.extensibility.core" Version="$(xUnitVersion)" />
-    <PackageReference Include="xunit.extensibility.execution" Version="$(xUnitVersion)" />
-    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit.assert" />
+    <PackageReference Include="xunit.extensibility.core" />
+    <PackageReference Include="xunit.extensibility.execution" />
+    <PackageReference Include="Xunit.SkippableFact" />
+    <PackageReference Include="FluentAssertions" />
   </ItemGroup>
   
 </Project>

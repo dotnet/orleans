@@ -12,6 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <PackageReference Include="Microsoft.CSharp" Version="$(MicrosoftCSharpVersion)" />
+    <PackageReference Include="Microsoft.CSharp" />
   </ItemGroup>
 </Project>

@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
-    <PackageReference Include="AWSSDK.SQS" Version="$(AWSSDKSQSVersion)" />
+    <PackageReference Include="AWSSDK.SQS" />
   </ItemGroup>
 
 </Project>

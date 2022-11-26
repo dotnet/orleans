@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <PackageReference Include="Consul" Version="$(ConsulVersion)" />
+    <PackageReference Include="Consul" />
   </ItemGroup>
 
 </Project>
