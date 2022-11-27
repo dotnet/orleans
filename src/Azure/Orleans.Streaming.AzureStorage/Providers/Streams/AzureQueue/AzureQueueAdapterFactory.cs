@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             this.providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
-            this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter)); ;
+            this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.streamQueueMapper = new(options.QueueNames, providerName);
             this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);

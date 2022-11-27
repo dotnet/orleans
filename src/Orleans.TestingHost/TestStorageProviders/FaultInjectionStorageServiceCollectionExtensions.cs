@@ -53,7 +53,7 @@ namespace Orleans.Hosting
             services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
             services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
             services.AddSingletonNamedService<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n, MemoryGrainStorageFactory.Create))
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n)); ;
+                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
             return services;
         }
     }
