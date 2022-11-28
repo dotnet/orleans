@@ -252,7 +252,7 @@ namespace UnitTests.Grains
 
         public ReminderTestCopyGrain(IServiceProvider services, ILoggerFactory loggerFactory)
         {
-            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services); ;
+            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 

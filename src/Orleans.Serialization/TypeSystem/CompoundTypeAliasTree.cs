@@ -97,7 +97,7 @@ public class CompoundTypeAliasTree
         }
         else
         {
-            return _children[key] = new CompoundTypeAliasTree(key, value);;
+            return _children[key] = new CompoundTypeAliasTree(key, value);
         }
     }
 }

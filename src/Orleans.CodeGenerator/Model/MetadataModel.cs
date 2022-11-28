@@ -141,7 +141,7 @@ namespace Orleans.CodeGenerator
             }
             else
             {
-                return _children[key] = new CompoundTypeAliasTree(key, value); ;
+                return _children[key] = new CompoundTypeAliasTree(key, value);
             }
         }
     }

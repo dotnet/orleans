@@ -248,7 +248,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastAsyncGrainRefCastFromSelf()
         {
-            IAddressable grain = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix); ;
+            IAddressable grain = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
             ISimpleGrain cast = grain.AsReference<ISimpleGrain>();
 
             Task<int> successfulCallPromise = cast.GetA();
