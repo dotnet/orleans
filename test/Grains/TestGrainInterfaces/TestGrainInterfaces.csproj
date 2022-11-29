@@ -14,6 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="protobuf-net" Version="$(ProtobufNetVersion)" />
+    <PackageReference Include="protobuf-net" />
   </ItemGroup>
 </Project>

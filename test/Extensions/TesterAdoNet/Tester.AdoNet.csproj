@@ -8,12 +8,12 @@
   <ItemGroup>
     <!--<PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.1" />-->
     <!--<PackageReference Include="MySqlConnector" Version="1.2.1" />-->
-    <PackageReference Include="System.Data.SqlClient" Version="$(SystemDataSqlClientVersion)" />
+    <PackageReference Include="System.Data.SqlClient" />
     <!--<PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.2" />-->
-    <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
-    <PackageReference Include="MySql.Data" Version="$(MySqlDataVersion)" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="$(SystemDiagnosticsPerformanceCounterVersion)" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="MySql.Data" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
 
   <ItemGroup>

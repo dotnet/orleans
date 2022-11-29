@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
-    <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
+    <PackageReference Include="Google.Cloud.PubSub.V1" />
   </ItemGroup>
 
 </Project>

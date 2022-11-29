@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <PackageReference Include="ZooKeeperNetEx" Version="$(ZooKeeperNetExVersion)" />
+    <PackageReference Include="ZooKeeperNetEx" />
   </ItemGroup>
 
 </Project>
