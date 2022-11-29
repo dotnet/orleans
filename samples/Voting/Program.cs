@@ -1,9 +1,4 @@
 using Voting.Data;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
-using System;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseOrleans((ctx, orleansBuilder) =>
@@ -19,12 +14,12 @@ builder.Host.UseOrleans((ctx, orleansBuilder) =>
     else
     {
         // In Kubernetes, we use environment variables and the pod manifest
-        orleansBuilder.UseKubernetesHosting();
+        //orleansBuilder.UseKubernetesHosting();
 
         // Use Redis for clustering & persistence
-        var redisAddress = $"{Environment.GetEnvironmentVariable("REDIS")}:6379";
-        orleansBuilder.UseRedisClustering(options => options.ConnectionString = redisAddress);
-        orleansBuilder.AddRedisGrainStorage("votes", options => options.ConnectionString = redisAddress);
+        //var redisAddress = $"{Environment.GetEnvironmentVariable("REDIS")}:6379";
+        //orleansBuilder.UseRedisClustering(options => options.ConnectionString = redisAddress);
+        //orleansBuilder.AddRedisGrainStorage("votes", options => options.ConnectionString = redisAddress);
     }
 });
 
@@ -45,12 +40,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
-
 app.Run();

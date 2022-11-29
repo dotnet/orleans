@@ -1,23 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
+namespace VotingContract;
 
-namespace VotingContract
+public interface IPollGrain : IGrainWithStringKey
 {
-    public interface IPollGrain : IGrainWithStringKey
-    {
-        Task CreatePoll(PollState initialState);
-        Task<PollState> GetCurrentResults();
-        Task<PollState> AddVote(int optionId);
-        Task StartWatching(IPollWatcher watcher);
-        Task StopWatching(IPollWatcher watcher);
-    }
+    Task CreatePoll(PollState initialState);
+    Task<PollState> GetCurrentResults();
+    Task<PollState> AddVote(int optionId);
+    Task StartWatching(IPollWatcher watcher);
+    Task StopWatching(IPollWatcher watcher);
+}
 
-    [Serializable]
-    public class PollState
-    {
-        public string Question { get; set; }
-        public List<(string Option, int Votes)> Options { get; set; }
-    }
+[GenerateSerializer]
+public class PollState
+{
+    [Id(0)] public string Question { get; set; }
+    [Id(1)] public List<(string Option, int Votes)> Options { get; set; }
 }

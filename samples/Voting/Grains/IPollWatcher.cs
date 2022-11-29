@@ -1,9 +1,6 @@
-using Orleans;
+namespace VotingContract;
 
-namespace VotingContract
+public interface IPollWatcher : IGrainObserver
 {
-    public interface IPollWatcher : IGrainObserver
-    {
-        void OnPollUpdated(PollState state);
-    }
+    void OnPollUpdated(PollState state);
 }
