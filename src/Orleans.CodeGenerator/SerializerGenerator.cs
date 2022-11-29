@@ -563,7 +563,7 @@ namespace Orleans.CodeGenerator
                 // C#: reader.ReadFieldHeader(ref header);
                 // C#: if (header.IsEndBaseOrEndObject) break;
                 // C#: id += header.FieldIdDelta;
-                var readFieldHeader = ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), ArgumentList(SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), headerVar)))));
+                var readFieldHeader = ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), refHeaderVar));
                 var endObjectCheck = IfStatement(headerVar.Member("IsEndBaseOrEndObject"), BreakStatement());
                 var idUpdate = ExpressionStatement(AssignmentExpression(SyntaxKind.AddAssignmentExpression, idVar, headerVar.Member("FieldIdDelta")));
                 loopBody.Add(readFieldHeader);

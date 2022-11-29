@@ -3,7 +3,7 @@ namespace Orleans.Serialization.WireProtocol
     /// <summary>
     /// Represents a 3-bit wire type, shifted into position 
     /// </summary>
-    public enum WireType : byte
+    public enum WireType : uint
     {
         /// <summary>
         /// A variable-length integer vlaue.

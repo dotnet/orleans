@@ -38,8 +38,8 @@ namespace Orleans.Runtime.Messaging
         internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
         {
             var output = connection.Transport.Output;
-            using var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(sizeof(int), 1024, MemoryPool<byte>.Shared);
-            outputWriter.Reset(output);
+            using var outputWriter = new PrefixingBufferWriter(sizeof(int), 1024, MemoryPool<byte>.Shared);
+            outputWriter.Init(output);
             _preambleSerializer.Serialize(
                 preamble,
                 outputWriter);
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Messaging
             return;
         }
 
-        private static void WriteLength(PrefixingBufferWriter<byte, PipeWriter> outputWriter, int length)
+        private static void WriteLength(PrefixingBufferWriter outputWriter, int length)
         {
             Span<byte> lengthSpan = stackalloc byte[4];
             BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);

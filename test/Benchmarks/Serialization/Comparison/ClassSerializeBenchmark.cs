@@ -65,7 +65,7 @@ namespace Benchmarks.Comparison
         [Benchmark(Baseline = true)]
         public long Orleans()
         {
-            Session.PartialReset();
+            Session.FullReset();
             return Serializer.Serialize(Input, Data, Session);
         }
 

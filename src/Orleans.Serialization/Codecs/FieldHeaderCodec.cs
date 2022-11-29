@@ -1,9 +1,85 @@
+using System;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
+
+namespace Orleans.Serialization.Buffers
+{
+    public ref partial struct Writer<TBufferWriter>
+    {
+        /// <summary>
+        /// Writes the field header.
+        /// </summary>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="actualType">The actual type.</param>
+        /// <param name="wireType">The wire type.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFieldHeader(uint fieldId, Type expectedType, Type actualType, WireType wireType)
+        {
+            var embeddedFieldId = fieldId > Tag.MaxEmbeddedFieldIdDelta ? Tag.FieldIdCompleteMask : fieldId;
+            var tag = (uint)wireType | embeddedFieldId;
+
+            if (actualType is null || actualType == expectedType)
+            {
+                WriteByte((byte)tag); // SchemaType.Expected=0
+                if (fieldId > Tag.MaxEmbeddedFieldIdDelta)
+                {
+                    WriteVarUInt32(fieldId);
+                }
+                return;
+            }
+
+            uint typeOrReferenceId;
+            if (Session.WellKnownTypes.TryGetWellKnownTypeId(actualType, out var typeId))
+            {
+                typeOrReferenceId = typeId;
+                tag |= (byte)SchemaType.WellKnown;
+            }
+            else if ((typeOrReferenceId = Session.ReferencedTypes.GetOrAddTypeReference(actualType)) != 0)
+            {
+                tag |= (byte)SchemaType.Referenced;
+            }
+            else
+            {
+                WriteFieldHeaderEncodeType(fieldId, actualType, tag);
+                return;
+            }
+
+            WriteByte((byte)tag);
+            if (fieldId > Tag.MaxEmbeddedFieldIdDelta)
+                WriteVarUInt32(fieldId);
+
+            WriteVarUInt32(typeOrReferenceId);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void WriteFieldHeaderEncodeType(uint fieldId, Type actualType, uint tag)
+        {
+            WriteByte((byte)(tag | (byte)SchemaType.Encoded));
+            if (fieldId > Tag.MaxEmbeddedFieldIdDelta)
+                WriteVarUInt32(fieldId);
+
+            Session.TypeCodec.WriteEncodedType(ref this, actualType);
+        }
+
+        /// <summary>
+        /// Writes an expected field header value.
+        /// </summary>
+        /// <param name="fieldId">The field identifier.</param>
+        /// <param name="wireType">The wire type of the field.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFieldHeaderExpected(uint fieldId, WireType wireType)
+        {
+            var embeddedFieldId = fieldId > Tag.MaxEmbeddedFieldIdDelta ? Tag.FieldIdCompleteMask : fieldId;
+            WriteByte((byte)((uint)wireType | embeddedFieldId));
+
+            if (fieldId > Tag.MaxEmbeddedFieldIdDelta)
+                WriteVarUInt32(fieldId);
+        }
+    }
+}
 
 namespace Orleans.Serialization.Codecs
 {
@@ -12,114 +88,6 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     public static class FieldHeaderCodec
     {
-        /// <summary>
-        /// Writes the field header.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldId">The field identifier.</param>
-        /// <param name="expectedType">The expected type.</param>
-        /// <param name="actualType">The actual type.</param>
-        /// <param name="wireType">The wire type.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteFieldHeader<TBufferWriter>(
-                    ref this Writer<TBufferWriter> writer,
-                    uint fieldId,
-                    Type expectedType,
-                    Type actualType,
-                    WireType wireType) where TBufferWriter : IBufferWriter<byte>
-        {
-            var hasExtendedFieldId = fieldId > Tag.MaxEmbeddedFieldIdDelta;
-            var embeddedFieldId = hasExtendedFieldId ? Tag.FieldIdCompleteMask : (byte)fieldId;
-            var tag = (byte)((byte)wireType | embeddedFieldId);
-
-            if (actualType is null || actualType == expectedType)
-            {
-                writer.WriteByte((byte)(tag | (byte)SchemaType.Expected));
-                if (hasExtendedFieldId)
-                {
-                    writer.WriteVarUInt32(fieldId);
-                }
-            }
-            else if (writer.Session.WellKnownTypes.TryGetWellKnownTypeId(actualType, out var typeOrReferenceId))
-            {
-                writer.WriteByte((byte)(tag | (byte)SchemaType.WellKnown));
-                if (hasExtendedFieldId)
-                {
-                    writer.WriteVarUInt32(fieldId);
-                }
-
-                writer.WriteVarUInt32(typeOrReferenceId);
-            }
-            else if (writer.Session.ReferencedTypes.GetOrAddTypeReference(actualType, out typeOrReferenceId))
-            {
-                writer.WriteByte((byte)(tag | (byte)SchemaType.Referenced));
-                if (hasExtendedFieldId)
-                {
-                    writer.WriteVarUInt32(fieldId);
-                }
-
-                writer.WriteVarUInt32(typeOrReferenceId);
-            }
-            else
-            {
-                writer.WriteByte((byte)(tag | (byte)SchemaType.Encoded));
-                if (hasExtendedFieldId)
-                {
-                    writer.WriteVarUInt32(fieldId);
-                }
-
-                writer.Session.TypeCodec.WriteEncodedType(ref writer, actualType);
-            }
-        }
-
-        /// <summary>
-        /// Writes an expected field header value.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldId">The field identifier.</param>
-        /// <param name="wireType">The wire type of the field.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteFieldHeaderExpected<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-                    where TBufferWriter : IBufferWriter<byte>
-        {
-            if (fieldId < Tag.MaxEmbeddedFieldIdDelta)
-            {
-                WriteFieldHeaderExpectedEmbedded(ref writer, fieldId, wireType);
-            }
-            else
-            {
-                WriteFieldHeaderExpectedExtended(ref writer, fieldId, wireType);
-            }
-        }
-
-        /// <summary>
-        /// Writes an field header value with an expected type and an embedded field identifier.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldId">The field identifier.</param>
-        /// <param name="wireType">The wire type.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteFieldHeaderExpectedEmbedded<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-                    where TBufferWriter : IBufferWriter<byte> => writer.WriteByte((byte)((byte)wireType | (byte)fieldId));
-
-        /// <summary>
-        /// Writes a field header with an expected type and an extended field id.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldId">The field identifier.</param>
-        /// <param name="wireType">The wire type.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteFieldHeaderExpectedExtended<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldId, WireType wireType)
-                    where TBufferWriter : IBufferWriter<byte>
-        {
-            writer.WriteByte((byte)((byte)wireType | Tag.FieldIdCompleteMask));
-            writer.WriteVarUInt32(fieldId);
-        }
-
         /// <summary>
         /// Reads a field header.
         /// </summary>

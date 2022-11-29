@@ -107,12 +107,26 @@ namespace Orleans.Serialization.Session
                     return true;
                 }
 
-                refValue = reference = nextReference;
+                refValue = nextReference;
+                Unsafe.SkipInit(out reference);
                 return false;
             }
 
             // Add the reference.
-            AddToReferenceToIdMap(value, reference = nextReference);
+            var objectsArray = _objectToReference;
+            var objectsCount = _objectToReferenceCount;
+            if ((uint)objectsCount < (uint)objectsArray.Length)
+            {
+                _objectToReferenceCount = objectsCount + 1;
+                objectsArray[objectsCount].Id = nextReference;
+                objectsArray[objectsCount].Object = value;
+            }
+            else
+            {
+                CreateObjectToReferenceOverflow(value);
+            }
+
+            Unsafe.SkipInit(out reference);
             return false;
         }
 
@@ -141,30 +155,22 @@ namespace Orleans.Serialization.Session
             return -1;
         }
 
-        private void AddToReferenceToIdMap(object value, uint reference)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void CreateObjectToReferenceOverflow(object value)
         {
-            _objectToReference[_objectToReferenceCount++] = new ReferencePair(reference, value);
-
-            if (_objectToReferenceCount >= _objectToReference.Length)
+            var result = new Dictionary<object, uint>(_objectToReferenceCount * 2, ReferenceEqualsComparer.Default);
+            var objects = _objectToReference;
+            for (var i = 0; i < objects.Length; i++)
             {
-                CreateObjectToReferenceOverflow();
+                var record = objects[i];
+                result[record.Object] = record.Id;
+                objects[i] = default;
             }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            void CreateObjectToReferenceOverflow()
-            {
-                var result = new Dictionary<object, uint>(_objectToReferenceCount * 2, ReferenceEqualsComparer.Default);
-                var objects = _objectToReference.AsSpan(0, _objectToReferenceCount);
-                for (var i = 0; i < objects.Length; i++)
-                {
-                    var record = objects[i];
-                    result[record.Object] = record.Id;
-                    objects[i] = default;
-                }
+            result[value] = _currentReferenceId;
 
-                _objectToReferenceCount = 0;
-                _objectToReferenceOverflow = result;
-            }
+            _objectToReferenceCount = 0;
+            _objectToReferenceOverflow = result;
         }
 
         private void AddToReferences(object value, uint reference)

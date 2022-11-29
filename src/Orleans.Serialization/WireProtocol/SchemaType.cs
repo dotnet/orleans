@@ -3,7 +3,7 @@ namespace Orleans.Serialization.WireProtocol
     /// <summary>
     /// Identifies the runtime type (schema type) of a field.
     /// </summary>
-    public enum SchemaType : byte
+    public enum SchemaType : uint
     {
         /// <summary>
         /// Indicates that the runtime type is the exact type expected by the current schema.

@@ -32,7 +32,7 @@ namespace Benchmarks.Utilities
         public int Length => _written;
 
         [Pure]
-        public ReadOnlySequence<byte> GetReadOnlySequence() => new(_buffer, 0, _written);
+        public ReadOnlySpan<byte> GetReadOnlySpan() => new(_buffer, 0, _written);
 
         public override string ToString() => Encoding.UTF8.GetString(_buffer.AsSpan(0, _written).ToArray());
     }

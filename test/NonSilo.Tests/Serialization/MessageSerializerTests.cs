@@ -23,14 +23,14 @@ namespace UnitTests.Serialization
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
-        private readonly IMessageSerializer messageSerializer;
+        private readonly MessageSerializer messageSerializer;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
-            this.messageSerializer = this.fixture.Services.GetRequiredService<IMessageSerializer>();
+            this.messageSerializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
         }
 
         [Fact, TestCategory("Functional")]
@@ -69,7 +69,7 @@ namespace UnitTests.Serialization
 
                 var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
                 var writer = pipe.Writer;
-                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(writer, message));
             }
             finally
             {
@@ -89,7 +89,7 @@ namespace UnitTests.Serialization
 
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var writer = pipe.Writer;
-            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(writer, message));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -130,7 +130,7 @@ namespace UnitTests.Serialization
         {
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var writer = pipe.Writer;
-            this.messageSerializer.Write(ref writer, message);
+            this.messageSerializer.Write(writer, message);
             writer.FlushAsync().AsTask().GetAwaiter().GetResult();
 
             pipe.Reader.TryRead(out var readResult);
