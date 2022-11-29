@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,14 +20,7 @@ namespace UnitTests.StorageTests.AdoNet
         {
             public Fixture()
             {
-                try
-                {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
-                }
+                Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
             }
 
             public RelationalStorageForTesting Storage { get; private set; }
