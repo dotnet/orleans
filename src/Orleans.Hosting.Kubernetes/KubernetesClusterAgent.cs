@@ -215,7 +215,7 @@ namespace Orleans.Hosting.Kubernetes
                         break;
                     }
 
-                    var pods = await _client.ListNamespacedPodWithHttpMessagesAsync(
+                    var pods = await _client.CoreV1.ListNamespacedPodWithHttpMessagesAsync(
                         namespaceParameter: _podNamespace,
                         labelSelector: _podLabelSelector,
                         watch: true,
