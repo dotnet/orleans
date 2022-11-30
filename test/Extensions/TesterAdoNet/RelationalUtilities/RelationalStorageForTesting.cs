@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
+using Xunit.Sdk;
 
 namespace UnitTests.General
 {
@@ -22,18 +23,13 @@ namespace UnitTests.General
 
         public string CurrentConnectionString
         {
-            get { return Storage.ConnectionString; }
+            get { return Storage?.ConnectionString; }
         }
 
         /// <summary>
         /// The name of the provider type (MySQL, SQLServer, Oracle, PostgreSQL, etc).
         /// </summary>
         protected abstract string ProviderMoniker { get; }
-
-        /// <summary>
-        /// Default connection string for testing
-        /// </summary>
-        public abstract string DefaultConnectionString { get; }
 
         /// <summary>
         /// A delayed query that is then cancelled in a test to see if cancellation works.
@@ -99,16 +95,15 @@ namespace UnitTests.General
             Console.WriteLine("Initializing relational databases...");
 
             RelationalStorageForTesting testStorage;
-            if (connectionString == null)
+            testStorage = CreateTestInstance(invariantName, connectionString);
+
+            if (string.IsNullOrEmpty(testStorage.CurrentConnectionString))
             {
-                testStorage = CreateTestInstance(invariantName);
-            }
-            else
-            {
-                testStorage = CreateTestInstance(invariantName, connectionString);
+                Console.WriteLine("No storage configured");
+                return testStorage;
             }
 
-            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, connectionString ?? testStorage.DefaultConnectionString);
+            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -145,11 +140,6 @@ namespace UnitTests.General
             return instanceFactory[invariantName](connectionString);
         }
 
-        private static RelationalStorageForTesting CreateTestInstance(string invariantName)
-        {
-            return CreateTestInstance(invariantName, CreateTestInstance(invariantName, "notempty").DefaultConnectionString);
-        }
-
         /// <summary>
         /// Constructor
         /// </summary>
@@ -157,7 +147,10 @@ namespace UnitTests.General
         /// <param name="connectionString"></param>
         protected RelationalStorageForTesting(string invariantName, string connectionString)
         {
-            Storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                Storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+            }
         }
 
         /// <summary>

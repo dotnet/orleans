@@ -11,11 +11,9 @@ namespace UnitTests.General
         protected override string ProviderMoniker => "SQLServer";
 
         public SqlServerStorageForTesting(string connectionString)
-            : base(AdoNetInvariants.InvariantNameSqlServer, connectionString)
+            : base(AdoNetInvariants.InvariantNameSqlServer, connectionString ?? TestDefaultConfiguration.MsSqlConnectionString)
         {
         }
-
-        public override string DefaultConnectionString => TestDefaultConfiguration.MsSqlConnectionString;
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
 

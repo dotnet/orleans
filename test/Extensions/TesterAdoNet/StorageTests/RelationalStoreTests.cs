@@ -30,7 +30,7 @@ namespace UnitTests.StorageTests.AdoNet
 
         protected static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
         {
-            Skip.If(sut == null, "Database was not initialized correctly");
+            Skip.If(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");
 
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
@@ -52,7 +52,7 @@ namespace UnitTests.StorageTests.AdoNet
 
         protected static async Task InsertIntoDatabaseUsingStream(RelationalStorageForTesting sut, int streamId, byte[] dataToInsert, CancellationToken cancellationToken)
         {
-            Skip.If(sut == null, "Database was not initialized correctly");
+            Skip.If(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");
             //The dataToInsert could be inserted here directly, but it wouldn't be streamed.
             using (var ms = new MemoryStream(dataToInsert))
             {
@@ -80,7 +80,7 @@ namespace UnitTests.StorageTests.AdoNet
 
         protected static async Task<StreamingTest> ReadFromDatabaseUsingAsyncStream(RelationalStorageForTesting sut, int streamId, CancellationToken cancellationToken)
         {
-            Skip.If(sut == null, "Database was not initialized correctly");
+            Skip.If(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");
             return (await sut.Storage.ReadAsync(sut.StreamTestSelect, command =>
             {
                 var p = command.CreateParameter();
@@ -105,7 +105,7 @@ namespace UnitTests.StorageTests.AdoNet
 
         protected static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
         {
-            Skip.If(sut == null, "Database was not initialized correctly");
+            Skip.If(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");
             using (var tokenSource = new CancellationTokenSource(timeoutLimit))
             {
                 try

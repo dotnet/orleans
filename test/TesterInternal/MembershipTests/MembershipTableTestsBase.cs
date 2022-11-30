@@ -59,6 +59,10 @@ namespace UnitTests.MembershipTests
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
+            if (string.IsNullOrEmpty(this.connectionString))
+            {
+                throw new SkipException("No connection string configured");
+            }
             this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
             var adoVariant = GetAdoInvariant();
 

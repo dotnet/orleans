@@ -11,11 +11,9 @@ namespace Tester.RelationalUtilities
         protected override string ProviderMoniker => "PostgreSQL";
 
         public PostgreSqlStorageForTesting(string connectionString)
-            : base(AdoNetInvariants.InvariantNamePostgreSql, connectionString)
+            : base(AdoNetInvariants.InvariantNamePostgreSql, connectionString ?? TestDefaultConfiguration.PostgresConnectionString)
         {
         }
-
-        public override string DefaultConnectionString => TestDefaultConfiguration.PostgresConnectionString;
 
         public override string CancellationTestQuery { get { return "SELECT pg_sleep(10); SELECT 1; "; } }
 

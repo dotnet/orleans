@@ -25,17 +25,10 @@ namespace UnitTests
                         $"{nameof(InitializeConnectionStringAccessor)} was not called before accessing the connection string");
                 }
 
-                try
+                var connString = this.connectionStringLazy.Value.Result;
+                if (connString != null)
                 {
-                    var connString = this.connectionStringLazy.Value.Result;
-                    if (connString != null)
-                    {
-                        return connString;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw new SkipException("Environment is not correctly set up to run these tests. " + ex);
+                    return connString;
                 }
 
                 throw new SkipException("Environment is not correctly set up to run these tests. Connection string is empty.");

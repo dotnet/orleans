@@ -10,7 +10,7 @@ namespace UnitTests.General
     internal class MySqlStorageForTesting : RelationalStorageForTesting
     {
         protected override string ProviderMoniker => "MySQL";
-        public MySqlStorageForTesting(string connectionString) : base(AdoNetInvariants.InvariantNameMySql, connectionString)
+        public MySqlStorageForTesting(string connectionString) : base(AdoNetInvariants.InvariantNameMySql, connectionString ?? TestDefaultConfiguration.MySqlConnectionString)
         {
         }
 
@@ -33,8 +33,6 @@ namespace UnitTests.General
         {
             get { return @"DROP DATABASE `{0}`"; }
         }
-
-        public override string DefaultConnectionString => TestDefaultConfiguration.MySqlConnectionString;
          
         protected override string ExistsDatabaseTemplate
         {
