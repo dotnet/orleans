@@ -50,9 +50,6 @@ namespace Orleans.Hosting
 
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, KubernetesClusterAgent>();
 
-            // Configure the Kubernetes client.
-            //services.AddSingleton<IKubernetes>(_ => new k8s.Kubernetes(KubernetesClientConfig);
-
             return services;
         }
     }
