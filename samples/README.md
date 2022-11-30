@@ -8,7 +8,7 @@
 ## [Hello, World!](https://learn.microsoft.com/samples/dotnet/samples/orleans-hello-world-sample-app)
 
 <p align="center">
-    <img src="./HelloWorld/code.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/HelloWorld/code.png" />
 </p>
 
 A *Hello, World!* application which demonstrates how to create and use your first grains.
@@ -22,7 +22,7 @@ A *Hello, World!* application which demonstrates how to create and use your firs
 ## [Adventure](https://learn.microsoft.com/samples/dotnet/samples/orleans-text-adventure-game)
 
 <p align="center">
-    <img src="./Adventure/assets/BoxArt.jpg" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Adventure/assets/BoxArt.jpg" />
 </p>
 
 Before there were graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure).
@@ -37,7 +37,7 @@ It's the inspiration for this sample.
 ## [Chirper](https://learn.microsoft.com/samples/dotnet/samples/orleans-chirper-social-media-sample-app)
 
 <p align="center">
-    <img src="./Chirper/screenshot.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Chirper/screenshot.png" />
 </p>
 
 A social network pub/sub system, with short text messages being sent between users.
@@ -54,7 +54,7 @@ Publishers send out short *"Chirp"* messages (not to be confused with *"Tweets"*
 ## [GPS Tracker](https://learn.microsoft.com/samples/dotnet/samples/orleans-gps-device-tracker-sample)
 
 <p align="center">
-    <img src="./GPSTracker/screenshot.jpeg" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/GPSTracker/screenshot.jpeg" />
 </p>
 
 A service for tracking GPS-equipped [IoT](https://en.wikipedia.org/wiki/Internet_of_Things) devices on a map.
@@ -70,7 +70,7 @@ The device updates originate from a *device gateway*, which is implemented using
 ## [HanBaoBao](https://github.com/ReubenBond/hanbaobao-web)
 
 <p align="center">
-    <img src="https://github.com/ReubenBond/hanbaobao-web/blob/main/assets/demo-1.png?raw=true" />
+    <img src="https://raw.githubusercontent.com/ReubenBond/hanbaobao-web/main/assets/demo-1.png" />
 </p>
 
 An English-Mandarin dictionary Web application demonstrating deployment to Kubernetes, fan-out grain calls, and request throttling.
@@ -88,7 +88,7 @@ An English-Mandarin dictionary Web application demonstrating deployment to Kuber
 ## [Presence Service](https://learn.microsoft.com/samples/dotnet/samples/orleans-gaming-presence-service-sample)
 
 <p align="center">
-    <img src="./Presence/screenshot.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Presence/screenshot.png" />
 </p>
 
 A gaming presence service, similar to one of the Orleans-based services built for [Halo](https://www.xbox.com/games/halo).
@@ -102,7 +102,7 @@ A presence service tracks players and game sessions in near-real-time.
 ## [Tic Tac Toe](https://learn.microsoft.com/samples/dotnet/samples/orleans-tictactoe-web-based-game)
 
 <p align="center">
-    <img src="./TicTacToe/logo.png"/>
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/TicTacToe/logo.png"/>
 </p>
 
 A Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game using ASP.NET MVC, JavaScript, and Orleans.
@@ -116,14 +116,14 @@ A Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game using 
 ## [Voting](https://learn.microsoft.com/samples/dotnet/samples/orleans-voting-sample-app-on-kubernetes)
 
 <p align="center">
-    <img src="./Voting/screenshot.png"/>
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Voting/screenshot.png"/>
 </p>
 
 A Web application for voting on a set of choices. This sample demonstrates deployment to Kubernetes.
 The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/extensions/generic-host) to co-host [ASP.NET Core](https://docs.microsoft.com/aspnet/core) and Orleans as well as the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard) together in the same process.
 
 <p align="center">
-    <img src="./Voting/dashboard.png"/>
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Voting/dashboard.png"/>
 </p>
 
 ### Demonstrates
@@ -134,7 +134,7 @@ The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/
 ## [Chat Room](https://learn.microsoft.com/samples/dotnet/samples/orleans-chat-room-sample)
 
 <p align="center">
-    <img src="./ChatRoom/screenshot.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/ChatRoom/screenshot.png" />
 </p>
 
 A terminal-based chat application built using [Orleans Streams](https://docs.microsoft.com/dotnet/orleans/streaming).
@@ -147,7 +147,7 @@ A terminal-based chat application built using [Orleans Streams](https://docs.mic
 ## [Bank Account](https://learn.microsoft.com/samples/dotnet/samples/orleans-bank-account-acid-transactions)
 
 <p align="center">
-    <img src="./BankAccount/assets/BankClient.png"/>
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/BankAccount/assets/BankClient.png"/>
 </p>
 
 Simulates bank accounts, using ACID transactions to transfer random amounts between a set of accounts.
@@ -159,7 +159,7 @@ Simulates bank accounts, using ACID transactions to transfer random amounts betw
 ## [Blazor Server](https://learn.microsoft.com/samples/dotnet/samples/orleans-aspnet-core-blazor-server-sample) and [Blazor WebAssembly](https://learn.microsoft.com/samples/dotnet/samples/orleans-aspnet-core-blazor-wasm-sample)
 
 <p align="center">
-    <img src="./Blazor/BlazorServer/screenshot.jpeg"/>
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Blazor/BlazorServer/screenshot.jpeg"/>
 </p>
 
 These two Blazor samples are based on the [Blazor introductory tutorials](https://dotnet.microsoft.com/learn/aspnet/blazor-tutorial/intro), adapted for use with Orleans.
@@ -175,7 +175,7 @@ They include an interactive counter, a TODO list, and a Weather service.
 ## [Stocks](https://learn.microsoft.com/samples/dotnet/samples/orleans-stocks-sample-app)
 
 <p align="center">
-    <img src="./Stocks/screenshot.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Stocks/screenshot.png" />
 </p>
 
 A stock price application which fetches prices from a remote service using an HTTP call and caches prices temporarily in a grain.
@@ -190,7 +190,7 @@ A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host
 ## [Transport Layer Security](https://learn.microsoft.com/samples/dotnet/samples/orleans-transport-layer-security-tls)
 
 <p align="center">
-    <img src="./TransportLayerSecurity/screenshot.png" />
+    <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/TransportLayerSecurity/screenshot.png" />
 </p>
 
 A *Hello, World!* application configured to use mutual [*Transport Layer Security*](https://en.wikipedia.org/wiki/Transport_Layer_Security) to secure network communication between every server.
