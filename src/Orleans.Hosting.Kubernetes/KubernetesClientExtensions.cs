@@ -1,5 +1,5 @@
 using k8s;
-using Microsoft.Rest;
+using k8s.Autorest;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;

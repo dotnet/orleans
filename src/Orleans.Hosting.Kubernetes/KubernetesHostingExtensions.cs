@@ -50,20 +50,6 @@ namespace Orleans.Hosting
 
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, KubernetesClusterAgent>();
 
-            // Configure the Kubernetes client.
-            services.AddHttpClient("Orleans.Kubernetes.Agent")
-                .AddTypedClient<IKubernetes>((httpClient, serviceProvider) =>
-                {
-                    var config = serviceProvider.GetRequiredService<KubernetesHostingOptions>().ClientConfiguration;
-                    return new k8s.Kubernetes(
-                        config,
-                        httpClient);
-                }).ConfigurePrimaryHttpMessageHandler(serviceProvider =>
-                {
-                    var config = serviceProvider.GetRequiredService<KubernetesHostingOptions>().ClientConfiguration;
-                    return config.CreateDefaultHttpClientHandler();
-                });
-
             return services;
         }
     }

@@ -57,7 +57,7 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.6.70" />
-    <PackageVersion Include="KubernetesClient" Version="7.0.7" />
+    <PackageVersion Include="KubernetesClient" Version="9.0.38" />
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
