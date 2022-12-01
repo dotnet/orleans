@@ -9,14 +9,14 @@ namespace Orleans.Serialization.Buffers
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVarInt8(sbyte value) => WriteVarUInt32(ZigZagEncode(value));
+        public void WriteVarInt8(sbyte value) => WriteVarUInt28(ZigZagEncode(value));
 
         /// <summary>
         /// Writes a variable-width <see cref="short"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVarInt16(short value) => WriteVarUInt32(ZigZagEncode(value));
+        public void WriteVarInt16(short value) => WriteVarUInt28(ZigZagEncode(value));
 
         /// <summary>
         /// Writes a variable-width <see cref="int"/>.
@@ -37,19 +37,19 @@ namespace Orleans.Serialization.Buffers
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVarUInt8(byte value) => WriteVarUInt32(value);
+        public void WriteVarUInt8(byte value) => WriteVarUInt28(value);
 
         /// <summary>
         /// Writes a variable-width <see cref="ushort"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVarUInt16(ushort value) => WriteVarUInt32(value);
+        public void WriteVarUInt16(ushort value) => WriteVarUInt28(value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint ZigZagEncode(int value) => (uint)((value << 1) ^ (value >> 31));
+        internal static uint ZigZagEncode(int value) => (uint)((value << 1) ^ (value >> 31));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong ZigZagEncode(long value) => (ulong)((value << 1) ^ (value >> 63));
+        internal static ulong ZigZagEncode(long value) => (ulong)((value << 1) ^ (value >> 63));
     }
 }

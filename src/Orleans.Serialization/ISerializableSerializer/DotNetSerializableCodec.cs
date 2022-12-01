@@ -177,11 +177,11 @@ namespace Orleans.Serialization
             {
                 // For exceptions, the type is serialized as a string to facilitate safe deserialization.
                 var typeName = _typeConverter.Format(info.ObjectType);
-                StringCodec.WriteField(ref writer, 1, typeof(string), typeName);
+                StringCodec.WriteField(ref writer, 1, typeName);
             }
             else
             {
-                TypeSerializerCodec.WriteField(ref writer, 0, typeof(Type), info.ObjectType);
+                TypeSerializerCodec.WriteField(ref writer, 0, info.ObjectType);
             }
 
             callbacks.OnSerializing?.Invoke(value, _streamingContext);
@@ -197,7 +197,7 @@ namespace Orleans.Serialization
                     ObjectType = field.ObjectType
                 };
 
-                _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, SerializationEntryCodec.SerializationEntryType, surrogate);
+                _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, typeof(SerializationEntrySurrogate), surrogate);
                 if (first)
                 {
                     first = false;

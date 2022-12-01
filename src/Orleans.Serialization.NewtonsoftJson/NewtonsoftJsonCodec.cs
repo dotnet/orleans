@@ -64,7 +64,7 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
         // Write the serialized payload
         var serializedValue = JsonConvert.SerializeObject(value, _options.SerializerSettings);
-        StringCodec.WriteField(ref writer, 1, typeof(string), serializedValue);
+        StringCodec.WriteField(ref writer, 1, serializedValue);
 
         writer.WriteEndObject();
     }

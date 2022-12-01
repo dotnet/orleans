@@ -39,7 +39,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Length > 0)
             {
-                UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
+                UInt32Codec.WriteField(ref writer, 0, (uint)value.Length);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value)
                 {
@@ -196,7 +196,7 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
 
-            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
+            UInt32Codec.WriteField(ref writer, 0, (uint)value.Length);
             uint innerFieldIdDelta = 1;
             foreach (var element in value.Span)
             {
@@ -358,7 +358,7 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
 
-            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Length);
+            UInt32Codec.WriteField(ref writer, 0, (uint)value.Length);
             uint innerFieldIdDelta = 1;
             foreach (var element in value.Span)
             {
@@ -522,7 +522,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Count > 0)
             {
-                UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, (uint)value.Count);
+                UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value.AsSpan())
                 {

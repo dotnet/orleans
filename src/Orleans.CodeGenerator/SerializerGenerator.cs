@@ -122,14 +122,14 @@ namespace Orleans.CodeGenerator
                                     type.FieldType,
                                     SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                         .WithInitializer(EqualsValueClause(TypeOfExpression(type.UnderlyingTypeSyntax))))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                     case CodecFieldTypeFieldDescription type:
                         return FieldDeclaration(
                                 VariableDeclaration(
                                     type.FieldType,
                                     SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                         .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                     case FieldAccessorDescription accessor:
                         return
                             FieldDeclaration(VariableDeclaration(accessor.FieldType,
@@ -213,14 +213,12 @@ namespace Orleans.CodeGenerator
             int typeIndex = 0;
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
-                fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
-
                 // Add a codec field for any field in the target which does not have a static codec.
-                if (libraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is null)
-                {
-                    fields.Add(GetCodecDescription(member, typeIndex));
-                }
+                if (libraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
+                    continue;
 
+                fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+                fields.Add(GetCodecDescription(member, typeIndex));
                 typeIndex++;
             }
 
@@ -402,7 +400,7 @@ namespace Orleans.CodeGenerator
                 var memberType = description.Type;
                 var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
                 ExpressionSyntax codecExpression;
-                if (staticCodec != null && libraryTypes.Compilation.IsSymbolAccessibleWithin(staticCodec.CodecType, libraryTypes.Compilation.Assembly))
+                if (staticCodec != null)
                 {
                     codecExpression = staticCodec.CodecType.ToNameSyntax();
                 }
@@ -412,19 +410,18 @@ namespace Orleans.CodeGenerator
                     codecExpression = IdentifierName(instanceCodec.FieldName);
                 }
 
-                var expectedType = serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType));
-                var writeFieldExpr = ExpressionStatement(
-                        InvocationExpression(
-                            codecExpression.Member("WriteField"),
-                            ArgumentList(
-                                SeparatedList(
-                                    new[]
-                                    {
-                                        Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                        Argument(fieldIdDeltaExpr),
-                                        Argument(expectedType.FieldName.ToIdentifierName()),
-                                        Argument(member.GetGetter(instanceParam))
-                                    }))));
+                var writeFieldArgs = new List<ArgumentSyntax> {
+                    Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
+                    Argument(fieldIdDeltaExpr)
+                };
+
+                if (staticCodec is null)
+                    writeFieldArgs.Add(Argument(serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType)).FieldName.ToIdentifierName()));
+
+                writeFieldArgs.Add(Argument(member.GetGetter(instanceParam)));
+
+                var writeFieldExpr = ExpressionStatement(InvocationExpression(codecExpression.Member("WriteField"), ArgumentList(SeparatedList(writeFieldArgs))));
+
                 if (!type.OmitDefaultMemberValues)
                 {
                     body.Add(writeFieldExpr);
@@ -556,9 +553,6 @@ namespace Orleans.CodeGenerator
                 }
 
                 var loopBody = new List<StatementSyntax>();
-                var codecs = serializerFields.OfType<ICodecDescription>()
-                        .Concat(libraryTypes.StaticCodecs)
-                        .ToList();
 
                 // C#: reader.ReadFieldHeader(ref header);
                 // C#: if (header.IsEndBaseOrEndObject) break;
@@ -579,28 +573,20 @@ namespace Orleans.CodeGenerator
                     // C#: instance.<member> = <codec>.ReadValue(ref reader, header);
                     // Codecs can either be static classes or injected into the constructor.
                     // Either way, the member signatures are the same.
-                    var codec = codecs.First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
-                    var memberType = description.Type;
-                    var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
                     ExpressionSyntax codecExpression;
-                    if (staticCodec != null)
+                    if (libraryTypes.StaticCodecs.FindByUnderlyingType(description.Type) is { } staticCodec)
                     {
                         codecExpression = staticCodec.CodecType.ToNameSyntax();
                     }
                     else
                     {
-                        var instanceCodec = serializerFields.Find(c => c is CodecFieldDescription f && SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
+                        var instanceCodec = serializerFields.Find(c => c is CodecFieldDescription f && SymbolEqualityComparer.Default.Equals(f.UnderlyingType, description.Type));
                         codecExpression = IdentifierName(instanceCodec.FieldName);
                     }
 
                     ExpressionSyntax readValueExpression = InvocationExpression(
                         codecExpression.Member("ReadValue"),
                         ArgumentList(SeparatedList(new[] { Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(headerVar) })));
-                    if (!codec.UnderlyingType.Equals(member.TypeSyntax))
-                    {
-                        // If the member type type differs from the codec type (eg because the member is an array), cast the result.
-                        readValueExpression = CastExpression(description.TypeSyntax, readValueExpression);
-                    }
 
                     var memberAssignment = ExpressionStatement(member.GetSetter(instanceParam, readValueExpression));
 
@@ -1033,7 +1019,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected => true;
         }
 
-        internal sealed class CodecFieldDescription : GeneratedFieldDescription, ICodecDescription
+        internal sealed class CodecFieldDescription : GeneratedFieldDescription
         {
             public CodecFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {

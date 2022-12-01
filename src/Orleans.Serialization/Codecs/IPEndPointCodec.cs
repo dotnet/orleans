@@ -14,16 +14,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class IPEndPointCodec : IFieldCodec<IPEndPoint>, IDerivedTypeCodec
     {
-        /// <summary>
-        /// The codec field type
-        /// </summary>
-        public static readonly Type CodecFieldType = typeof(IPEndPoint);
-
-        /// <inheritdoc/>
         IPEndPoint IFieldCodec<IPEndPoint>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
-
-        /// <inheritdoc/>
-        void IFieldCodec<IPEndPoint>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPEndPoint value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Reads a value.
@@ -63,24 +54,36 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        /// <summary>
-        /// Writes a field.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
-        /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPEndPoint value) where TBufferWriter : IBufferWriter<byte>
+        void IFieldCodec<IPEndPoint>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPEndPoint value)
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, CodecFieldType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(IPEndPoint), value))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.TagDelimited);
-            IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Address);
-            if (value.Port != 0) UInt16Codec.WriteField(ref writer, 1, UInt16Codec.CodecFieldType, (ushort)value.Port);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(IPEndPoint), WireType.TagDelimited);
+            IPAddressCodec.WriteField(ref writer, 0, value.Address);
+            if (value.Port != 0) UInt16Codec.WriteField(ref writer, 1, (ushort)value.Port);
+            writer.WriteEndObject();
+        }
+
+        /// <summary>
+        /// Writes a field without type info (expected type is statically known).
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="value">The value.</param>
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, IPEndPoint value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
+            {
+                return;
+            }
+
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.TagDelimited);
+            IPAddressCodec.WriteField(ref writer, 0, value.Address);
+            if (value.Port != 0) UInt16Codec.WriteField(ref writer, 1, (ushort)value.Port);
             writer.WriteEndObject();
         }
     }

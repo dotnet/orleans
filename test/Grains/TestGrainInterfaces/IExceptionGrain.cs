@@ -91,7 +91,7 @@ namespace UnitTests.GrainInterfaces
         public UndeserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException(UndeserializableType.FailureMessage);
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte>
         {
-            Int32Codec.WriteField(ref writer, fieldIdDelta, typeof(UndeserializableType), value.Number);
+            Int32Codec.WriteField(ref writer, fieldIdDelta, value.Number);
         }
     }
 

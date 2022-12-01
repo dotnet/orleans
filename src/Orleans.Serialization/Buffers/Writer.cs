@@ -123,6 +123,11 @@ namespace Orleans.Serialization.Buffers
         /// </summary>
         private int _previousBuffersSize;
 
+        /// <summary>
+        /// Max segment buffer size hint (1MB)
+        /// </summary>
+        internal const int MaxMultiSegmentSizeHint = 1024 * 1024;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Writer(TBufferWriter output, SerializerSession session)
         {
@@ -231,43 +236,22 @@ namespace Orleans.Serialization.Buffers
 #if DEBUG
             // Throw if the allocation does not satisfy the request.
             if (_currentSpan.Length < length)
-            {
-                ThrowTooLarge(length);
-            }
-
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            static void ThrowTooLarge(int l) => throw new InvalidOperationException($"Requested buffer length {l} cannot be satisfied by the writer.");
+                throw new InvalidOperationException($"Requested buffer length {length} cannot be satisfied by the writer.");
 #endif
-        }
-
-        /// <summary>
-        /// Allocates additional buffer space.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public void AllocateUnspecified()
-        {
-            // Commit the bytes which have been written.
-            _output.Advance(_bufferPos);
-
-            _currentSpan = _output.GetSpan();
-
-            // Update internal state for the new buffer.
-            _previousBuffersSize += _bufferPos;
-            _bufferPos = 0;
         }
 
         /// <summary>
         /// Allocates buffer space for the specified number of bytes.
         /// </summary>
-        /// <param name="length">The number of bytes to reserve.</param>
+        /// <param name="sizeHint">The number of bytes to reserve.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public void Allocate(int length)
+        public void Allocate(int sizeHint)
         {
             // Commit the bytes which have been written.
             _output.Advance(_bufferPos);
 
             // Request a new buffer with at least the requested number of available bytes.
-            _currentSpan = _output.GetSpan(length);
+            _currentSpan = _output.GetSpan(sizeHint);
 
             // Update internal state for the new buffer.
             _previousBuffersSize += _bufferPos;
@@ -282,9 +266,10 @@ namespace Orleans.Serialization.Buffers
         public void Write(scoped ReadOnlySpan<byte> value)
         {
             // Fast path, try copying to the current buffer.
-            if (value.Length <= _currentSpan.Length - _bufferPos)
+            var destination = WritableSpan;
+            if ((uint)value.Length <= (uint)destination.Length)
             {
-                value.CopyTo(WritableSpan);
+                value.CopyTo(destination);
                 _bufferPos += value.Length;
             }
             else
@@ -294,14 +279,14 @@ namespace Orleans.Serialization.Buffers
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void WriteMultiSegment(scoped ReadOnlySpan<byte> source)
+        private void WriteMultiSegment(scoped ReadOnlySpan<byte> input)
         {
-            var input = source;
             while (true)
             {
                 // Write as much as possible/necessary into the current segment.
-                var writeSize = Math.Min(_currentSpan.Length - _bufferPos, input.Length);
-                input[..writeSize].CopyTo(WritableSpan);
+                var span = WritableSpan;
+                var writeSize = Math.Min(span.Length, input.Length);
+                input[..writeSize].CopyTo(span);
                 _bufferPos += writeSize;
 
                 input = input[writeSize..];
@@ -312,7 +297,7 @@ namespace Orleans.Serialization.Buffers
                 }
 
                 // The current segment is full but there is more to write.
-                AllocateUnspecified();
+                Allocate(Math.Min(input.Length, MaxMultiSegmentSizeHint));
             }
         }
 
@@ -417,6 +402,51 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Writes a 7-bit unsigned value as a variable-width integer.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void WriteVarUInt7(uint value)
+        {
+            Debug.Assert(value < 1 << 7);
+            WriteByte((byte)((value << 1) + 1));
+        }
+
+        /// <summary>
+        /// Writes a 28-bit unsigned value as a variable-width integer.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void WriteVarUInt28(uint value)
+        {
+            Debug.Assert(value < 1 << 28);
+
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
+
+            uint lower = ((value << 1) + 1) << neededBytes;
+
+            nuint pos = (uint)_bufferPos;
+            if ((uint)pos + sizeof(uint) <= (uint)_currentSpan.Length)
+            {
+                _bufferPos = (int)(uint)pos + neededBytes + 1;
+                if (!BitConverter.IsLittleEndian) lower = BinaryPrimitives.ReverseEndianness(lower);
+                Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos), lower);
+            }
+            else
+            {
+                WriteVarUInt28Slow(lower);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void WriteVarUInt28Slow(uint lower)
+        {
+            Allocate(sizeof(uint));
+
+            var neededBytes = BitOperations.TrailingZeroCount(lower) + 1;
+            BinaryPrimitives.WriteUInt32LittleEndian(_currentSpan, lower);
+            _bufferPos = neededBytes;
+        }
+
+        /// <summary>
         /// Writes the provided <see cref="uint"/> to the output buffer as a variable-width integer.
         /// </summary>
         /// <param name="value">The value.</param>
@@ -436,12 +466,37 @@ namespace Orleans.Serialization.Buffers
             }
             else
             {
-                WriteVarUInt32Slow(lower);
+                WriteVarUInt56Slow(lower);
+            }
+        }
+
+        /// <summary>
+        /// Writes a 56-bit unsigned value as a variable-width integer.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void WriteVarUInt56(ulong value)
+        {
+            Debug.Assert(value < 1UL << 56);
+
+            var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
+
+            ulong lower = ((value << 1) + 1) << neededBytes;
+
+            nuint pos = (uint)_bufferPos;
+            if ((uint)pos + sizeof(ulong) <= (uint)_currentSpan.Length)
+            {
+                _bufferPos = (int)(uint)pos + neededBytes + 1;
+                if (!BitConverter.IsLittleEndian) lower = BinaryPrimitives.ReverseEndianness(lower);
+                Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos), lower);
+            }
+            else
+            {
+                WriteVarUInt56Slow(lower);
             }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void WriteVarUInt32Slow(ulong lower)
+        private void WriteVarUInt56Slow(ulong lower)
         {
             Allocate(sizeof(ulong));
 

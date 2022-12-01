@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator
 {
-    internal class WellKnownCodecDescription : ICodecDescription
+    internal sealed class WellKnownCodecDescription
     {
         public WellKnownCodecDescription(ITypeSymbol underlyingType, INamedTypeSymbol codecType)
         {
@@ -10,12 +10,11 @@ namespace Orleans.CodeGenerator
             CodecType = codecType;
         }
 
-        public ITypeSymbol UnderlyingType { get; }
-
-        public INamedTypeSymbol CodecType { get; }
+        public readonly ITypeSymbol UnderlyingType;
+        public readonly INamedTypeSymbol CodecType;
     }
 
-    internal class WellKnownCopierDescription : ICopierDescription
+    internal sealed class WellKnownCopierDescription : ICopierDescription
     {
         public WellKnownCopierDescription(ITypeSymbol underlyingType, INamedTypeSymbol codecType)
         {
